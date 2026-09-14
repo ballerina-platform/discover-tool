@@ -72,22 +72,19 @@ Five behaviours worth knowing because no signature shows them:
 
 ## Installing It
 
-The tool is **not on Ballerina Central**, so `bal tool pull library` does not resolve it, and this
-repository publishes no release of it either — the source moved here on 2026-08-24 and the release
-half stayed with the tool's previous upstream, where it no longer builds against this tree. Treat the
-zip as a layout rather than as a download: `./make-dist.sh` assembles `dist/` in exactly that shape.
+The tool is **not on Ballerina Central** yet, so `bal tool pull library` does not resolve it, and this
+repository does not yet publish a release either. Treat the dist zip as a layout rather than as a
+download: `./make-dist.sh` assembles `dist/` in exactly that shape.
 
-There are three ways it reaches a machine, and which one you want depends on what runs it.
+There are two ways it reaches a machine, and which one you want depends on what runs it.
 
 | You are | After a tool change, run | What it does |
 |---|---|---|
-| developing the tool, or running anything on the **host** (`make eval-bal`, `pnpm play <dir> code --host`) | `./install-local.sh` | Builds the jar and installs it into your `~/.ballerina`, which is where a host run resolves `bal library` from. |
-| running the **playground** in docker | `make bal-library-tool` | Builds the jar only. The run bind-mounts it over the image's installed copy, so there is no install and no image rebuild. |
-| running a **dispatched / cluster** task | `make build-runner FORCE=1` | Rebuilds the runner image, whose first stage compiles the tool from source and installs it. The build is skipped when the tag already exists, so `FORCE=1` is the part that matters. |
+| developing the tool, or running `bal library` directly on this machine | `./install-local.sh` | Builds the jar and installs it into your `~/.ballerina`, which is where `bal library` resolves it from. |
+| shipping it to a machine that cannot build it — a container image, another repository | `./make-dist.sh`, then copy `dist/` there | Assembles an offline, installable distribution (see below). |
 
-To put a built distribution on a machine that cannot build one — a container image, or a repository
-that vendors the tool — run `./make-dist.sh` to assemble `dist/`, copy that directory to the target,
-and run the installer beside it there.
+To put a built distribution on a machine that cannot build one, run `./make-dist.sh` to assemble
+`dist/`, copy that directory to the target, and run the installer beside it there.
 
 **macOS / Linux:**
 ```bash
@@ -129,7 +126,7 @@ export packagePAT="$(gh auth token)"
 
 In GitHub Actions no secret has to be provisioned: `packagePAT: ${{ secrets.GITHUB_TOKEN }}` is
 sufficient for that cross-org public read, and is the convention across WSO2 and ballerina-platform
-repos. The runner image's build stage takes the same token as a BuildKit secret.
+repos.
 
 The whole dependency is one interface, `io.ballerina.cli.BLauncherCmd`, which `LibraryTool` implements
 and `bal` discovers through `META-INF/services`. Everything else — gson, picocli — is on Central.
@@ -140,7 +137,7 @@ and `bal` discovers through `META-INF/services`. Everything else — gson, picoc
 ./gradlew :native:jar      # the tool jar (~370KB, our classes only)
 ./gradlew :native:test     # the suite — 715 cases, offline
 ./install-local.sh         # build and register as a local bal tool
-./make-dist.sh             # the offline distribution: what a release zip and the runner image both use
+./make-dist.sh             # the offline distribution: what a release zip uses
 ```
 
 There is no `bala` packaging step. The `:ballerina` subproject that published one to Central was
@@ -241,8 +238,9 @@ is the job the construct table does.
 
 ## Verification
 
-`./gradlew :native:test` proves the pipeline, and CI runs it plus the coverage floors on every pull
-request (`.github/workflows/ci.yml`). It does **not** prove the tool is installed, that `bal` routes to
+`./gradlew :native:test` proves the pipeline, and should run alongside the coverage floors on every
+pull request once this repository's own CI is set up (not yet present here). It does **not** prove
+the tool is installed, that `bal` routes to
 it, that arguments survive `bal`'s own launcher, that exit codes reach the shell, or that stdout is
 clean enough to redirect. Those are only observable through a real `bal library` invocation, so run
 this after any change to the CLI.
