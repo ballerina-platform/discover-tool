@@ -118,7 +118,7 @@ look like declarations and are not, which invites an agent to transcribe from a 
 | Code | `type`, `api`, **and any `-r` response** | No fences of our own, no report marker, no Markdown tables. A `//` comment annotates a real declaration. |
 | Report | `find`, `overview`, `client`, `class`, `funcs`, `guide` | Ballerina only inside ` ```ballerina ` fences. No bare `//`. Structure is headings. Opens with `<!-- bal discover <verb> v1 -->`. |
 
-The register is a property of the **document**, not of the verb (amending ADR-0008). A `-r` response is
+The register is a property of the **document**, not of the verb. A `-r` response is
 nothing but declarations, so it is pasteable whole even when a report verb reached it — which means the
 three container verbs each produce documents in both registers and each obeys the rules of the one it
 is in.
@@ -132,13 +132,13 @@ point in `Cli` that every document passes through on its way to stdout, so a vie
 and the renderers stay untouched (which is why the committed `.bal` snapshots did not move when this
 landed). It is the only defence the tool has against a caller's filter: piping was measured at 100% of
 sessions and did not respond to prose, and a `| head -150` over a 535-line closure says nothing about the
-385 lines it dropped. See ADR-0023.
+385 lines it dropped.
 
 **The split also decides what goes WHERE, not only how it is spelled.** A declaration in the code register is
-something to copy, so anything that does not compile stays out of it and the gap gets named instead (ADR-0010):
+something to copy, so anything that does not compile stays out of it and the gap gets named instead:
 a service template is written only for a type the listener's `attach` names, and a `configurable` — which is
 module-private, so a caller cannot reference it — is NAMED by `api` in comments rather than declared by it. That
-last one moved: `overview` used to carry it as a `Config.toml` fragment and stopped (ADR-0017), because that
+last one moved: `overview` used to carry it as a `Config.toml` fragment and stopped, because that
 section addressed a deployer rather than the reader writing a `.bal` file. `type` cannot reach a configurable at
 all, so `api` is where the fact lives or nowhere does. A module-level `public final` variable goes the other way: it IS referenceable, so it is
 a declaration and prints with the initialiser its own source writes.
@@ -154,10 +154,10 @@ a declaration and prints with the initialiser its own source writes.
 | `central/schema/Schema` | The one place untyped JSON is touched. Collects EVERY mismatch before failing, because the person reading a drift failure is about to extend the schema. |
 | `cache/DocsCache` | **The interface is the test surface.** `DocsCache.NULL` is what keeps every other test hermetic — no test can reach a developer's real `$HOME`. Two implementations make it a real seam. Nothing here may throw or report. |
 | `model/FromCentral` | Deepest module in the tool: Central's flag-bag encoding is decided **once**, and nothing downstream ever sees `isResource`, `isAnonymousUnionType` or `inclusionType`. |
-| `model/Patches` | Three per-package corrections, for names Central OMITS. Was eight; ADR-0007 sets the admission bar and five did not clear it. |
+| `model/Patches` | Three per-package corrections, for names Central OMITS. Was eight; the admission bar tightened and five did not clear it. |
 | `render/Report` | The report register, and the one place that decides how declarations are separated inside a fence — so `ballerinaBytes` is what a header sizes a block with, rather than a second derivation of the same number. |
-| `render/Signatures` | The **shared** renderer. Views and `api` agree structurally because both call `renderMemberFunction`; `ViewsAgreeTest` asserts it because the cheap way to break it is for a view to hand-roll a line. `Detail` is the one axis on which they differ — the registers print a declaration's `# +` parameter rows and the compact views do not (ADR-0008). |
-| `model/ModuleRef` | A foreign reference's three derivations, which one formatted string kept conflating: the import path (keyword segments quoted), the CLI coordinate (which rejects the quote), and whether an import is needed at all. The pre-declared langlib set is measured with the compiler, not inferred from `lang.*` (ADR-0009). |
+| `render/Signatures` | The **shared** renderer. Views and `api` agree structurally because both call `renderMemberFunction`; `ViewsAgreeTest` asserts it because the cheap way to break it is for a view to hand-roll a line. `Detail` is the one axis on which they differ — the registers print a declaration's `# +` parameter rows and the compact views do not. |
+| `model/ModuleRef` | A foreign reference's three derivations, which one formatted string kept conflating: the import path (keyword segments quoted), the CLI coordinate (which rejects the quote), and whether an import is needed at all. The pre-declared langlib set is measured with the compiler, not inferred from `lang.*`. |
 | `symbols/PathTree` | Anchored, tolerant path matching. Anchoring is the correctness property: an unanchored match for `repos/{owner}/{repo}` on github returns nine operations rather than three — and a wildcard names every branch it also matched, because `*` takes the busiest one and `--all` promises completeness. `locate` is the ONE relaxation: a *trailing* segment is looked for under the prefix that matched, answered when there is exactly one and listed when there are several, so `repos/owner/repo/caches` reaches `.../actions/caches` without reintroducing suffix matching. |
 | `symbols/Surface` | **The partition the three container verbs address**, by derived role rather than by Central's filing. Exhaustive and disjoint over every object a package declares, which `SurfaceTest` asserts in both directions — an object in neither verb is unreachable, one in both is a document that says two different things about one name. |
 | `symbols/Filter` | `-s`, as a linear scan over the package already in memory: no index, no second cache tier. Two tiers of RESULT, though, and that is the design — a surface match is rendered and a documentation-only match is named. Measured on github, `upload` is 7 against 12 and `pagination` is 0 against 14, so rendering both buries the first set and dropping the second loses the query shape a caller uses when they know the capability and not the vocabulary. |
@@ -178,7 +178,7 @@ a declaration and prints with the initialiser its own source writes.
 | exit 0 | success, and stdout is **complete** |
 | exit 1 | every failure, whatever went wrong |
 
-**One failure code, and the `kind` is the branch** (ADR-0015). `upstream` and `timeout` are the two
+**One failure code, and the `kind` is the branch.** `upstream` and `timeout` are the two
 worth re-running unchanged; `validation`, `package-not-found` and `symbol-not-found` need a different
 command, which the `suggestion` names; `schema-drift` is for a human. None of them is a licence to
 guess a signature.

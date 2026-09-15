@@ -10,14 +10,14 @@ bal discover client --help   # one verb: its flags, and what its own reader need
 ```
 
 **The tool documents itself, and there is one copy of each thing it says.** The lists inside `--help`
-are rendered from the picocli model rather than written twice (ADR-0012); a flag is described on the
+are rendered from the picocli model rather than written twice; a flag is described on the
 verb that accepts it, and a rule about something a document prints is printed by that document, beside
-the thing it is about (ADR-0013). The root text stops at the verb list: it answers *what can I ask,
+the thing it is about. The root text stops at the verb list: it answers *what can I ask,
 and how*, while the discipline a caller carries into a lookup — a `// Special Agent Note:` is the
 import, a `## Next` block is a pointer, a failure `kind` says whether to retry — belongs to the agent
-skill that is in context when it applies (ADR-0022, which narrows ADR-0011). This file deliberately
-does not restate the grammar — a second copy on a different release clock is exactly what those
-decisions removed.
+skill that is in context when it applies. This file deliberately
+does not restate the grammar — a second copy on a different release clock is exactly what that
+discipline removed.
 
 What follows is what `--help` has no room for: why the tool is shaped this way, and how to build,
 iterate on and verify it.
@@ -31,7 +31,7 @@ instead, and the numbers are why each one exists:
 | | measured |
 |---|---|
 | `overview` is a bounded MAP | it generates no signature at all, so its size is a property of the design rather than of the package — the eleven-package corpus is **732 lines**, against 2,426 when it carried signatures and 4,168 when it carried the readme too. A byte cap would still have let `ballerina/crypto` emit 20,000 bytes before degrading |
-| the map is ordered to survive a pipe | **80% of recorded lookups were piped**, so it leads with facts, quickstart and navigation — a `head -100` reaches `## Next` in 11 packages of 11, against 0 of 11 before (ADR-0017) |
+| the map is ordered to survive a pipe | **80% of recorded lookups were piped**, so it leads with facts, quickstart and navigation — a `head -100` reaches `## Next` in 11 packages of 11, against 0 of 11 before |
 | `guide` is a verb, not a section | the readme was **44% of the entry document and 29% of it was account setup**. A code-only extract was considered and rejected: `googleapis.sheets`' readme is 178 lines with 4 code blocks, so it would discard 85% of it — including the note that `deleteSpreadsheet` needs the Drive API enabled, which no signature implies |
 | `client` walks a path tree | github's **903 operations reduce to 36 top-level segments in 445 bytes**, and each level names the next command |
 | `client` also addresses names | a remote function has no path, so the same slot takes a name filter — twilio's **200 operations are an index of names, not 62,063 bytes of signatures** |
@@ -48,7 +48,7 @@ Five behaviours worth knowing because no signature shows them:
   tool at all: every session that piped had piped a genuinely noisy command (`bal openapi`, `bal tool
   pull`) moments earlier, and the `| head` arrived on `bal discover --help` before a byte of any
   document had been seen. A `| head -150` over one github operation's 535-line closure discards 72% and
-  ends mid-record; the length makes that arithmetic instead of a guess (ADR-0023).
+  ends mid-record; the length makes that arithmetic instead of a guess.
 
 - **Paths match from the first segment.** An unanchored match for `repos/{owner}/{repo}` would return
   nine operations rather than three, mixing in two unrelated subtrees about team access. The one
@@ -352,7 +352,7 @@ done
 
 ### The cache, and that it is silent
 
-The cache no longer speaks in `--help` (ADR-0013), so its state is read from timings and from
+The cache no longer speaks in `--help`, so its state is read from timings and from
 `DocsCache.describe()` rather than from a status line.
 
 ```bash
