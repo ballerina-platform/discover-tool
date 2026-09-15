@@ -51,8 +51,7 @@ import java.util.stream.Collectors;
  *   <li><b>a regression</b> — a construct with no open finding changed, or one with an open finding changed
  *       into something that is still not its declaration. Revert or explain.</li>
  *   <li><b>a fix landed</b> — the output now equals the construct's real declaration. Promote the row:
- *       move {@code shouldRender} into {@code renders}, drop the finding, and tick it off in
- *       {@code docs/design/draft/bal-library-central-fidelity.md}.</li>
+ *       move {@code shouldRender} into {@code renders} and drop the finding.</li>
  * </ul>
  *
  * @since 0.1.0
