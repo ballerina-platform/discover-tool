@@ -188,7 +188,7 @@ public class ViewsAgreeTest {
     /**
      * A {@code -r} response is the code register, and its declarations are {@code renderTypeDef} exactly.
      *
-     * <p>The amended ADR-0008. A {@code -r} answer is reached through a container verb but is nothing but
+     * <p>The register is a property of the document, not the verb. A {@code -r} answer is reached through a container verb but is nothing but
      * declarations, so it is pasteable whole — and every one of its lines is still a line of the API document.
      */
     @Test(dataProvider = "fixtures")
@@ -247,7 +247,7 @@ public class ViewsAgreeTest {
         // harness's cap, which silently substituted a 2.2KB stub. The widest package in this corpus is the same
         // shape of risk, so the bound is asserted rather than described.
         //
-        // Measured on the map's OWN text. ADR-0024 uncapped the quotation, so the section carrying it is as long
+        // Measured on the map's OWN text. The quotation is uncapped, so the section carrying it is as long
         // as the package's readme decided — postgresql's 28 blocks put the document at 365 lines. That is the
         // package's size and not this tool's, and the two are worth keeping apart: what must stay bounded is
         // what the tool WRITES, which is the property `theOverviewGeneratesNoSignatureAtAll` states from the
@@ -541,7 +541,7 @@ public class ViewsAgreeTest {
         Assert.assertTrue(view.isOk());
         Assert.assertTrue(view.value().contains(
                 "\n// Declared in other modules, not included above:\n"));
-        // ADR-0013. That the command below is to be RUN rather than adapted was a line of `--help` prose, read
+        // That the command below is to be RUN rather than adapted was a line of `--help` prose, read
         // before there was a command to apply it to. It belongs on the line above the commands.
         Assert.assertTrue(view.value().contains("// Run one of these verbatim"), view.value());
         // The version Central published for the edge is PRINTED, so a reader can see which version these

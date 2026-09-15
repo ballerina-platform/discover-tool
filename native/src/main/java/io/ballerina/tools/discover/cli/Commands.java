@@ -35,7 +35,7 @@ import java.util.Map;
  * our code runs.
  *
  * <p>Every {@code description} here is written ONCE and rendered into BOTH the root usage text and the verb's own
- * {@code --help} by {@link UsageRenderer} (ADR-0012). They used to be two strings that said nearly the same thing,
+ * {@code --help} by {@link UsageRenderer}. They used to be two strings that said nearly the same thing,
  * and the pair had already drifted: the root synopsis advertised {@code --client C} while the flag list below it
  * and every verb text said {@code --client <Name>}.
  *
@@ -51,7 +51,7 @@ import java.util.Map;
  *       way every other addressed argument does.
  *   <li>{@code --all} is declared {@code hidden}. It is an escape hatch, not part of the taught contract, so it
  *       does not appear in {@code --help} at all; the documents that collapse a section offer it in their
- *       {@code ## Next} block, last, with the byte cost stated (ADR-0013).
+ *       {@code ## Next} block, last, with the byte cost stated.
  * </ul>
  *
  * <p>NO ALIASES for the removed names. Every consumer is ours — the tool is not on Central, so consumers copy it

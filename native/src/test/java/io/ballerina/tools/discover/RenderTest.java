@@ -599,8 +599,8 @@ public class RenderTest {
         // non-accessible symbol`, because a `configurable` is module-private. So it must never be printed as
         // source and must never pick up the blanket `public` the other declarations carry.
         //
-        // It is NAMED here all the same, as comments. `overview` used to carry the fact and stopped
-        // (ADR-0017); `type` cannot reach it, because a configurable is not a declaration to resolve. With no
+        // It is NAMED here all the same, as comments. `overview` used to carry the fact and stopped;
+        // `type` cannot reach it, because a configurable is not a declaration to resolve. With no
         // section here the cut would have deleted the fact from every verb rather than moved it — expensive to
         // reach was the intended cost, unreachable was not.
         Library library = new Library(

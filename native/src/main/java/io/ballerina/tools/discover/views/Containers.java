@@ -107,7 +107,7 @@ public final class Containers {
     /**
      * The shortest camelCase prefix that may name a cluster.
      *
-     * <p>ADR-0019 measured what happens without it: splitting names into segments reads beautifully on
+     * <p>Measured what happens without it: splitting names into segments reads beautifully on
      * {@code twilio} ({@code list} 61, {@code fetch} 43, {@code create} 35) and produces {@code z} 20,
      * {@code s} 14, {@code h} 14, {@code l} 10 on {@code ballerinax/redis}, where the leading run of
      * {@code zAdd}/{@code hGet}/{@code lPush} is one letter. That is structure in the tokenizer rather than in the
@@ -395,7 +395,7 @@ public final class Containers {
     /**
      * Several containers and nothing to choose between them yet.
      *
-     * <p>Every row ends in the command that OPENS it (ADR-0019): {@code overview}'s old unconditional pointer
+     * <p>Every row ends in the command that OPENS it: {@code overview}'s old unconditional pointer
      * returned "none in any client" on {@code ballerinax/aws.s3} and pointed back at {@code overview}, a two-call
      * loop carrying no information.
      */
@@ -870,7 +870,7 @@ public final class Containers {
         }
         facts.add(new Report.Fact("Showing", tier.describe(selected.size())));
         report.facts(facts);
-        // ADR-0013: the rule is printed where it applies, and only when there IS a dropped branch. The rows say
+        // The rule is printed where it applies, and only when there IS a dropped branch. The rows say
         // WHICH paths; repeating the consequence on each would say it twice.
         if (facts.stream().anyMatch(fact -> "Also matched".equals(fact.label()))) {
             report.paragraph("A wildcard takes one branch. What follows is short by exactly the paths in the "
@@ -1015,7 +1015,7 @@ public final class Containers {
     /**
      * Signatures, split by call form, because {@code ->} versus {@code .} is the fact a caller came for.
      *
-     * <p>A client declaring both halves is answered with BOTH (ADR-0019). {@code ballerina/http}'s {@code Client}
+     * <p>A client declaring both halves is answered with BOTH. {@code ballerina/http}'s {@code Client}
      * is 7 resource functions and 20 named ones, and the shipped view printed the 7 under a fact row reading
      * {@code (7 of 7)} — {@code execute}, {@code forward}, {@code submit}, the promise set and the circuit-breaker
      * controls were reachable from no verb at all.
@@ -1046,7 +1046,7 @@ public final class Containers {
     /**
      * Too many even to name: path roots, or camelCase clusters.
      *
-     * <p>A cluster needs a prefix of at least {@value #MIN_CLUSTER_PREFIX} characters, which is the guard ADR-0019's
+     * <p>A cluster needs a prefix of at least {@value #MIN_CLUSTER_PREFIX} characters, which is the guard the
      * {@code redis} measurement demands: {@code z}, {@code s}, {@code h} and {@code l} are what a segment splitter
      * finds in {@code zAdd}/{@code hGet}/{@code lPush}, and they are structure in the tokenizer rather than in the
      * domain. Where clustering does not cover most of the names the flat list wins, capped and honest about it.
@@ -1112,7 +1112,7 @@ public final class Containers {
     /**
      * {@code -r} — the answer as Ballerina, so it is pasteable whole.
      *
-     * <p>The register is a property of the DOCUMENT rather than of the verb (§4.1, amending ADR-0008): a
+     * <p>The register is a property of the DOCUMENT rather than of the verb: a
      * {@code -r} response is nothing but declarations, whichever verb reached it, so it carries no fences, no
      * report marker and no Markdown tables.
      */
@@ -1121,12 +1121,12 @@ public final class Containers {
      *
      * <p>Measured before this existed: {@code client ballerinax/github Client nosuchthingatall -r} answered with
      * 42,746 bytes, every one of 903 labels joined onto a single line, for a typo. The report register had always
-     * answered the same miss in about 800 by printing the COUNT and pointing at the listing, so ADR-0020's budget
+     * answered the same miss in about 800 by printing the COUNT and pointing at the listing, so the byte budget
      * held everywhere except the path a caller reaches by making a mistake — the path least worth ten thousand
      * tokens, and the one where a wall of text is hardest to read past.
      *
      * <p>So names are offered only while they are cheap, and the count plus the recovery command carry the rest.
-     * The command matters as much as the bound: ADR-0014 is about a recovery that named no next step.
+     * The command matters as much as the bound: a recovery that names no next step is the mistake to avoid.
      */
     private static String missComment(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,

@@ -32,7 +32,7 @@ import java.util.Set;
 /**
  * Every LIST in the usage text, rendered from {@link Commands}' picocli model.
  *
- * <p>picocli owns the MODEL; the layout is ours (ADR-0012). Its own renderer was measured against this text and
+ * <p>picocli owns the MODEL; the layout is ours. Its own renderer was measured against this text and
  * gets the two list sections right, but not the synopsis: it sorts options alphabetically and emits them BEFORE
  * the positionals, in a tool whose whole grammar is positional-first, and 4.0.1 — the version on the Ballerina
  * distribution's classpath — has no knob that reorders them. So {@code Help.synopsis} is not used and these
@@ -133,7 +133,7 @@ final class UsageRenderer {
      *
      * <p>{@code -s} rather than {@code --search}, because the short form is what every example and every
      * {@code ## Next} bullet in the tool uses. A synopsis that advertises a spelling nothing else teaches is the
-     * same drift ADR-0012 exists to prevent, in the other direction.
+     * same drift rendering the lists from one model exists to prevent, in the other direction.
      */
     private static String slot(OptionSpec option) {
         String name = shortestName(option);

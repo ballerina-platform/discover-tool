@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 /**
  * Every command a document prints is RUN, and has to answer.
  *
- * <p>"A pointer that cannot answer is worse than no pointer" (ADR-0019) was a rule enforced by three separate
+ * <p>"A pointer that cannot answer is worse than no pointer" was a rule enforced by three separate
  * assertions about three separate bugs, each written after the fact: {@code overview} offered
  * {@code ops <pkg> <path>} to a package with no paths and got "none in any client" back, a two-call loop;
  * {@code ops}' signature bullet interpolated {@code (root)} — a DISPLAY token — into a command, so following the
@@ -52,7 +52,7 @@ import java.util.regex.Pattern;
  * A new pointer cannot be added wrong.
  *
  * <p>Two exclusions, both principled. A command containing an angle-bracket slot is a TEMPLATE — {@code <Name>} is
- * the grammar, not an argument — and a command naming a DIFFERENT package is an ADR-0009 cross-package edge, which
+ * the grammar, not an argument — and a command naming a DIFFERENT package is a cross-package edge, which
  * by design is not followed and whose payload this fixture cannot serve. Both are asserted as shapes rather than
  * silently skipped, so an exclusion cannot become a hiding place.
  *
@@ -158,7 +158,7 @@ public class PointersTest {
             Assert.assertTrue(Pattern.compile("<[A-Za-z][^>]*>").matcher(text).find(),
                     slug + ": `" + text + "` has an angle bracket that is not a slot");
         }
-        // A foreign command is a cross-package edge (ADR-0009), so it has to name a real coordinate and this
+        // A foreign command is a cross-package edge, so it has to name a real coordinate and this
         // package must not be it.
         for (String text : foreign) {
             Assert.assertTrue(Pattern.compile("bal discover \\w+ [\\w.]+/[\\w.]+").matcher(text).find(),

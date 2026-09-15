@@ -24,7 +24,7 @@ import java.util.List;
  * The PROSE of the usage text: everything a reader cannot derive from the grammar.
  *
  * <p>Kept out of {@link Cli} so the dispatcher stays about dispatch, and split from {@link UsageRenderer} along
- * the line ADR-0012 draws: every LIST — the synopsis, the verbs, the flags — is rendered from {@link Commands}'
+ * the line drawn between them: every LIST — the synopsis, the verbs, the flags — is rendered from {@link Commands}'
  * picocli model, and every PARAGRAPH is written here. A sentence that names a flag, a verb or a label therefore
  * appears exactly once in this package, and a label cannot disagree with itself.
  *
@@ -32,13 +32,13 @@ import java.util.List;
  * lines by hand. Only the literal blocks — the session walk-through and the examples — are laid out here, because
  * for those the line breaks ARE the content.
  *
- * <p>What this text is FOR narrowed twice. ADR-0011 made it the whole agent contract, because the companion skill
- * held a second copy in another repository on another release clock and that copy had drifted. ADR-0013 moved every
- * rule about something the OUTPUT prints into the view that prints it, where it is read at the moment it applies.
- * ADR-0022 finishes the narrowing: what is left here answers "what can I ask, and how" — the grammar, the session
- * and the verbs. The rules a caller carries INTO a lookup (a note is an import, an absent note is not, a '## Next'
- * block is a pointer, a failure 'kind' is a branch) are the agent's standing instructions rather than this
- * command's usage, and they live in the {@code ballerina} skill; the ADR records what holds them honest.
+ * <p>What this text is FOR narrowed twice. It once was the whole agent contract, because the companion skill
+ * held a second copy in another repository on another release clock and that copy had drifted. Every rule
+ * about something the OUTPUT prints then moved into the view that prints it, where it is read at the moment
+ * it applies. What is left here, after both narrowings, answers "what can I ask, and how" — the grammar, the
+ * session and the verbs. The rules a caller carries INTO a lookup (a note is an import, an absent note is not,
+ * a '## Next' block is a pointer, a failure 'kind' is a branch) are the agent's standing instructions rather
+ * than this command's usage, and they live in the {@code ballerina} skill instead.
  *
  * @since 0.1.0
  */
@@ -54,7 +54,7 @@ final class Usage {
      * — which verb starts, how {@code -s} attaches, what one call with every type looks like — where the previous
      * prose described the shape of the documents instead and left the caller to infer the commands.
      *
-     * <p>And it ENDS with the verb list. ADR-0022: everything after it was a rule for the reader of an answer, not
+     * <p>And it ENDS with the verb list. Everything after it was a rule for the reader of an answer, not
      * a description of the command, and it is the skill's to state.
      */
     static String root(Commands.Grammar grammar) {
@@ -93,7 +93,7 @@ final class Usage {
 
     // The four paragraphs that used to close this text — what a `## Next` block is, that a note IS the import and
     // an absent one is not, that every other reading rule prints itself, and the stream-and-`kind` contract — are
-    // in `skills/ballerina/SKILL.md` (ADR-0022). None of them described a command; each was an instruction to the
+    // in `skills/ballerina/SKILL.md`. None of them described a command; each was an instruction to the
     // reader of an answer, which is what a skill is for. The per-verb notes below still carry the applied halves,
     // beside the verbs whose output prints a note.
 
@@ -122,8 +122,8 @@ final class Usage {
     /**
      * The three container verbs share one note about the split, because they share one implementation.
      *
-     * <p>Repeating it is the trade ADR-0013 makes deliberately: the alternative is a section at the root that a
-     * caller choosing between eight verbs has to read first, which is exactly the section that ADR removed.
+     * <p>Repeating it is a deliberate trade: the alternative is a section at the root that a
+     * caller choosing between eight verbs has to read first, which is exactly the kind of section removed from there.
      */
     private static final String KIND_SPLIT =
             "A guess costs a line, not a call. This verb answers for a symbol of another kind too, prepending "

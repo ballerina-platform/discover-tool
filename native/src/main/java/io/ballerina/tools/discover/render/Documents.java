@@ -140,7 +140,7 @@ public final class Documents {
      * register, where a declaration is something to copy — the same reason an unconfirmed service attachment is a
      * note here rather than a template.
      *
-     * <p>It is here at all because {@code overview} stopped carrying it (ADR-0017) and this is the register that
+     * <p>It is here at all because {@code overview} stopped carrying it and this is the register that
      * still can. The entry document's section was addressed to a DEPLOYER rather than to someone writing a
      * {@code .bal} file, which is who that document is for; but the fact is real, {@code type} cannot reach it —
      * a configurable is not a declaration to resolve — and a fact reachable from no verb has been deleted rather

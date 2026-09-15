@@ -126,7 +126,7 @@ public class DiscoverToolTest {
     /**
      * The grammar and the text that describes it cannot disagree, because one renders the other.
      *
-     * <p>This is the drift ADR-0012 closed, and it had already happened: the hand-written synopsis advertised
+     * <p>This is the drift closed by rendering both from one model, and it had already happened: the hand-written synopsis advertised
      * {@code --client C} while the flag list two paragraphs below it — and all five verb texts — said
      * {@code --client <Name>}. Nothing failed, because nothing compared them.
      */
@@ -195,17 +195,17 @@ public class DiscoverToolTest {
     /**
      * The root text answers "what can I ask, and how", and carries no reading rule at all.
      *
-     * <p>Three narrowings, each with its own ADR. ADR-0011 put every rule here, because the agent skill held a
+     * <p>Three narrowings. Every rule used to live here, because the agent skill held a
      * second copy in another repository on another release clock and that copy had drifted — its langlib list was
-     * six modules of fourteen and it named the wrong rule. ADR-0013 moved the rules about something the output
-     * PRINTS into the views that print them, beside the thing they describe ({@code ViewsTest} and
-     * {@code ViewsAgreeTest} hold those assertions). ADR-0022 moves the last four — a {@code ## Next} block is a
+     * six modules of fourteen and it named the wrong rule. The rules about something the output
+     * PRINTS then moved into the views that print them, beside the thing they describe ({@code ViewsTest} and
+     * {@code ViewsAgreeTest} hold those assertions). The last four moved next — a {@code ## Next} block is a
      * pointer, a note IS the import and an absent note is not, every other rule prints itself, and the
      * stream-and-{@code kind} contract — into {@code skills/ballerina/SKILL.md}, because each instructs the reader
      * of an ANSWER rather than describing this command.
      *
      * <p>So the assertions here are all negative, and that is the point: what a rule must not have is two homes,
-     * or the drift ADR-0011 fixed comes back. The applied halves still print — {@code type --help} and
+     * or the original drift comes back. The applied halves still print — {@code type --help} and
      * {@code api --help} name the note beside the verbs whose output carries one — and that is asserted below
      * rather than left to the golden.
      */
@@ -252,7 +252,7 @@ public class DiscoverToolTest {
     /**
      * A flag is documented on the verb that accepts it, and nowhere else.
      *
-     * <p>The root text used to list all six with their descriptions, which is the section ADR-0013 deleted: it
+     * <p>The root text used to list all six with their descriptions, which is the section that got deleted: it
      * told a caller choosing between five verbs what {@code --refresh} does, and said nothing about which verb
      * to run. The cost is that the three shared resolution flags now repeat across four pages, so this pins both
      * ends — the root names none of them, and every page names all of its own.

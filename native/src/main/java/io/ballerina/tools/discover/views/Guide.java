@@ -35,8 +35,8 @@ import java.util.stream.Collectors;
  * {@code guide <pkg> [n | "title"] [-s <q>] [--module <name>]} — the package's own readme, verbatim.
  *
  * <p>A VERB rather than a flag on {@code overview}: it is a distinct document that Central publishes, on the
- * package author's release clock, and everything in it is a quotation. ADR-0002 is verb-first with no implicit
- * default, and ADR-0017 split it out of the entry document for size — 44% of the entry document's bytes, 29% of
+ * package author's release clock, and everything in it is a quotation. The grammar is verb-first with no implicit
+ * default, and this was split out of the entry document for size — 44% of the entry document's bytes, 29% of
  * which was account setup a coding agent cannot act on.
  *
  * <p><b>CHUNK ADDRESSING, NOT A CODE-ONLY EXTRACT.</b> A design revision proposed an {@code examples} verb that
@@ -60,7 +60,7 @@ public final class Guide {
     /**
      * @param chunk a chunk number or a title fragment, or {@code null} for the whole readme
      * @param search the {@code -s} query over readme text, or {@code null}
-     * @param module one module's readme (ADR-0014), or {@code null} for all of them
+     * @param module one module's readme, or {@code null} for all of them
      */
     public record Options(String chunk, String search, String module) {
 
@@ -288,7 +288,7 @@ public final class Guide {
                 : Texts.count(chunks.size()) + ", addressable one at a time"));
         report.facts(facts);
 
-        // ADR-0013. The rule that a readme can be stale where a signature cannot is the sentence directly above
+        // The rule that a readme can be stale where a signature cannot is the sentence directly above
         // the readme, rather than a line of `--help` read some lookups before it mattered.
         report.paragraph("*The package's own readme, verbatim, with its headings demoted two levels. It is "
                 + "Central's prose and can be out of date; the signatures the container verbs print are "
@@ -381,7 +381,7 @@ public final class Guide {
      * Where the quotation came from and which half wins, as one paragraph.
      *
      * <p>It used to carry a second paragraph naming the readme's own identifiers that this version no longer
-     * declares. ADR-0024 removed the check behind it: {@code guide} reproduces the package's document, and a
+     * declares. That check behind it was removed: {@code guide} reproduces the package's document, and a
      * name check is an analysis of its contents rather than a property of the reproduction. The sentence that
      * remains says the same thing at the altitude {@code guide} works at — Central's prose can be stale, and the
      * generated signatures win.

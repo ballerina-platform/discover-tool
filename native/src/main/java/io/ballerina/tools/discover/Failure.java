@@ -28,7 +28,7 @@ import java.util.List;
  *
  * <p>The question every failure has to answer is "what does the agent reading this do next". The
  * answer is carried by {@link #kind()} and {@link #describe()}, not by the exit code: a failing run
- * is exit 1 whatever went wrong (ADR-0015), so the discriminator has to be in the JSON. A sealed
+ * is exit 1 whatever went wrong, so the discriminator has to be in the JSON. A sealed
  * hierarchy makes both switches exhaustive with no {@code default}, so a new failure mode fails the
  * build until someone names it and decides what it tells the caller.
  *

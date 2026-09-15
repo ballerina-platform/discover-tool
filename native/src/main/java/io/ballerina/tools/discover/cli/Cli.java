@@ -49,7 +49,7 @@ import java.util.function.Consumer;
  *   <li>stderr — on failure, one JSON object matching {@link Failure}, and nothing else
  *   <li>exit 0 — success, and stdout is COMPLETE
  *   <li>exit 1 — every failure, whatever went wrong. What to do next is {@code kind} and {@code suggestion} in
- *       the JSON, never the code (ADR-0015)
+ *       the JSON, never the code
  * </ul>
  *
  * <p>VERB-FIRST, not mode flags. Eight distinct nouns should not be eight modifiers on one command, and a LEADING

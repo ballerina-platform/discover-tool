@@ -48,11 +48,11 @@ import java.util.stream.Collectors;
  *
  * <p>What remains is what a map is for: the counts, the readme's quickstart, the guide's chunk index, where to go
  * next, and a roster whose every row ends in the command that opens it. A roster row that dead-ends is the one
- * shape this document never ships (ADR-0019) — {@code overview}'s old unconditional {@code ops <pkg> <path>}
+ * shape this document never ships — {@code overview}'s old unconditional {@code ops <pkg> <path>}
  * pointer answered "none in any client" on {@code ballerinax/aws.s3} and pointed back here, a two-call loop
  * carrying no information.
  *
- * <p><b>ORDERED TO SURVIVE A PIPE</b> (ADR-0017, unchanged and strengthened). 80% of recorded lookups are piped
+ * <p><b>ORDERED TO SURVIVE A PIPE.</b> 80% of recorded lookups are piped
  * through a filter, and putting {@code ## Next} before the bulk took {@code head -100} reaching it from 0 of 11
  * packages to 11 of 11.
  *
@@ -121,7 +121,7 @@ public final class Overview {
         roster(report, "Clients", Surface.Scope.CLIENT, library, pkg);
         roster(report, "Classes and object types", Surface.Scope.CLASS, library, pkg);
         roster(report, "Module-level functions", Surface.Scope.MODULE, library, pkg);
-        // LAST, and that is the whole reason the section can be unbounded. ADR-0024 took the cap off the quoted
+        // LAST, and that is the whole reason the section can be unbounded. The cap is off the quoted
         // code, so this is the one part of the map whose length the package decides; everything a reader
         // navigates by — the facts, the chunk index, `## Next`, the rosters — is already behind them by here, so
         // a `head -100` loses trailing examples rather than the map.
@@ -269,8 +269,8 @@ public final class Overview {
             return;
         }
         report.heading(2, "Quickstart");
-        // ADR-0013 asked for the rules a reader needs at the moment they read quoted code. ADR-0024 cut that to
-        // two, because the third — what a mark on a line means — described a check that no longer runs.
+        // The rules a reader needs at the moment they read quoted code were cut to two, because the third —
+        // what a mark on a line means — described a check that no longer runs.
         report.paragraph("*Every Ballerina block in the package's own readme, quoted verbatim and in its "
                 + "order. It is Central's text and can be out of date; the signatures the container verbs "
                 + "generate win wherever the two disagree.*");
@@ -304,7 +304,7 @@ public final class Overview {
     /**
      * Where to go, DERIVED from what the package declares rather than asserted.
      *
-     * <p>ADR-0019: a pointer that cannot answer is worse than no pointer. The old bullet said {@code <path>}
+     * <p>A pointer that cannot answer is worse than no pointer. The old bullet said {@code <path>}
      * unconditionally, and an agent following it on {@code ballerinax/aws.s3} spent a call to arrive back here.
      */
     private static List<String> nextBullets(Library library, String pkg) {

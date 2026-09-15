@@ -58,7 +58,7 @@ import java.util.regex.Pattern;
  * <p><b>The roots are never dropped.</b> They are what was asked for, so they are charged before the budget is
  * consulted; a budget that could refuse the question is worse than a large answer.
  *
- * <p>Cross-package edges still stop at the package boundary and are NAMED rather than followed (ADR-0009).
+ * <p>Cross-package edges still stop at the package boundary and are NAMED rather than followed.
  * {@code ballerina/http:ConnectionConfig} has a local closure of one and fifteen external edges, so crossing would
  * hide a cold fetch per edge inside an answer the caller expects to be warm.
  *
@@ -300,7 +300,7 @@ public final class Closure {
     /**
      * Names from other packages, and the command that reads them.
      *
-     * <p>ADR-0009: a foreign reference is three facts — the import path, the CLI coordinate, and whether an
+     * <p>A foreign reference is three facts — the import path, the CLI coordinate, and whether an
      * import is needed at all. A {@code //} comment rather than prose because every document that carries this is
      * the code register, where a comment annotates real declarations instead of impersonating them.
      *

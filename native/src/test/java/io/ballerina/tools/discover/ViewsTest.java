@@ -200,7 +200,7 @@ public class ViewsTest {
     /**
      * A collapsed section states its cost, and offers {@code --all} last.
      *
-     * <p>ADR-0013 and the pre-announcement rule together: the escape hatch appears where it applies, with the byte
+     * <p>Two rules together: the escape hatch appears where it applies, with the byte
      * figure that makes choosing it a decision rather than a gamble, and nowhere else. Its absence from
      * {@code --help} is asserted in {@link DiscoverToolTest}.
      */
@@ -358,7 +358,7 @@ public class ViewsTest {
     public void aClientWithBothHalvesIsAnsweredWithBothSplitByCallForm() {
         // `ballerina/http`'s `Client` declares 7 resource functions and 19 named ones. The shipped view printed
         // the 7 under a fact row reading `(7 of 7)` and said nothing about `execute`, `forward`, `submit`, the
-        // promise set or the circuit-breaker controls — reachable from no verb in the tool (ADR-0019).
+        // promise set or the circuit-breaker controls — reachable from no verb in the tool.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         Result<String> view = Containers.render(http, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("Client")));
@@ -443,11 +443,11 @@ public class ViewsTest {
      *
      * <p>Measured: {@code client ballerinax/github Client nosuchthingatall -r} answered with 42,746 bytes — every
      * one of 903 labels, on a single line, for a typo. The report register answers the same miss in about 800 and
-     * points at the listing, so the budget rule (ADR-0020) held everywhere except the one path a caller reaches
+     * points at the listing, so the budget rule held everywhere except the one path a caller reaches
      * by making a mistake, which is the path least worth spending 10,000 tokens on.
      *
      * <p>Bounded by the same {@code MAX_LISTING_BYTES}, and it must still name the recovery — an empty answer
-     * that offers no next command is what ADR-0014 was written about.
+     * that offers no next command is exactly the failure this guards against.
      */
     /**
      * {@code new} addresses the constructor, which Ballerina spells {@code init}.
@@ -554,7 +554,7 @@ public class ViewsTest {
         Assert.assertTrue(document.contains(
                 "| Also matched | `repos/{templateOwner}/{templateRepo}/generate` (1), not included here |"),
                 document);
-        // ADR-0013. The row names the branch; this says what the row MEANS for the answer under it, and it is
+        // The row names the branch; this says what the row MEANS for the answer under it, and it is
         // printed here rather than in `--help` so it is read at the moment a short answer is on screen.
         String meaning = "short by exactly the paths in the 'Also matched' rows above";
         Assert.assertTrue(document.contains(meaning), document);
@@ -635,7 +635,7 @@ public class ViewsTest {
 
     @Test
     public void aRosterRowIsNeverADeadEnd() {
-        // ADR-0019: `overview`'s old unconditional `ops <pkg> <path>` pointer answered "none in any client" on
+        // `overview`'s old unconditional `ops <pkg> <path>` pointer answered "none in any client" on
         // `ballerinax/aws.s3` and pointed back at `overview`, a two-call loop carrying no information. Every row
         // now ends in the command that opens it, and PointersTest re-runs all of them.
         for (String slug : FixtureCorpus.listFixtures()) {
@@ -926,7 +926,7 @@ public class ViewsTest {
         LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__postgresql");
         String overview = Overview.render(context);
         Assert.assertFalse(overview.contains("\n## Guide"), "the guide is not in the entry document");
-        // ADR-0024 put the quotation LAST. Under ADR-0017 it sat before `## Next` because it was capped at
+        // The quotation is LAST now. It used to sit before `## Next` because it was capped at
         // forty lines; uncapped, the only place an unbounded section can sit without pushing the navigation
         // behind a pipe is the end.
         Assert.assertTrue(overview.indexOf("\n## Next\n") < overview.indexOf("\n## Quickstart\n"));
@@ -936,14 +936,14 @@ public class ViewsTest {
         Result<String> guide = Guide.render(context, Guide.Options.ALL);
         Assert.assertTrue(guide.isOk(), guide.isOk() ? "" : guide.failure().describe());
         // Asserted as PROSE and not as a size ratio. It used to be `guide > overview * 3`, which stopped holding
-        // when ADR-0024 moved all 28 of postgresql's code blocks into the map — the map is now 13KB of a 24KB
+        // when all 28 of postgresql's code blocks moved into the map — the map is now 13KB of a 24KB
         // readme, and almost all of the difference is prose. That is the split working, not failing: the code is
         // in both because the reader needs it in both, and the manual around it has its own verb.
         Assert.assertTrue(guide.value().length() > overview.length(),
                 "guide " + guide.value().length() + " vs overview " + overview.length());
         Assert.assertTrue(guide.value().contains("######"), "the guide carries the readme's own sections");
         Assert.assertFalse(overview.contains("######"), "and the map carries none of them");
-        // ADR-0013. The rule that a readme can be stale where the signature cannot was a line of `--help` prose.
+        // The rule that a readme can be stale where the signature cannot was a line of `--help` prose.
         // It is the sentence introducing the readme, so it is read where it applies.
         Assert.assertTrue(guide.value().contains("Where the two disagree, the signature is what compiles."),
                 "the readme is introduced by the rule for reading it");
@@ -996,7 +996,7 @@ public class ViewsTest {
 
     @Test
     public void everyBallerinaBlockInTheReadmeIsQuotedAndNothingElseIs() {
-        // ADR-0024. The fence is the whole rule, and these are the two packages that killed the classifier it
+        // The fence is the whole rule, and these are the two packages that killed the classifier it
         // replaced. `ballerina/log` publishes eight worked blocks and none of them constructs a client, calls one
         // with `->` or attaches a service, so the old rule reached the reader with zero examples for a package
         // whose entire surface is module-level functions.
@@ -1033,13 +1033,13 @@ public class ViewsTest {
             return;
         }
         String quickstart = document.substring(document.indexOf("\n## Quickstart\n"));
-        // No truncation marker, and no mark on a line. ADR-0024 removed the name check: `overview` quotes the
+        // No truncation marker, and no mark on a line. The name check is removed: `overview` quotes the
         // package's bytes, and a reader who is told the generated signatures win does not also need the tool
         // arguing with the readme inside the quotation.
         Assert.assertFalse(quickstart.contains("\u2026 "), slug + ": a quotation was cut");
         // The MARK this tool used to emit, not the character: a package whose own readme code contains a
         // "\u26a0" is quoting its own text, and banning the character outright would fail the tool for the
-        // package's content — the exact confusion between our output and theirs that ADR-0024 removed.
+        // package's content — the exact confusion between our output and theirs that this removes.
         Assert.assertFalse(quickstart.contains("# \u26a0 `"), slug + ": a quotation was annotated");
 
         // Every block the readme wrote arrived. Counted against `guide`, which reproduces the readme verbatim,
@@ -1075,7 +1075,7 @@ public class ViewsTest {
                 "\npublic type ClientRequestError distinct (ApplicationResponseError & error<Detail>);\n"));
         Assert.assertTrue(document.contains("\npublic type SslError distinct ClientError;\n"));
         Assert.assertTrue(document.contains("\npublic type Error distinct error;\n"));
-        // ADR-0013. The rule came here with the declarations, from an `overview` section that no longer exists;
+        // The rule came here with the declarations, from an `overview` section that no longer exists;
         // without the move it would simply have been deleted.
         Assert.assertTrue(document.contains("// The subtype chain is what `is` tests against"), document);
         // And it is not printed for a lookup that resolved no error, or it is noise on every other one.

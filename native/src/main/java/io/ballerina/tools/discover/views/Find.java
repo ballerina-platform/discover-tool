@@ -43,7 +43,7 @@ import java.util.List;
  * After the format change a useless hit costs about 80 characters instead of 400, and the {@code Matches} row
  * already tells an agent the query was broad.
  *
- * <p><b>ADR-0003 is kept exactly.</b> Central's relevance order stands, packages under 1,000 pulls are
+ * <p><b>Central's relevance order is kept exactly.</b> Packages under 1,000 pulls are
  * stable-partitioned to the end, and the pull count is printed on every row. Dropping counts on the grounds that
  * "relevance already encodes popularity" is measurably false: Central ranks a ONE-PULL package fourth for
  * {@code http client}, above {@code ballerina/sql}. The list looks clean because the demotion already ran.

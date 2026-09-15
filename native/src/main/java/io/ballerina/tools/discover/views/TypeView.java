@@ -265,7 +265,7 @@ public final class TypeView {
     /**
      * What the {@code distinct} chain below is FOR, printed when the answer is error declarations.
      *
-     * <p>ADR-0013. Only when the resolved set actually contains one, or it is noise on every other lookup. The
+     * <p>Only when the resolved set actually contains one, or it is noise on every other lookup. The
      * test is {@code distinct}, which is exact rather than a heuristic: a type alias may be {@code distinct} only
      * if it is an error type or an object type, and an object type is an {@link TypeDef.ObjectDef} by the time it
      * reaches here.

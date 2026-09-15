@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  * the code past the cut was prose. So the code is kept here and the prose is sent to {@code bal discover guide}.
  *
  * <p>WHAT IT SELECTS ON IS THE FENCE, and nothing else. A block whose fence says {@code ballerina} or {@code bal}
- * is in; a shell transcript or a TOML fragment is out. ADR-0024 reversed the classifier this used to run, which
+ * is in; a shell transcript or a TOML fragment is out. This reverses the classifier that used to run, which
  * kept a block only when it constructed a client, called one with {@code ->}, or attached a service to a
  * listener. That is the shape of a CONNECTOR, and a package that is not one fell straight through it:
  * {@code ballerina/log} published eight worked blocks and reached the reader with none, and
@@ -43,8 +43,8 @@ import java.util.stream.Collectors;
  * were dropped as demonstrating nothing. A rule that admits a foreign client and rejects the package's own entry
  * point is not a filter worth having.
  *
- * <p>WHAT IT NEVER DOES IS EDIT ONE. No truncation, no per-block cap, no dedupe, and no name check: ADR-0008 has
- * the views quoting rather than paraphrasing, and half a snippet is a paraphrase with the compiler's half
+ * <p>WHAT IT NEVER DOES IS EDIT ONE. No truncation, no per-block cap, no dedupe, and no name check: the views quote
+ * rather than paraphrase, and half a snippet is a paraphrase with the compiler's half
  * missing — kafka's listener example declares its {@code consumerConfiguration} nine lines above the
  * {@code service} that uses it. The section is unbounded, which is why {@link Overview} prints it last.
  *

@@ -331,7 +331,7 @@ public class RegisterTest {
      *
      * <p>Asserted as a LINE NUMBER rather than as "before the client sections", because the property is about
      * surviving a cut and a section-order test would pass for a document whose quoted code ran to 300 lines.
-     * ADR-0024 made that a real possibility rather than a hypothetical — postgresql publishes 28 blocks and its
+     * The uncapped quotation made that a real possibility rather than a hypothetical — postgresql publishes 28 blocks and its
      * map is 365 lines — and answered it by moving the quotation BEHIND this section rather than by capping it.
      * So the bound is now on the map's own text, which nothing unbounded precedes: measured across this corpus
      * the worst case is line 15, against 421 for kafka before any of this.
@@ -342,9 +342,9 @@ public class RegisterTest {
         List<String> lines = List.of(document.split("\n", -1));
         int next = lines.indexOf("## Next");
         Assert.assertTrue(next > 0, slug + ": no ## Next section");
-        // ADR-0017's measured window is `head -100`, which is what moved this section out of the document's
+        // The measured window is `head -100`, which is what moved this section out of the document's
         // tail: at the end it survived a `head -200` in 3 packages of 11. The bound is derived rather than
-        // picked — a dozen lines of title and facts, plus the one-line chunk index. Under ADR-0024 the quoted
+        // picked — a dozen lines of title and facts, plus the one-line chunk index. Now that the quotation is uncapped, the quoted
         // code is no longer ahead of it at all, so measured across this corpus the worst case is line 15.
         Assert.assertTrue(next < 100, slug + ": ## Next is at line " + next);
         // Nothing unbounded may precede it. The map has no unbounded section left at all — the rosters are capped
@@ -375,7 +375,7 @@ public class RegisterTest {
                 new Document("api", Documents.toSyntaxString(context.library())),
                 new Document("type -r", typeView.value())));
 
-        // The amended ADR-0008: the register is a property of the DOCUMENT, not of the verb. A `-r` response is
+        // The register is a property of the DOCUMENT, not of the verb. A `-r` response is
         // nothing but declarations, so it is code however it was reached — which means the container verbs produce
         // documents in BOTH registers and each has to obey the rules of the one it is in.
         for (Surface.Scope scope : Surface.Scope.values()) {

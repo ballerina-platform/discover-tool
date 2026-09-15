@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
  *
  * <p>The skill depends on all three — it redirects stdout straight into a file, and it has no fallback source, so
  * the failure JSON has to say plainly which kind of thing went wrong, since exit 1 alone no longer distinguishes
- * them (ADR-0015). The verb grammar adds one more thing to pin: every mistyped or version-skewed call must fail
+ * them. The verb grammar adds one more thing to pin: every mistyped or version-skewed call must fail
  * LOUDLY as {@code validation} rather than resolving as something else and reporting a Central failure the agent
  * will retry.
  *
@@ -262,7 +262,7 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("--help"), capture.streams(), never()), 0);
         Assert.assertTrue(capture.stdout().startsWith("Usage: bal discover"));
-        // ADR-0013. The text used to end with a `Cache:` line — the one place the cache was allowed to speak,
+        // The text used to end with a `Cache:` line — the one place the cache was allowed to speak,
         // and how an operator proved it was alive inside a runner. It is gone: this text is read by an agent
         // choosing a verb, and where the tool keeps its cache is not one of that reader's questions. The state
         // is still reachable through `DocsCache.describe()`, which `CacheTest` covers.
@@ -633,7 +633,7 @@ public class CliTest {
 
     @Test
     public void resolvingTypesSwitchesTheDocumentToTheCodeRegister() {
-        // The amended ADR-0008: the register is a property of the DOCUMENT, not the verb. A `-r` answer is nothing
+        // The register is a property of the DOCUMENT, not the verb. A `-r` answer is nothing
         // but declarations, so it is pasteable whole even though a report verb reached it.
         Capture capture = new Capture();
         int exitCode = Cli.run(
@@ -814,7 +814,7 @@ public class CliTest {
     }
 
     /**
-     * ADR-0015. There are two codes, and the second one is every failure.
+     * There are two codes, and the second one is every failure.
      *
      * <p>What replaced the old split is the {@code kind} field, asserted here beside each code: an argument
      * error, an upstream error and an unresolved name are one code and three kinds. The split they used to have
