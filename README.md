@@ -72,38 +72,22 @@ Five behaviours worth knowing because no signature shows them:
 
 ## Installing It
 
-The tool is **not on Ballerina Central** yet, so `bal tool pull discover` does not resolve it, and this
-repository does not yet publish a release either. Treat the dist zip as a layout rather than as a
-download: `./make-dist.sh` assembles `dist/` in exactly that shape.
+The tool is **not on Ballerina Central** yet, so `bal tool pull discover` does not resolve it. CI
+builds and tests every PR (`.github/workflows/pull-request.yml`), and `:bal-tool` already produces a
+real `ballerina/tool_discover` bala the same way `bal openapi` is packaged — what's missing is Central
+credentials and a release process, not the packaging mechanism. See `internal-docs/distribution.md`
+for the exact status.
 
-There are two ways it reaches a machine, and which one you want depends on what runs it.
+Until it's on Central, install it locally the same way a real Central publish would resolve it —
+there is deliberately one path, not a separate hand-rolled one for local use:
 
-| You are | After a tool change, run | What it does |
-|---|---|---|
-| developing the tool, or running `bal discover` directly on this machine | `./install-local.sh` | Builds the jar and installs it into your `~/.ballerina`, which is where `bal discover` resolves it from. |
-| shipping it to a machine that cannot build it — a container image, another repository | `./make-dist.sh`, then copy `dist/` there | Assembles an offline, installable distribution (see below). |
-
-To put a built distribution on a machine that cannot build one, run `./make-dist.sh` to assemble
-`dist/`, copy that directory to the target, and run the installer beside it there.
-
-**macOS / Linux:**
 ```bash
-./make-dist.sh                 # on a machine with JDK 21 — produces dist/
-cd dist && ./install.sh        # on the target
+./gradlew :bal-tool:build                                            # packs and pushes to the local repository
+bal tool pull ballerina/tool_discover:<version> --repository=local   # registers it as an active tool
+bal discover --help                                                  # smoke test
 ```
 
-**Windows (PowerShell):**
-```powershell
-# `make-dist.sh` is bash, so dist/ is produced elsewhere and copied here.
-Set-Location dist
-.\install.ps1
-```
-
-Both installers are fully offline and only need `bal` on your `PATH`. The install has to happen
-**where the tool will run**: `install.sh` stamps the bala's `package.json` with the distribution the
-adjacent `bal` reports, and `bal` refuses a tool stamped newer than the distribution running it — so
-a bala tree built on one machine and copied into an image with a different distribution can be
-rejected. See `internal-docs/distribution.md`.
+`<version>` is `gradle.properties`' `version` with any `-SNAPSHOT` suffix stripped — `0.1.0` today.
 
 ## Building from the Source
 
@@ -137,63 +121,26 @@ and `bal` discovers through `META-INF/services`. Everything else — gson, picoc
 ./gradlew :native:jar      # the tool jar (~370KB, our classes only)
 ./gradlew :native:test     # the suite — 715 cases, offline
 ./gradlew :bal-tool:build  # packages the jar into a ballerina/tool_discover bala
-./install-local.sh         # build and register as a local bal tool
-./make-dist.sh             # the offline distribution: what a release zip uses
 ```
 
 `:bal-tool` is the `bala` packaging step: it wraps the `:native` jar into a `ballerina/tool_discover`
-package via `io.ballerina.plugin` (`./gradlew :bal-tool:build`), the same mechanism
-`ballerina-platform/openapi-tools` uses for `bal openapi`. It is not yet wired to CI or to a Central
-publish — see `internal-docs/distribution.md` for exactly what is and is not verified. Until that
-lands, both installers below still build the bala tree by hand, independently of `:bal-tool`.
-
-### Shipping it to something that cannot pull it
-
-Until the tool is on Ballerina Central there is no `bal tool pull discover`, so a
-consumer — a container image, another repository — has to **copy** it.
-`./make-dist.sh` assembles exactly what a release zip carries:
-
-```
-dist/  native-<version>.jar  Ballerina.toml  VERSION  install.sh  install.ps1
-```
-
-Drop that directory anywhere and run `install.sh`; it needs nothing but `bal` on
-`PATH` and touches nothing outside `~/.ballerina`. An unzipped release works the
-same way, because it is the same output.
-
-Install it **where the tool will run**, and do not ship a prebuilt bala tree
-instead. `install.sh` stamps the bala's `package.json` with the distribution the
-`bal` beside it reports, and `bal` refuses a tool stamped newer than the
-distribution running it:
-
-```
-error: tool 'discover:0.1.0-SNAPSHOT' is not compatible with the current
-Ballerina distribution '2201.12.3'.
-```
+package via `io.ballerina.plugin`, the same mechanism `ballerina-platform/openapi-tools` uses for
+`bal openapi`. `.github/workflows/pull-request.yml` runs this on every PR; it is not yet wired to an
+actual Central publish — see `internal-docs/distribution.md` for exactly what is and is not verified.
 
 ## Development Iteration Flow
 
-The inner loop is: change the Java source, rebuild the jar, drop it in place, run `bal discover`. The
-tool resolves out of the local bala repository, so no Central interaction is involved in the install
-itself.
+The inner loop is: change the Java source, repackage, reinstall, run `bal discover`. There is one path
+for this — the same one "Installing It" above describes — not a faster hand-rolled shortcut.
 
 ### Apply a change
 
 ```bash
-./gradlew :native:jar
-cp native/build/libs/native-0.1.0-SNAPSHOT.jar \
-   ~/.ballerina/repositories/local/bala/ballerina/tool_discover/0.1.0-SNAPSHOT/java21/tool/libs/
+./gradlew :bal-tool:build
+bal tool pull ballerina/tool_discover:<version> --repository=local
 ```
 
-The next `bal discover` invocation picks up the new jar. There is no re-registration step and no cache
-to clear. The version in both paths is `version` from `gradle.properties`.
-
-After changing `Ballerina.toml`, `BalTool.toml`, the tool id or the package version, do a full
-reinstall instead, so the metadata and the `bal-tools.toml` registration are rewritten:
-
-```bash
-./install-local.sh
-```
+The next `bal discover` invocation picks up the change.
 
 ### Test
 

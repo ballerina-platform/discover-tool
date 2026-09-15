@@ -226,8 +226,6 @@ bal-discover-tool/
 ├── build.gradle              ← root: plugins + allprojects repos
 ├── settings.gradle           ← includes ':native', and nothing else
 ├── gradle.properties         ← all versions
-├── install-local.sh          ← local dev install
-├── build-config/resources/package/{Ballerina,BalTool}.toml   ← templates
 └── native/
     ├── build.gradle          ← Java subproject; every dependency is compileOnly
     └── src/
@@ -314,7 +312,8 @@ real `bal discover` invocation — see **Verification** in `README.md`.
 ## Build & install
 
 ```bash
-./install-local.sh        # build the jar and register it as a local bal tool
-./gradlew :native:test    # the suite
-./gradlew :native:jar     # just the jar
+./gradlew :native:test     # the suite
+./gradlew :native:jar      # just the jar
+./gradlew :bal-tool:build  # packages the jar into a ballerina/tool_discover bala
+bal tool pull ballerina/tool_discover:<version> --repository=local   # register it locally
 ```
