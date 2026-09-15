@@ -1,16 +1,16 @@
-# Installs the prebuilt bal library tool from a released distribution zip.
+# Installs the prebuilt bal discover tool from a released distribution zip.
 # Run from the unzipped release directory:
-#   Expand-Archive bal-library-tool-<version>.zip -DestinationPath .
-#   Set-Location bal-library-tool-<version>
+#   Expand-Archive bal-discover-tool-<version>.zip -DestinationPath .
+#   Set-Location bal-discover-tool-<version>
 #   .\install.ps1
 #
 # Fully offline — does not invoke gradle, does not contact the network.
 
 $ErrorActionPreference = 'Stop'
 
-$toolId = 'library'
-$org    = 'ballerinax'
-$name   = 'tool_library'
+$toolId = 'discover'
+$org    = 'ballerina'
+$name   = 'tool_discover'
 
 $scriptDir = $PSScriptRoot
 
@@ -93,6 +93,6 @@ Add-Content -Path $balToolsToml -Value $toolEntry
 Write-Host ""
 Write-Host "Installed $org/$name`:$version."
 Write-Host "Try:"
-Write-Host "  bal library --help"
-Write-Host "  bal library search kafka messaging"
-Write-Host "  bal library overview ballerinax/kafka"
+Write-Host "  bal discover --help"
+Write-Host "  bal discover find kafka messaging"
+Write-Host "  bal discover overview ballerinax/kafka"

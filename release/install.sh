@@ -15,19 +15,19 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Installs the prebuilt bal library tool from a released distribution zip.
+# Installs the prebuilt bal discover tool from a released distribution zip.
 # Run from the unzipped release directory:
-#   unzip bal-library-tool-<version>.zip
-#   cd bal-library-tool-<version>
+#   unzip bal-discover-tool-<version>.zip
+#   cd bal-discover-tool-<version>
 #   ./install.sh
 #
 # Fully offline — does not invoke gradle, does not contact the network.
 
 set -euo pipefail
 
-TOOL_ID="library"
-ORG="ballerinax"
-NAME="tool_library"
+TOOL_ID="discover"
+ORG="ballerina"
+NAME="tool_discover"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -105,6 +105,6 @@ TOML
 echo ""
 echo "Installed $ORG/$NAME:$VERSION."
 echo "Try:"
-echo "  bal library --help"
-echo "  bal library search kafka messaging"
-echo "  bal library overview ballerinax/kafka"
+echo "  bal discover --help"
+echo "  bal discover find kafka messaging"
+echo "  bal discover overview ballerinax/kafka"

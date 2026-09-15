@@ -1,8 +1,8 @@
-# bal-library-tool — System Design & Architecture
+# bal-discover-tool — System Design & Architecture
 
 ## Context
 
-`bal library` reads a Ballerina package off **Ballerina Central's docs API** and answers eight addressed
+`bal discover` reads a Ballerina package off **Ballerina Central's docs API** and answers eight addressed
 questions about it. It talks to Central over HTTPS and to nothing else: no language server, no bundled
 search index, no compiler invocation, no local package resolution.
 
@@ -15,14 +15,14 @@ are `compileOnly` and no third-party code is redistributed.
 ## Commands
 
 ```bash
-bal library find     <keywords...>                              # Central registry search
-bal library overview <org/name>                        [-s <q>]  # a map of the package
-bal library client   <org/name> [<Name|selector>...]   [-s <q>] [-r]
-bal library class    <org/name> [<Name|member>...]     [-s <q>] [-r]
-bal library funcs    <org/name> [<name|prefix*>...]    [-s <q>] [-r]
-bal library type     <org/name> <Name>...              [-s <q>] [-r]
-bal library guide    <org/name> [<n|title>] [--module <name>] [-s <q>]
-bal library api      <org/name>
+bal discover find     <keywords...>                              # Central registry search
+bal discover overview <org/name>                        [-s <q>]  # a map of the package
+bal discover client   <org/name> [<Name|selector>...]   [-s <q>] [-r]
+bal discover class    <org/name> [<Name|member>...]     [-s <q>] [-r]
+bal discover funcs    <org/name> [<name|prefix*>...]    [-s <q>] [-r]
+bal discover type     <org/name> <Name>...              [-s <q>] [-r]
+bal discover guide    <org/name> [<n|title>] [--module <name>] [-s <q>]
+bal discover api      <org/name>
 
   --refresh · -h                          # every verb that reads a package
   --all                                   # hidden: ignores the byte budget, offered only in `## Next`
@@ -47,7 +47,7 @@ resolves and names its owner. Without that, a kind-specific verb would make ever
 trip — which is what makes the split safe rather than merely tidier.
 
 **Versions are internal.** There is no version syntax in the grammar and no document discloses the
-resolution. `LibraryTool` walks up from the process's directory for a `Ballerina.toml`, and
+resolution. `DiscoverTool` walks up from the process's directory for a `Ballerina.toml`, and
 `Dependencies.toml` beside it pins the version — including transitively, so a cross-package pointer
 needs no version argument either.
 
@@ -59,7 +59,7 @@ needs no version argument either.
                        argv
                         │
         ┌───────────────▼────────────────┐
-        │  cli/LibraryTool               │  BLauncherCmd. THE ONLY class that reads the
+        │  cli/DiscoverTool               │  BLauncherCmd. THE ONLY class that reads the
         │  (the process wrapper)         │  environment or exits the process.
         └───────────────┬────────────────┘
                         │  argv + streams + cache, all injected
@@ -116,7 +116,7 @@ look like declarations and are not, which invites an agent to transcribe from a 
 | Register | Documents | Rules, enforced by `RegisterTest` |
 |---|---|---|
 | Code | `type`, `api`, **and any `-r` response** | No fences of our own, no report marker, no Markdown tables. A `//` comment annotates a real declaration. |
-| Report | `find`, `overview`, `client`, `class`, `funcs`, `guide` | Ballerina only inside ` ```ballerina ` fences. No bare `//`. Structure is headings. Opens with `<!-- bal library <verb> v1 -->`. |
+| Report | `find`, `overview`, `client`, `class`, `funcs`, `guide` | Ballerina only inside ` ```ballerina ` fences. No bare `//`. Structure is headings. Opens with `<!-- bal discover <verb> v1 -->`. |
 
 The register is a property of the **document**, not of the verb (amending ADR-0008). A `-r` response is
 nothing but declarations, so it is pasteable whole even when a report verb reached it — which means the
@@ -126,7 +126,7 @@ is in.
 `Report` is the only way a report document is built, which is why those rules hold for documents nobody
 has written yet.
 
-**Both registers state the document's own length on line one** — `<!-- bal library overview v1 · 42
+**Both registers state the document's own length on line one** — `<!-- bal discover overview v1 · 42
 lines -->` and `// ballerinax/github:6.0.0 · 535 lines`. Stamped by `Documents.withLength` at the single
 point in `Cli` that every document passes through on its way to stdout, so a view added later inherits it
 and the renderers stay untouched (which is why the committed `.bal` snapshots did not move when this
@@ -165,7 +165,7 @@ a declaration and prints with the initialiser its own source writes.
 | `views/Containers` | One implementation behind `client`, `class` and `funcs`. Holds the resolution order (exact container → exact member in scope → another scope → substring member), the byte budgets and the tier ladder. The parser cannot be decided per verb: a client IS a class, so the selector grammar is read off what the resolved CONTAINER declares. |
 | `Loader` | `loadPackage` is the only load, so no verb is cheap because it skipped work another verb does. |
 | `cli/Cli` | argv → exit code, with streams, transport and cache injected so tests drive the real command. |
-| `cli/LibraryTool` | The process wrapper — the only place that reads the environment or exits. |
+| `cli/DiscoverTool` | The process wrapper — the only place that reads the environment or exits. |
 
 ---
 
@@ -202,11 +202,11 @@ big answer.
 
 Location is a pure function of the environment (`cache/CacheLocation`), tried in order:
 
-1. `BAL_LIBRARY_CACHE=off` — explicit opt-out
-2. `BAL_LIBRARY_CACHE_DIR=<dir>` — explicit location, no fallback
-3. `$XDG_CACHE_HOME/bal-library` when absolute
-4. `~/.cache/bal-library` — the default
-5. `<tmpdir>/bal-library-<user>`, mode 0700
+1. `BAL_DISCOVER_CACHE=off` — explicit opt-out
+2. `BAL_DISCOVER_CACHE_DIR=<dir>` — explicit location, no fallback
+3. `$XDG_CACHE_HOME/bal-discover` when absolute
+4. `~/.cache/bal-discover` — the default
+5. `<tmpdir>/bal-discover-<user>`, mode 0700
 6. disabled
 
 **Any** problem with an entry is a miss, never a failure: missing, unreadable, truncated, not JSON,
@@ -222,7 +222,7 @@ process can observe a partial file.
 ## Project structure
 
 ```
-bal-library-tool/
+bal-discover-tool/
 ├── build.gradle              ← root: plugins + allprojects repos
 ├── settings.gradle           ← includes ':native', and nothing else
 ├── gradle.properties         ← all versions
@@ -231,7 +231,7 @@ bal-library-tool/
 └── native/
     ├── build.gradle          ← Java subproject; every dependency is compileOnly
     └── src/
-        ├── main/java/io/ballerina/library/
+        ├── main/java/io/ballerina/tools/discover/
         │   ├── Result.java, Failure.java          ← sealed; failures are values
         │   ├── QualifiedName.java, Version.java   ← parser-only construction
         │   ├── Texts.java                         ← collation, byte length, counts
@@ -246,9 +246,9 @@ bal-library-tool/
         │   ├── symbols/{Declarations,Names,PathTree,Surface,Filter}.java
         │   ├── views/{Find,Overview,Containers,TypeView,Guide,Closure,
         │   │            Snippets,Readmes}.java
-        │   └── cli/{LibraryTool,Cli,Commands,Usage,UsageRenderer}.java
+        │   └── cli/{DiscoverTool,Cli,Commands,Usage,UsageRenderer}.java
         └── test/
-            ├── java/io/ballerina/library/    ← 17 suites, 715 cases
+            ├── java/io/ballerina/tools/discover/    ← 17 suites, 715 cases
             └── resources/
                 ├── fixtures/*.json.gz        ← 13 recorded Central payloads
                 ├── snapshots/                ← 13 .bal + 50 .md + keyspace.txt
@@ -286,7 +286,7 @@ by hand rather than adding a bundled dependency.
 |---|---|
 | `CorpusTest` | **The one that pins the rendering.** Thirteen recorded payloads render byte-for-byte to thirteen committed `.bal` snapshots. Those snapshots are also the interface redesign's own gate: they did not move by a byte, which is what proves the renderer was never touched. |
 | `ViewsAgreeTest` | **The one that makes the addressed verbs safe.** Every signature a container verb prints appears in the `api` snapshot verbatim, at every tier and under `--all`; `overview` generates none at all; every `type <Name>` body is `renderTypeDef` exactly; every offered path is reachable; every `-r` closure terminates, stays bounded and names what it dropped. |
-| `PointersTest` | **The general form of "a pointer that cannot answer is worse than no pointer".** Extracts every `bal library` command from every document of every fixture and RUNS it through the real CLI, requiring exit 0. Three separate bugs of this shape had three separate assertions written after the fact; a new pointer cannot be added wrong. |
+| `PointersTest` | **The general form of "a pointer that cannot answer is worse than no pointer".** Extracts every `bal discover` command from every document of every fixture and RUNS it through the real CLI, requiring exit 0. Three separate bugs of this shape had three separate assertions written after the fact; a new pointer cannot be added wrong. |
 | `SurfaceTest` | That the three-way split is exhaustive and disjoint, and that a `client object` type Central files as an ordinary declaration is still addressed by `client`. |
 | `ViewsTest` | The report snapshots, and the composition rules that decide their shape — what the quickstart quotes and in what order, where the tier ladder fires, that the errors the map names resolve through `type`. Also where path-tree ORDERING is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
 | `RegisterTest` | The two-registers rule, mechanically, over every fixture and every verb. |
@@ -296,18 +296,18 @@ by hand rather than adding a bundled dependency.
 | `SymbolsTest` | Carries the **discovery corpus** — every lookup the nine recorded playground runs made, pinned with hit counts, so a zero-hit pin cannot masquerade as a working index. |
 | `KeySpaceTest` | The payload's whole key space per fixture: the live drift detector for fields the reader does not read yet. |
 | `PatchesTest` | Each correction pinned in BOTH directions — what it must change and what it must leave alone. |
-| `LibraryToolTest` | The usage text as golden files, and that `bal` routes every verb. |
+| `DiscoverToolTest` | The usage text as golden files, and that `bal` routes every verb. |
 
 Snapshot escape hatches, both narrow and deliberate:
 
 ```bash
 UPDATE_SNAPSHOTS=1 ./gradlew :native:test              # after an intentional rendering change
-BAL_LIBRARY_UPDATE_KEYSPACE=1 ./gradlew :native:test   # after re-recording fixtures
+BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :native:test   # after re-recording fixtures
 ```
 
 `./gradlew :native:test` does **not** prove the tool is installed, that `bal` routes to it, that
 arguments survive the launcher, or that exit codes reach the shell. Those are only observable through a
-real `bal library` invocation — see **Verification** in `README.md`.
+real `bal discover` invocation — see **Verification** in `README.md`.
 
 ---
 

@@ -15,14 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# Builds the JAR and installs it as a local bal tool named "library".
+# Builds the JAR and installs it as a local bal tool named "discover".
 # Usage: ./install-local.sh
 
 set -euo pipefail
 
-TOOL_ID="library"
-ORG="ballerinax"
-NAME="tool_library"
+TOOL_ID="discover"
+ORG="ballerina"
+NAME="tool_discover"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Read, not restated. `make-dist.sh` and the playground's jar overlay both derive
@@ -30,7 +30,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # stale silently and installs to a path nothing else looks in.
 #
 # Guarded, because `awk` exits 0 when it matches nothing — so `set -e` would let
-# an empty VERSION through and install to `.../tool_library//any`.
+# an empty VERSION through and install to `.../tool_discover//any`.
 VERSION="$(awk -F= '/^version=/{print $2}' "$SCRIPT_DIR/gradle.properties" | tr -d '[:space:]')"
 if [ -z "$VERSION" ]; then
     echo "ERROR: no version= line in $SCRIPT_DIR/gradle.properties" >&2
@@ -99,6 +99,6 @@ TOML
 
 echo ""
 echo "Done! Try:"
-echo "  bal library --help"
-echo "  bal library find kafka messaging"
-echo "  bal library overview ballerinax/kafka"
+echo "  bal discover --help"
+echo "  bal discover find kafka messaging"
+echo "  bal discover overview ballerinax/kafka"

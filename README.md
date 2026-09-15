@@ -1,12 +1,12 @@
-# Ballerina Library Tool
+# Ballerina Discover Tool
 
 A Ballerina CLI tool that reads a package off **Ballerina Central** and answers eight addressed
 questions about it. It exists so an AI copilot can learn a package's real signatures instead of
 guessing them — and so a human can too.
 
 ```bash
-bal library --help          # what the tool is, what it can be asked, and how to walk it
-bal library client --help   # one verb: its flags, and what its own reader needs to know
+bal discover --help          # what the tool is, what it can be asked, and how to walk it
+bal discover client --help   # one verb: its flags, and what its own reader needs to know
 ```
 
 **The tool documents itself, and there is one copy of each thing it says.** The lists inside `--help`
@@ -46,7 +46,7 @@ Five behaviours worth knowing because no signature shows them:
 - **Line one states the document's own length**, in both registers. Piping was measured at 100% of
   sessions and did not respond to being asked not to — and the reason turned out not to be about this
   tool at all: every session that piped had piped a genuinely noisy command (`bal openapi`, `bal tool
-  pull`) moments earlier, and the `| head` arrived on `bal library --help` before a byte of any
+  pull`) moments earlier, and the `| head` arrived on `bal discover --help` before a byte of any
   document had been seen. A `| head -150` over one github operation's 535-line closure discards 72% and
   ends mid-record; the length makes that arithmetic instead of a guess (ADR-0023).
 
@@ -72,7 +72,7 @@ Five behaviours worth knowing because no signature shows them:
 
 ## Installing It
 
-The tool is **not on Ballerina Central** yet, so `bal tool pull library` does not resolve it, and this
+The tool is **not on Ballerina Central** yet, so `bal tool pull discover` does not resolve it, and this
 repository does not yet publish a release either. Treat the dist zip as a layout rather than as a
 download: `./make-dist.sh` assembles `dist/` in exactly that shape.
 
@@ -80,7 +80,7 @@ There are two ways it reaches a machine, and which one you want depends on what 
 
 | You are | After a tool change, run | What it does |
 |---|---|---|
-| developing the tool, or running `bal library` directly on this machine | `./install-local.sh` | Builds the jar and installs it into your `~/.ballerina`, which is where `bal library` resolves it from. |
+| developing the tool, or running `bal discover` directly on this machine | `./install-local.sh` | Builds the jar and installs it into your `~/.ballerina`, which is where `bal discover` resolves it from. |
 | shipping it to a machine that cannot build it — a container image, another repository | `./make-dist.sh`, then copy `dist/` there | Assembles an offline, installable distribution (see below). |
 
 To put a built distribution on a machine that cannot build one, run `./make-dist.sh` to assemble
@@ -128,7 +128,7 @@ In GitHub Actions no secret has to be provisioned: `packagePAT: ${{ secrets.GITH
 sufficient for that cross-org public read, and is the convention across WSO2 and ballerina-platform
 repos.
 
-The whole dependency is one interface, `io.ballerina.cli.BLauncherCmd`, which `LibraryTool` implements
+The whole dependency is one interface, `io.ballerina.cli.BLauncherCmd`, which `DiscoverTool` implements
 and `bal` discovers through `META-INF/services`. Everything else — gson, picocli — is on Central.
 
 ### Build
@@ -136,18 +136,20 @@ and `bal` discovers through `META-INF/services`. Everything else — gson, picoc
 ```bash
 ./gradlew :native:jar      # the tool jar (~370KB, our classes only)
 ./gradlew :native:test     # the suite — 715 cases, offline
+./gradlew :bal-tool:build  # packages the jar into a ballerina/tool_discover bala
 ./install-local.sh         # build and register as a local bal tool
 ./make-dist.sh             # the offline distribution: what a release zip uses
 ```
 
-There is no `bala` packaging step. The `:ballerina` subproject that published one to Central was
-deleted: nothing here consumed it, and its Gradle plugin resolves only from that same authenticated
-repository, so it failed a clean build at *configuration* time before the classpath was even reached.
-Both installers build the bala tree by hand.
+`:bal-tool` is the `bala` packaging step: it wraps the `:native` jar into a `ballerina/tool_discover`
+package via `io.ballerina.plugin` (`./gradlew :bal-tool:build`), the same mechanism
+`ballerina-platform/openapi-tools` uses for `bal openapi`. It is not yet wired to CI or to a Central
+publish — see `internal-docs/distribution.md` for exactly what is and is not verified. Until that
+lands, both installers below still build the bala tree by hand, independently of `:bal-tool`.
 
 ### Shipping it to something that cannot pull it
 
-Until the tool is on Ballerina Central there is no `bal tool pull library`, so a
+Until the tool is on Ballerina Central there is no `bal tool pull discover`, so a
 consumer — a container image, another repository — has to **copy** it.
 `./make-dist.sh` assembles exactly what a release zip carries:
 
@@ -165,13 +167,13 @@ instead. `install.sh` stamps the bala's `package.json` with the distribution the
 distribution running it:
 
 ```
-error: tool 'library:0.1.0-SNAPSHOT' is not compatible with the current
+error: tool 'discover:0.1.0-SNAPSHOT' is not compatible with the current
 Ballerina distribution '2201.12.3'.
 ```
 
 ## Development Iteration Flow
 
-The inner loop is: change the Java source, rebuild the jar, drop it in place, run `bal library`. The
+The inner loop is: change the Java source, rebuild the jar, drop it in place, run `bal discover`. The
 tool resolves out of the local bala repository, so no Central interaction is involved in the install
 itself.
 
@@ -180,10 +182,10 @@ itself.
 ```bash
 ./gradlew :native:jar
 cp native/build/libs/native-0.1.0-SNAPSHOT.jar \
-   ~/.ballerina/repositories/local/bala/ballerinax/tool_library/0.1.0-SNAPSHOT/any/tool/libs/
+   ~/.ballerina/repositories/local/bala/ballerina/tool_discover/0.1.0-SNAPSHOT/java21/tool/libs/
 ```
 
-The next `bal library` invocation picks up the new jar. There is no re-registration step and no cache
+The next `bal discover` invocation picks up the new jar. There is no re-registration step and no cache
 to clear. The version in both paths is `version` from `gradle.properties`.
 
 After changing `Ballerina.toml`, `BalTool.toml`, the tool id or the package version, do a full
@@ -204,7 +206,7 @@ rendering change is intentional, regenerate the snapshots and review the diff:
 
 ```bash
 UPDATE_SNAPSHOTS=1 ./gradlew :native:test              # the report snapshots + usage text
-BAL_LIBRARY_UPDATE_KEYSPACE=1 ./gradlew :native:test   # after re-recording the fixtures
+BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :native:test   # after re-recording the fixtures
 ```
 
 The 13 `.bal` snapshots have no update switch on purpose. They are the oracle.
@@ -242,17 +244,17 @@ is the job the construct table does.
 pull request once this repository's own CI is set up (not yet present here). It does **not** prove
 the tool is installed, that `bal` routes to
 it, that arguments survive `bal`'s own launcher, that exit codes reach the shell, or that stdout is
-clean enough to redirect. Those are only observable through a real `bal library` invocation, so run
+clean enough to redirect. Those are only observable through a real `bal discover` invocation, so run
 this after any change to the CLI.
 
 ### Routing and help
 
 ```bash
-bal library --help                      # usage naming every verb, on stdout; exit 0
-bal library                             # same as --help; exit 0
-bal library overview --help             # overview's own flags; exit 0
-bal library nonsense                    # names every verb; exit 1, one JSON object on stderr
-bal library ballerinax/github           # exit 1, suggesting `bal library overview ballerinax/github`
+bal discover --help                      # usage naming every verb, on stdout; exit 0
+bal discover                             # same as --help; exit 0
+bal discover overview --help             # overview's own flags; exit 0
+bal discover nonsense                    # names every verb; exit 1, one JSON object on stderr
+bal discover ballerinax/github           # exit 1, suggesting `bal discover overview ballerinax/github`
 ```
 
 ### Coordinates the document prints must run
@@ -260,36 +262,36 @@ bal library ballerinax/github           # exit 1, suggesting `bal library overvi
 Every command a document hands back is part of the answer, so each of these is checked by RUNNING what
 the previous one printed:
 
-`PointersTest` does this offline over every fixture — it extracts every `bal library` command from
+`PointersTest` does this offline over every fixture — it extracts every `bal discover` command from
 every document and re-runs it — so these are the cases it cannot reach: cross-package edges, and the
 launcher.
 
 ```bash
-bal library type ballerinax/sap TargetType -r               # footer names the edge with its version
-bal library type ballerina/http Response -r                 # …and that command works verbatim
-bal library type ballerinax/aws.s3 ConnectionConfig -r       # a module that is not its own package
-bal library type ballerinax/aws.auth AuthConfig              # …readable on its own; the version is resolved
+bal discover type ballerinax/sap TargetType -r               # footer names the edge with its version
+bal discover type ballerina/http Response -r                 # …and that command works verbatim
+bal discover type ballerinax/aws.s3 ConnectionConfig -r       # a module that is not its own package
+bal discover type ballerinax/aws.auth AuthConfig              # …readable on its own; the version is resolved
                                                              #    through ballerinax/aws, which contains it
-bal library client ballerinax/googleapis.gmail | grep -c 'resource function'   # 32, not 0
-bal library client ballerinax/github Client 'repos/*/*' | head -12   # names the branch `*` did not take
-bal library client ballerinax/github Client repos/owner/repo/caches  # located one level deeper
-bal library type ballerinax/sap Client                       # the client resolves by name
+bal discover client ballerinax/googleapis.gmail | grep -c 'resource function'   # 32, not 0
+bal discover client ballerinax/github Client 'repos/*/*' | head -12   # names the branch `*` did not take
+bal discover client ballerinax/github Client repos/owner/repo/caches  # located one level deeper
+bal discover type ballerinax/sap Client                       # the client resolves by name
 ```
 
 ### Each verb, live against Central
 
 ```bash
-bal library find     kafka messaging
-bal library overview ballerinax/kafka
-bal library overview ballerina/http -s cookie
-bal library client   ballerinax/github Client repos
-bal library client   ballerinax/twilio 'create*'
-bal library client   ballerinax/github Client delete repos/{owner}/{repo}/actions/caches -r
-bal library class    ballerina/http Cookie
-bal library funcs    ballerina/uuid
-bal library type     ballerina/http ClientRequestError -r
-bal library guide    ballerinax/googleapis.sheets 2
-bal library api      ballerinax/sap
+bal discover find     kafka messaging
+bal discover overview ballerinax/kafka
+bal discover overview ballerina/http -s cookie
+bal discover client   ballerinax/github Client repos
+bal discover client   ballerinax/twilio 'create*'
+bal discover client   ballerinax/github Client delete repos/{owner}/{repo}/actions/caches -r
+bal discover class    ballerina/http Cookie
+bal discover funcs    ballerina/uuid
+bal discover type     ballerina/http ClientRequestError -r
+bal discover guide    ballerinax/googleapis.sheets 2
+bal discover api      ballerinax/sap
 ```
 
 Each must exit 0 and print its document to stdout. Two are worth reading rather than just checking:
@@ -301,10 +303,10 @@ call rather than two.
 ### The stream contract
 
 ```bash
-bal library overview ballerinax/kafka > /tmp/doc.md 2>/tmp/err.txt
+bal discover overview ballerinax/kafka > /tmp/doc.md 2>/tmp/err.txt
 test -s /tmp/doc.md && test ! -s /tmp/err.txt   # document on stdout, nothing on stderr
 
-bal library type ballerina/http NoSuchType 2>/tmp/err.json 1>/tmp/out.txt
+bal discover type ballerina/http NoSuchType 2>/tmp/err.json 1>/tmp/out.txt
 test ! -s /tmp/out.txt                          # all-or-nothing: stdout empty on failure
 python3 -c 'import json; d=json.load(open("/tmp/err.json")); print(d["kind"], len(d["candidates"]))'
 ```
@@ -312,7 +314,7 @@ python3 -c 'import json; d=json.load(open("/tmp/err.json")); print(d["kind"], le
 ### Exit codes, asserted not eyeballed
 
 ```bash
-check() { local want="$1"; shift; bal library "$@" >/dev/null 2>&1; local got=$?
+check() { local want="$1"; shift; bal discover "$@" >/dev/null 2>&1; local got=$?
   [ "$got" = "$want" ] && echo "ok   $* -> $got" || echo "FAIL $* -> $got want $want"; }
 
 check 0 overview ballerinax/kafka
@@ -343,7 +345,7 @@ the `clients` array would report a database package as having none.
 ```bash
 for pkg in ballerinax/rabbitmq ballerina/websocket ballerina/sql ballerinax/redis; do
   for verb in overview client class funcs guide api; do
-    bal library $verb "$pkg" >/dev/null 2>&1 && echo "ok   $verb $pkg" || echo "FAIL $verb $pkg"
+    bal discover $verb "$pkg" >/dev/null 2>&1 && echo "ok   $verb $pkg" || echo "FAIL $verb $pkg"
   done
 done
 ```
@@ -354,11 +356,11 @@ The cache no longer speaks in `--help` (ADR-0013), so its state is read from tim
 `DocsCache.describe()` rather than from a status line.
 
 ```bash
-rm -rf ~/.cache/bal-library
-time bal library overview ballerinax/github     # cold
-time bal library overview ballerinax/github     # warm — expect a large drop
-BAL_LIBRARY_CACHE=off bal library overview ballerinax/kafka                  # still exit 0
-BAL_LIBRARY_CACHE_DIR=/dev/null/nope bal library overview ballerinax/kafka   # still exit 0, silent
+rm -rf ~/.cache/bal-discover
+time bal discover overview ballerinax/github     # cold
+time bal discover overview ballerinax/github     # warm — expect a large drop
+BAL_DISCOVER_CACHE=off bal discover overview ballerinax/kafka                  # still exit 0
+BAL_DISCOVER_CACHE_DIR=/dev/null/nope bal discover overview ballerinax/kafka   # still exit 0, silent
 ```
 
 An unusable cache directory must never be a failure: failing there would send an agent into the

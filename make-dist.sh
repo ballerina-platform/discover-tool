@@ -18,7 +18,7 @@
 # Assembles the offline distribution into dist/ — the jar, the package metadata,
 # and the two installers, in exactly the layout the release zip carries.
 #
-# This is what a consumer copies when it cannot `bal tool pull library`: the tool
+# This is what a consumer copies when it cannot `bal tool pull discover`: the tool
 # is not on Ballerina Central (internal-docs/distribution.md), so a downstream
 # repo has no way to fetch it and vendors this directory instead. Producing it
 # with a script rather than by hand is what keeps a vendored copy honest — the

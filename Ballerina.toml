@@ -1,9 +1,9 @@
 [package]
-org = "ballerinax"
-name = "tool_library"
+org = "ballerina"
+name = "tool_discover"
 version = "0.1.0-SNAPSHOT"
 distribution = "2201.13.2"
 authors = ["Ballerina"]
-keywords = ["library", "search", "copilot"]
+keywords = ["discover", "search", "copilot"]
 repository = "https://github.com/ballerina-platform/discover-tool"
 license = ["Apache-2.0"]
