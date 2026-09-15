@@ -1,26 +1,26 @@
-<!-- bal library overview v1 -->
+<!-- bal discover overview v1 -->
 # ballerinax/googleapis.sheets 0.0.0-fixture
 
 | | |
 |---|---|
-| Clients | 1 — `Client` — `bal library client ballerinax/googleapis.sheets` |
+| Clients | 1 — `Client` — `bal discover client ballerinax/googleapis.sheets` |
 | Classes | none |
 | Module functions | none |
-| Errors | 3 — `Error`, `InvalidRangeError`, `SpreadsheetError` — read one with `bal library type ballerinax/googleapis.sheets <Name>` |
+| Errors | 3 — `Error`, `InvalidRangeError`, `SpreadsheetError` — read one with `bal discover type ballerinax/googleapis.sheets <Name>` |
 | Types | 28 declarations (20 records, 1 type aliases, 6 enums, 1 constants), not listed here — read one with `type` |
-| Guide | 157 lines — `bal library guide ballerinax/googleapis.sheets` |
+| Guide | 157 lines — `bal discover guide ballerinax/googleapis.sheets` |
 
-Guide chunks (4): 1. `Step 1: Import connector`  2. `Step 2: Create a new connector instance`  3. `Create a spreadsheet with a given name`  4. `Step 4: Run the Ballerina application` — `bal library guide ballerinax/googleapis.sheets <n>`
+Guide chunks (4): 1. `Step 1: Import connector`  2. `Step 2: Create a new connector instance`  3. `Create a spreadsheet with a given name`  4. `Step 4: Run the Ballerina application` — `bal discover guide ballerinax/googleapis.sheets <n>`
 
 ## Next
 
-- `bal library client ballerinax/googleapis.sheets Client` — the client's whole callable surface
-- `bal library overview ballerinax/googleapis.sheets -s "<what you need>"` — search every kind at once when you do not know which verb holds it
-- `bal library type ballerinax/googleapis.sheets <Name> [-r]` — a declaration whole, with the types it names
+- `bal discover client ballerinax/googleapis.sheets Client` — the client's whole callable surface
+- `bal discover overview ballerinax/googleapis.sheets -s "<what you need>"` — search every kind at once when you do not know which verb holds it
+- `bal discover type ballerinax/googleapis.sheets <Name> [-r]` — a declaration whole, with the types it names
 
 ## Clients — 1
 
-- `Client` — 43 remote · `bal library client ballerinax/googleapis.sheets Client`
+- `Client` — 43 remote · `bal discover client ballerinax/googleapis.sheets Client`
 
 ## Quickstart
 

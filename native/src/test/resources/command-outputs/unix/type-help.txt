@@ -1,4 +1,4 @@
-Usage: bal library type <org/name> <Name>... [-s <q>] [-r] [--refresh]
+Usage: bal discover type <org/name> <Name>... [-s <q>] [-r] [--refresh]
 
 One or more declarations, as Ballerina. All-or-nothing: a name that does not resolve
 fails the run with candidates.
@@ -27,6 +27,6 @@ redirecting caller relies on.
   --refresh             Ignore any cached copy and rewrite it. Worth passing only
                         when a name should exist and does not.
 
-  bal library type ballerina/http ClientRequestError -r
-  bal library type ballerinax/aws.auth AuthConfig
-  bal library type ballerinax/github -s "repository"
+  bal discover type ballerina/http ClientRequestError -r
+  bal discover type ballerinax/aws.auth AuthConfig
+  bal discover type ballerinax/github -s "repository"

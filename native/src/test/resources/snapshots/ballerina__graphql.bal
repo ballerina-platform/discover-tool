@@ -645,7 +645,7 @@ public class Listener {
 
 service graphql:Service on new graphql:Listener(listenTo, configuration) {
     // Central publishes no method contract for this service type. The listener may still require
-    // one — add the resource or remote methods the package's guide shows; `bal library overview`
+    // one — add the resource or remote methods the package's guide shows; `bal discover overview`
     // reproduces it.
 }
 
@@ -656,7 +656,7 @@ service graphql:Service on new graphql:Listener(listenTo, configuration) {
 // by INCLUDING that type, and Central publishes no inclusion for an object type — so some of these
 // do attach and some do not, and the payload cannot say which. An interceptor type, for one, reaches
 // the runtime as a `createInterceptors()` return rather than as an attachment. The package's own
-// guide is where the usage of each is written; `bal library overview` reproduces it.
+// guide is where the usage of each is written; `bal discover overview` reproduces it.
 
 // --- Annotations ---
 

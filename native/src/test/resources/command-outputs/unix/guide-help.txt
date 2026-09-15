@@ -1,5 +1,5 @@
-Usage: bal library guide <org/name> [<n|title>] [--module <name>] [-s <q>]
-                         [--refresh]
+Usage: bal discover guide <org/name> [<n|title>] [--module <name>] [-s <q>]
+                          [--refresh]
 
 The package's own readme, verbatim: setup steps, account prerequisites and worked
 recipes. Addressable one chunk at a time.
@@ -23,6 +23,6 @@ one.
   --refresh          Ignore any cached copy and rewrite it. Worth passing only when
                      a name should exist and does not.
 
-  bal library guide ballerinax/twilio
-  bal library guide ballerinax/googleapis.sheets 2
-  bal library guide ballerina/http --module http
+  bal discover guide ballerinax/twilio
+  bal discover guide ballerinax/googleapis.sheets 2
+  bal discover guide ballerina/http --module http

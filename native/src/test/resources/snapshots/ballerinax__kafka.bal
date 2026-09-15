@@ -840,7 +840,7 @@ public isolated class Listener {
 
 service kafka:Service on new kafka:Listener(bootstrapServers, config) {
     // Central publishes no method contract for this service type. The listener may still require
-    // one — add the resource or remote methods the package's guide shows; `bal library overview`
+    // one — add the resource or remote methods the package's guide shows; `bal discover overview`
     // reproduces it.
 }
 

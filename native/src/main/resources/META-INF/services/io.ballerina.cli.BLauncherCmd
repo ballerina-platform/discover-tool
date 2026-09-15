@@ -1,1 +1,1 @@
-io.ballerina.library.cli.LibraryTool
+io.ballerina.tools.discover.cli.DiscoverTool

@@ -1,29 +1,29 @@
-<!-- bal library overview v1 -->
+<!-- bal discover overview v1 -->
 # ballerina/xlsx 0.0.0-fixture
 
 | | |
 |---|---|
 | Clients | none |
-| Classes | 3 — `Workbook`, `Sheet`, `Table` — `bal library class ballerina/xlsx` |
-| Module functions | 6 — `bal library funcs ballerina/xlsx` |
-| Errors | 11 — `ConstraintValidationError`, `Error`, `FileNotFoundError`, `InvalidTableRangeError`, `ParseError`, `SheetExistsError`, `SheetNotFoundError`, `TableExistsError`, `TableNotFoundError`, `TableOverlapError`, `TypeConversionError` — read one with `bal library type ballerina/xlsx <Name>` |
+| Classes | 3 — `Workbook`, `Sheet`, `Table` — `bal discover class ballerina/xlsx` |
+| Module functions | 6 — `bal discover funcs ballerina/xlsx` |
+| Errors | 11 — `ConstraintValidationError`, `Error`, `FileNotFoundError`, `InvalidTableRangeError`, `ParseError`, `SheetExistsError`, `SheetNotFoundError`, `TableExistsError`, `TableNotFoundError`, `TableOverlapError`, `TypeConversionError` — read one with `bal discover type ballerina/xlsx <Name>` |
 | Types | 29 declarations (19 records, 2 type aliases, 5 enums, 3 classes and object types), not listed here — read one with `type` |
-| Guide | 201 lines — `bal library guide ballerina/xlsx` |
+| Guide | 201 lines — `bal discover guide ballerina/xlsx` |
 
-Guide chunks (10): 1. `Step 1: Import the module`  2. `Parse an XLSX file into typed records`  3. `Write records to an XLSX file`  4. `Map non-matching headers with `@xlsx:Name``  5. `Work with multiple sheets via the `Workbook` API`  6. `Bytes in, bytes out`  7. `Read and write Excel Tables`  8. `Bind dates and times to `time:Civil`, `time:Date`, or `time:TimeOfDay``  9. `Continue parsing on row-level errors with fail-safe mode`  10. `Step 3: Run the Ballerina application` — `bal library guide ballerina/xlsx <n>`
+Guide chunks (10): 1. `Step 1: Import the module`  2. `Parse an XLSX file into typed records`  3. `Write records to an XLSX file`  4. `Map non-matching headers with `@xlsx:Name``  5. `Work with multiple sheets via the `Workbook` API`  6. `Bytes in, bytes out`  7. `Read and write Excel Tables`  8. `Bind dates and times to `time:Civil`, `time:Date`, or `time:TimeOfDay``  9. `Continue parsing on row-level errors with fail-safe mode`  10. `Step 3: Run the Ballerina application` — `bal discover guide ballerina/xlsx <n>`
 
 ## Next
 
-- `bal library class ballerina/xlsx` — 3 classes and object types, called with `.`
-- `bal library funcs ballerina/xlsx` — 6 functions callable without a client
-- `bal library overview ballerina/xlsx -s "<what you need>"` — search every kind at once when you do not know which verb holds it
-- `bal library type ballerina/xlsx <Name> [-r]` — a declaration whole, with the types it names
+- `bal discover class ballerina/xlsx` — 3 classes and object types, called with `.`
+- `bal discover funcs ballerina/xlsx` — 6 functions callable without a client
+- `bal discover overview ballerina/xlsx -s "<what you need>"` — search every kind at once when you do not know which verb holds it
+- `bal discover type ballerina/xlsx <Name> [-r]` — a declaration whole, with the types it names
 
 ## Classes and object types — 3
 
-- `Workbook` — 12 normal · `bal library class ballerina/xlsx Workbook`
-- `Sheet` — 21 normal · `bal library class ballerina/xlsx Sheet`
-- `Table` — 18 normal · `bal library class ballerina/xlsx Table`
+- `Workbook` — 12 normal · `bal discover class ballerina/xlsx Workbook`
+- `Sheet` — 21 normal · `bal discover class ballerina/xlsx Sheet`
+- `Table` — 18 normal · `bal discover class ballerina/xlsx Table`
 
 ## Module-level functions — 6, call with `.`
 

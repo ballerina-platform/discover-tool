@@ -21,7 +21,7 @@ plugins {
     id 'jacoco'
 }
 
-description = 'Ballerina library tool native code'
+description = 'Ballerina discover tool native code'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21

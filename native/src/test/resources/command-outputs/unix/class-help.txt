@@ -1,4 +1,4 @@
-Usage: bal library class <org/name> [<Name|member>...] [-s <q>] [-r] [--refresh]
+Usage: bal discover class <org/name> [<Name|member>...] [-s <q>] [-r] [--refresh]
 
 A class, service type or listener, and its members. Same shape as 'client'; these
 are the objects called with '.' rather than '->'.
@@ -37,6 +37,6 @@ that cut is visible — fewer lines than it says means the answer is incomplete.
   --refresh             Ignore any cached copy and rewrite it. Worth passing only
                         when a name should exist and does not.
 
-  bal library class ballerina/http
-  bal library class ballerina/http Cookie
-  bal library class ballerina/http Cookie toStringValue -r
+  bal discover class ballerina/http
+  bal discover class ballerina/http Cookie
+  bal discover class ballerina/http Cookie toStringValue -r

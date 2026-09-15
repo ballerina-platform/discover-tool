@@ -1,4 +1,4 @@
-<!-- bal library funcs v1 -->
+<!-- bal discover funcs v1 -->
 # Module functions — ballerina/graphql
 
 | | |
@@ -7,7 +7,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal library funcs ballerina/graphql __addError -r`
+- one call and every type it needs: `bal discover funcs ballerina/graphql __addError -r`
 
 ## Module-level functions — 2, call with `.`
 

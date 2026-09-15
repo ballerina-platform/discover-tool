@@ -1,4 +1,4 @@
-<!-- bal library client v1 -->
+<!-- bal discover client v1 -->
 # Clients — ballerinax/postgresql `Client`
 
 | | |
@@ -8,7 +8,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal library client ballerinax/postgresql Client init -r`
+- one call and every type it needs: `bal discover client ballerinax/postgresql Client init -r`
 
 ## Constructor — 1
 

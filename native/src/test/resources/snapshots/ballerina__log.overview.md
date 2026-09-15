@@ -1,29 +1,29 @@
-<!-- bal library overview v1 -->
+<!-- bal discover overview v1 -->
 # ballerina/log 0.0.0-fixture
 
 | | |
 |---|---|
 | Clients | none |
-| Classes | 3 — `Logger`, `LoggerRegistry`, `PrintableRawTemplate` — `bal library class ballerina/log` |
-| Module functions | 11 — `bal library funcs ballerina/log` |
-| Errors | 1 — `Error` — read one with `bal library type ballerina/log <Name>` |
+| Classes | 3 — `Logger`, `LoggerRegistry`, `PrintableRawTemplate` — `bal discover class ballerina/log` |
+| Module functions | 11 — `bal discover funcs ballerina/log` |
+| Errors | 1 — `Error` — read one with `bal discover type ballerina/log <Name>` |
 | Types | 23 declarations (8 records, 5 type aliases, 6 enums, 1 constants, 3 classes and object types), not listed here — read one with `type` |
-| Guide | 275 lines — `bal library guide ballerina/log` |
+| Guide | 275 lines — `bal discover guide ballerina/log` |
 
-Guide chunks (11): 1. `Log Levels`  2. `Logging API`  3. `Log Output and Format`  4. `Log Rotation`  5. `Root Context`  6. `Contextual Logging`  7. `Runtime Log Level Modification`  8. `Sensitive Data Masking`  9. `Sensitive Data Annotation`  10. `Masking Strategies`  11. `Masked String Function` — `bal library guide ballerina/log <n>`
+Guide chunks (11): 1. `Log Levels`  2. `Logging API`  3. `Log Output and Format`  4. `Log Rotation`  5. `Root Context`  6. `Contextual Logging`  7. `Runtime Log Level Modification`  8. `Sensitive Data Masking`  9. `Sensitive Data Annotation`  10. `Masking Strategies`  11. `Masked String Function` — `bal discover guide ballerina/log <n>`
 
 ## Next
 
-- `bal library class ballerina/log` — 3 classes and object types, called with `.`
-- `bal library funcs ballerina/log` — 11 functions callable without a client
-- `bal library overview ballerina/log -s "<what you need>"` — search every kind at once when you do not know which verb holds it
-- `bal library type ballerina/log <Name> [-r]` — a declaration whole, with the types it names
+- `bal discover class ballerina/log` — 3 classes and object types, called with `.`
+- `bal discover funcs ballerina/log` — 11 functions callable without a client
+- `bal discover overview ballerina/log -s "<what you need>"` — search every kind at once when you do not know which verb holds it
+- `bal discover type ballerina/log <Name> [-r]` — a declaration whole, with the types it names
 
 ## Classes and object types — 3
 
-- `Logger` — 7 normal · `bal library class ballerina/log Logger`
-- `LoggerRegistry` — 2 normal · `bal library class ballerina/log LoggerRegistry`
-- `PrintableRawTemplate` — nothing callable · `bal library class ballerina/log PrintableRawTemplate`
+- `Logger` — 7 normal · `bal discover class ballerina/log Logger`
+- `LoggerRegistry` — 2 normal · `bal discover class ballerina/log LoggerRegistry`
+- `PrintableRawTemplate` — nothing callable · `bal discover class ballerina/log PrintableRawTemplate`
 
 ## Module-level functions — 11, call with `.`
 

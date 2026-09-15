@@ -1,4 +1,4 @@
-<!-- bal library class v1 -->
+<!-- bal discover class v1 -->
 # Classes — ballerina/xlsx
 
 | | |
@@ -7,11 +7,11 @@
 
 ## Next
 
-- open one: `bal library class ballerina/xlsx Workbook`
-- search across all of them: `bal library class ballerina/xlsx -s "<what it does>"`
+- open one: `bal discover class ballerina/xlsx Workbook`
+- search across all of them: `bal discover class ballerina/xlsx -s "<what it does>"`
 
 ## 3 classes
 
-- `Workbook` — 12 normal · `bal library class ballerina/xlsx Workbook`
-- `Sheet` — 21 normal · `bal library class ballerina/xlsx Sheet`
-- `Table` — 18 normal · `bal library class ballerina/xlsx Table`
+- `Workbook` — 12 normal · `bal discover class ballerina/xlsx Workbook`
+- `Sheet` — 21 normal · `bal discover class ballerina/xlsx Sheet`
+- `Table` — 18 normal · `bal discover class ballerina/xlsx Table`

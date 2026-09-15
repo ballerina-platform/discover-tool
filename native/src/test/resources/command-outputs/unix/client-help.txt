@@ -1,4 +1,4 @@
-Usage: bal library client <org/name> [<Name|selector>...] [-s <q>] [-r] [--refresh]
+Usage: bal discover client <org/name> [<Name|selector>...] [-s <q>] [-r] [--refresh]
 
 One client's whole callable surface, or a roster of them. Resource functions by
 path, remote and normal ones by name, the constructor included.
@@ -37,7 +37,7 @@ that cut is visible — fewer lines than it says means the answer is incomplete.
   --refresh             Ignore any cached copy and rewrite it. Worth passing only
                         when a name should exist and does not.
 
-  bal library client ballerinax/github
-  bal library client ballerinax/github repos
-  bal library client ballerinax/github Client delete repos/{owner}/{repo}/actions/caches -r
-  bal library client ballerinax/twilio -s "message"
+  bal discover client ballerinax/github
+  bal discover client ballerinax/github repos
+  bal discover client ballerinax/github Client delete repos/{owner}/{repo}/actions/caches -r
+  bal discover client ballerinax/twilio -s "message"

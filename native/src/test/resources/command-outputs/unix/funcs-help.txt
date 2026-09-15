@@ -1,4 +1,4 @@
-Usage: bal library funcs <org/name> [<name|prefix*>...] [-s <q>] [-r] [--refresh]
+Usage: bal discover funcs <org/name> [<name|prefix*>...] [-s <q>] [-r] [--refresh]
 
 Functions at module scope — the callable surface of a package that has no client,
 and the utilities of one that does.
@@ -29,6 +29,6 @@ that cut is visible — fewer lines than it says means the answer is incomplete.
   --refresh             Ignore any cached copy and rewrite it. Worth passing only
                         when a name should exist and does not.
 
-  bal library funcs ballerina/uuid
-  bal library funcs ballerina/crypto 'hash*'
-  bal library funcs ballerina/crypto -s "sha256" -r
+  bal discover funcs ballerina/uuid
+  bal discover funcs ballerina/crypto 'hash*'
+  bal discover funcs ballerina/crypto -s "sha256" -r

@@ -1,4 +1,4 @@
-<!-- bal library funcs v1 -->
+<!-- bal discover funcs v1 -->
 # Module functions — ballerina/http
 
 | | |
@@ -7,7 +7,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal library funcs ballerina/http authenticateResource -r`
+- one call and every type it needs: `bal discover funcs ballerina/http authenticateResource -r`
 
 ## Module-level functions — 7, call with `.`
 

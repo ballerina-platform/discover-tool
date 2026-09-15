@@ -1,4 +1,4 @@
-Usage: bal library overview <org/name> [-s <q>] [--refresh]
+Usage: bal discover overview <org/name> [-s <q>] [--refresh]
 
 A map of the package: what it declares, the readme's worked code, and the command
 that opens each part. Start here.
@@ -24,5 +24,5 @@ cut it off, line one says so.
   --refresh          Ignore any cached copy and rewrite it. Worth passing only when
                      a name should exist and does not.
 
-  bal library overview ballerinax/github
-  bal library overview ballerina/http -s "cookie"
+  bal discover overview ballerinax/github
+  bal discover overview ballerina/http -s "cookie"

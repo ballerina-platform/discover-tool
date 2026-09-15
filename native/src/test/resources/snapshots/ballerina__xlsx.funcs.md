@@ -1,4 +1,4 @@
-<!-- bal library funcs v1 -->
+<!-- bal discover funcs v1 -->
 # Module functions — ballerina/xlsx
 
 | | |
@@ -7,7 +7,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal library funcs ballerina/xlsx fromBytes -r`
+- one call and every type it needs: `bal discover funcs ballerina/xlsx fromBytes -r`
 
 ## Module-level functions — 6, call with `.`
 

@@ -1,4 +1,4 @@
-<!-- bal library client v1 -->
+<!-- bal discover client v1 -->
 # Clients — ballerinax/twilio `Client`
 
 | | |
@@ -8,9 +8,9 @@
 
 ## Next
 
-- narrow it: `bal library client ballerinax/twilio Client -s "<what it does>"` — matches names, paths, parameter and type names, and documentation
-- one call and every type it needs: `bal library client ballerinax/twilio Client init -r`
-- last resort — every signature, unbudgeted: `bal library client ballerinax/twilio Client --all` — 200 signatures, 51,608 bytes
+- narrow it: `bal discover client ballerinax/twilio Client -s "<what it does>"` — matches names, paths, parameter and type names, and documentation
+- one call and every type it needs: `bal discover client ballerinax/twilio Client init -r`
+- last resort — every signature, unbudgeted: `bal discover client ballerinax/twilio Client --all` — 200 signatures, 51,608 bytes
 
 ## 200 by name
 

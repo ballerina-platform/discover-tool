@@ -1,26 +1,26 @@
-<!-- bal library overview v1 -->
+<!-- bal discover overview v1 -->
 # ballerinax/twilio 0.0.0-fixture
 
 | | |
 |---|---|
-| Clients | 1 — `Client` — `bal library client ballerinax/twilio` |
+| Clients | 1 — `Client` — `bal discover client ballerinax/twilio` |
 | Classes | none |
 | Module functions | none |
 | Errors | none declared here; each operation names its error type in its `returns` clause |
 | Types | 278 declarations (212 records, 66 type aliases), not listed here — read one with `type` |
-| Guide | 154 lines — `bal library guide ballerinax/twilio` |
+| Guide | 154 lines — `bal discover guide ballerinax/twilio` |
 
-Guide chunks (4): 1. `Step 1 - Import the module`  2. `Step 2 - Create a new connector instance`  3. `Step 3 - Invoke the connector operation`  4. `Step 4: Run the Ballerina application` — `bal library guide ballerinax/twilio <n>`
+Guide chunks (4): 1. `Step 1 - Import the module`  2. `Step 2 - Create a new connector instance`  3. `Step 3 - Invoke the connector operation`  4. `Step 4: Run the Ballerina application` — `bal discover guide ballerinax/twilio <n>`
 
 ## Next
 
-- `bal library client ballerinax/twilio Client` — the client's whole callable surface
-- `bal library overview ballerinax/twilio -s "<what you need>"` — search every kind at once when you do not know which verb holds it
-- `bal library type ballerinax/twilio <Name> [-r]` — a declaration whole, with the types it names
+- `bal discover client ballerinax/twilio Client` — the client's whole callable surface
+- `bal discover overview ballerinax/twilio -s "<what you need>"` — search every kind at once when you do not know which verb holds it
+- `bal discover type ballerinax/twilio <Name> [-r]` — a declaration whole, with the types it names
 
 ## Clients — 1
 
-- `Client` — 199 remote · `bal library client ballerinax/twilio Client`
+- `Client` — 199 remote · `bal discover client ballerinax/twilio Client`
 
 ## Quickstart
 

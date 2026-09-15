@@ -1,26 +1,26 @@
-<!-- bal library overview v1 -->
+<!-- bal discover overview v1 -->
 # ballerinax/redis 0.0.0-fixture
 
 | | |
 |---|---|
-| Clients | 1 — `Client` — `bal library client ballerinax/redis` |
+| Clients | 1 — `Client` — `bal discover client ballerinax/redis` |
 | Classes | none |
 | Module functions | none |
-| Errors | 1 — `Error` — read one with `bal library type ballerinax/redis <Name>` |
+| Errors | 1 — `Error` — read one with `bal discover type ballerinax/redis <Name>` |
 | Types | 8 declarations (6 records, 1 type aliases, 1 enums), not listed here — read one with `type` |
-| Guide | 114 lines — `bal library guide ballerinax/redis` |
+| Guide | 114 lines — `bal discover guide ballerinax/redis` |
 
-Guide chunks (7): 1. `Step 2: Start Redis server`  2. `Step 3: Verify Redis connectivity`  3. `Step 1: Import the module`  4. `Step 2: Instantiate a new connector`  5. `Set a key-value pair`  6. `Get value by key`  7. `Step 4: Run the Ballerina application` — `bal library guide ballerinax/redis <n>`
+Guide chunks (7): 1. `Step 2: Start Redis server`  2. `Step 3: Verify Redis connectivity`  3. `Step 1: Import the module`  4. `Step 2: Instantiate a new connector`  5. `Set a key-value pair`  6. `Get value by key`  7. `Step 4: Run the Ballerina application` — `bal discover guide ballerinax/redis <n>`
 
 ## Next
 
-- `bal library client ballerinax/redis Client` — the client's whole callable surface
-- `bal library overview ballerinax/redis -s "<what you need>"` — search every kind at once when you do not know which verb holds it
-- `bal library type ballerinax/redis <Name> [-r]` — a declaration whole, with the types it names
+- `bal discover client ballerinax/redis Client` — the client's whole callable surface
+- `bal discover overview ballerinax/redis -s "<what you need>"` — search every kind at once when you do not know which verb holds it
+- `bal discover type ballerinax/redis <Name> [-r]` — a declaration whole, with the types it names
 
 ## Clients — 1
 
-- `Client` — 111 remote, 1 normal · `bal library client ballerinax/redis Client`
+- `Client` — 111 remote, 1 normal · `bal discover client ballerinax/redis Client`
 
 ## Quickstart
 

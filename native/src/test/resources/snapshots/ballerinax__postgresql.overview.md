@@ -1,52 +1,52 @@
-<!-- bal library overview v1 -->
+<!-- bal discover overview v1 -->
 # ballerinax/postgresql 0.0.0-fixture
 
 | | |
 |---|---|
-| Clients | 1 — `Client` — `bal library client ballerinax/postgresql` |
-| Classes | 126, too many to name here — `bal library class ballerinax/postgresql` |
+| Clients | 1 — `Client` — `bal discover client ballerinax/postgresql` |
+| Classes | 126, too many to name here — `bal discover class ballerinax/postgresql` |
 | Module functions | none |
 | Errors | none declared here; each operation names its error type in its `returns` clause |
 | Types | 162 declarations (32 records, 4 enums, 126 classes and object types), not listed here — read one with `type` |
-| Guide | 554 lines — `bal library guide ballerinax/postgresql` |
+| Guide | 554 lines — `bal discover guide ballerinax/postgresql` |
 
-Guide chunks (18): 1. `Prerequisite`  2. `Change data capture`  3. `Create a client`  4. `Using SSL`  5. `Connection pool handling`  6. `Close the client`  7. `Parameterized query`  8. `Create tables`  9. `Insert data`  10. `Insert data with auto-generated keys`  11. `Query data`  12. `Update data`  13. `Delete data`  14. `Batch update data`  15. `Execute stored procedures`  16. `Create a listener`  17. `Configure the database connection`  18. `Implement a service to handle CDC events` — `bal library guide ballerinax/postgresql <n>`
+Guide chunks (18): 1. `Prerequisite`  2. `Change data capture`  3. `Create a client`  4. `Using SSL`  5. `Connection pool handling`  6. `Close the client`  7. `Parameterized query`  8. `Create tables`  9. `Insert data`  10. `Insert data with auto-generated keys`  11. `Query data`  12. `Update data`  13. `Delete data`  14. `Batch update data`  15. `Execute stored procedures`  16. `Create a listener`  17. `Configure the database connection`  18. `Implement a service to handle CDC events` — `bal discover guide ballerinax/postgresql <n>`
 
 ## Next
 
-- `bal library client ballerinax/postgresql Client` — the client's whole callable surface
-- `bal library class ballerinax/postgresql` — 126 classes and object types, called with `.`
-- `bal library overview ballerinax/postgresql -s "<what you need>"` — search every kind at once when you do not know which verb holds it
-- `bal library type ballerinax/postgresql <Name> [-r]` — a declaration whole, with the types it names
+- `bal discover client ballerinax/postgresql Client` — the client's whole callable surface
+- `bal discover class ballerinax/postgresql` — 126 classes and object types, called with `.`
+- `bal discover overview ballerinax/postgresql -s "<what you need>"` — search every kind at once when you do not know which verb holds it
+- `bal discover type ballerinax/postgresql <Name> [-r]` — a declaration whole, with the types it names
 
 ## Clients — 1
 
-- `Client` — 5 remote, 1 normal · `bal library client ballerinax/postgresql Client`
+- `Client` — 5 remote, 1 normal · `bal discover client ballerinax/postgresql Client`
 
 ## Classes and object types — 126
 
-- `BitStringArrayValue` — nothing callable · `bal library class ballerinax/postgresql BitStringArrayValue`
-- `BitStringValue` — nothing callable · `bal library class ballerinax/postgresql BitStringValue`
-- `BoxArrayValue` — nothing callable · `bal library class ballerinax/postgresql BoxArrayValue`
-- `BoxOutParameter` — 1 normal · `bal library class ballerinax/postgresql BoxOutParameter`
-- `BoxValue` — nothing callable · `bal library class ballerinax/postgresql BoxValue`
-- `ByteaOutParameter` — 1 normal · `bal library class ballerinax/postgresql ByteaOutParameter`
-- `CidrArrayValue` — nothing callable · `bal library class ballerinax/postgresql CidrArrayValue`
-- `CidrOutParameter` — 1 normal · `bal library class ballerinax/postgresql CidrOutParameter`
-- `CidrValue` — nothing callable · `bal library class ballerinax/postgresql CidrValue`
-- `CircleArrayValue` — nothing callable · `bal library class ballerinax/postgresql CircleArrayValue`
-- `CircleOutParameter` — 1 normal · `bal library class ballerinax/postgresql CircleOutParameter`
-- `CircleValue` — nothing callable · `bal library class ballerinax/postgresql CircleValue`
-- `CustomResultIterator` — 2 normal · `bal library class ballerinax/postgresql CustomResultIterator`
-- `CustomTypeValue` — nothing callable · `bal library class ballerinax/postgresql CustomTypeValue`
-- `DateRangeArrayValue` — nothing callable · `bal library class ballerinax/postgresql DateRangeArrayValue`
-- `DateRangeOutParameter` — 1 normal · `bal library class ballerinax/postgresql DateRangeOutParameter`
-- `DateRangeValue` — nothing callable · `bal library class ballerinax/postgresql DateRangeValue`
-- `EnumOutParameter` — 1 normal · `bal library class ballerinax/postgresql EnumOutParameter`
-- `EnumValue` — nothing callable · `bal library class ballerinax/postgresql EnumValue`
-- `InetArrayValue` — nothing callable · `bal library class ballerinax/postgresql InetArrayValue`
+- `BitStringArrayValue` — nothing callable · `bal discover class ballerinax/postgresql BitStringArrayValue`
+- `BitStringValue` — nothing callable · `bal discover class ballerinax/postgresql BitStringValue`
+- `BoxArrayValue` — nothing callable · `bal discover class ballerinax/postgresql BoxArrayValue`
+- `BoxOutParameter` — 1 normal · `bal discover class ballerinax/postgresql BoxOutParameter`
+- `BoxValue` — nothing callable · `bal discover class ballerinax/postgresql BoxValue`
+- `ByteaOutParameter` — 1 normal · `bal discover class ballerinax/postgresql ByteaOutParameter`
+- `CidrArrayValue` — nothing callable · `bal discover class ballerinax/postgresql CidrArrayValue`
+- `CidrOutParameter` — 1 normal · `bal discover class ballerinax/postgresql CidrOutParameter`
+- `CidrValue` — nothing callable · `bal discover class ballerinax/postgresql CidrValue`
+- `CircleArrayValue` — nothing callable · `bal discover class ballerinax/postgresql CircleArrayValue`
+- `CircleOutParameter` — 1 normal · `bal discover class ballerinax/postgresql CircleOutParameter`
+- `CircleValue` — nothing callable · `bal discover class ballerinax/postgresql CircleValue`
+- `CustomResultIterator` — 2 normal · `bal discover class ballerinax/postgresql CustomResultIterator`
+- `CustomTypeValue` — nothing callable · `bal discover class ballerinax/postgresql CustomTypeValue`
+- `DateRangeArrayValue` — nothing callable · `bal discover class ballerinax/postgresql DateRangeArrayValue`
+- `DateRangeOutParameter` — 1 normal · `bal discover class ballerinax/postgresql DateRangeOutParameter`
+- `DateRangeValue` — nothing callable · `bal discover class ballerinax/postgresql DateRangeValue`
+- `EnumOutParameter` — 1 normal · `bal discover class ballerinax/postgresql EnumOutParameter`
+- `EnumValue` — nothing callable · `bal discover class ballerinax/postgresql EnumValue`
+- `InetArrayValue` — nothing callable · `bal discover class ballerinax/postgresql InetArrayValue`
 
-106 more, not listed — `bal library class ballerinax/postgresql -s "<what it does>"` searches all of them at once.
+106 more, not listed — `bal discover class ballerinax/postgresql -s "<what it does>"` searches all of them at once.
 
 ## Quickstart
 

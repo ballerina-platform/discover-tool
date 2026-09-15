@@ -1,4 +1,4 @@
-<!-- bal library funcs v1 -->
+<!-- bal discover funcs v1 -->
 # Module functions — ballerina/log
 
 | | |
@@ -7,7 +7,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal library funcs ballerina/log evaluateTemplate -r`
+- one call and every type it needs: `bal discover funcs ballerina/log evaluateTemplate -r`
 
 ## Module-level functions — 11, call with `.`
 
