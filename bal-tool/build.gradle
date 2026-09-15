@@ -1,0 +1,144 @@
+/*
+ *  Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com)
+ *
+ *  WSO2 LLC. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
+
+import org.apache.tools.ant.taskdefs.condition.Os
+
+plugins {
+    id 'io.ballerina.plugin'
+    id 'maven-publish'
+}
+
+description = 'Ballerina - Discover Tool'
+
+// Modelled on ballerina-platform/openapi-tools' `openapi-tool/build.gradle` — the working pattern for
+// a `bal tool` package built by `io.ballerina.plugin` and pushed to Central via `-PpublishToCentral=true`.
+// Simpler than that reference: `:native` produces exactly one jar, so there is one `[[dependency]]` and
+// one upstream `build` to depend on, not several.
+
+def packageName = "tool_discover"
+def packageOrg = "ballerina"
+def tomlVersion = stripBallerinaExtensionVersion("${project.version}")
+def ballerinaTomlFilePlaceHolder = new File("${project.rootDir}/config/resources/ToolBallerina.toml")
+def balToolTomlFilePlaceHolder = new File("${project.rootDir}/config/resources/BalTool.toml")
+def ballerinaTomlFile = new File("$project.projectDir/Ballerina.toml")
+def balToolTomlFile = new File("$project.projectDir/BalTool.toml")
+// Where `io.ballerina.plugin`'s own `unpackJballerinaTools` task actually extracts to — verified by
+// running it and inspecting the output; it is NOT the `build/target/extracted-distributions/...` path
+// openapi-tools' openapi-tool/build.gradle uses (that one instead points at a SIBLING project,
+// module-ballerina-openapi, which extracts there itself via its own hand-written Copy task — a pattern
+// that does not apply here since we have no such sibling and rely on the plugin's own task instead).
+def distributionPath = "${project.buildDir}/jballerina-tools-${ballerinaLangVersion}"
+def distributionBinPath = "${distributionPath}/bin"
+
+def stripBallerinaExtensionVersion(String extVersion) {
+    if (extVersion.matches(project.ext.timestampedVersionRegex)) {
+        def splitVersion = extVersion.split('-')
+        if (splitVersion.length > 3) {
+            def strippedValues = splitVersion[0..-4]
+            return strippedValues.join('-')
+        } else {
+            return extVersion
+        }
+    } else {
+        return extVersion.replace("${project.ext.snapshotVersion}", "")
+    }
+}
+
+ballerina {
+    packageOrganization = packageOrg
+    module = packageName
+    langVersion = ballerinaLangVersion
+}
+
+// `unpackJballerinaTools` itself comes from the `io.ballerina.plugin` plugin (declaring it here too,
+// as one might copy from a project that predates the plugin's own task, collides with it) — only the
+// `jbalTools` configuration it resolves against needs declaring.
+configurations {
+    jbalTools
+}
+
+dependencies {
+    jbalTools("org.ballerinalang:jballerina-tools:${ballerinaLangVersion}") {
+        transitive = false
+    }
+}
+
+task updateTomlFiles {
+    doLast {
+        def newBallerinaToml = ballerinaTomlFilePlaceHolder.text.replace("@toml.version@", tomlVersion)
+        ballerinaTomlFile.text = newBallerinaToml
+
+        def newBalToolTomlFile = balToolTomlFilePlaceHolder.text.replace("@project.version@", project.version)
+        balToolTomlFile.text = newBalToolTomlFile
+    }
+}
+
+task publishToLocal {
+    dependsOn ":native:build"
+    dependsOn unpackJballerinaTools
+    doLast {
+        project.exec {
+            println "distributionBinPath: $distributionBinPath"
+            workingDir project.projectDir
+            environment 'JAVA_OPTS', '-DBALLERINA_DEV_COMPILE_BALLERINA_ORG=true'
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                commandLine 'cmd', '/c', "$distributionBinPath/bal.bat pack && $distributionBinPath/bal.bat push --repository=local"
+            } else {
+                commandLine 'sh', '-c', "$distributionBinPath/bal pack && $distributionBinPath/bal push --repository=local"
+            }
+        }
+    }
+}
+
+task commitTomlFiles {
+    doLast {
+        project.exec {
+            ignoreExitValue true
+            if (Os.isFamily(Os.FAMILY_WINDOWS)) {
+                commandLine 'cmd', '/c', "git commit -m \"[Automated] Update the native jar version\" Ballerina.toml BalTool.toml"
+            } else {
+                commandLine 'sh', '-c', "git commit -m '[Automated] Update the native jar version' Ballerina.toml BalTool.toml"
+            }
+        }
+    }
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifact source: createArtifactZip, extension: 'zip'
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/ballerina-platform/discover-tool")
+            credentials {
+                username = System.getenv("packageUser")
+                password = System.getenv("packagePAT")
+            }
+        }
+    }
+}
+
+updateTomlFiles.dependsOn ":native:build"
+publishToLocal.dependsOn updateTomlFiles
+build.dependsOn "generatePomFileForMavenPublication"
+build.dependsOn publishToLocal
+publishToMavenLocal.dependsOn build
+publish.dependsOn build

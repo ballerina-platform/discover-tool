@@ -1,32 +1,58 @@
 # Distribution
 
-How the `bal library` tool reaches the machines that run it, and what is not possible today.
+How the `bal discover` tool reaches the machines that run it, and what is not possible today.
 
 ## Status
 
-**Ballerina Central publishing is not wired.** The goal is still that any user can install with
-`bal tool pull library`, but nothing here can produce that today, and the gap is structural rather
-than a missing credential:
+**The packaging step exists and is verified; Ballerina Central publishing itself is still not wired.**
+A `:bal-tool` subproject now applies `io.ballerina.plugin` the way
+`ballerina-platform/openapi-tools`' `openapi-tool` does, wrapping `:native`'s jar into a real
+`ballerina/tool_discover` bala. This has been run end to end in a working environment, not just read
+off the reference: `./gradlew :bal-tool:build` compiles `:native`, runs `bal pack`, then
+`bal push --repository=local`, producing
+`ballerina/tool_discover/0.1.0/java21/tool/libs/native-<version>.jar` inside the bala — and a
+subsequent `bal tool pull discover:0.1.0 --repository=local` followed by `bal discover --help`
+dispatches correctly through the system `bal`. Two things worth knowing before relying on this:
 
-- The `:ballerina` subproject that packaged the `.bala` for Central was **deleted** — it applied
-  `io.ballerina.plugin`, which resolves only from ballerina-platform's authenticated GitHub Packages
-  and therefore failed a clean build at *configuration* time, before the classpath was reached.
-  Nothing in this repo consumed the bala it produced. See
-  `runners/remote-worker/design/decisions/ADR-0008-the-bal-library-tool-is-built-in-the-image.md`.
-- The release workflow that once cut a zip lives in the tool's **previous upstream repository**, not
-  here. It builds with `-PlsVersion=…` and expects a `.bala` under `ballerina/build`; neither exists
-  in this tree, so tagging there against a synced source would fail at the build step.
+- **The platform directory is `java21`, not `any`.** A tool with a native (JVM) dependency packages
+  under a JDK-specific platform directory — `install-local.sh` and `release/install.{sh,ps1}` (what
+  `make-dist.sh` assembles into `dist/`) predate `:bal-tool` and originally hand-wrote a bala tree
+  under `any` with `"platform": "java"` instead. Both have since been corrected to write `java21`,
+  matching what a real `bal pack` produces, even though they still bypass `bal pack` entirely (they
+  write `package.json` and the tool jar directly and register the tool via `bal-tools.toml`).
+- **`io.ballerina.plugin` runs `commitTomlFiles` as part of `build` on its own initiative** — this
+  repo's `bal-tool/build.gradle` only *defines* that task (matching `openapi-tool/build.gradle`'s own
+  choice of name), it never wires it as a dependency, yet `./gradlew :bal-tool:build` still invoked
+  it and attempted a real `git commit Ballerina.toml BalTool.toml`. It failed harmlessly here only
+  because those files were not yet tracked by git in the test environment (`ignoreExitValue true`
+  swallows the failure either way) — on a checkout where they ARE tracked, a plain developer build
+  would silently attempt a commit. Treat that as inherited upstream behavior to be aware of, not
+  something introduced here; openapi-tools carries the identical risk.
 
-So there is currently **no way to cut a release of this tool from anywhere**. That is fine for the
-platform — the runner image compiles the tool from source, so it never needed a release — but it does
-mean the "Install a Released Version" path in the README is gone, and reinstating it is a decision
-someone has to take rather than a script someone has to run.
+What is still missing before an actual Central publish:
 
-Open questions if Central publishing is revived:
-- publishing under the `ballerinax` org on Ballerina Central
+- **No CI.** This repository has no `.github/workflows/` at all — a `pull-request.yml` build, a
+  `publish-release.yml`, and a `central-publish.yml` mirroring openapi-tools' three still need writing.
+- **No Central credentials provisioned.** `BALLERINA_CENTRAL_ACCESS_TOKEN` (plus dev/stage variants),
+  `BALLERINA_BOT_USERNAME`/`BALLERINA_BOT_TOKEN`, and the `packagePAT` this repo already needs just to
+  *build* (`org.ballerinalang:ballerina-cli` is GitHub-Packages-only) all live in `ballerina-platform`'s
+  org secrets, which nobody has requested yet.
+- **`-PpublishToCentral=true`** (openapi-tools' actual Central publish switch, wired into
+  `openapi-tool/build.gradle`'s own `build` task via `io.ballerina.plugin`) has not been exercised
+  against `:bal-tool` — only `bal push --repository=local` has been verified here, deliberately never
+  a real Central push.
+- **Versioning.** `gradle.properties` still pins `version=0.1.0-SNAPSHOT` and nothing moves it; a real
+  release needs `net.researchgate.release` (or an equivalent) wired in, plus an actual versioning
+  decision — not just a working pipeline.
+
+So `bal tool pull discover` against the real Ballerina Central still resolves nothing — nobody has
+pushed a `ballerina/tool_discover` bala anywhere Central-facing. What changed is that the remaining gap
+is CI, credentials and a release process, not a Gradle plugin that fails before the classpath is even
+reached.
+
+Open questions if Central publishing is finished:
 - whether the tool is officially supported or community-maintained
-- versioning and release cadence — `gradle.properties` pins `version=0.1.0-SNAPSHOT` and nothing
-  moves it, which is safe only because no artifact is addressed by that version today
+- versioning and release cadence
 
 ## How Ballerina tool distribution works
 
@@ -41,8 +67,8 @@ inside the `.bala` under `tool/libs/`.
     └── native-<version>.jar
 ```
 
-Once published, users would install with `bal tool pull library` and remove with
-`bal tool remove library`. The local installers below write this same tree by hand, into the local
+Once published, users would install with `bal tool pull discover` and remove with
+`bal tool remove discover`. The local installers below write this same tree by hand, into the local
 bala repository rather than a Central-backed one.
 
 ## The two install paths that DO work
@@ -52,7 +78,7 @@ Both derive the version from `gradle.properties`, which is the only place it is 
 ### `install-local.sh` — the developer loop
 
 Builds the native JAR and installs it into `~/.ballerina/repositories/local/bala`, registering
-`[[tool]] id = "library"` with `repository = "local"` in `~/.ballerina/.config/bal-tools.toml`.
+`[[tool]] id = "discover"` with `repository = "local"` in `~/.ballerina/.config/bal-tools.toml`.
 
 ```bash
 ./install-local.sh
@@ -76,7 +102,7 @@ beyond the dependency resolution the build itself needs.
 cd dist && ./install.sh     # on the target machine, in the target image
 ```
 
-This is the answer for anything that cannot `bal tool pull library`: a container image, or another
+This is the answer for anything that cannot `bal tool pull discover`: a container image, or another
 repository that vendors the tool. It is the ONE place that decides what a distribution contains, so
 the runner image and any future release zip cannot disagree about it — which is why the runner image
 runs this script rather than `gradlew :native:jar`, and why CI runs it too (`ci.yml`, the
@@ -92,7 +118,7 @@ by copying a prebuilt bala tree in.
 
 The runner image builds the tool itself. `runners/remote-worker/Dockerfile`'s first stage reaches the
 source through the `bal-library-tool` **named build context**, runs `make-dist.sh`, and the final
-stage runs the resulting `install.sh` as the `aep` user, followed by `bal library --help` as a smoke
+stage runs the resulting `install.sh` as the `aep` user, followed by `bal discover --help` as a smoke
 test. There is no artifact to refresh and no ordering to remember: a build cannot use a tool that is
 not this commit's.
 
@@ -120,9 +146,9 @@ the image's installed copy, aiming the mount with the version from `gradle.prope
 ./install-local.sh
 
 # 5. Smoke test — see README.md "Verification" for the full protocol
-bal library --help
-bal library overview ballerinax/kafka
-bal library type ballerina/http ClientRequestError --deps
+bal discover --help
+bal discover overview ballerinax/kafka
+bal discover type ballerina/http ClientRequestError --deps
 ```
 
 ## Notes
@@ -137,5 +163,5 @@ bal library type ballerina/http ClientRequestError --deps
 - Nothing needs to be bumped when anything upstream releases. The one coupling left is to the
   distribution's own versions of `picocli` and `gson`, so no code here may rely on a feature newer
   than what `bre/lib` ships.
-- The SPI entry at `META-INF/services/io.ballerina.cli.BLauncherCmd` wires `LibraryTool` as the
-  `bal library` command handler.
+- The SPI entry at `META-INF/services/io.ballerina.cli.BLauncherCmd` wires `DiscoverTool` as the
+  `bal discover` command handler.

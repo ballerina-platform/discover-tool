@@ -33,15 +33,19 @@ allprojects {
         }
     }
 
+    ext {
+        snapshotVersion = '-SNAPSHOT'
+        timestampedVersionRegex = '.*-\\d{8}-\\d{6}-\\w.*$'
+    }
 }
 
-// `:native` is the only project, so the root `build` is its build. What used to
-// be here — a `jballerina-tools` configuration, a `-SNAPSHOT`/timestamp version
-// regex and a second name for `:native:build` — all served the `:ballerina`
-// subproject that packaged a bala for Ballerina Central. Deleted by
-// runners/remote-worker/design/decisions/ADR-0008-the-bal-library-tool-is-built-in-the-image.md
-// (spelled out because this package has an ADR-0008 of its own, about registers
-// and views — the deletion belongs to the runner's, which owns how the tool ships).
+// `:bal-tool` packages `:native`'s jar into a `ballerina/tool_discover` bala via `io.ballerina.plugin` —
+// the same mechanism ballerina-platform/openapi-tools uses for `bal openapi`. A previous packaging
+// subproject in this tool's prior monorepo home was deleted there
+// (runners/remote-worker/design/decisions/ADR-0008-the-bal-library-tool-is-built-in-the-image.md,
+// a repo not present here) because that monorepo consumed the tool by compiling it straight into a
+// Docker runner image and never published it to Central. `:bal-tool` serves a different goal — actually
+// reaching Ballerina Central — and is not a revival of the deleted one; see internal-docs/distribution.md.
 tasks.register('build') {
-    dependsOn(":native:build")
+    dependsOn(":native:build", ":bal-tool:build")
 }
