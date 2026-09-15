@@ -137,6 +137,10 @@ public final class DiskCache implements DocsCache {
      * Windows does for some volumes — is accepted rather than refused: the check exists to avoid writing into
      * somebody else's directory, and refusing every root we cannot interrogate would disable caching wholesale
      * on a platform the installers support.
+     *
+     * <p>The comparison is case-insensitive because a Windows account name is: the SID is what the ACL
+     * actually stores, and the display name {@code Files.getOwner} resolves it to can differ in case from
+     * {@code user.name} (sourced from {@code USERNAME}) without being a different account.
      */
     private static boolean isOurs(Path root) throws IOException {
         String expected = System.getProperty("user.name");
@@ -149,7 +153,16 @@ public final class DiskCache implements DocsCache {
         } catch (UnsupportedOperationException ignored) {
             return true;
         }
-        return owner == null || owner.getName().equals(expected) || owner.getName().endsWith("\\" + expected);
+        if (owner == null) {
+            return true;
+        }
+        String name = owner.getName();
+        if (name.equalsIgnoreCase(expected)) {
+            return true;
+        }
+        String suffix = "\\" + expected;
+        return name.length() >= suffix.length()
+                && name.regionMatches(true, name.length() - suffix.length(), suffix, 0, suffix.length());
     }
 
     /**

@@ -18,7 +18,6 @@
 
 package io.ballerina.tools.discover.cache;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -117,16 +116,36 @@ public final class CacheLocation {
         return List.copyOf(candidates);
     }
 
+    /**
+     * Absolute by POSIX OR Windows spelling, regardless of which platform this JVM happens to run on.
+     *
+     * <p>{@code Path.of(path).isAbsolute()} answers relative to the HOST filesystem, not the spelling in
+     * {@code path} — {@code Path.of("/home/aep")} is absolute on a POSIX host and NOT absolute on a Windows
+     * one, since Windows requires a drive letter or UNC prefix. That would make this "pure function of the
+     * environment" secretly a function of the OS running the test too, which defeats the point of it being
+     * pure. A real {@code $HOME}/{@code $TMPDIR} is always already native to whatever host produced it, so
+     * recognizing both spellings here costs nothing on a real run and is what makes the candidates the same
+     * regardless of host.
+     */
     private static boolean isAbsolute(String path) {
-        try {
-            return Path.of(path).isAbsolute();
-        } catch (RuntimeException ignored) {
-            // A path the platform cannot even parse is not an absolute one.
-            return false;
-        }
+        return path.startsWith("/") || path.startsWith("\\")
+                || (path.length() >= 3 && Character.isLetter(path.charAt(0)) && path.charAt(1) == ':'
+                        && (path.charAt(2) == '/' || path.charAt(2) == '\\'));
     }
 
+    /**
+     * String concatenation rather than {@link java.nio.file.Path}, so the result does not depend on the host
+     * filesystem.
+     */
     private static String join(String first, String... rest) {
-        return Path.of(first, rest).toString();
+        StringBuilder joined = new StringBuilder(stripTrailingSeparator(first));
+        for (String segment : rest) {
+            joined.append('/').append(segment);
+        }
+        return joined.toString();
+    }
+
+    private static String stripTrailingSeparator(String path) {
+        return path.endsWith("/") || path.endsWith("\\") ? path.substring(0, path.length() - 1) : path;
     }
 }
