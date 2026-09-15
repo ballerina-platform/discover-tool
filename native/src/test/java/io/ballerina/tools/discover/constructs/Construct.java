@@ -23,8 +23,9 @@ package io.ballerina.tools.discover.constructs;
  *
  * <p>{@code renders} is what the reader prints TODAY. {@code shouldRender} is what the construct's own
  * Ballerina declaration is. Where they are equal the case carries {@code shouldRender = null} and is a
- * plain regression guard; where they differ the case names the finding in
- * {@code docs/design/draft/bal-library-central-fidelity.md} that explains the difference.
+ * plain regression guard; where they differ the case names the finding — a register ID (see
+ * {@link #finding}) from this package's pre-migration fidelity audit, a document that predates this
+ * repository and is not checked in here.
  *
  * <p>Holding both is the design decision worth explaining. A suite that asserted only the correct answer
  * would be 30-odd failures on a green checkout, so it would be switched off; a suite that asserted only

@@ -31,11 +31,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 #
 # Guarded, because `awk` exits 0 when it matches nothing — so `set -e` would let
 # an empty VERSION through and install to `.../tool_discover//java21`.
-VERSION="$(awk -F= '/^version=/{print $2}' "$SCRIPT_DIR/gradle.properties" | tr -d '[:space:]')"
-if [ -z "$VERSION" ]; then
+RAW_VERSION="$(awk -F= '/^version=/{print $2}' "$SCRIPT_DIR/gradle.properties" | tr -d '[:space:]')"
+if [ -z "$RAW_VERSION" ]; then
     echo "ERROR: no version= line in $SCRIPT_DIR/gradle.properties" >&2
     exit 1
 fi
+# `:bal-tool`'s own `stripBallerinaExtensionVersion` (bal-tool/build.gradle) strips a plain
+# "-SNAPSHOT" suffix before `bal pack`/`bal push --repository=local` register the bala, so a real
+# "0.1.0-SNAPSHOT" in gradle.properties resolves to a "0.1.0" bala coordinate. Match that here too —
+# otherwise this script and the `:bal-tool` gradle path install to two different local versions of the
+# same tool, and it stops being obvious which one `bal discover` resolves to. (Only the plain
+# "-SNAPSHOT" suffix is handled, not `:bal-tool`'s separate timestamped-version case — that format is
+# only produced by the dev/stage Central publish workflow, not a local build.)
+VERSION="${RAW_VERSION%-SNAPSHOT}"
 BALA_HOME="$HOME/.ballerina/repositories/local/bala"
 # java21, not any: this tool bundles a native JVM jar built for JDK 21, and that is what a real
 # `bal pack` files it under too (verified) — `any` is only for a pure-Ballerina, platform-independent
@@ -51,7 +59,9 @@ echo "==> Building JAR..."
 cd "$SCRIPT_DIR"
 ./gradlew :native:jar
 
-JAR="$SCRIPT_DIR/native/build/libs/native-$VERSION.jar"
+# Gradle's default `jar` task names this off the raw, unstripped `project.version` — not the
+# `-SNAPSHOT`-stripped $VERSION used for the bala coordinate below.
+JAR="$SCRIPT_DIR/native/build/libs/native-$RAW_VERSION.jar"
 if [ ! -f "$JAR" ]; then
     echo "ERROR: JAR not found at $JAR"
     exit 1
@@ -62,7 +72,12 @@ mkdir -p "$TOOL_LIBS"
 cp "$JAR" "$TOOL_LIBS/"
 
 echo "==> Writing package.json..."
-cp "$SCRIPT_DIR/Ballerina.toml" "$TOOL_BALA/"
+# Rewrite the version field rather than trust the root Ballerina.toml's hand-maintained value to
+# already agree with gradle.properties — nothing keeps the two in sync (unlike `bal-tool/Ballerina.toml`,
+# regenerated from a template on every build). A plain `cp` here would let the installed bala's
+# directory name and package.json show one version while its own bundled Ballerina.toml still declared
+# another, the moment the two source files drift.
+sed "s/^version = .*/version = \"$VERSION\"/" "$SCRIPT_DIR/Ballerina.toml" > "$TOOL_BALA/Ballerina.toml"
 BAL_VERSION=$(bal version | grep "^Ballerina" | awk '{print $2}')
 cat > "$TOOL_BALA/package.json" <<JSON
 {
