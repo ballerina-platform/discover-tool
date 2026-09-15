@@ -37,7 +37,9 @@ $balVersionLine = (& bal version | Select-String -Pattern '^Ballerina').Line
 $balVersion = ($balVersionLine -split '\s+')[1]
 
 $balaHome     = Join-Path $env:USERPROFILE '.ballerina\repositories\local\bala'
-$toolBala     = Join-Path $balaHome "$org\$name\$version\any"
+# java21, not any: this tool bundles a native JVM jar built for JDK 21, and that is what a real
+# `bal pack` files it under too.
+$toolBala     = Join-Path $balaHome "$org\$name\$version\java21"
 $toolLibs     = Join-Path $toolBala 'tool\libs'
 $balToolsToml = Join-Path $env:USERPROFILE '.ballerina\.config\bal-tools.toml'
 
@@ -59,7 +61,7 @@ $packageJson = @"
   "name": "$name",
   "version": "$version",
   "ballerina_version": "$balVersion",
-  "platform": "java"
+  "platform": "java21"
 }
 "@
 Set-Content -Path (Join-Path $toolBala 'package.json') -Value $packageJson -NoNewline

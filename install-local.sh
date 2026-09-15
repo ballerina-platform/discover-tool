@@ -30,14 +30,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # stale silently and installs to a path nothing else looks in.
 #
 # Guarded, because `awk` exits 0 when it matches nothing — so `set -e` would let
-# an empty VERSION through and install to `.../tool_discover//any`.
+# an empty VERSION through and install to `.../tool_discover//java21`.
 VERSION="$(awk -F= '/^version=/{print $2}' "$SCRIPT_DIR/gradle.properties" | tr -d '[:space:]')"
 if [ -z "$VERSION" ]; then
     echo "ERROR: no version= line in $SCRIPT_DIR/gradle.properties" >&2
     exit 1
 fi
 BALA_HOME="$HOME/.ballerina/repositories/local/bala"
-TOOL_BALA="$BALA_HOME/$ORG/$NAME/$VERSION/any"
+# java21, not any: this tool bundles a native JVM jar built for JDK 21, and that is what a real
+# `bal pack` files it under too (verified) — `any` is only for a pure-Ballerina, platform-independent
+# package, which this has never been.
+TOOL_BALA="$BALA_HOME/$ORG/$NAME/$VERSION/java21"
 TOOL_LIBS="$TOOL_BALA/tool/libs"
 BAL_TOOLS_TOML="$HOME/.ballerina/.config/bal-tools.toml"
 
@@ -67,7 +70,7 @@ cat > "$TOOL_BALA/package.json" <<JSON
   "name": "$NAME",
   "version": "$VERSION",
   "ballerina_version": "$BAL_VERSION",
-  "platform": "java"
+  "platform": "java21"
 }
 JSON
 

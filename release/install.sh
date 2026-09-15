@@ -52,7 +52,9 @@ fi
 
 BAL_VERSION=$(bal version | grep "^Ballerina" | awk '{print $2}')
 BALA_HOME="$HOME/.ballerina/repositories/local/bala"
-TOOL_BALA="$BALA_HOME/$ORG/$NAME/$VERSION/any"
+# java21, not any: this tool bundles a native JVM jar built for JDK 21, and that is what a real
+# `bal pack` files it under too.
+TOOL_BALA="$BALA_HOME/$ORG/$NAME/$VERSION/java21"
 TOOL_LIBS="$TOOL_BALA/tool/libs"
 BAL_TOOLS_TOML="$HOME/.ballerina/.config/bal-tools.toml"
 
@@ -71,7 +73,7 @@ cat > "$TOOL_BALA/package.json" <<JSON
   "name": "$NAME",
   "version": "$VERSION",
   "ballerina_version": "$BAL_VERSION",
-  "platform": "java"
+  "platform": "java21"
 }
 JSON
 
