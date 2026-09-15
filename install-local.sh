@@ -72,7 +72,12 @@ mkdir -p "$TOOL_LIBS"
 cp "$JAR" "$TOOL_LIBS/"
 
 echo "==> Writing package.json..."
-cp "$SCRIPT_DIR/Ballerina.toml" "$TOOL_BALA/"
+# Rewrite the version field rather than trust the root Ballerina.toml's hand-maintained value to
+# already agree with gradle.properties — nothing keeps the two in sync (unlike `bal-tool/Ballerina.toml`,
+# regenerated from a template on every build). A plain `cp` here would let the installed bala's
+# directory name and package.json show one version while its own bundled Ballerina.toml still declared
+# another, the moment the two source files drift.
+sed "s/^version = .*/version = \"$VERSION\"/" "$SCRIPT_DIR/Ballerina.toml" > "$TOOL_BALA/Ballerina.toml"
 BAL_VERSION=$(bal version | grep "^Ballerina" | awk '{print $2}')
 cat > "$TOOL_BALA/package.json" <<JSON
 {
