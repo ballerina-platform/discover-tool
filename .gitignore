@@ -22,3 +22,20 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Gradle / build output
+.gradle/
+build/
+dist/
+
+# IDE / OS
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# Local-only internal notes
+internal-docs/CONTEXT.md
+target/
+CLAUDE.md
+.claude/

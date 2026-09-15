@@ -1,0 +1,11 @@
+# Normalize to LF everywhere by default. Without this, a Windows checkout (Git for Windows
+# defaults to core.autocrlf=true) converts every fixture, snapshot and source file to CRLF, and
+# the test suite's byte-for-byte comparisons against LF-only rendered output all fail — see the
+# windows-build CI failures this was added to fix.
+* text=auto eol=lf
+
+gradlew text eol=lf
+*.bat text eol=crlf
+
+*.jar binary
+*.gz binary
