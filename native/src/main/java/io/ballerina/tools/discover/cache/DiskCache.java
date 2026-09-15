@@ -132,17 +132,22 @@ public final class DiskCache implements DocsCache {
     /**
      * Whether the current user owns the directory.
      *
-     * <p>There is no {@code getuid()} on the JVM, so this asks the filesystem for the owner principal and
-     * compares its name to {@code user.name}. A filesystem that cannot report an owner — which is what
-     * Windows does for some volumes — is accepted rather than refused: the check exists to avoid writing into
-     * somebody else's directory, and refusing every root we cannot interrogate would disable caching wholesale
-     * on a platform the installers support.
-     *
-     * <p>The comparison is case-insensitive because a Windows account name is: the SID is what the ACL
-     * actually stores, and the display name {@code Files.getOwner} resolves it to can differ in case from
-     * {@code user.name} (sourced from {@code USERNAME}) without being a different account.
+     * <p>There is no {@code getuid()} on the JVM, so on a POSIX filesystem this asks for the owner principal
+     * and compares its name to {@code user.name} — the same account name spelling on both sides of a POSIX
+     * {@code stat()}. Checked only there: on a non-POSIX filesystem (Windows), the same {@link
+     * PosixFilePermissions} feature test {@link #createDirectories} already uses to skip setting a mode is
+     * used here to skip this check too, and for the matching reason — {@code createDirectories}'s own javadoc
+     * notes Windows inherits the parent's ACL, which for a user's own profile directory already restricts it
+     * to that user, so the ACL is doing this job already. The owner name Windows hands back for that ACL is
+     * not one specific spelling of the account — the observed domain-qualification and case both vary by
+     * runner — so comparing it against {@code user.name} would be guessing at a format rather than checking
+     * an identity, and refusing every root that guess gets wrong would disable caching wholesale on a
+     * platform the installers support.
      */
     private static boolean isOurs(Path root) throws IOException {
+        if (!root.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            return true;
+        }
         String expected = System.getProperty("user.name");
         if (expected == null || expected.isEmpty()) {
             return true;
@@ -153,16 +158,7 @@ public final class DiskCache implements DocsCache {
         } catch (UnsupportedOperationException ignored) {
             return true;
         }
-        if (owner == null) {
-            return true;
-        }
-        String name = owner.getName();
-        if (name.equalsIgnoreCase(expected)) {
-            return true;
-        }
-        String suffix = "\\" + expected;
-        return name.length() >= suffix.length()
-                && name.regionMatches(true, name.length() - suffix.length(), suffix, 0, suffix.length());
+        return owner == null || owner.getName().equals(expected);
     }
 
     /**
