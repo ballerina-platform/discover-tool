@@ -38,3 +38,4 @@ dist/
 internal-docs/CONTEXT.md
 target/
 CLAUDE.md
+.claude/
