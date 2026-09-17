@@ -28,41 +28,29 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Everything this tool needs at RUN time is already on the Ballerina distribution's classpath
-// (`bre/lib` ships gson, picocli and the CLI launcher), so the dependencies are compile-only and the
-// jar carries nothing but our own classes — roughly 370KB, no third-party code redistributed.
-//
-// BUILD time is a different question, and conflating the two is why the credential requirement below
-// went unnoticed: `org.ballerinalang:ballerina-cli` is published only to ballerina-platform's GitHub
-// Packages, so resolving it needs `packageUser`/`packagePAT` with `read:packages`. The whole of that
-// dependency is one interface, `io.ballerina.cli.BLauncherCmd`.
 dependencies {
     compileOnly "org.ballerinalang:ballerina-cli:${ballerinaLangVersion}"
     compileOnly "info.picocli:picocli:${picocliVersion}"
     compileOnly "com.google.code.gson:gson:${gsonVersion}"
 
-    testImplementation "org.ballerinalang:ballerina-cli:${ballerinaLangVersion}"
-    testImplementation "info.picocli:picocli:${picocliVersion}"
-    testImplementation "com.google.code.gson:gson:${gsonVersion}"
     testImplementation "org.testng:testng:${testngVersion}"
+}
+
+configurations {
+    testImplementation.extendsFrom(compileOnly)
 }
 
 test {
     useTestNG()
-    // The corpus is 12.4MB of JSON for one fixture and the suite holds several parsed at once. `bal`
-    // itself launches with -Xmx2048m, so this is the same ceiling the tool has in production.
     maxHeapSize = '2048m'
-    systemProperty "project.version", "${project.version}"
+    systemProperty 'project.version', "${project.version}"
     testLogging {
-        events "failed"
-        exceptionFormat "full"
+        events 'failed'
+        exceptionFormat 'full'
     }
     finalizedBy jacocoTestReport
 }
 
-// Coverage is a map of what the suite does not reach, not a score to chase. The reason it is wired at
-// all: the fidelity register lists defects whose fix sites are read once, deep in a payload walk, and a
-// line nothing executes is a line whose fix nothing will verify.
 jacoco {
     toolVersion = '0.8.12'
 }
@@ -76,8 +64,6 @@ jacocoTestReport {
     }
 }
 
-// A floor, set at what the suite reaches today rather than at an aspiration, so it fails on a
-// REGRESSION and never on an untouched gap. Raise it when a stage of the fidelity fix plan lands.
 jacocoTestCoverageVerification {
     dependsOn jacocoTestReport
     violationRules {

@@ -17,18 +17,13 @@
  */
 
 allprojects {
-    group = project.group
-    version = project.version
-
     repositories {
-        mavenLocal()
         mavenCentral()
-
         maven {
             url = 'https://maven.pkg.github.com/ballerina-platform/*'
             credentials {
-                username System.getenv("packageUser")
-                password System.getenv("packagePAT")
+                username System.getenv('packageUser')
+                password System.getenv('packagePAT')
             }
         }
     }
@@ -39,13 +34,3 @@ allprojects {
     }
 }
 
-// `:bal-tool` packages `:native`'s jar into a `ballerina/tool_discover` bala via `io.ballerina.plugin` —
-// the same mechanism ballerina-platform/openapi-tools uses for `bal openapi`. A previous packaging
-// subproject in this tool's prior monorepo home was deleted there
-// (runners/remote-worker/design/decisions/ADR-0008-the-bal-library-tool-is-built-in-the-image.md,
-// a repo not present here) because that monorepo consumed the tool by compiling it straight into a
-// Docker runner image and never published it to Central. `:bal-tool` serves a different goal — actually
-// reaching Ballerina Central — and is not a revival of the deleted one; see internal-docs/distribution.md.
-tasks.register('build') {
-    dependsOn(":native:build", ":bal-tool:build")
-}

@@ -12,8 +12,8 @@ bal discover client --help   # one verb: its flags, and what its own reader need
 **The tool documents itself, and there is one copy of each thing it says.** The lists inside `--help`
 are rendered from the picocli model rather than written twice; a flag is described on the
 verb that accepts it, and a rule about something a document prints is printed by that document, beside
-the thing it is about. The root text stops at the verb list: it answers *what can I ask,
-and how*, while the discipline a caller carries into a lookup — a `// Special Agent Note:` is the
+the thing it is about. The root text stops at the verb list: it answers _what can I ask,
+and how_, while the discipline a caller carries into a lookup — a `// Special Agent Note:` is the
 import, a `## Next` block is a pointer, a failure `kind` says whether to retry — belongs to the agent
 skill that is in context when it applies. This file deliberately
 does not restate the grammar — a second copy on a different release clock is exactly what that
@@ -28,31 +28,31 @@ iterate on and verify it.
 several turns and usually ends in a wrong extent. The addressed verbs answer by name or by path
 instead, and the numbers are why each one exists:
 
-| | measured |
-|---|---|
-| `overview` is a bounded MAP | it generates no signature at all, so its size is a property of the design rather than of the package — the eleven-package corpus is **732 lines**, against 2,426 when it carried signatures and 4,168 when it carried the readme too. A byte cap would still have let `ballerina/crypto` emit 20,000 bytes before degrading |
-| the map is ordered to survive a pipe | **80% of recorded lookups were piped**, so it leads with facts, quickstart and navigation — a `head -100` reaches `## Next` in 11 packages of 11, against 0 of 11 before |
-| `guide` is a verb, not a section | the readme was **44% of the entry document and 29% of it was account setup**. A code-only extract was considered and rejected: `googleapis.sheets`' readme is 178 lines with 4 code blocks, so it would discard 85% of it — including the note that `deleteSpreadsheet` needs the Drive API enabled, which no signature implies |
-| `client` walks a path tree | github's **903 operations reduce to 36 top-level segments in 445 bytes**, and each level names the next command |
-| `client` also addresses names | a remote function has no path, so the same slot takes a name filter — twilio's **200 operations are an index of names, not 62,063 bytes of signatures** |
-| three verbs, not one | `client`, `class` and `funcs` split the callable surface by how it is CALLED. Central publishes no `isClient` key, so the split is derived from the grammar: `ballerina/http` has ten clients, two of which Central files as ordinary declarations |
-| `-r` stops at the package edge | `http:ConnectionConfig` has a local closure of one and **fifteen** external edges; following them would hide a five-second fetch inside an answer the caller expects to be warm |
-| `-r` is bounded and names what it drops | `http:ClientConfiguration` was 38 declarations, 505 lines and 24,183 bytes handed back whole |
-| `find` demotes unadopted packages | measured, Central ranks a **one-pull** package fourth for `http client` |
-| the payload cache | **8.0s cold, 1.2s warm** on `ballerinax/github` — what makes four precise questions cheaper than one big answer |
+|                                         | measured                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `overview` is a bounded MAP             | it generates no signature at all, so its size is a property of the design rather than of the package — the eleven-package corpus is **732 lines**, against 2,426 when it carried signatures and 4,168 when it carried the readme too. A byte cap would still have let `ballerina/crypto` emit 20,000 bytes before degrading     |
+| the map is ordered to survive a pipe    | **80% of recorded lookups were piped**, so it leads with facts, quickstart and navigation — a `head -100` reaches `## Next` in 11 packages of 11, against 0 of 11 before                                                                                                                                                        |
+| `guide` is a verb, not a section        | the readme was **44% of the entry document and 29% of it was account setup**. A code-only extract was considered and rejected: `googleapis.sheets`' readme is 178 lines with 4 code blocks, so it would discard 85% of it — including the note that `deleteSpreadsheet` needs the Drive API enabled, which no signature implies |
+| `client` walks a path tree              | github's **903 operations reduce to 36 top-level segments in 445 bytes**, and each level names the next command                                                                                                                                                                                                                 |
+| `client` also addresses names           | a remote function has no path, so the same slot takes a name filter — twilio's **200 operations are an index of names, not 62,063 bytes of signatures**                                                                                                                                                                         |
+| three verbs, not one                    | `client`, `class` and `funcs` split the callable surface by how it is CALLED. Central publishes no `isClient` key, so the split is derived from the grammar: `ballerina/http` has ten clients, two of which Central files as ordinary declarations                                                                              |
+| `-r` stops at the package edge          | `http:ConnectionConfig` has a local closure of one and **fifteen** external edges; following them would hide a five-second fetch inside an answer the caller expects to be warm                                                                                                                                                 |
+| `-r` is bounded and names what it drops | `http:ClientConfiguration` was 38 declarations, 505 lines and 24,183 bytes handed back whole                                                                                                                                                                                                                                    |
+| `find` demotes unadopted packages       | measured, Central ranks a **one-pull** package fourth for `http client`                                                                                                                                                                                                                                                         |
+| the payload cache                       | **8.0s cold, 1.2s warm** on `ballerinax/github` — what makes four precise questions cheaper than one big answer                                                                                                                                                                                                                 |
 
 Five behaviours worth knowing because no signature shows them:
 
 - **Line one states the document's own length**, in both registers. Piping was measured at 100% of
   sessions and did not respond to being asked not to — and the reason turned out not to be about this
   tool at all: every session that piped had piped a genuinely noisy command (`bal openapi`, `bal tool
-  pull`) moments earlier, and the `| head` arrived on `bal discover --help` before a byte of any
+pull`) moments earlier, and the `| head` arrived on `bal discover --help` before a byte of any
   document had been seen. A `| head -150` over one github operation's 535-line closure discards 72% and
   ends mid-record; the length makes that arithmetic instead of a guess.
 
 - **Paths match from the first segment.** An unanchored match for `repos/{owner}/{repo}` would return
   nine operations rather than three, mixing in two unrelated subtrees about team access. The one
-  relaxation is a *trailing* segment: `repos/owner/repo/caches` is answered at
+  relaxation is a _trailing_ segment: `repos/owner/repo/caches` is answered at
   `repos/{owner}/{repo}/actions/caches` when that is the only match, and listed rather than chosen
   when it is not.
 - **A wrong guess costs a line, not a round trip.** A verb given another kind's symbol still answers,
@@ -98,7 +98,7 @@ OpenJDK 21 ([Adopt OpenJDK](https://adoptopenjdk.net/) or any other OpenJDK dist
 
 **And a GitHub token with `read:packages`, exported as `packagePAT`.** This is not optional and it is
 worth saying plainly, because this file used to claim the opposite. `org.ballerinalang:ballerina-cli`
-— the one dependency that is not on Maven Central — is published *only* to ballerina-platform's GitHub
+— the one dependency that is not on Maven Central — is published _only_ to ballerina-platform's GitHub
 Packages, which requires authentication even for a public read. Without it Gradle fails with
 `Username must not be null!`.
 
@@ -118,6 +118,7 @@ and `bal` discovers through `META-INF/services`. Everything else — gson, picoc
 ### Build
 
 ```bash
+./gradlew build            # the complete project
 ./gradlew :native:jar      # the tool jar (~370KB, our classes only)
 ./gradlew :native:test     # the suite — 715 cases, offline
 ./gradlew :bal-tool:build  # packages the jar into a ballerina/tool_discover bala
@@ -136,8 +137,8 @@ for this — the same one "Installing It" above describes — not a faster hand-
 ### Apply a change
 
 ```bash
-./gradlew :bal-tool:build
-bal tool pull ballerina/tool_discover:<version> --repository=local
+./gradlew build -P publishToLocalCentral=true
+bal tool pull discover:<version> --repository=local
 ```
 
 The next `bal discover` invocation picks up the change.
@@ -145,7 +146,7 @@ The next `bal discover` invocation picks up the change.
 ### Test
 
 ```bash
-./gradlew :native:test
+./gradlew test
 ```
 
 The suite is offline and hermetic: no network, and no test can reach your real `~/.cache`. When a
@@ -160,10 +161,10 @@ The 13 `.bal` snapshots have no update switch on purpose. They are the oracle.
 
 It runs at two scales, and the difference matters when you change how something renders:
 
-| | asks | answers |
-|---|---|---|
-| **the corpus** — `CorpusTest`, `ViewsTest`, `ViewsAgreeTest` | 13 recorded packages, whole documents | *did anything move?* |
-| **the constructs** — `constructs/ConstructTest` | one synthetic payload per Ballerina syntax dimension | *which construct moved, and is it now right?* |
+|                                                              | asks                                                 | answers                                       |
+| ------------------------------------------------------------ | ---------------------------------------------------- | --------------------------------------------- |
+| **the corpus** — `CorpusTest`, `ViewsTest`, `ViewsAgreeTest` | 13 recorded packages, whole documents                | _did anything move?_                          |
+| **the constructs** — `constructs/ConstructTest`              | one synthetic payload per Ballerina syntax dimension | _which construct moved, and is it now right?_ |
 
 A change to how closed records render fails one construct case by name; the corpus reports it as
 several thousand lines of snapshot diff across four packages. Both are wanted — the corpus is the
@@ -334,5 +335,5 @@ All contributors are encouraged to read the [Ballerina Code of Conduct](https://
 
 ## Useful Links
 
-* Chat live with us via our [Discord server](https://discord.gg/ballerinalang).
-* Post all technical questions on Stack Overflow with the [#ballerina](https://stackoverflow.com/questions/tagged/ballerina) tag.
+- Chat live with us via our [Discord server](https://discord.gg/ballerinalang).
+- Post all technical questions on Stack Overflow with the [#ballerina](https://stackoverflow.com/questions/tagged/ballerina) tag.
