@@ -1,0 +1,9 @@
+[package]
+org = "ballerina"
+name = "tool_discover"
+version = "@toml.version@"
+authors = ["Ballerina"]
+keywords = ["discover", "search", "copilot"]
+repository = "https://github.com/ballerina-platform/discover-tool"
+license = ["Apache-2.0"]
+distribution = "2201.13.2"
