@@ -77,6 +77,7 @@ tasks.register('updateTomlFiles') {
 }
 
 tasks.register('commitTomlFiles')  {
+    onlyIf { project.hasProperty('autoCommitToml') }
     doLast {
         project.exec {
             ignoreExitValue true

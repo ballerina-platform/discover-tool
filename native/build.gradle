@@ -18,6 +18,8 @@
 
 plugins {
     id 'java'
+    id 'checkstyle'
+    id 'com.github.spotbugs'
     id 'jacoco'
 }
 
@@ -29,11 +31,44 @@ java {
 }
 
 dependencies {
+    checkstyle project(':checkstyle')
+    checkstyle "com.puppycrawl.tools:checkstyle:${checkstylePluginVersion}"
+
     compileOnly "org.ballerinalang:ballerina-cli:${ballerinaLangVersion}"
     compileOnly "info.picocli:picocli:${picocliVersion}"
     compileOnly "com.google.code.gson:gson:${gsonVersion}"
 
     testImplementation "org.testng:testng:${testngVersion}"
+}
+
+checkstyle {
+    toolVersion "${checkstylePluginVersion}"
+    configFile rootProject.file("config/checkstyle/build/checkstyle.xml")
+    configProperties = ["suppressionFile": file("${rootDir}/config/checkstyle/build/suppressions.xml")]
+}
+
+checkstyleMain.dependsOn(":checkstyle:downloadCheckstyleRuleFiles")
+checkstyleTest.dependsOn(":checkstyle:downloadCheckstyleRuleFiles")
+
+spotbugsMain {
+    def classLoader = plugins["com.github.spotbugs"].class.classLoader
+    def spotbugsEffort = classLoader.findLoadedClass("com.github.spotbugs.snom.Effort")
+    def spotbugsConfidence = classLoader.findLoadedClass("com.github.spotbugs.snom.Confidence")
+    effort = spotbugsEffort.MAX
+    reportLevel = spotbugsConfidence.LOW
+    reportsDir = file("$project.buildDir/reports/spotbugs")
+    reports {
+        html.enabled true
+        text.enabled = true
+    }
+    def excludeFile = file("${rootDir}/spotbugs-exclude.xml")
+    if (excludeFile.exists()) {
+        excludeFilter = excludeFile
+    }
+}
+
+spotbugsTest {
+    enabled = false
 }
 
 configurations {
