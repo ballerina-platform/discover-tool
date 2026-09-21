@@ -46,13 +46,24 @@ public final class CacheLocation {
     private CacheLocation() {
     }
 
-    /** Everything about the machine the decision depends on. */
+    /**
+     * Everything about the machine the decision depends on.
+     *
+     * @param env the process environment variables
+     * @param homedir the user's home directory
+     * @param tmpdir the platform's temporary directory
+     * @param user the current user's name
+     */
     public record Environment(Map<String, String> env, String homedir, String tmpdir, String user) { }
 
     /** One rung of the preference list. */
     public sealed interface Candidate {
 
-        /** No cache at all: either asked for, or nowhere safe to put one. */
+        /**
+         * No cache at all: either asked for, or nowhere safe to put one.
+         *
+         * @param reason why there is no cache
+         */
         record Disabled(String reason) implements Candidate { }
 
         record Directory(String root, int mode) implements Candidate { }

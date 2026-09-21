@@ -31,10 +31,20 @@ package io.ballerina.tools.discover;
  */
 public sealed interface Result<T> {
 
-    /** A value. */
+    /**
+     * A value.
+     *
+     * @param <T> the value's type
+     * @param value the value
+     */
     record Ok<T>(T value) implements Result<T> { }
 
-    /** A failure. The type parameter is phantom, so an error can be re-typed by {@link #cast()}. */
+    /**
+     * A failure. The type parameter is phantom, so an error can be re-typed by {@link #cast()}.
+     *
+     * @param <T> the value type a successful result would have carried
+     * @param failure what went wrong
+     */
     record Err<T>(Failure failure) implements Result<T> { }
 
     static <T> Result<T> ok(T value) {

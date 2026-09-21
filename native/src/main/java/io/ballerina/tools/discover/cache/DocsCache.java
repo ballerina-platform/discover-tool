@@ -49,13 +49,29 @@ import java.util.List;
  */
 public interface DocsCache {
 
-    /** A package's immutable coordinates — the whole key of a docs entry. */
+    /**
+     * A package's immutable coordinates — the whole key of a docs entry.
+     *
+     * @param org the package organization
+     * @param name the package name
+     * @param version the package version
+     */
     record DocsKey(String org, String name, String version) { }
 
-    /** A package without a version, which is what the versions list is keyed by. */
+    /**
+     * A package without a version, which is what the versions list is keyed by.
+     *
+     * @param org the package organization
+     * @param name the package name
+     */
     record PackageKey(String org, String name) { }
 
-    /** The one mutable answer Central gives, and when we last believed it. */
+    /**
+     * The one mutable answer Central gives, and when we last believed it.
+     *
+     * @param version the latest version Central answered with
+     * @param atMs when that answer was cached, as epoch milliseconds
+     */
     record LatestEntry(String version, long atMs) { }
 
     /** The raw payload, or {@code null} for any reason whatsoever. */

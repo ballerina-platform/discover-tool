@@ -88,6 +88,10 @@ public final class Patches {
      * <p>What is deliberately absent matters as much: http's 51 errors whose {@code detailType} is a plain
      * named base carry no detail record at all, and attaching one would make every {@code SslError}
      * advertise an {@code int statusCode} it does not have.
+     *
+     * @param library the package the pin was read from, as {@code org/name}
+     * @param declaration the error type the argument belongs to
+     * @param argument the detail record argument, as source text
      */
     private record DetailArgument(String library, String declaration, String argument) { }
 

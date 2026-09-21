@@ -40,6 +40,11 @@ import java.util.List;
  * Central publishes no inclusion for an object type — so this is the whole of what can be known, and a type it
  * is false for gets its contract stated rather than a template that does not compile.
  *
+ * @param name the service type's name
+ * @param isDeprecated whether Central flagged the type deprecated
+ * @param listener the listener it binds to, and what its constructor takes
+ * @param methods the remote contract the service block must implement
+ * @param isAttachable whether the listener's {@code attach} names this type
  * @since 0.1.0
  */
 public record Service(
@@ -54,6 +59,9 @@ public record Service(
      *
      * <p>{@code name} is qualified ({@code kafka:Listener}) because a service is written in the caller's
      * module, where the listener is a foreign name.
+     *
+     * @param name the listener's qualified name
+     * @param initParams what its constructor takes
      */
     public record Listener(String name, List<Param> initParams) { }
 }

@@ -23,7 +23,6 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
-import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.Report;
 import io.ballerina.tools.discover.render.Signatures;
@@ -516,7 +515,12 @@ public final class Containers {
     // Selection inside one container
     // -----------------------------------------------------------------------
 
-    /** One callable, with the path it is reached by when it has one. */
+    /**
+     * One callable, with the path it is reached by when it has one.
+     *
+     * @param fn the callable
+     * @param path the path it is reached by, empty when it has none
+     */
     public record Entry(Fn fn, List<String> path) {
 
         /** How it is addressed: {@code get repos/{owner}} for a resource, the bare name otherwise. */
@@ -605,7 +609,12 @@ public final class Containers {
         return all.stream().filter(entry -> matchesName(entry, token)).toList();
     }
 
-    /** A path request, split into the accessor that filters it and the path that anchors it. */
+    /**
+     * A path request, split into the accessor that filters it and the path that anchors it.
+     *
+     * @param accessor the accessor that filters it, empty when none was given
+     * @param tokens the path tokens that anchor it
+     */
     private record PathRequest(String accessor, List<String> tokens) { }
 
     /** How a path selector reads against this container, or nothing when it is not one. */

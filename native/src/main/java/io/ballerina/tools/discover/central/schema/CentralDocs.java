@@ -55,6 +55,35 @@ public record CentralDocs(List<Module> modules) {
      * combination of flags is set. Every field is optional because the same node type stands in for a
      * builtin, an external record reference, an inline record's field, a union member and an array
      * element.
+     *
+     * @param name the type's own name, when it has one
+     * @param category which of Central's type categories this node was read from
+     * @param orgName the organization of the module that declares it, when it is an external reference
+     * @param moduleName the module that declares it, when it is an external reference
+     * @param version the version of the module that declares it, when it is an external reference
+     * @param description the type's own documentation, when it has one
+     * @param isArrayType whether this node is an array type
+     * @param isNullable whether the type includes {@code ()}
+     * @param isOptional whether the field or parameter it describes is optional
+     * @param isAnonymousUnionType whether this node is an inline union
+     * @param isIntersectionType whether this node is an intersection type
+     * @param isParenthesisedType whether the source wrote it in parentheses
+     * @param isTypeDesc whether this node is a {@code typedesc}
+     * @param isTuple whether this node is a tuple type
+     * @param isRestParam whether this node describes a rest parameter
+     * @param isInclusion whether this node describes an included type
+     * @param isReadOnly whether Central declared the type {@code readonly}
+     * @param isDeprecated whether Central flagged the type deprecated
+     * @param isIsolated whether Central declared the type {@code isolated}
+     * @param isDistinct whether Central declared the type {@code distinct}
+     * @param isLambda whether this node is a function-type value
+     * @param arrayDimensions how many array dimensions the type has
+     * @param constraint the constraint type, for a constrained builtin such as {@code map&lt;T&gt;}
+     * @param elementType the array's element type, when this node is an array
+     * @param returnType the function's return type, when this node is a function type
+     * @param memberTypes the union's or tuple's member types, when this node is one
+     * @param paramTypes a lambda's parameter types
+     * @param functionTypes an anonymous object type's methods, each as a function-type node
      */
     public record TypeNode(
             Optional<String> name,
@@ -113,6 +142,12 @@ public record CentralDocs(List<Module> modules) {
      *
      * <p>Central sends the declaration's coordinates and nothing about the arguments, which is why a
      * rendered attachment can only be {@code @module:Name} — see the note on {@link Annotation}.
+     *
+     * @param name the annotation's name
+     * @param orgName the organization of the module that declares it
+     * @param moduleName the module that declares it
+     * @param version the version of the module that declares it
+     * @param description the annotation's own documentation, when it has one
      */
     public record AnnotationRef(
             String name,
@@ -135,6 +170,19 @@ public record CentralDocs(List<Module> modules) {
      * {@code init}, a service type's remote contract. Which of the four it is comes from
      * {@code name.equals("init")}, {@code isResource} and {@code isRemote} — the same discrimination
      * {@code FromCentral} performs once, so the rest of the codebase never sees these flags.
+     *
+     * @param name the function's name
+     * @param description the function's own documentation, when it has one
+     * @param isRemote whether it is a {@code remote} method
+     * @param isResource whether it is a {@code resource} method
+     * @param isDeprecated whether Central flagged it deprecated
+     * @param isIsolated whether Central declared it {@code isolated}
+     * @param isExtern whether it is an {@code external} function
+     * @param accessor the resource accessor, when it is a resource method
+     * @param resourcePath the resource path, when it is a resource method
+     * @param parameters its parameters
+     * @param returnParameters its return type, and the return's own description
+     * @param annotations the annotations attached to it
      */
     public record Method(
             String name,
@@ -189,7 +237,13 @@ public record CentralDocs(List<Module> modules) {
         }
     }
 
-    /** A name and a description: an enum's member, and nothing else in the payload. */
+    /**
+     * A name and a description: an enum's member, and nothing else in the payload.
+     *
+     * @param name the member's name
+     * @param description the member's own documentation, when it has one
+     * @param isDeprecated whether Central flagged the member deprecated
+     */
     public record Named(String name, Optional<String> description, boolean isDeprecated) { }
 
     /**
@@ -207,6 +261,10 @@ public record CentralDocs(List<Module> modules) {
      * <p>{@code type} is the declaration object read AS a type node, which is not a trick — a Ballerina
      * type alias IS a name bound to a type descriptor, and that is how Central publishes it. Reading it
      * this way is what makes {@code simpleNameReferenceTypes}' resolved target available at all.
+     *
+     * @param name the alias's name
+     * @param description the alias's own documentation, when it has one
+     * @param type the descriptor it is bound to
      */
     public record AliasDecl(String name, Optional<String> description, TypeNode type) { }
 
@@ -221,6 +279,18 @@ public record CentralDocs(List<Module> modules) {
      * <p>{@code otherMethods} is Central's name for the methods that are neither remote nor resource;
      * {@code methods} holds the ones that are. A caller needs both, and the previous reader took the name
      * and discarded every one of them.
+     *
+     * @param name the declaration's name
+     * @param description the declaration's own documentation, when it has one
+     * @param isDeprecated whether Central flagged the declaration deprecated
+     * @param isIsolated whether Central declared it {@code isolated}
+     * @param isReadOnly whether Central declared it {@code readonly}
+     * @param isService whether it is a service type
+     * @param isDistinct whether Central declared it {@code distinct}
+     * @param initMethod its {@code init} method, when it declares one
+     * @param fields its own fields
+     * @param methods its remote and resource methods
+     * @param otherMethods its methods that are neither remote nor resource
      */
     public record ObjectDecl(
             String name,
@@ -254,6 +324,13 @@ public record CentralDocs(List<Module> modules) {
      * <p>One shape for both, again by measurement: http's 61 variables and 13 configurables and graphql's
      * 3 and 1 all carry the same six keys. Neither was read at all, so a configurable — which is the one
      * declaration a deployer must set — appeared in no verb.
+     *
+     * @param name the variable's name
+     * @param description the variable's own documentation, when it has one
+     * @param defaultValue its default, as source text, when it has one
+     * @param isReadOnly whether Central declared its type {@code readonly}
+     * @param isDeprecated whether Central flagged it deprecated
+     * @param type its declared type
      */
     public record VariableDecl(
             String name,
@@ -274,6 +351,11 @@ public record CentralDocs(List<Module> modules) {
      * error at the top of its own hierarchy ({@code http:Error}, {@code kafka:Error}) narrows nothing.
      * Despite the name it holds the distinct SUPERTYPE, and the reader calls it {@code base} from here
      * on.
+     *
+     * @param name the error type's name
+     * @param description the error's own documentation, when it has one
+     * @param isDistinct whether Central declared the type {@code distinct}
+     * @param detailType the distinct supertype, when Central published one
      */
     public record ErrorDecl(
             String name, Optional<String> description, boolean isDistinct, Optional<TypeNode> detailType) { }
@@ -307,6 +389,12 @@ public record CentralDocs(List<Module> modules) {
      * <p>{@code isIsolated} is required under this package's usual rule: it is set on all 18 clients across the
      * nine fixtures, and every one of their sources writes {@code public isolated client class}. Its absence
      * would mean the payload changed shape rather than that a package is unusual.
+     *
+     * @param name the client class's name
+     * @param description the class's own documentation, when it has one
+     * @param isDeprecated whether Central flagged the class deprecated
+     * @param isIsolated whether Central declared the class {@code isolated}
+     * @param methods everything callable on it
      */
     public record Client(
             String name,
@@ -327,6 +415,9 @@ public record CentralDocs(List<Module> modules) {
      * <p>Composed rather than flattened because that is what Central publishes, and because the listener's
      * {@code init} — the whole of what a {@code service … on new Listener(…)} template needs — lives in
      * the object half.
+     *
+     * @param object the listener's own declaration, including its {@code init}
+     * @param lifeCycleMethods its {@code attach}/{@code detach}/{@code start} contract
      */
     public record Listener(ObjectDecl object, Optional<List<Method>> lifeCycleMethods) {
 
@@ -347,6 +438,12 @@ public record CentralDocs(List<Module> modules) {
      * An annotation the module DECLARES. {@code attachmentPoints} is comma-separated, e.g.
      * {@code "service, type"}, and {@code type} is the record an attachment's argument must be — absent
      * for the marker annotations that take none.
+     *
+     * @param name the annotation's name
+     * @param description the annotation's own documentation, when it has one
+     * @param attachmentPoints Central's own comma-separated {@code on} clause
+     * @param isDeprecated whether Central flagged the annotation deprecated
+     * @param type the record an attachment's argument must be, absent for a marker annotation
      */
     public record Annotation(
             String name,
@@ -371,6 +468,41 @@ public record CentralDocs(List<Module> modules) {
      * cost the caller anything else: it is the module's own written guide — the same bytes the published
      * {@code .bala} keeps at {@code docs/README.md} — and a package that never wrote a {@code Module.md}
      * should still render its API.
+     *
+     * @param id the module's name
+     * @param orgName the module's organization
+     * @param summary the module's one-line summary
+     * @param description the module's own written guide, verbatim
+     * @param records every record type
+     * @param stringTypes every {@code string} alias
+     * @param integerTypes every {@code int} alias
+     * @param decimalTypes every {@code decimal} alias
+     * @param booleanTypes every {@code boolean} alias
+     * @param simpleNameReferenceTypes every alias whose descriptor is another named type
+     * @param arrayTypes every array-type alias
+     * @param unionTypes every union-type alias
+     * @param intersectionTypes every intersection-type alias
+     * @param anyDataTypes every {@code anydata} alias
+     * @param anyTypes every {@code any} alias
+     * @param tupleTypes every tuple-type alias
+     * @param functionTypes every function-type alias
+     * @param typeDescriptorTypes every {@code typedesc} alias
+     * @param mapTypes every {@code map} alias
+     * @param streamTypes every {@code stream} alias
+     * @param tableTypes every {@code table} alias
+     * @param xmlTypes every {@code xml} alias
+     * @param errors every error declaration
+     * @param constants every {@code const} declaration
+     * @param enums every enum declaration
+     * @param classes every class
+     * @param objectTypes every non-service, non-client object type
+     * @param clients every client class
+     * @param functions every module-level function
+     * @param listeners every listener
+     * @param serviceTypes every service type
+     * @param annotations every annotation the module declares
+     * @param variables every module-level {@code public final} variable
+     * @param configurables every {@code configurable} the module declares
      */
     public record Module(
             String id,

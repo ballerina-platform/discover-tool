@@ -36,32 +36,70 @@ import java.util.List;
  */
 public sealed interface Failure {
 
-    /** One place a payload stopped matching the schema. */
+    /**
+     * One place a payload stopped matching the schema.
+     *
+     * @param path where in the payload the mismatch was found
+     * @param message what was expected and what was found instead
+     */
     record SchemaIssue(String path, String message) { }
 
-    /** The caller's arguments are wrong — nothing upstream was contacted. */
+    /**
+     * The caller's arguments are wrong — nothing upstream was contacted.
+     *
+     * @param message what was wrong with the arguments
+     * @param suggestion the corrected command to run instead
+     */
     record Validation(String message, String suggestion) implements Failure { }
 
-    /** Central has no such package, or no such version of it. */
+    /**
+     * Central has no such package, or no such version of it.
+     *
+     * @param qualified the coordinate that was not found
+     * @param suggestion what to try instead
+     */
     record PackageNotFound(String qualified, String suggestion) implements Failure { }
 
     /**
      * Central answered, but not usefully — a 4xx/5xx, a network error, a bad body. {@code status} is
      * {@code null} when the failure happened before a status line existed.
+     *
+     * @param url the request that failed
+     * @param attempts how many times it was retried before giving up
+     * @param message what Central's answer, or the transport, said
+     * @param suggestion what to try next
+     * @param status the HTTP status Central answered with, or {@code null}
      */
     record Upstream(String url, int attempts, String message, String suggestion, Integer status)
             implements Failure { }
 
-    /** Central did not answer inside the budget. */
+    /**
+     * Central did not answer inside the budget.
+     *
+     * @param url the request that timed out
+     * @param budgetMs the budget it exceeded, in milliseconds
+     * @param suggestion what to try next
+     */
     record Timeout(String url, long budgetMs, String suggestion) implements Failure { }
 
-    /** Central answered with a shape this reader does not understand. */
+    /**
+     * Central answered with a shape this reader does not understand.
+     *
+     * @param qualified the package coordinate whose payload drifted
+     * @param issues every place the payload stopped matching the schema
+     * @param suggestion what to try next
+     */
     record SchemaDrift(String qualified, List<SchemaIssue> issues, String suggestion) implements Failure { }
 
     /**
      * The package parsed, but no declaration matched the name the caller asked for. {@code
      * candidates} is what the index does hold — either near-misses of the requested name, or the
      * whole roster when there were none.
+     *
+     * @param qualified the package coordinate that was searched
+     * @param requested the name (or names) the caller asked for
+     * @param candidates the near-misses, or the whole roster when there were none
+     * @param suggestion what to try next
      */
     record SymbolNotFound(String qualified, List<String> requested, List<String> candidates, String suggestion)
             implements Failure { }

@@ -87,6 +87,7 @@ public final class CentralClient {
     /**
      * A version, and the two things a caller may need to know about where it came from.
      *
+     * @param version the resolved version
      * @param stale the registry was unreachable and this came off disk unverified
      * @param supplied the CALLER chose this version — {@code --version}, or a {@code Dependencies.toml} the
      *     reader was pointed at — rather than the reader resolving it. It decides what a later 404 from the
@@ -149,7 +150,15 @@ public final class CentralClient {
 
         record Body(JsonElement value) implements Outcome { }
 
-        /** {@code retryAfterMs} is negative when upstream did not say. */
+        /**
+         * {@code retryAfterMs} is negative when upstream did not say.
+         *
+         * @param message what upstream, or the transport, said
+         * @param status the HTTP status the attempt failed with, or {@code null}
+         * @param timedOut whether the attempt failed by timing out
+         * @param retryable whether another attempt is worth making
+         * @param retryAfterMs how long to wait before retrying, or negative when upstream did not say
+         */
         record Spent(String message, Integer status, boolean timedOut, boolean retryable, long retryAfterMs)
                 implements Outcome { }
     }

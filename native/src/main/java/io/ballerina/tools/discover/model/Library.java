@@ -29,6 +29,14 @@ import java.util.Optional;
  * every collection here is an immutable {@code List}.
  *
  * @param name {@code org/module-id} — the string an {@code import} statement takes
+ * @param description the module's own documentation, verbatim
+ * @param typeDefs every module-level type declaration
+ * @param clients every client class
+ * @param functions every standalone function
+ * @param listeners every listener, held apart from {@code typeDefs} — see {@link #declarations()}
+ * @param services every service type, paired with the listener it binds to
+ * @param annotations every annotation the module declares
+ * @param configurables every {@code configurable} the module declares
  * @since 0.1.0
  */
 public record Library(
@@ -67,6 +75,11 @@ public record Library(
      * {@code Config.toml}", and NOT in the code register, where a declaration is something to copy.
      *
      * <p>It must never gain the blanket {@code public} the other declarations carry, for the same reason.
+     *
+     * @param name the configurable's name
+     * @param description its own documentation, verbatim
+     * @param type its declared type
+     * @param defaultValue the default Central publishes, as source text
      */
     public record Configurable(String name, String description, TypeRef type, String defaultValue) { }
 
@@ -84,6 +97,11 @@ public record Library(
      * <p>{@code type} is the record an attachment's argument must be, absent for the marker annotations that
      * take none. Without it {@code @http:ResourceConfig { … }} has no discoverable field set, even though the
      * record is declared in the same document.
+     *
+     * @param name the annotation's name
+     * @param description its own documentation, verbatim
+     * @param type the record its attachment's argument must be, or empty for a marker annotation
+     * @param attachmentPoints Central's own {@code on} clause, verbatim
      */
     public record AnnotationDef(
             String name, String description, Optional<TypeRef> type, String attachmentPoints) { }

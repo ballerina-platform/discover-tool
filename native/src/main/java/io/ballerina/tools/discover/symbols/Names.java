@@ -52,7 +52,11 @@ public final class Names {
 
         record Found(String name) implements Match { }
 
-        /** Several declarations normalise to the same thing. The caller has to choose. */
+        /**
+         * Several declarations normalise to the same thing. The caller has to choose.
+         *
+         * @param candidates the declarations that all normalise to the requested name
+         */
         record Ambiguous(List<String> candidates) implements Match { }
 
         record Missing(List<String> candidates) implements Match { }

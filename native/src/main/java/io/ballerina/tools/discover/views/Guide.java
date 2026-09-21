@@ -32,7 +32,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * {@code guide <pkg> [n | "title"] [-s <q>] [--module <name>]} — the package's own readme, verbatim.
+ * {@code guide <pkg> [n | "title"] [-s &lt;q&gt;] [--module <name>]} — the package's own readme, verbatim.
  *
  * <p>A VERB rather than a flag on {@code overview}: it is a distinct document that Central publishes, on the
  * package author's release clock, and everything in it is a quotation. The grammar is verb-first with no implicit
@@ -80,6 +80,7 @@ public final class Guide {
      *
      * @param number the 1-based address a caller types
      * @param title the heading it sits under, or a generated one when the readme opens with prose
+     * @param module the module whose readme the section came from
      * @param markdown the section verbatim, prose and code together
      */
     public record Chunk(int number, String title, String module, String markdown) {
@@ -135,7 +136,12 @@ public final class Guide {
         return List.copyOf(chunks);
     }
 
-    /** A readme section: the heading it sits under, and everything down to the next heading of that depth. */
+    /**
+     * A readme section: the heading it sits under, and everything down to the next heading of that depth.
+     *
+     * @param title the heading it sits under
+     * @param body everything down to the next heading of that depth
+     */
     private record Section(String title, String body) { }
 
     /**

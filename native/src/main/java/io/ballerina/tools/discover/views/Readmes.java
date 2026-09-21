@@ -48,7 +48,12 @@ public final class Readmes {
     private Readmes() {
     }
 
-    /** One module's guide. A package publishes one document per module. */
+    /**
+     * One module's guide. A package publishes one document per module.
+     *
+     * @param module the module the guide belongs to
+     * @param markdown the guide, verbatim
+     */
     public record ModuleReadme(String module, String markdown) { }
 
     /**
@@ -119,6 +124,9 @@ public final class Readmes {
      * 61 {@code ballerina}, 8 {@code bash}, 1 {@code toml}, none bare. So the tag is a reliable filter, and the
      * one blind spot it leaves — a future readme that fences Ballerina with no tag — costs a dropped snippet
      * rather than a wrong one.
+     *
+     * @param language the info string the opening fence carried
+     * @param code the lines inside the fence
      */
     public record Block(String language, String code) { }
 

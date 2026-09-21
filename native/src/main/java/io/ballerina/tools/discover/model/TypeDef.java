@@ -45,6 +45,12 @@ public sealed interface TypeDef {
     /**
      * A record. {@code isClosed} is {@code record {| |}} — the form that REJECTS extra fields, and the one
      * fact a caller building a value needs, since an open record accepts anything and a closed one does not.
+     *
+     * @param name the record type's name
+     * @param description the type's own documentation, verbatim
+     * @param isClosed whether the record rejects fields beyond the ones declared
+     * @param isDeprecated whether Central flagged the type deprecated
+     * @param fields the record's own fields
      */
     record Rec(
             String name,
@@ -78,6 +84,10 @@ public sealed interface TypeDef {
      * an explicit one and 6 of those differ from the member name in more than case, so
      * {@code enum SSLMode { … VERIFY_CA }} is a legal declaration that is not quite the real one. The
      * description is the only part of that gap either page can close.
+     *
+     * @param name the enum type's name
+     * @param description the type's own documentation, verbatim
+     * @param members the enum's members, each with its own description
      */
     record Enumeration(String name, String description, List<Member> members) implements TypeDef {
 
@@ -99,6 +109,10 @@ public sealed interface TypeDef {
      *
      * <p>{@code type.name()} empty means the reader could not encode the descriptor. That still renders the
      * name, as a comment, because the declaration exists and a caller may need to know it does.
+     *
+     * @param name the alias's own name
+     * @param description the type's own documentation, verbatim
+     * @param type the descriptor it is bound to, or empty when the reader could not encode it
      */
     record Alias(String name, String description, TypeRef type) implements TypeDef { }
 
@@ -113,8 +127,12 @@ public sealed interface TypeDef {
      * across the corpus under {@code variables}, and they were parsed and rendered nowhere, so
      * {@code http:CONTINUE} — which compiles from another module, measured — appeared in no verb.
      *
+     * @param name the variable's name
+     * @param description the variable's own documentation, verbatim
+     * @param varType the variable's declared type
      * @param initialiser the default Central publishes, which for most of these is {@code {}} and is therefore
      *     not the value; {@link Defaults} decides whether it is writable
+     * @param isReadOnly whether the variable's type is {@code readonly}
      */
     record Variable(String name, String description, TypeRef varType, String initialiser, boolean isReadOnly)
             implements TypeDef { }
@@ -139,6 +157,17 @@ public sealed interface TypeDef {
      * {@code lifeCycleMethods} and {@code initMethod} are all SUBSETS of it — measured across every object in
      * the corpus, with no exception — so they are groupings of one list rather than four lists, and reading
      * them all would print {@code init} twice.
+     *
+     * @param name the object's name
+     * @param description the type's own documentation, verbatim
+     * @param form whether the declaration is instantiable
+     * @param role how the object's methods are called
+     * @param isDistinct whether Central declared the type {@code distinct}
+     * @param isReadOnly whether Central declared the type {@code readonly}
+     * @param isIsolated whether Central declared the type {@code isolated}
+     * @param isDeprecated whether Central flagged the type deprecated
+     * @param fields the object's own fields
+     * @param methods every method Central published for it, including its lifecycle and init methods
      */
     record ObjectDef(
             String name,
@@ -181,6 +210,12 @@ public sealed interface TypeDef {
      * a safe generalisation: {@code ballerinax/health.clients.fhir} publishes records, and the document
      * printed {@code distinct FHIRServerErrorDetails} — which is not an error type, does not compile as
      * one, and quietly contradicts the promise that a signature from here is the source for what does.
+     *
+     * @param name the error type's name
+     * @param description the type's own documentation, verbatim
+     * @param isDistinct whether Central declared the type {@code distinct}
+     * @param base the error's supertype or detail record, or empty when Central published none
+     * @param detailRecord whether {@code base} is a detail record rather than a supertype
      */
     record ErrorDef(
             String name, String description, boolean isDistinct, Optional<TypeRef> base, boolean detailRecord)

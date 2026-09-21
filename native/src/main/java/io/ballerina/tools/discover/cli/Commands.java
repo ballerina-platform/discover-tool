@@ -74,6 +74,16 @@ final class Commands {
      * <p>One factory rather than two assembly sites: {@link Cli} needs it to dispatch and {@link DiscoverTool}
      * needs it to answer {@code bal help discover}, and a second {@code addSubcommand} chain is a second place a
      * verb can be forgotten.
+     *
+     * @param line the picocli parser, with every verb registered as a subcommand
+     * @param find the {@code find} verb's argument holder
+     * @param overview the {@code overview} verb's argument holder
+     * @param client the {@code client} verb's argument holder
+     * @param klass the {@code class} verb's argument holder
+     * @param funcs the {@code funcs} verb's argument holder
+     * @param type the {@code type} verb's argument holder
+     * @param guide the {@code guide} verb's argument holder
+     * @param api the {@code api} verb's argument holder
      */
     record Grammar(
             CommandLine line,

@@ -35,7 +35,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * {@code overview <pkg> [-s <q>]} — a bounded MAP of the package, and the entry document.
+ * {@code overview <pkg> [-s &lt;q&gt;]} — a bounded MAP of the package, and the entry document.
  *
  * <p><b>NO GENERATED SIGNATURES.</b> This is the largest behavioural change in the redesign and it is chosen
  * deliberately over a byte cap. A cap still lets {@code ballerina/crypto} emit 20,000 bytes before it degrades; a
@@ -385,7 +385,14 @@ public final class Overview {
     // The cross-kind search
     // -----------------------------------------------------------------------
 
-    /** One thing a cross-kind search found: what it is, who owns it, and the command that opens it. */
+    /**
+     * One thing a cross-kind search found: what it is, who owns it, and the command that opens it.
+     *
+     * @param kind what bucket the hit belongs to
+     * @param label the hit's own name
+     * @param owner the declaration it belongs to, or empty when it is not owned by one
+     * @param command the command that opens it
+     */
     private record Hit(String kind, String label, String owner, String command) {
 
         String row() {

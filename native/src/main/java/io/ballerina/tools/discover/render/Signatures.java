@@ -60,6 +60,9 @@ public final class Signatures {
      *
      * <p>The alias and the import path are derived from the module rather than passed alongside it, so the
      * prefix a signature is printed with and the coordinate a footer offers cannot disagree.
+     *
+     * @param recordName the name as the owning module declares it
+     * @param module the module it came from
      */
     public record ExternalLink(String recordName, ModuleRef module) {
 

@@ -69,7 +69,12 @@ public final class Cli {
     private Cli() {
     }
 
-    /** Where the two streams go. Injected so a test can capture both without a subprocess. */
+    /**
+     * Where the two streams go. Injected so a test can capture both without a subprocess.
+     *
+     * @param out where stdout goes
+     * @param errorOut where stderr goes
+     */
     public record Streams(Consumer<String> out, Consumer<String> errorOut) { }
 
     public static int run(List<String> argv, Streams streams, HttpOptions http) {

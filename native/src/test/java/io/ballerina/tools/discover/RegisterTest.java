@@ -25,7 +25,6 @@ import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Guide;
 import io.ballerina.tools.discover.views.Overview;
-import io.ballerina.tools.discover.views.Snippets;
 import io.ballerina.tools.discover.views.Readmes;
 import io.ballerina.tools.discover.views.TypeView;
 import org.testng.Assert;
@@ -67,7 +66,12 @@ public class RegisterTest {
         return FixtureCorpus.fixtureRows();
     }
 
-    /** A document plus what produced it, for a failure message that names the verb. */
+    /**
+     * A document plus what produced it, for a failure message that names the verb.
+     *
+     * @param label what produced the document
+     * @param text the document itself
+     */
     private record Document(String label, String text) { }
 
     /**
@@ -331,8 +335,9 @@ public class RegisterTest {
      *
      * <p>Asserted as a LINE NUMBER rather than as "before the client sections", because the property is about
      * surviving a cut and a section-order test would pass for a document whose quoted code ran to 300 lines.
-     * The uncapped quotation made that a real possibility rather than a hypothetical — postgresql publishes 28 blocks and its
-     * map is 365 lines — and answered it by moving the quotation BEHIND this section rather than by capping it.
+     * The uncapped quotation made that a real possibility rather than a hypothetical — postgresql publishes
+     * 28 blocks and its map is 365 lines — and answered it by moving the quotation BEHIND this section
+     * rather than by capping it.
      * So the bound is now on the map's own text, which nothing unbounded precedes: measured across this corpus
      * the worst case is line 15, against 421 for kafka before any of this.
      */
@@ -344,8 +349,9 @@ public class RegisterTest {
         Assert.assertTrue(next > 0, slug + ": no ## Next section");
         // The measured window is `head -100`, which is what moved this section out of the document's
         // tail: at the end it survived a `head -200` in 3 packages of 11. The bound is derived rather than
-        // picked — a dozen lines of title and facts, plus the one-line chunk index. Now that the quotation is uncapped, the quoted
-        // code is no longer ahead of it at all, so measured across this corpus the worst case is line 15.
+        // picked — a dozen lines of title and facts, plus the one-line chunk index. Now that the quotation
+        // is uncapped, the quoted code is no longer ahead of it at all, so measured across this corpus the
+        // worst case is line 15.
         Assert.assertTrue(next < 100, slug + ": ## Next is at line " + next);
         // Nothing unbounded may precede it. The map has no unbounded section left at all — the rosters are capped
         // at 20 rows — but the ORDER still has to hold, because a roster placed first would put the navigation

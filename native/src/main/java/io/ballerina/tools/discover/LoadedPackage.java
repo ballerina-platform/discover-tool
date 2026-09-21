@@ -26,6 +26,9 @@ import java.util.List;
 /**
  * One package, read once: its coordinates, its API as the IR, and its guide.
  *
+ * @param qualified the package's organization and name
+ * @param version the resolved version
+ * @param library the package's API, as the IR
  * @param readmes every module of the payload that wrote a guide, in Central's order
  * @param warning why this version cannot be trusted, or {@code null} when it was confirmed against the
  *     registry — see {@link Loader#unverifiedWarning}

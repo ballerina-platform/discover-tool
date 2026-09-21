@@ -37,6 +37,15 @@ package io.ballerina.tools.discover.model;
  * <p>{@code unwritableDefault} is set by {@link Defaults} when the default expression names something the
  * document does not declare, so the renderer can say so instead of presenting it as copyable syntax.
  *
+ * @param name the field's name, empty for the two forms that have none
+ * @param description the field's own documentation, verbatim
+ * @param type the field's declared type
+ * @param defaultValue the default, as source text, or {@code null} when there is none
+ * @param optional whether the field is declared with {@code ?}
+ * @param readonly whether the field is declared {@code readonly}
+ * @param deprecated whether Central flagged the field deprecated
+ * @param unwritableDefault whether the default names something the document does not declare
+ * @param form how the member is written
  * @since 0.1.0
  */
 public record RecordField(

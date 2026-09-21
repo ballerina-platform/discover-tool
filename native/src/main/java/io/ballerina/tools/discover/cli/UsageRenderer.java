@@ -256,7 +256,7 @@ final class UsageRenderer {
     }
 
     /**
-     * EVERY spelling of a flag, short first: {@code -s, --search <q>}.
+     * EVERY spelling of a flag, short first: {@code -s, --search &lt;q&gt;}.
      *
      * <p>Both, because the two are used in different places and a reader needs to connect them: the prose and the
      * examples type {@code -s}, and a failure's "belongs to" sentence names {@code --search}. Showing one alone

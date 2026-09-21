@@ -56,7 +56,12 @@ public final class FromCentral {
     private FromCentral() {
     }
 
-    /** The module a name belongs to, for deciding whether it needs a prefix. */
+    /**
+     * The module a name belongs to, for deciding whether it needs a prefix.
+     *
+     * @param moduleId the module's name
+     * @param orgName the module's organization
+     */
     private record Scope(String moduleId, String orgName) { }
 
     /**
