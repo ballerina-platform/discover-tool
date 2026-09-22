@@ -446,9 +446,10 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
-        // A bucket, not the bare package: the warning row is a fact of the Markdown documents `Containers`
-        // still renders, which is unaffected by the bare package's move onto the JSON/text result IR — see
-        // aBarePackageWarningFlowsThroughBothRenderers below for that path.
+        // A bucket, not the bare package. kafka's client bucket is a roster (3 clients), so this is the JSON
+        // default off a TTY — the warning travels as the structured answer's own `warning` field, not a
+        // Markdown facts row, which is what `Containers.roster` threads `loaded.warning()` into. See
+        // aBarePackageWarningFlowsThroughBothRenderers below for the bare-package path.
         Cli.run(List.of(PKG, "client"), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
@@ -462,8 +463,9 @@ public class CacheTest {
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
-        Assert.assertTrue(offline.stdout().contains("\n| Warning | the registry was unreachable, so this "
-                + "version came off disk unchecked |\n"));
+        Assert.assertTrue(offline.stdout().contains(
+                "\"warning\":\"the registry was unreachable, so this version came off disk unchecked\""),
+                offline.stdout());
     }
 
     @Test
@@ -491,8 +493,9 @@ public class CacheTest {
                 options(transport, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
-        Assert.assertTrue(capture.stdout().contains("\n| Warning | the registry was unreachable, so this "
-                + "version came off disk unchecked |\n"));
+        Assert.assertTrue(capture.stdout().contains(
+                "\"warning\":\"the registry was unreachable, so this version came off disk unchecked\""),
+                capture.stdout());
     }
 
     @Test

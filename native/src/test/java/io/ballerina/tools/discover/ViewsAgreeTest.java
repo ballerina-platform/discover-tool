@@ -30,6 +30,7 @@ import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.TypeView;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -148,41 +150,59 @@ public class ViewsAgreeTest {
         return view.value();
     }
 
+    private static Containers.Answer expectAnswer(Result<Containers.Answer> view, String what) {
+        Assert.assertTrue(view.isOk(), what + " failed: "
+                + (view.isOk() ? "" : view.failure().describe()));
+        return view.value();
+    }
+
     // -----------------------------------------------------------------------
     // 1. Signatures agree with the API document
     // -----------------------------------------------------------------------
 
+    /** Across every fixture — a single fixture legitimately checks zero, see below. */
+    private static final AtomicInteger TOTAL_CHECKED = new AtomicInteger();
+
     /**
-     * Every container verb, over every container, at every tier the fixtures reach.
+     * Every container verb, over every container that still answers in Markdown.
      *
-     * <p>Both the bare listing and {@code --all} are checked, because they render at different tiers and the point
-     * of the rule is that a tier chooses how MUCH to quote and never how to spell it. {@code --all} is also the
-     * only way to force the signature tier on {@code github}'s 903 operations, which otherwise degrade to an index
-     * and would leave the widest package in the corpus contributing nothing to this oracle.
+     * <p>{@code --all} is gone — the RFC's entry ceiling has no escape hatch — so there is one tier per container
+     * to check now, not two. A container over the ceiling answers on the result IR instead (a roster, a grouped
+     * or paginated listing), which quotes no Ballerina at all; this oracle is specifically about what a Markdown
+     * answer QUOTES, so those are skipped rather than checked vacuously.
+     *
+     * <p>The vacuous-check itself moved from per-fixture to {@link #TOTAL_CHECKED}, checked once across the whole
+     * class in {@link #atLeastOneSignatureWasActuallyChecked()}: naming a container by itself now reaches the
+     * structured IR (not Markdown) for any container with more than one purely-resource or purely-named entry,
+     * which is most containers in most fixtures — a fixture built entirely of those legitimately checks zero here.
      */
     @Test(dataProvider = "fixtures")
     public void everySignatureAContainerVerbPrintsIsInTheApiSnapshotVerbatim(String slug) {
         Set<String> snapshot = snapshotLines(slug);
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
-        int checked = 0;
 
         for (Surface.Scope scope : Surface.Scope.values()) {
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 List<String> selector = container.isModule() ? List.of() : List.of(container.name());
-                for (boolean all : new boolean[] {false, true}) {
-                    String document = expect(Containers.render(context, scope,
-                            new Containers.Options(selector, null, false, all)),
-                            scope.verb() + " " + container.name());
-                    for (String line : fencedBallerina(withoutQuotations(document))) {
-                        Assert.assertTrue(snapshot.contains(line.stripLeading()),
-                                slug + " " + scope.verb() + " " + container.name()
-                                        + " quotes a line api does not:\n  " + line);
-                        checked++;
-                    }
+                Containers.Answer answer = expectAnswer(Containers.render(context, scope,
+                        new Containers.Options(selector)), scope.verb() + " " + container.name());
+                if (!(answer instanceof Containers.Answer.Markdown markdown)) {
+                    continue;
+                }
+                for (String line : fencedBallerina(withoutQuotations(markdown.text()))) {
+                    Assert.assertTrue(snapshot.contains(line.stripLeading()),
+                            slug + " " + scope.verb() + " " + container.name()
+                                    + " quotes a line api does not:\n  " + line);
+                    TOTAL_CHECKED.incrementAndGet();
                 }
             }
         }
-        Assert.assertTrue(checked > 0, slug + ": nothing was checked, so this passed vacuously");
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void atLeastOneSignatureWasActuallyChecked() {
+        Assert.assertTrue(TOTAL_CHECKED.get() > 0,
+                "nothing was checked across any fixture, so the test above passed vacuously");
     }
 
     /**
@@ -200,9 +220,12 @@ public class ViewsAgreeTest {
         for (Surface.Scope scope : Surface.Scope.values()) {
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 List<String> selector = container.isModule() ? List.of() : List.of(container.name());
-                String document = expect(Containers.render(context, scope,
-                        new Containers.Options(selector, null, true, false)),
+                Containers.Answer answer = expectAnswer(Containers.render(context, scope,
+                        new Containers.Options(selector, null, true, false, 1)),
                         scope.verb() + " " + container.name() + " -r");
+                Assert.assertTrue(answer instanceof Containers.Answer.Markdown,
+                        "the code register is always Markdown");
+                String document = ((Containers.Answer.Markdown) answer).text();
                 // A fence at the START of a line would be this document's own structure. One inside a `#` doc
                 // comment is the package author's sample — kafka documents `producer->send` that way — and every
                 // fence the corpus carries is of that second kind.
@@ -351,7 +374,7 @@ public class ViewsAgreeTest {
                 // A navigation affordance that dead-ends is a test failure, not a wasted agent turn.
                 Assert.assertTrue(PathTree.resolve(tree, path) instanceof PathTree.Resolution.Found,
                         container.name() + ": " + String.join("/", path) + " is offered but unreachable");
-                expect(Containers.render(context, Surface.Scope.CLIENT, new Containers.Options(
+                expectAnswer(Containers.render(context, Surface.Scope.CLIENT, new Containers.Options(
                                 List.of(container.name(), String.join("/", path)))),
                         container.name() + " " + String.join("/", path));
             }
@@ -494,11 +517,14 @@ public class ViewsAgreeTest {
         // arguments — and no signature line spells those out, so the flow used to cost two calls and the design
         // sample that skipped it invented two parameters instead.
         LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__github");
-        Result<String> view = Containers.render(context, Surface.Scope.CLIENT,
+        Result<Containers.Answer> view = Containers.render(context, Surface.Scope.CLIENT,
                 new Containers.Options(
-                        List.of("Client", "delete", "repos/{owner}/{repo}/actions/caches"), null, true, false));
+                        List.of("Client", "delete", "repos/{owner}/{repo}/actions/caches"),
+                        null, true, false, 1));
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
-        String document = view.value();
+        Assert.assertTrue(view.value() instanceof Containers.Answer.Markdown,
+                "the code register is always Markdown");
+        String document = ((Containers.Answer.Markdown) view.value()).text();
         Assert.assertTrue(document.contains("resource function delete repos/[string owner]/[string repo]"
                 + "/actions/caches("), document);
         Assert.assertTrue(document.contains("*ActionsDeleteActionsCacheByKeyQueries queries"), document);

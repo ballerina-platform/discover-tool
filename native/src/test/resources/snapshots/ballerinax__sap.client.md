@@ -4,7 +4,6 @@
 | | |
 |---|---|
 | Container | `Client` — 7 resource, 7 remote |
-| Showing | 15 signatures |
 
 ## Next
 

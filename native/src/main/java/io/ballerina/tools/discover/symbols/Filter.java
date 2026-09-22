@@ -24,13 +24,12 @@ import io.ballerina.tools.discover.model.RecordField;
 import io.ballerina.tools.discover.model.TypeDef;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
 
 /**
- * {@code -s} — a linear scan over the package that is already in memory.
+ * {@code --filter} — a linear scan over the package that is already in memory.
  *
  * <p>NO INDEX IS BUILT AND NO CACHE TIER IS ADDED. {@code Loader.loadPackage} holds the whole package, and
  * {@link Declarations}, {@link Names} and {@link PathTree} are already constructed per load;
@@ -44,10 +43,18 @@ import java.util.function.Function;
  * the agent receives counts where it should receive seven signatures. Dropping documentation instead loses
  * {@code pagination} entirely, and that is the query shape a caller uses when they know the capability and not the
  * vocabulary. So a documentation-only match is NEVER RENDERED and ALWAYS NAMED, which costs one line and leaves
- * every one of them promotable by name in a single follow-up call.
+ * every one of them promotable by name in a single follow-up call. Kept from this tool's earlier {@code -s} flag,
+ * which the RFC's {@code --filter} replaces — the RFC does not contradict this split.
  *
  * <p>That split is also what removes the need for a cross-kind relevance score — the part of a search design
  * hardest to test and easiest to rot silently, since nothing fails when a weight drifts.
+ *
+ * <p><b>MATCHING ITSELF IS THE PART {@code --filter} CHANGES.</b> {@code -s} required every whitespace/slash-split
+ * token of the query to appear (an unordered AND), which is what let it also narrow a query written as a path.
+ * {@code --filter} is deliberately simpler — the RFC's own "keyword-facet approach Ballerina Central's own search
+ * already uses" — a single case-insensitive substring match of the whole argument, no splitting. A caller who
+ * wants a path narrowed uses the positional selector, which already does that anchored, ordered walk; this flag
+ * is for a keyword, not a shape.
  *
  * @since 0.1.0
  */
@@ -75,63 +82,36 @@ public final class Filter {
     }
 
     /**
-     * Partition a list against a query.
+     * Partition a list against a keyword.
      *
-     * <p>Every whitespace-separated token of the query has to appear, so {@code -s "list repo"} narrows rather
-     * than widening the way an OR would. Case-insensitive substring rather than word matching, because the
-     * identifiers being searched are camelCase: {@code repo} has to reach {@code listRepositories}, and a
-     * word-boundary match would not.
+     * <p>A single case-insensitive substring match of the whole argument — no tokenising, no AND. Normalised
+     * through {@link PathTree#readableSelector} for the same reason the selector is: the escaped spelling
+     * ({@code chat\.postMessage}, {@code code\-scanning}, {@code 'import}) is what the documents print, so it is
+     * what a caller copies back.
      */
     public static <T> Split<T> apply(
             String query, List<T> items, Function<T, String> surfaceText, Function<T, String> docText) {
-        List<String> tokens = tokens(query);
-        if (tokens.isEmpty()) {
+        String keyword = normalise(query);
+        if (keyword.isEmpty()) {
             return new Split<>(List.copyOf(items), List.of());
         }
         List<T> surface = new ArrayList<>();
         List<T> documented = new ArrayList<>();
         for (T item : items) {
-            if (containsAll(surfaceText.apply(item), tokens)) {
+            if (surfaceText.apply(item).toLowerCase(Locale.ROOT).contains(keyword)) {
                 surface.add(item);
-            } else if (containsAll(docText.apply(item), tokens)) {
+            } else if (docText.apply(item).toLowerCase(Locale.ROOT).contains(keyword)) {
                 documented.add(item);
             }
         }
         return new Split<>(List.copyOf(surface), List.copyOf(documented));
     }
 
-    /**
-     * A query as the tokens that all have to appear — split on {@code /} as well as on whitespace.
-     *
-     * <p>THE SLASH IS WHY {@code -s} DID NOT MATCH PATHS. A resource function's searchable text joins its
-     * segments with spaces ({@code get repos &#123;owner&#125; &#123;repo&#125; issues}), so a query containing
-     * {@code /} could never be a substring of it. Measured:
-     * {@code -s "repos/&#123;owner&#125;/&#123;repo&#125;/issues"} matched nothing on a client declaring 903
-     * resource functions, while the identical string resolved as a
-     * positional selector — and the flag's own description had claimed path matching all along.
-     *
-     * <p>Splitting keeps the flag's existing meaning rather than bolting a second one on: every token must
-     * appear, so a path narrows exactly as {@code -s "list repo"} already did. It is deliberately an UNORDERED
-     * and unanchored AND — {@code -s} is a filter, and the anchored, ordered walk is what the positional
-     * selector is for. A caller who needs "this path and not one that merely shares its segments" wants that
-     * slot, not this flag.
-     *
-     * <p>Normalised through {@link PathTree#readableSelector} for the same reason the selector is: the escaped
-     * spelling ({@code chat\.postMessage}, {@code code\-scanning}, {@code 'import}) is what the documents
-     * print, so it is what a caller copies back.
-     */
-    private static List<String> tokens(String query) {
+    private static String normalise(String query) {
         if (query == null || query.isBlank()) {
-            return List.of();
+            return "";
         }
-        return Arrays.stream(PathTree.readableSelector(query).trim().toLowerCase(Locale.ROOT).split("[\\s/]+"))
-                .filter(token -> !token.isEmpty())
-                .toList();
-    }
-
-    private static boolean containsAll(String haystack, List<String> tokens) {
-        String lowered = haystack.toLowerCase(Locale.ROOT);
-        return tokens.stream().allMatch(lowered::contains);
+        return PathTree.readableSelector(query).trim().toLowerCase(Locale.ROOT);
     }
 
     // -----------------------------------------------------------------------

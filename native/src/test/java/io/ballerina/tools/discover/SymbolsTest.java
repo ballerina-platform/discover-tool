@@ -180,7 +180,7 @@ public class SymbolsTest {
         // unrelated subtrees END in the same three segments, so a SUFFIX match returns nine operations for a
         // path that has three — and a SUBSTRING match returns 426.
         List<PathTree.Operation> all = PathTree.operationsUnder(tree);
-        String target = "repos/{owner}/{repo}";
+        String target = "repos/:owner/:repo";
         List<String> bySuffix = all.stream()
                 .map(operation -> String.join("/", operation.segments()))
                 .filter(path -> path.endsWith(target))
@@ -198,8 +198,8 @@ public class SymbolsTest {
                 .sorted()
                 .toList();
         Assert.assertEquals(strangers, List.of(
-                "orgs/{org}/teams/{teamSlug}/repos/{owner}/{repo}",
-                "teams/{teamId}/repos/{owner}/{repo}"),
+                "orgs/:org/teams/:teamSlug/repos/:owner/:repo",
+                "teams/:teamId/repos/:owner/:repo"),
                 "these two are what an unanchored match mixes in, and they are about team access");
     }
 
@@ -209,7 +209,7 @@ public class SymbolsTest {
         PathTree.Resolution resolution =
                 PathTree.resolve(github(), PathTree.splitPath("repos/*/*/nonesuch"));
         PathTree.Resolution.Missing missing = (PathTree.Resolution.Missing) resolution;
-        Assert.assertEquals(missing.matched(), List.of("repos", "{owner}", "{repo}"));
+        Assert.assertEquals(missing.matched(), List.of("repos", ":owner", ":repo"));
         Assert.assertEquals(missing.token(), "nonesuch");
         Assert.assertEquals(missing.available().size(), 63);
     }
@@ -233,7 +233,7 @@ public class SymbolsTest {
         PathTree.Resolution.Found anchored =
                 (PathTree.Resolution.Found) PathTree.resolve(tree, PathTree.splitPath("repos/*/*"));
         Assert.assertEquals(anchored.node().operations().size(), 3);
-        Assert.assertEquals(anchored.path(), List.of("repos", "{owner}", "{repo}"));
+        Assert.assertEquals(anchored.path(), List.of("repos", ":owner", ":repo"));
 
         // The same three are reachable by naming the parameters, with or without braces.
         for (String spelling : new String[] {"repos/{owner}/{repo}", "repos/owner/repo", "repos/*/repo"}) {
@@ -265,7 +265,7 @@ public class SymbolsTest {
         Assert.assertTrue(located.resolution() instanceof PathTree.Resolution.Found);
         Assert.assertEquals(located.alternatives().size(), 1);
         Assert.assertEquals(String.join("/", located.alternatives().get(0)),
-                "repos/{owner}/{repo}/actions/caches");
+                "repos/:owner/:repo/actions/caches");
     }
 
     @Test
@@ -308,7 +308,7 @@ public class SymbolsTest {
                 (PathTree.Resolution.Found) PathTree.resolve(tree, List.of("repos"));
 
         PathTree.Descent descent = PathTree.autoDescend(repos.node(), repos.path());
-        Assert.assertEquals(descent.path(), List.of("repos", "{owner}", "{repo}"));
+        Assert.assertEquals(descent.path(), List.of("repos", ":owner", ":repo"));
         Assert.assertEquals(descent.node().operations().size(), 3);
 
         // Naming the sibling is not cosmetic: `repos` really has two parameter children with different
@@ -316,7 +316,7 @@ public class SymbolsTest {
         // nothing downstream would mention it again.
         Assert.assertEquals(descent.skipped().size(), 1);
         Assert.assertEquals(descent.skipped().get(0).path(),
-                List.of("repos", "{templateOwner}", "{templateRepo}", "generate"));
+                List.of("repos", ":templateOwner", ":templateRepo", "generate"));
         Assert.assertEquals(descent.skipped().get(0).total(), 1);
     }
 

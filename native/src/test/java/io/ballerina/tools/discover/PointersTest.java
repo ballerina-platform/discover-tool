@@ -21,6 +21,7 @@ package io.ballerina.tools.discover;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.HttpTransport;
 import io.ballerina.tools.discover.cli.Cli;
+import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import org.testng.Assert;
@@ -46,19 +47,20 @@ import java.util.regex.Pattern;
  * followed it ran the same wrong shape again.
  *
  * <p>All three are the same defect, and this is the general form of the test: extract every {@code bal discover}
- * command from every document, run it through the real CLI against the recorded payload, and require exit 0.
- * A new pointer cannot be added wrong.
+ * command a bucket can print — from a Markdown answer's backtick-quoted prose, and from a structured answer's own
+ * {@code call}/{@code next} fields directly, since the RFC's plain text carries no backticks to scan for — run it
+ * through the real CLI against the recorded payload, and require exit 0. A new pointer cannot be added wrong.
  *
- * <p>Two exclusions, both principled. A command containing an angle-bracket slot is a TEMPLATE — {@code <Name>} is
- * the grammar, not an argument — and a command naming a DIFFERENT package is a cross-package edge, which
- * by design is not followed and whose payload this fixture cannot serve. Both are asserted as shapes rather than
- * silently skipped, so an exclusion cannot become a hiding place.
+ * <p>Two exclusions, both principled. A command containing an angle-bracket slot is a TEMPLATE — {@code <Name>} or
+ * {@code <keyword>} is the grammar, not an argument — and a command naming a DIFFERENT package is a cross-package
+ * edge, which by design is not followed and whose payload this fixture cannot serve. Both are asserted as shapes
+ * rather than silently skipped, so an exclusion cannot become a hiding place.
  *
  * @since 0.1.0
  */
 public class PointersTest {
 
-    /** A command as a document prints it, inside backticks. */
+    /** A command as a Markdown document prints it, inside backticks. */
     private static final Pattern COMMAND = Pattern.compile("`(bal discover [^`]+)`");
 
     @DataProvider(name = "fixtures")
@@ -82,7 +84,8 @@ public class PointersTest {
     }
 
     /**
-     * Every document a fixture can produce, from every bucket the new grammar dispatches to.
+     * Every command a fixture's buckets can print, from every {@link Containers.Answer} shape a bucket query can
+     * produce.
      *
      * <p>{@code Overview} and {@code Guide} are deliberately absent here for now: neither is wired into
      * {@link Cli} any more (the bare-package listing that replaces {@code Overview} is item 5's own work, and
@@ -92,26 +95,71 @@ public class PointersTest {
      * <p>Deliberately the same breadth {@code RegisterTest} uses: a pointer printed only by the roster of a
      * package with 91 classes is exactly the one nobody checks by hand.
      */
-    private static List<String> documentsOf(LoadedPackage context) {
-        List<String> documents = new ArrayList<>();
+    private static List<String> commandsOf(LoadedPackage context) {
+        List<String> commands = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
-            documents.add(expect(Containers.render(context, scope, Containers.Options.bare())));
-            documents.add(expect(Containers.render(context, scope,
-                    new Containers.Options(List.of(), "config", false, false))));
+            commands.addAll(commandsOf(expect(Containers.render(context, scope, Containers.Options.bare()))));
+            commands.addAll(commandsOf(expect(Containers.render(context, scope,
+                    new Containers.Options(List.of(), "config", false, false, 1)))));
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 if (container.isModule()) {
                     continue;
                 }
-                documents.add(expect(Containers.render(context, scope,
-                        new Containers.Options(List.of(container.name())))));
-                documents.add(expect(Containers.render(context, scope,
-                        new Containers.Options(List.of(container.name(), "zzznosuchmember")))));
+                commands.addAll(commandsOf(expect(Containers.render(context, scope,
+                        new Containers.Options(List.of(container.name()))))));
+                commands.addAll(commandsOf(expect(Containers.render(context, scope,
+                        new Containers.Options(List.of(container.name(), "zzznosuchmember"))))));
             }
         }
-        return documents;
+        return commands;
     }
 
-    private static String expect(Result<String> view) {
+    /** Every command one answer prints — backtick-scanned from Markdown, or read off a structured result's own
+     * fields, since the RFC's plain text carries no backticks to scan for. */
+    private static List<String> commandsOf(Containers.Answer answer) {
+        return switch (answer) {
+            case Containers.Answer.Markdown markdown -> {
+                List<String> found = new ArrayList<>();
+                Matcher command = COMMAND.matcher(markdown.text());
+                while (command.find()) {
+                    found.add(command.group(1).trim());
+                }
+                yield found;
+            }
+            case Containers.Answer.Structured structured -> commandsOf(structured.result());
+        };
+    }
+
+    private static List<String> commandsOf(DiscoverResult result) {
+        List<String> commands = new ArrayList<>();
+        switch (result) {
+            case DiscoverResult.BucketList ignored -> {
+                // No embedded command fields — the buckets are the whole answer.
+            }
+            case DiscoverResult.ContainerRoster roster -> {
+                roster.containers().forEach(entry -> commands.add(entry.call()));
+                addIfPresent(commands, roster.next());
+            }
+            case DiscoverResult.PathGroups groups -> {
+                groups.groups().forEach(group -> commands.add(group.call()));
+                addIfPresent(commands, groups.next());
+            }
+            case DiscoverResult.ResourceList resources -> {
+                resources.resources().forEach(resource -> addIfPresent(commands, resource.call()));
+                addIfPresent(commands, resources.next());
+            }
+            case DiscoverResult.MethodList methods -> addIfPresent(commands, methods.next());
+        }
+        return commands;
+    }
+
+    private static void addIfPresent(List<String> commands, String command) {
+        if (command != null) {
+            commands.add(command);
+        }
+    }
+
+    private static Containers.Answer expect(Result<Containers.Answer> view) {
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
         return view.value();
     }
@@ -125,17 +173,13 @@ public class PointersTest {
         Set<String> runnable = new LinkedHashSet<>();
         Set<String> templates = new LinkedHashSet<>();
         Set<String> foreign = new LinkedHashSet<>();
-        for (String document : documentsOf(context)) {
-            Matcher command = COMMAND.matcher(document);
-            while (command.find()) {
-                String text = command.group(1).trim();
-                if (text.contains("<") || text.contains(">")) {
-                    templates.add(text);
-                } else if (!text.contains(" " + pkg)) {
-                    foreign.add(text);
-                } else {
-                    runnable.add(text);
-                }
+        for (String text : commandsOf(context)) {
+            if (text.contains("<") || text.contains(">")) {
+                templates.add(text);
+            } else if (!text.contains(" " + pkg)) {
+                foreign.add(text);
+            } else {
+                runnable.add(text);
             }
         }
 

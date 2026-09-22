@@ -161,20 +161,30 @@ public final class Cli {
             return 0;
         }
 
-        Containers.Options containerOptions = new Containers.Options(rest.subList(1, rest.size()));
-        Result<String> document = switch (bucket) {
+        Containers.Options containerOptions =
+                new Containers.Options(rest.subList(1, rest.size()), root.filter, false, false, root.page);
+        Result<Containers.Answer> answer = switch (bucket) {
             case "client" -> Containers.render(loaded.value(), Surface.Scope.CLIENT, containerOptions);
             case "class" -> Containers.render(loaded.value(), Surface.Scope.CLASS, containerOptions);
             case "funcs" -> Containers.render(loaded.value(), Surface.Scope.MODULE, containerOptions);
             default -> throw new IllegalStateException("unreachable: validated above");
         };
-        if (!document.isOk()) {
-            return fail(document.failure(), streams);
+        if (!answer.isOk()) {
+            return fail(answer.failure(), streams);
         }
-        // The one point every Markdown document passes through, which is why the length stamp goes here — see
-        // Documents.withLength for what it defends against. The IR path above carries no such stamp: it is not
-        // part of the RFC's shape for that response.
-        streams.out().accept(Documents.withLength(document.value()));
+        switch (answer.value()) {
+            case Containers.Answer.Markdown markdown ->
+                    // The one point every Markdown document passes through, which is why the length stamp goes
+                    // here — see Documents.withLength for what it defends against. The structured case below
+                    // carries no such stamp: it is not part of the RFC's shape for that response.
+                    streams.out().accept(Documents.withLength(markdown.text()));
+            case Containers.Answer.Structured structured -> {
+                boolean json = jsonOutput(root.output, interactive);
+                streams.out().accept((json
+                        ? JsonRenderer.render(structured.result())
+                        : TextRenderer.render(structured.result())) + "\n");
+            }
+        }
         return 0;
     }
 

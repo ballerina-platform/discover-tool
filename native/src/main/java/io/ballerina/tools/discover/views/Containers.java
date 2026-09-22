@@ -23,6 +23,7 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
+import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.Report;
 import io.ballerina.tools.discover.render.Signatures;
@@ -34,6 +35,7 @@ import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,52 +49,66 @@ import java.util.stream.Collectors;
  * {@code client} / {@code class} / {@code funcs} — one implementation, three scopes.
  *
  * <p>The three verbs differ ONLY in which slice of {@link Surface} they address. Everything below — how a
- * positional resolves, how a selector is parsed, how much is printed and what {@code ## Next} offers — is one code
+ * positional resolves, how a selector is parsed, how much is printed and what {@code Next} offers — is one code
  * path, because three copies of it would be three places for the same rule to rot separately.
  *
  * <p><b>THE PARSER CANNOT BE DECIDED PER VERB.</b> In Ballerina a client IS a class, so {@code ballerina/http:Client}
  * is a legal argument to both {@code client} and {@code class} and declares seven resource functions either way.
  * Confining HTTP-verb parsing to one verb would make {@code class ballerina/http Client delete repos/…} fail on a
  * container that has exactly that operation. So the CONTAINER is resolved first and the selector grammar is read
- * off what that container declares (§3.4).
+ * off what that container declares.
  *
- * <p><b>A WRONG GUESS COSTS A LINE, NOT A ROUND TRIP.</b> Three rules do that work and all three were measured
- * defects: a name that is a MEMBER rather than a container still resolves and names its owner (T3); a symbol of
- * another kind still renders, with one line saying which verb is canonical (T6); and an exact one-of-many name
- * match prints the SIGNATURE rather than the name back (T15).
+ * <p><b>A WRONG GUESS COSTS A LINE, NOT A ROUND TRIP.</b> Three rules do that work: a name that is a MEMBER rather
+ * than a container still resolves and names its owner; a symbol of another kind still renders, with one line
+ * saying which bucket is canonical; and an exact one-of-many name match prints the SIGNATURE rather than the name
+ * back.
+ *
+ * <p><b>OUTPUT SIZE IS AN ENTRY/LINE CEILING NOW, NOT A BYTE BUDGET.</b> The RFC replaces this tool's earlier
+ * byte-budget tier ladder (bytes of quoted Ballerina, degrading through four tiers) with a hard ceiling of
+ * {@value #MAX_ENTRIES} entries per listing: under it, everything is shown; over it, resource paths GROUP by
+ * segment and remote/normal methods PAGE with {@code --page}, both honestly disclosing {@code shown}/{@code total}
+ * and the exact next command rather than silently degrading. Exactly one result, and a container mixing resource
+ * paths with named methods under the ceiling, are the two cases this still answers as Markdown — see
+ * {@link #fullAnswer} and {@link #mixedAnswer} — because neither has a ceiling problem to solve.
  *
  * <p><b>THE VIEWS QUOTE, THEY NEVER RE-SPELL.</b> Every declaration printed here comes from
- * {@link Signatures} or {@link TypeDefs} byte-for-byte. The tiers below choose HOW MANY declarations and how much
- * prose surrounds them; they never choose a different spelling. That is what {@code ViewsAgreeTest} pins, and the
- * reason it is a gate rather than a suite: a summariser permitted to invent a shorter form must pick one, and no
- * test can catch a spelling nothing else in the tool produces.
+ * {@link Signatures} or {@link TypeDefs} byte-for-byte. That is what {@code ViewsAgreeTest} pins, and the reason
+ * it is a gate rather than a suite: a summariser permitted to invent a shorter form must pick one, and no test
+ * can catch a spelling nothing else in the tool produces.
  *
  * @since 0.1.0
  */
 public final class Containers {
 
     /**
-     * How many bytes a whole container's signatures may take.
-     *
-     * <p>Measured either side: {@code googleapis.sheets}' 43 remote signatures are about 9KB and print in full,
-     * while {@code twilio}'s 199 and {@code github}'s 903 fall to an index. Bytes rather than a count, because
-     * one match is 200 bytes as a name and 900 as a resource signature — github's
-     * {@code repos/&#123;owner&#125;/&#123;repo&#125;/actions/caches} is 723 bytes for three operations where
-     * sheets averages 210 across forty-three.
+     * The RFC's output-size ceiling: at most this many entries in one listing. Applies to a roster of
+     * containers, a grouped path listing, a flat resource listing and a method listing alike — the one number
+     * every "too many to show" decision in this class is made against.
+     */
+    public static final int MAX_ENTRIES = 40;
+
+    /**
+     * How many bytes a whole container's signatures may take — used only by the still-Markdown, still-dead
+     * {@code -r} code register path ({@link #codeAnswer}) and its miss case, which this phase does not reach
+     * from the CLI (there is no {@code -r} flag left to set {@code Options.resolve()} true) and does not delete
+     * either — that is item 8's job, alongside the rest of the code register.
      */
     public static final int MAX_LISTING_BYTES = 20_000;
 
     /**
-     * How many bytes a FILTERED response may take.
-     *
-     * <p>Lower than a full listing, because a filter is a claim that the caller knows roughly what they want: the
-     * real {@code -s "cache"} case on github is about 1.5KB, and a filtered answer that reaches 20KB means the
-     * filter did not filter.
+     * How many bytes a type closure may take when inlined under a single fully-resolved result — {@link
+     * #renderFull}'s own budget, unrelated to the entry ceiling above: this bounds a CLOSURE (how many types a
+     * signature transitively names), not a LISTING (how many results a query matched).
      */
-    public static final int MAX_FILTERED_BYTES = 6_000;
+    public static final int MAX_CLOSURE_BYTES = 6_000;
 
-    /** How many roster rows a listing prints before it prints a count instead. */
-    public static final int MAX_ROSTER_ROWS = 20;
+    /**
+     * How many additional path-grouping levels are allowed beyond the top-level segment, surveyed against real
+     * connectors (the RFC's own check: seven connectors, three levels needed at most, four is one level of
+     * margin). Past this depth, a still-oversized group is shown flat and truncated rather than subdivided
+     * again, so a group can never fragment into an unnavigable tree of one-entry leaves.
+     */
+    private static final int MAX_GROUP_DEPTH = 4;
 
     /**
      * How many bytes of member names a MISS may offer before it prints a count instead.
@@ -103,20 +119,6 @@ public final class Containers {
      */
     private static final int MAX_MISS_NAME_BYTES = 1_500;
 
-    /**
-     * The shortest camelCase prefix that may name a cluster.
-     *
-     * <p>Measured what happens without it: splitting names into segments reads beautifully on
-     * {@code twilio} ({@code list} 61, {@code fetch} 43, {@code create} 35) and produces {@code z} 20,
-     * {@code s} 14, {@code h} 14, {@code l} 10 on {@code ballerinax/redis}, where the leading run of
-     * {@code zAdd}/{@code hGet}/{@code lPush} is one letter. That is structure in the tokenizer rather than in the
-     * domain, and nothing in the payload separates the two cases — but the PREFIX LENGTH does, exactly.
-     */
-    private static final int MIN_CLUSTER_PREFIX = 3;
-
-    /** How many names a cluster needs before it is worth naming as one. */
-    private static final int MIN_CLUSTER_SIZE = 3;
-
     /** Accessors a resource function may declare. Not a closed set — see {@link #isAccessor}. */
     private static final Pattern ACCESSOR = Pattern.compile("[a-z][a-zA-Z0-9]*");
 
@@ -125,45 +127,52 @@ public final class Containers {
 
     /**
      * @param selectors everything after the package: a container name, a member, an accessor and a path
-     * @param search the {@code -s} query, or {@code null}
-     * @param resolve {@code -r}: answer in the code register, with the type closure
-     * @param all {@code --all}: ignore the byte budget. Hidden from {@code --help}, offered only in {@code ## Next}
+     * @param filter the {@code --filter} keyword, or {@code null}
+     * @param resolve {@code -r} from the tool's earlier grammar — dead from the CLI now (see
+     *     {@link #MAX_LISTING_BYTES})
+     * @param all {@code --all} from the tool's earlier grammar — dead from the CLI now, same reason
+     * @param page {@code --page}, 1-indexed, for a method listing over the ceiling
      */
-    public record Options(List<String> selectors, String search, boolean resolve, boolean all) {
+    public record Options(List<String> selectors, String filter, boolean resolve, boolean all, int page) {
 
         public static Options bare() {
-            return new Options(List.of(), null, false, false);
+            return new Options(List.of(), null, false, false, 1);
         }
 
         public Options(List<String> selectors) {
-            this(selectors, null, false, false);
+            this(selectors, null, false, false, 1);
         }
 
         public boolean filtered() {
-            return search != null && !search.isBlank();
-        }
-
-        /**
-         * How many bytes this response may print.
-         *
-         * <p>NAMING A CONTAINER IS NOT A FILTER ON IT. {@code client ballerina/http Client} asked for that
-         * container whole, so it gets the container budget — the narrower one applies once a SELECTOR or {@code -s}
-         * has cut the container down, which is why this takes the selectors that survived container resolution
-         * rather than reading the ones the caller typed.
-         */
-        int budget(List<String> remaining) {
-            if (all) {
-                return Integer.MAX_VALUE;
-            }
-            return filtered() || !remaining.isEmpty() ? MAX_FILTERED_BYTES : MAX_LISTING_BYTES;
+            return filter != null && !filter.isBlank();
         }
     }
 
-    public static Result<String> render(LoadedPackage loaded, Surface.Scope scope, Options options) {
+    /**
+     * What a bucket query answers with: still-Markdown prose for the cases with no ceiling problem (exactly one
+     * result, a mixed resource-and-method container under the ceiling, kind tolerance, a miss), or a value on
+     * the RFC's shared result IR for the cases the ceiling actually governs.
+     */
+    public sealed interface Answer {
+
+        record Markdown(String text) implements Answer { }
+
+        record Structured(DiscoverResult result) implements Answer { }
+
+        static Answer markdown(String text) {
+            return new Markdown(text);
+        }
+
+        static Answer structured(DiscoverResult result) {
+            return new Structured(result);
+        }
+    }
+
+    public static Result<Answer> render(LoadedPackage loaded, Surface.Scope scope, Options options) {
         return render(loaded, scope, options, null);
     }
 
-    private static Result<String> render(
+    private static Result<Answer> render(
             LoadedPackage loaded, Surface.Scope scope, Options options, String note) {
         List<Surface.Container> containers = Surface.of(loaded.library(), scope);
         if (containers.isEmpty()) {
@@ -175,7 +184,7 @@ public final class Containers {
             if (containers.size() == 1) {
                 return answer(loaded, scope, containers.get(0), List.of(), options, note);
             }
-            return Result.ok(roster(loaded, scope, containers, options, note));
+            return Result.ok(roster(loaded, scope, containers, options));
         }
 
         // 1. An exact container name always wins, so no casing heuristic is needed anywhere. `client sheets
@@ -190,10 +199,10 @@ public final class Containers {
             return answer(loaded, scope, containers.get(0), selectors, options, note);
         }
 
-        // 3. An EXACT member name or a resolving path, across every container in scope. T3: this used to be a bare
-        //    validation failure whose suggestion rebuilt the command WITHOUT the name that failed, so following it
+        // 3. An EXACT member name or a resolving path, across every container in scope. A bare validation
+        //    failure here used to rebuild its own suggestion WITHOUT the name that failed, so following it
         //    looped.
-        Result<String> exact = byOwner(loaded, scope, containers, selectors, options, note, true);
+        Result<Answer> exact = byOwner(loaded, scope, containers, selectors, options, note, true);
         if (exact != null) {
             return exact;
         }
@@ -202,13 +211,13 @@ public final class Containers {
         //    CLASS, and it is also a substring of `getCookieStore`, which two of http's ten clients declare. Run
         //    the fuzzy pass first and `client ballerina/http Cookie` answers with a roster of two clients that
         //    happen to contain those letters instead of routing to the class the caller plainly named.
-        Result<String> other = elsewhereIfKnown(loaded, scope, options);
+        Result<Answer> other = elsewhereIfKnown(loaded, scope, options);
         if (other != null) {
             return other;
         }
 
         // 5. A substring of a member name, which is the widening a caller relies on when they half-remember one.
-        Result<String> fuzzy = byOwner(loaded, scope, containers, selectors, options, note, false);
+        Result<Answer> fuzzy = byOwner(loaded, scope, containers, selectors, options, note, false);
         if (fuzzy != null) {
             return fuzzy;
         }
@@ -219,11 +228,11 @@ public final class Containers {
     /**
      * Whichever containers in this scope hold the selector: one is answered, several are a roster.
      *
-     * <p>{@code exactly} is the two passes of §3.3 rather than two code paths — the resolution ORDER is the whole
-     * subtlety here, and expressing it as one function called twice is what keeps the two passes from drifting into
+     * <p>{@code exactly} is two passes rather than two code paths — the resolution ORDER is the whole subtlety
+     * here, and expressing it as one function called twice is what keeps the two passes from drifting into
      * different notions of a match.
      */
-    private static Result<String> byOwner(
+    private static Result<Answer> byOwner(
             LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers,
             List<String> selectors, Options options, String note, boolean exactly) {
         Map<Surface.Container, List<Entry>> owners = new LinkedHashMap<>();
@@ -243,7 +252,7 @@ public final class Containers {
             return answer(loaded, scope, owner, selectors, options,
                     note != null ? note : ownerNote(loaded, scope, owner, selectors.get(0)));
         }
-        return Result.ok(ownerRoster(loaded, scope, owners, selectors, options));
+        return Result.ok(Answer.markdown(ownerRoster(loaded, scope, owners, selectors)));
     }
 
     /**
@@ -252,7 +261,7 @@ public final class Containers {
      * <p>Split out of {@link #elsewhere} so the resolution order can consult it without committing to a failure:
      * {@code null} means "not there either", which is what lets the substring pass run afterwards.
      */
-    private static Result<String> elsewhereIfKnown(
+    private static Result<Answer> elsewhereIfKnown(
             LoadedPackage loaded, Surface.Scope scope, Options options) {
         String token = options.selectors().get(0);
         for (Surface.Scope other : Surface.Scope.values()) {
@@ -274,23 +283,19 @@ public final class Containers {
     // -----------------------------------------------------------------------
 
     /**
-     * A symbol this verb's scope does not hold, answered anyway.
+     * A symbol this bucket does not hold, answered anyway.
      *
-     * <p>This is what makes kind-specific verbs safe for an agent at all. Without it every kind guess risks a
-     * wasted round trip; with it the split costs ONE PRINTED LINE. It closes T6, where
-     * {@code ops <pkg> <constant>} failed with a client-ambiguity error for a name the package declares plainly.
-     *
-     * <p>The note is written in the register of the document it lands in — a facts row in a report, a {@code //}
-     * comment in the code register — never a bare {@code note:} prefix, which fits neither.
+     * <p>This is what makes bucket-specific addressing safe for an agent at all. Without it every kind guess
+     * risks a wasted round trip; with it the split costs ONE PRINTED LINE.
      */
-    private static Result<String> elsewhere(
+    private static Result<Answer> elsewhere(
             LoadedPackage loaded, Surface.Scope scope, Options options, String why) {
         if (options.selectors().isEmpty()) {
-            return Result.ok(emptyScope(loaded, scope, why));
+            return Result.ok(Answer.markdown(emptyScope(loaded, scope, why)));
         }
         // The exact pass first, then a substring of a member in another scope — the same two-pass order the
         // in-scope resolution uses, for the same reason.
-        Result<String> known = elsewhereIfKnown(loaded, scope, options);
+        Result<Answer> known = elsewhereIfKnown(loaded, scope, options);
         if (known != null) {
             return known;
         }
@@ -324,8 +329,7 @@ public final class Containers {
     /**
      * Nothing matched anywhere, with the names that came closest.
      *
-     * <p>The suggestion must never rebuild the command WITHOUT the argument that failed — the shipped {@code ops}
-     * path did exactly that, so an agent following it ran the same wrong shape again.
+     * <p>The suggestion must never rebuild the command WITHOUT the argument that failed.
      */
     private static Failure notFound(
             LoadedPackage loaded, Surface.Scope scope, String token, Declarations index) {
@@ -385,15 +389,11 @@ public final class Containers {
     // -----------------------------------------------------------------------
 
     /**
-     * Several containers and nothing to choose between them yet.
-     *
-     * <p>Every row ends in the command that OPENS it: {@code overview}'s old unconditional pointer
-     * returned "none in any client" on {@code ballerinax/aws.s3} and pointed back at {@code overview}, a two-call
-     * loop carrying no information.
+     * Several containers and nothing to choose between them yet — the RFC's entry ceiling, applied to a roster
+     * of containers rather than to one container's own members.
      */
-    private static String roster(
-            LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers, Options options,
-            String note) {
+    private static Answer roster(
+            LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers, Options options) {
         String pkg = loaded.qualified().qualified();
         List<Surface.Container> selected = options.filtered()
                 ? containers.stream()
@@ -401,50 +401,37 @@ public final class Containers {
                         .toList()
                 : containers;
 
-        Report report = new Report(scope.verb());
-        report.heading(1, title(scope) + " — " + pkg);
-
-        List<Report.Fact> facts = new ArrayList<>(Report.warning(loaded.warning()));
-        if (note != null) {
-            facts.add(new Report.Fact("Note", note));
-        }
-        facts.add(new Report.Fact(title(scope), Texts.count(containers.size()) + ", listed below"));
-        if (options.filtered()) {
-            facts.add(new Report.Fact("Filter", Texts.code(options.search()) + " — "
-                    + Texts.count(selected.size()) + " of " + Texts.count(containers.size())
-                    + " declare a match"));
-        }
-        report.facts(facts);
-
-        report.heading(2, "Next");
-        List<String> next = new ArrayList<>();
-        if (!selected.isEmpty()) {
-            next.add("open one: " + Texts.code("bal discover " + pkg + " " + scope.verb() + " "
-                    + selected.get(0).name()));
-        }
-        report.bullets(next);
-
         if (selected.isEmpty()) {
-            report.heading(2, "No match");
-            report.paragraph("Nothing under " + Texts.code(scope.verb()) + " matches "
-                    + Texts.code(options.search()) + ".");
-            return report.toString();
+            return Answer.markdown(noRosterMatch(loaded, scope, containers.size(), options));
         }
 
-        report.heading(2, Texts.count(selected.size()) + " " + title(scope).toLowerCase(java.util.Locale.ROOT));
-        List<Surface.Container> shown = selected.subList(0, Math.min(MAX_ROSTER_ROWS, selected.size()));
-        report.bullets(shown.stream()
-                .map(container -> rosterRow(pkg, scope, container))
-                .toList());
-        if (shown.size() < selected.size()) {
-            report.paragraph(Texts.count(selected.size() - shown.size()) + " more, not listed.");
-        }
-        return report.toString();
+        List<Surface.Container> shown = selected.subList(0, Math.min(MAX_ENTRIES, selected.size()));
+        List<DiscoverResult.ContainerRoster.Container> items = shown.stream()
+                .map(container -> new DiscoverResult.ContainerRoster.Container(
+                        container.name(),
+                        container.operations().size(),
+                        (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
+                        (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
+                        "bal discover " + pkg + " " + scope.verb() + " " + container.name()))
+                .toList();
+        String next = shown.size() < selected.size()
+                ? "bal discover " + pkg + " " + scope.verb() + " --filter <keyword>"
+                : null;
+        return Answer.structured(new DiscoverResult.ContainerRoster(items, selected.size(), next, loaded.warning()));
     }
 
-    private static String rosterRow(String pkg, Surface.Scope scope, Surface.Container container) {
-        return Texts.code(container.name()) + " — " + counts(container) + " · "
-                + Texts.code("bal discover " + pkg + " " + scope.verb() + " " + container.name());
+    private static String noRosterMatch(
+            LoadedPackage loaded, Surface.Scope scope, int total, Options options) {
+        String pkg = loaded.qualified().qualified();
+        Report report = new Report(scope.verb());
+        report.heading(1, title(scope) + " — " + pkg);
+        List<Report.Fact> facts = new ArrayList<>(Report.warning(loaded.warning()));
+        facts.add(new Report.Fact(title(scope), Texts.count(total) + " declared"));
+        facts.add(new Report.Fact("Filter", Texts.code(options.filter()) + " — none declare a match"));
+        report.facts(facts);
+        report.heading(2, "Next");
+        report.bullets(List.of("list them all: " + Texts.code("bal discover " + pkg + " " + scope.verb())));
+        return report.toString();
     }
 
     /** What a container holds, split by call form because {@code ->} versus {@code .} is the fact a caller wants. */
@@ -469,11 +456,12 @@ public final class Containers {
      * One member name, declared on several containers.
      *
      * <p>The answer is the OWNERS with counts, each row ending in the command that opens it — never a bare
-     * validation failure, which is what T3 recorded as the sweep's most-hit ergonomic bug.
+     * validation failure. Kept as Markdown: the owner count is bounded by how many containers a bucket has, and
+     * no fixture comes close to the entry ceiling here.
      */
     private static String ownerRoster(
             LoadedPackage loaded, Surface.Scope scope, Map<Surface.Container, List<Entry>> owners,
-            List<String> selectors, Options options) {
+            List<String> selectors) {
         String pkg = loaded.qualified().qualified();
         String token = selectors.get(0);
         Report report = new Report(scope.verb());
@@ -512,7 +500,7 @@ public final class Containers {
      */
     public record Entry(Fn fn, List<String> path) {
 
-        /** How it is addressed: {@code get repos/{owner}} for a resource, the bare name otherwise. */
+        /** How it is addressed: {@code get repos/:owner} for a resource, the bare name otherwise. */
         public String label() {
             return switch (fn) {
                 case Fn.Resource resource -> resource.accessor() + " " + String.join("/", path);
@@ -523,9 +511,6 @@ public final class Containers {
 
         /**
          * {@code ->} or {@code .} — DERIVED and always printed.
-         *
-         * <p>Both signature errors in the 2026-08-15 sweep came from this fact being absent: a database client
-         * declares {@code remote function close()}, and {@code dbClient.close()} does not compile.
          */
         public String callForm() {
             return fn instanceof Fn.Remote || fn instanceof Fn.Resource ? "->" : ".";
@@ -537,8 +522,7 @@ public final class Containers {
      *
      * <p>THE GRAMMAR FOLLOWS THE CONTAINER. A container that declares resource functions reads
      * {@code get}/{@code post}/{@code delete} as an accessor and the token after it as a path; one that does not
-     * reads the same token as a member name. So {@code class ballerina/http Cookie get} looks for a member called
-     * {@code get}, finds none, and fails with {@code Cookie}'s actual members as candidates.
+     * reads the same token as a member name.
      */
     private static List<Entry> select(Surface.Container container, List<String> selectors) {
         return select(container, selectors, false);
@@ -574,9 +558,7 @@ public final class Containers {
             return List.of();
         }
         // `new` is the constructor, which Ballerina spells `init`. An INPUT alias only — the document still prints
-        // `init`, because it prints what the package declares. Measured in two separate sweeps: an agent asked for
-        // `Client new`, was told nothing matched on a container declaring 112 members, and found it as `init` on
-        // the next call. The guess is correct in most languages an agent has read, and it cost a round trip twice.
+        // `init`, because it prints what the package declares.
         if (token.equalsIgnoreCase("new") && container.constructor().isPresent()) {
             List<Entry> constructor = all.stream().filter(entry -> entry.fn() instanceof Fn.Constructor).toList();
             if (!constructor.isEmpty()) {
@@ -590,9 +572,7 @@ public final class Containers {
                 .filter(entry -> entry.label().equals(token) || entry.label().equals(readable))
                 .toList();
         if (exactly || !exact.isEmpty()) {
-            // AN EXACT NAME NEVER LOSES TO A SUBSTRING. `Producer send` is one function; widened first it is two,
-            // because `sendWithMetadata` also contains those letters — and two results is the difference between
-            // the full declaration with its types and a pair of signature lines (T15).
+            // AN EXACT NAME NEVER LOSES TO A SUBSTRING.
             return exact;
         }
         return all.stream().filter(entry -> matchesName(entry, token)).toList();
@@ -659,10 +639,6 @@ public final class Containers {
 
     /**
      * The facts rows a path selector earns: where it landed, and what a wildcard did not take.
-     *
-     * <p>Both are DISCLOSURES rather than decorations. A relocated request answered at a deeper path has to say
-     * so or the caller believes the tree is shaped differently than it is; a wildcard took one branch and the
-     * answer is short by exactly the paths it names.
      */
     private static List<Report.Fact> pathFacts(Surface.Container container, List<String> selectors) {
         Optional<PathTree.Located> found = located(container, selectors);
@@ -671,9 +647,6 @@ public final class Containers {
         }
         PathTree.Located located = found.get();
         List<Report.Fact> facts = new ArrayList<>();
-        // The path AS RESOLVED, which is the only place placeholder normalisation is visible: `owner`,
-        // `{owner}` and `[string owner]` all address the same segment, and a document that echoed only what was
-        // typed would leave a caller unable to tell which spelling the tree actually holds.
         if (located.resolution() instanceof PathTree.Resolution.Found node
                 && !node.path().isEmpty()) {
             facts.add(new Report.Fact("Path", Texts.code(String.join("/", node.path()))));
@@ -694,11 +667,33 @@ public final class Containers {
     }
 
     /**
+     * The same relocation/wildcard advisory {@link #pathFacts} renders as Markdown facts rows, as one line for
+     * the structured IR's own {@code note} field — the RFC's shapes have no room for several distinct facts rows,
+     * but silently dropping which sibling branch a wildcard or an auto-relocation did NOT take is exactly the bug
+     * this mechanism exists to prevent (GITHUB-02: {@code repos/*}/{@code *} answered with 420 of 421 operations
+     * under exit 0 and nothing said so), so it travels here instead of being lost when the answer is a resource
+     * listing rather than one full signature.
+     */
+    private static String pathNote(Surface.Container container, List<String> selectors) {
+        Optional<PathTree.Located> found = located(container, selectors);
+        if (found.isEmpty() || !(found.get().resolution() instanceof PathTree.Resolution.Found node)) {
+            return null;
+        }
+        PathTree.Located located = found.get();
+        List<String> parts = new ArrayList<>();
+        if (located.relocated() && !located.alternatives().isEmpty()) {
+            parts.add("relocated to " + Texts.code(String.join("/", node.path()))
+                    + " — the only match for that segment under the requested prefix");
+        }
+        for (PathTree.Descent.Sibling other : node.alsoMatched()) {
+            parts.add("also matched " + Texts.code(String.join("/", other.path())) + " ("
+                    + Texts.count(other.total()) + "), not included here");
+        }
+        return parts.isEmpty() ? null : String.join("; ", parts);
+    }
+
+    /**
      * Is this token an accessor rather than a member name?
-     *
-     * <p>Read off the container rather than from a closed set of HTTP methods: a resource accessor is an
-     * identifier, and {@code subscribe} (websub, graphql) is as legal as {@code get}. So the test is whether some
-     * resource function of THIS container declares it.
      */
     private static boolean isAccessor(Surface.Container container, String token) {
         if (!ACCESSOR.matcher(token).matches()) {
@@ -710,8 +705,6 @@ public final class Containers {
 
     /** A bare token matches anywhere in a name; {@code *} is a wildcard, as it is in a path. */
     private static boolean matchesName(Entry entry, String token) {
-        // The fenced spelling widens too, or a caller who copied `chat\.postMessage` and then tried to widen it
-        // would be told twice that nothing matches.
         return glob(token).matcher(entry.label()).matches()
                 || glob(PathTree.readableSelector(token)).matcher(entry.label()).matches();
     }
@@ -742,7 +735,7 @@ public final class Containers {
     }
 
     private static Filter.Split<Entry> filterEntries(Surface.Container container, Options options) {
-        return Filter.apply(options.search(), entriesOf(container),
+        return Filter.apply(options.filter(), entriesOf(container),
                 entry -> Filter.surfaceOf(entry.fn()), entry -> Filter.docsOf(entry.fn()));
     }
 
@@ -750,44 +743,66 @@ public final class Containers {
     // The answer
     // -----------------------------------------------------------------------
 
-    private static Result<String> answer(
+    private static Result<Answer> answer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, String note) {
         List<Entry> selected = select(container, selectors);
         List<Entry> documented = List.of();
 
         if (options.filtered()) {
-            Filter.Split<Entry> split = Filter.apply(options.search(), selected,
+            Filter.Split<Entry> split = Filter.apply(options.filter(), selected,
                     entry -> Filter.surfaceOf(entry.fn()), entry -> Filter.docsOf(entry.fn()));
             selected = split.surface();
             documented = split.documented();
         }
 
-        // The register is a property of the DOCUMENT (§4.1), so it is decided BEFORE the answer's shape: a `-r`
-        // response is nothing but declarations even when the selection came back empty, or a caller redirecting it
-        // into a .bal file would get a Markdown table in the middle of their source.
+        // The register is a property of the DOCUMENT, so it is decided BEFORE the answer's shape: a `-r`
+        // response is nothing but declarations even when the selection came back empty.
         if (options.resolve()) {
-            return Result.ok(codeAnswer(loaded, scope, container, selected, selectors, options, note));
+            return Result.ok(Answer.markdown(
+                    codeAnswer(loaded, scope, container, selected, selectors, options, note)));
         }
         if (selected.isEmpty() && documented.isEmpty()) {
-            return Result.ok(nothingMatched(loaded, scope, container, selectors, options));
+            return Result.ok(Answer.markdown(nothingMatched(loaded, scope, container, selectors, options)));
         }
-        return Result.ok(reportAnswer(loaded, scope, container, selectors, selected, documented, options,
-                note));
+        if (selected.size() == 1) {
+            return Result.ok(Answer.markdown(
+                    fullAnswer(loaded, scope, container, selectors, selected.get(0), documented, options, note)));
+        }
+
+        // The constructor is never part of the ceiling problem — it is one signature, always shown once, on
+        // request (`init`/`new`) rather than folded into a "many entries" listing.
+        List<Entry> callable = selected.stream()
+                .filter(entry -> !(entry.fn() instanceof Fn.Constructor))
+                .toList();
+        boolean hasResources = callable.stream().anyMatch(entry -> entry.fn() instanceof Fn.Resource);
+        boolean hasNamed = callable.stream().anyMatch(entry -> !(entry.fn() instanceof Fn.Resource));
+        if (hasResources && hasNamed) {
+            // A container answering to both `->path.accessor()` and `->name()` under the ceiling — measured,
+            // only ballerina/http's Client does this among real connectors surveyed, at 22 total entries. Kept
+            // as Markdown, sectioned by call form: the RFC's separate resource/method JSON shapes have no
+            // combined form, and this is the one case item 4 leaves for a later pass rather than inventing one
+            // under this item's own time pressure.
+            return Result.ok(Answer.markdown(
+                    mixedAnswer(loaded, scope, container, selectors, selected, documented, options, note)));
+        }
+        if (hasResources) {
+            return Result.ok(resourceAnswer(loaded, scope, container, selectors, callable, options, note));
+        }
+        return Result.ok(methodAnswer(loaded, scope, container, callable, options, note));
     }
 
     /**
      * A selector that matched nothing, answered with what IS there.
      *
      * <p>Exit 0 with the alternatives rather than a failure: an empty selection is a fact about the container,
-     * and the caller's next move is in the document. The one thing it must not do is offer a command WITHOUT the
-     * argument that failed.
+     * and the caller's next move is in the document.
      */
     private static String nothingMatched(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options) {
         String pkg = loaded.qualified().qualified();
-        String asked = options.filtered() ? options.search() : String.join(" ", selectors);
+        String asked = options.filtered() ? options.filter() : String.join(" ", selectors);
         List<Entry> all = entriesOf(container);
 
         Report report = new Report(scope.verb());
@@ -834,15 +849,13 @@ public final class Containers {
     }
 
     // -----------------------------------------------------------------------
-    // The report register
+    // Exactly one result, and the mixed case — still Markdown, no ceiling problem
     // -----------------------------------------------------------------------
 
-    private static String reportAnswer(
+    private static String fullAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> selected, List<Entry> documented, Options options, String note) {
+            Entry entry, List<Entry> documented, Options options, String note) {
         String pkg = loaded.qualified().qualified();
-        Tier tier = tierFor(selected, container, selectors, options);
-
         Report report = new Report(scope.verb());
         report.heading(1, title(scope) + " — " + pkg + containerSuffix(container));
 
@@ -854,19 +867,16 @@ public final class Containers {
             facts.add(new Report.Fact("Container", Texts.code(container.name()) + " — " + counts(container)));
         }
         if (!selectors.isEmpty()) {
-            facts.add(new Report.Fact("Selector", Texts.code(String.join(" ", selectors)) + " — "
-                    + Texts.count(selected.size()) + " of " + Texts.count(entriesOf(container).size())));
+            facts.add(new Report.Fact("Selector", Texts.code(String.join(" ", selectors)) + " — 1 of "
+                    + Texts.count(entriesOf(container).size())));
             facts.addAll(pathFacts(container, selectors));
         }
         if (options.filtered()) {
-            facts.add(new Report.Fact("Filter", Texts.code(options.search()) + " — "
-                    + Texts.count(selected.size()) + " by name or type, " + Texts.count(documented.size())
-                    + " more by documentation only"));
+            facts.add(new Report.Fact("Filter", Texts.code(options.filter()) + " — 1 by name or type, "
+                    + Texts.count(documented.size()) + " more by documentation only"));
         }
-        facts.add(new Report.Fact("Showing", tier.describe(selected.size())));
+        facts.add(new Report.Fact("Showing", "the declaration in full, with the types it names"));
         report.facts(facts);
-        // The rule is printed where it applies, and only when there IS a dropped branch. The rows say
-        // WHICH paths; repeating the consequence on each would say it twice.
         if (facts.stream().anyMatch(fact -> "Also matched".equals(fact.label()))) {
             report.paragraph("A wildcard takes one branch. What follows is short by exactly the paths in the "
                     + "'Also matched' rows above — ask for those by name before concluding an operation does "
@@ -876,96 +886,13 @@ public final class Containers {
         report.heading(2, "Next");
         report.bullets(nextBullets(loaded, scope, container, canonical(container, selectors)));
 
-        renderTier(report, tier, container, selected, loaded, options);
+        renderFull(report, container, entry, loaded, options);
 
         if (!documented.isEmpty()) {
-            // NAMED, never rendered — the 6-versus-33 measurement on github. One line, and every one of them is
-            // promotable by name in a single follow-up call.
             report.heading(2, Texts.count(documented.size()) + " matched documentation only");
             report.literal(Report.columns(documented.stream().map(Entry::label).toList()));
         }
         return report.toString();
-    }
-
-    /** How much of the shared renderer to quote. Never a different spelling of a declaration. */
-    private enum Tier {
-
-        /** One result: everything the declaration documents, plus the types its signature names. */
-        FULL,
-
-        /** The description and the declaration, one per result. */
-        SIGNATURE,
-
-        /** One line each: the name or the path, no signature. */
-        INDEX,
-
-        /** Path roots, or camelCase prefix clusters, with counts. */
-        GROUPED;
-
-        String describe(int results) {
-            return switch (this) {
-                case FULL -> "the declaration in full, with the types it names";
-                case SIGNATURE -> Texts.count(results) + " signature" + (results == 1 ? "" : "s");
-                case INDEX -> Texts.count(results) + " by name, no signatures — over the byte budget";
-                case GROUPED -> Texts.count(results) + " grouped, no names — well over the byte budget";
-            };
-        }
-    }
-
-    /**
-     * The richest tier that fits.
-     *
-     * <p>Exactly one result is the case worth naming: T15 recorded that an exact one-of-many name match printed
-     * the NAME back, forcing a second call for the signature the caller had already identified.
-     */
-    private static Tier tierFor(
-            List<Entry> selected, Surface.Container container, List<String> remaining, Options options) {
-        if (selected.size() == 1 && !options.all()) {
-            return Tier.FULL;
-        }
-        int budget = options.budget(remaining);
-        if (Report.ballerinaBytes(signatures(selected, container)) <= budget) {
-            return Tier.SIGNATURE;
-        }
-        if (indexBytes(selected) <= budget) {
-            return Tier.INDEX;
-        }
-        return Tier.GROUPED;
-    }
-
-    private static int indexBytes(List<Entry> selected) {
-        return Report.ballerinaBytes(Report.columns(selected.stream().map(Entry::label).toList()));
-    }
-
-    /**
-     * The signatures, from the one renderer.
-     *
-     * <p>A module function carries {@code public} and a member does not, so the renderer is chosen by scope
-     * rather than by shape — the same split the API document draws.
-     */
-    private static List<String> signatures(List<Entry> entries, Surface.Container container) {
-        return entries.stream()
-                .map(entry -> container.isModule() && entry.fn() instanceof Fn.Standalone standalone
-                        ? Signatures.renderStandaloneFunction(standalone)
-                        : Signatures.renderSignature(entry.fn()))
-                .toList();
-    }
-
-    private static void renderTier(
-            Report report, Tier tier, Surface.Container container, List<Entry> selected, LoadedPackage loaded,
-            Options options) {
-        if (selected.isEmpty()) {
-            return;
-        }
-        switch (tier) {
-            case FULL -> renderFull(report, container, selected.get(0), loaded, options);
-            case SIGNATURE -> renderByCallForm(report, container, selected);
-            case INDEX -> {
-                report.heading(2, Texts.count(selected.size()) + " by name");
-                report.literal(Report.columns(selected.stream().map(Entry::label).toList()));
-            }
-            case GROUPED -> renderGrouped(report, container, selected);
-        }
     }
 
     /**
@@ -973,8 +900,7 @@ public final class Containers {
      *
      * <p>The inlining is a DEPTH-1 closure and it is what makes the common flow one call rather than two: the
      * caches DELETE on github names {@code ActionsDeleteActionsCacheByKeyQueries}, the included-record parameter
-     * whose fields are the call's named arguments, and no signature line spells those out. Over budget it is
-     * dropped and {@code -r} is offered instead, because a truncated record is worse than a named one.
+     * whose fields are the call's named arguments, and no signature line spells those out.
      */
     private static void renderFull(
             Report report, Surface.Container container, Entry entry, LoadedPackage loaded, Options options) {
@@ -990,7 +916,7 @@ public final class Containers {
         }
         Closure.Result closure = options.resolve()
                 ? Closure.of(roots, index, Closure.MAX_BYTES, Closure.UNBOUNDED)
-                : Closure.of(roots, index, MAX_FILTERED_BYTES, 1);
+                : Closure.of(roots, index, MAX_CLOSURE_BYTES, 1);
         List<String> rendered = closure.names().stream()
                 .map(name -> TypeDefs.renderTypeDef(index.get(name)))
                 .toList();
@@ -1007,24 +933,50 @@ public final class Containers {
     }
 
     /**
-     * Signatures, split by call form, because {@code ->} versus {@code .} is the fact a caller came for.
-     *
-     * <p>A client declaring both halves is answered with BOTH. {@code ballerina/http}'s {@code Client}
-     * is 7 resource functions and 20 named ones, and the shipped view printed the 7 under a fact row reading
-     * {@code (7 of 7)} — {@code execute}, {@code forward}, {@code submit}, the promise set and the circuit-breaker
-     * controls were reachable from no verb at all.
+     * A container answering to both {@code ->path.accessor()} and {@code ->name()}, under the ceiling — see the
+     * note at its one call site in {@link #answer}.
      */
-    private static void renderByCallForm(
-            Report report, Surface.Container container, List<Entry> selected) {
+    private static String mixedAnswer(
+            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
+            List<Entry> selected, List<Entry> documented, Options options, String note) {
+        String pkg = loaded.qualified().qualified();
+        Report report = new Report(scope.verb());
+        report.heading(1, title(scope) + " — " + pkg + containerSuffix(container));
+
+        List<Report.Fact> facts = new ArrayList<>(Report.warning(loaded.warning()));
+        if (note != null) {
+            facts.add(new Report.Fact("Note", note));
+        }
+        facts.add(new Report.Fact("Container", Texts.code(container.name()) + " — " + counts(container)));
+        if (!selectors.isEmpty()) {
+            facts.add(new Report.Fact("Selector", Texts.code(String.join(" ", selectors)) + " — "
+                    + Texts.count(selected.size()) + " of " + Texts.count(entriesOf(container).size())));
+            facts.addAll(pathFacts(container, selectors));
+        }
+        if (options.filtered()) {
+            facts.add(new Report.Fact("Filter", Texts.code(options.filter()) + " — "
+                    + Texts.count(selected.size()) + " by name or type, " + Texts.count(documented.size())
+                    + " more by documentation only"));
+        }
+        report.facts(facts);
+
+        report.heading(2, "Next");
+        report.bullets(nextBullets(loaded, scope, container, canonical(container, selectors)));
+
         section(report, container, "Constructor", null,
                 selected.stream().filter(entry -> entry.fn() instanceof Fn.Constructor).toList());
         section(report, container, "Resource functions", "-> and a path",
                 selected.stream().filter(entry -> entry.fn() instanceof Fn.Resource).toList());
         section(report, container, "Remote functions", "->",
                 selected.stream().filter(entry -> entry.fn() instanceof Fn.Remote).toList());
-        section(report, container,
-                container.isModule() ? "Module-level functions" : "Normal functions", ".",
+        section(report, container, container.isModule() ? "Module-level functions" : "Normal functions", ".",
                 selected.stream().filter(entry -> entry.fn() instanceof Fn.Normal).toList());
+
+        if (!documented.isEmpty()) {
+            report.heading(2, Texts.count(documented.size()) + " matched documentation only");
+            report.literal(Report.columns(documented.stream().map(Entry::label).toList()));
+        }
+        return report.toString();
     }
 
     private static void section(
@@ -1038,95 +990,185 @@ public final class Containers {
     }
 
     /**
-     * Too many even to name: path roots, or camelCase clusters.
+     * The signatures, from the one shared renderer.
      *
-     * <p>A cluster needs a prefix of at least {@value #MIN_CLUSTER_PREFIX} characters, which is the guard the
-     * {@code redis} measurement demands: {@code z}, {@code s}, {@code h} and {@code l} are what a segment splitter
-     * finds in {@code zAdd}/{@code hGet}/{@code lPush}, and they are structure in the tokenizer rather than in the
-     * domain. Where clustering does not cover most of the names the flat list wins, capped and honest about it.
+     * <p>A module function carries {@code public} and a member does not, so the renderer is chosen by scope
+     * rather than by shape.
      */
-    private static void renderGrouped(Report report, Surface.Container container, List<Entry> selected) {
-        List<Entry> paths = selected.stream().filter(entry -> entry.fn() instanceof Fn.Resource).toList();
-        if (!paths.isEmpty()) {
-            PathTree tree = PathTree.build(container.operations());
-            report.heading(2, Texts.count(tree.total()) + " operations across "
-                    + Texts.count(tree.children().size()) + " top-level segments");
-            report.literal(Report.columns(tree.children().stream()
-                    .map(child -> child.segment() + " " + Texts.count(child.total()))
-                    .toList()));
-        }
-        List<Entry> named = selected.stream().filter(entry -> !(entry.fn() instanceof Fn.Resource)).toList();
-        if (named.isEmpty()) {
-            return;
-        }
-        Map<String, List<Entry>> clusters = clustersOf(named);
-        int clustered = clusters.values().stream().mapToInt(List::size).sum();
-        if (clustered * 2 < named.size()) {
-            report.heading(2, Texts.count(named.size()) + " by name");
-            report.literal(Report.columns(named.stream().map(Entry::label).toList()));
-            return;
-        }
-        report.heading(2, Texts.count(named.size()) + " named functions in "
-                + Texts.count(clusters.size()) + " prefix groups");
-        report.literal(Report.columns(clusters.entrySet().stream()
-                .map(entry -> entry.getKey() + "* " + Texts.count(entry.getValue().size()))
-                .toList()));
+    private static List<String> signatures(List<Entry> entries, Surface.Container container) {
+        return entries.stream()
+                .map(entry -> container.isModule() && entry.fn() instanceof Fn.Standalone standalone
+                        ? Signatures.renderStandaloneFunction(standalone)
+                        : Signatures.renderSignature(entry.fn()))
+                .toList();
     }
 
-    /** Names grouped by their leading lowercase run, where that run is long enough to mean something. */
-    private static Map<String, List<Entry>> clustersOf(List<Entry> entries) {
-        Map<String, List<Entry>> byPrefix = new LinkedHashMap<>();
+    // -----------------------------------------------------------------------
+    // Remote / normal methods — flat under the ceiling, paginated over it
+    // -----------------------------------------------------------------------
+
+    private static Answer methodAnswer(
+            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<Entry> callable,
+            Options options, String note) {
+        String pkg = loaded.qualified().qualified();
+        String command = "bal discover " + pkg + " " + scope.verb() + containerArgument(container);
+        List<String> names = callable.stream().map(Entry::label).sorted(Texts.LOCALE_ORDER).toList();
+        int total = names.size();
+
+        if (options.filtered() || total <= MAX_ENTRIES) {
+            return Answer.structured(
+                    new DiscoverResult.MethodList(names, total, total, null, loaded.warning(), note));
+        }
+
+        int page = Math.max(1, options.page());
+        int from = Math.min((page - 1) * MAX_ENTRIES, total);
+        int to = Math.min(from + MAX_ENTRIES, total);
+        List<String> shown = names.subList(from, to);
+        String next = to < total ? command + " --page " + (page + 1) : null;
+        return Answer.structured(
+                new DiscoverResult.MethodList(shown, shown.size(), total, next, loaded.warning(), note));
+    }
+
+    // -----------------------------------------------------------------------
+    // Resource paths — flat under the ceiling, grouped by segment over it
+    // -----------------------------------------------------------------------
+
+    private static Answer resourceAnswer(
+            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
+            List<Entry> callable, Options options, String note) {
+        String pkg = loaded.qualified().qualified();
+        String baseCommand = "bal discover " + pkg + " " + scope.verb() + containerArgument(container);
+        List<String> prefix = canonical(container, selectors);
+        List<DiscoverResult.ResourceList.Resource> merged = mergedResources(callable, baseCommand);
+        // A relocation or a wildcard's skipped sibling outranks a kind-tolerance note: the two never co-occur in
+        // one request (the first is within-bucket, the second crosses buckets before a container is even named),
+        // and losing which branch a wildcard did NOT take is the one this mechanism exists to prevent.
+        String pathAdvisory = pathNote(container, selectors);
+        String combinedNote = pathAdvisory != null ? pathAdvisory : note;
+
+        boolean mustStayFlat = options.filtered() || prefix.size() > MAX_GROUP_DEPTH;
+        if (mustStayFlat || merged.size() <= MAX_ENTRIES) {
+            List<DiscoverResult.ResourceList.Resource> shown =
+                    merged.subList(0, Math.min(MAX_ENTRIES, merged.size()));
+            String next = shown.size() < merged.size()
+                    ? baseCommand + pathArgument(prefix) + " --filter <keyword>"
+                    : null;
+            return Answer.structured(new DiscoverResult.ResourceList(
+                    shown, shown.size(), merged.size(), next, loaded.warning(), combinedNote));
+        }
+
+        PathTree node = nodeFor(container, selectors);
+        List<PathGroup> groups = groupsUnder(node, prefix);
+        List<PathGroup> shownGroups = groups.subList(0, Math.min(MAX_ENTRIES, groups.size()));
+        List<DiscoverResult.PathGroups.Group> jsonGroups = shownGroups.stream()
+                .map(group -> new DiscoverResult.PathGroups.Group(
+                        group.name(), group.count(), baseCommand + " " + quotedPath(group.name())))
+                .toList();
+        String next = shownGroups.size() < groups.size()
+                ? baseCommand + pathArgument(prefix) + " --filter <keyword>"
+                : null;
+        return Answer.structured(
+                new DiscoverResult.PathGroups(jsonGroups, groups.size(), next, loaded.warning(), combinedNote));
+    }
+
+    /** One entry per resource PATH, not one per accessor — several accessors on one path share one row. */
+    private static List<DiscoverResult.ResourceList.Resource> mergedResources(
+            List<Entry> entries, String baseCommand) {
+        Map<String, List<String>> accessorsByPath = new LinkedHashMap<>();
         for (Entry entry : entries) {
-            String prefix = leadingLowercase(entry.label());
-            if (prefix.length() >= MIN_CLUSTER_PREFIX) {
-                byPrefix.computeIfAbsent(prefix, key -> new ArrayList<>()).add(entry);
-            }
+            accessorsByPath.computeIfAbsent(String.join("/", entry.path()), key -> new ArrayList<>())
+                    .add(((Fn.Resource) entry.fn()).accessor());
         }
-        Map<String, List<Entry>> clusters = new LinkedHashMap<>();
-        byPrefix.forEach((prefix, members) -> {
-            if (members.size() >= MIN_CLUSTER_SIZE) {
-                clusters.put(prefix, members);
-            }
+        List<DiscoverResult.ResourceList.Resource> resources = new ArrayList<>();
+        accessorsByPath.forEach((path, accessors) -> {
+            // A `call` field only where it is unambiguous — exactly one accessor. A flat field on a
+            // multi-accessor path would have to guess which one, which this design refuses to do.
+            String call = accessors.size() == 1
+                    ? baseCommand + " " + quotedPath(path) + " " + accessors.get(0)
+                    : null;
+            resources.add(new DiscoverResult.ResourceList.Resource(path, List.copyOf(accessors), call));
         });
-        return clusters;
+        return List.copyOf(resources);
     }
 
-    private static String leadingLowercase(String name) {
-        int end = 0;
-        while (end < name.length() && Character.isLowerCase(name.charAt(end))) {
-            end++;
+    /** The tree node the current selector already resolved to — the root, for a bare container. */
+    private static PathTree nodeFor(Surface.Container container, List<String> selectors) {
+        if (selectors.isEmpty()) {
+            return PathTree.build(container.operations());
         }
-        return name.substring(0, end);
+        return located(container, selectors)
+                .map(PathTree.Located::resolution)
+                .filter(PathTree.Resolution.Found.class::isInstance)
+                .map(resolution -> ((PathTree.Resolution.Found) resolution).node())
+                .orElseGet(() -> PathTree.build(container.operations()));
     }
-
-    // -----------------------------------------------------------------------
-    // The code register
-    // -----------------------------------------------------------------------
 
     /**
-     * {@code -r} — the answer as Ballerina, so it is pasteable whole.
+     * One node's operations, grouped by their next LITERAL segment — transparent through any purely-parameter
+     * level in between, since a parameter carries no naming choice and is not a grouping boundary. Busiest
+     * first, matching the tree's own ordering.
      *
-     * <p>The register is a property of the DOCUMENT rather than of the verb: a
-     * {@code -r} response is nothing but declarations, whichever verb reached it, so it carries no fences, no
-     * report marker and no Markdown tables.
+     * @param name the group's path, {@code /}-joined from the top of the bucket — {@code "."} for operations
+     *     that terminate exactly at this prefix, with no further segment (github's own top level has one)
+     * @param count operations at or under this group
      */
+    private record PathGroup(String name, int count) { }
+
+    private static List<PathGroup> groupsUnder(PathTree node, List<String> prefix) {
+        Map<String, List<PathTree>> byLiteralChild = new LinkedHashMap<>();
+        collectNextLiteralChildren(node, byLiteralChild);
+
+        List<PathGroup> groups = new ArrayList<>();
+        if (!node.operations().isEmpty()) {
+            groups.add(new PathGroup(prefix.isEmpty() ? "." : String.join("/", prefix), node.operations().size()));
+        }
+        byLiteralChild.forEach((literal, children) -> {
+            List<String> path = new ArrayList<>(prefix);
+            path.add(literal);
+            int count = children.stream().mapToInt(PathTree::total).sum();
+            groups.add(new PathGroup(String.join("/", path), count));
+        });
+        groups.sort(Comparator.comparingInt(PathGroup::count).reversed()
+                .thenComparing(PathGroup::name, Texts.LOCALE_ORDER));
+        return groups;
+    }
+
+    private static void collectNextLiteralChildren(PathTree node, Map<String, List<PathTree>> into) {
+        for (PathTree child : node.children()) {
+            if (child.isParam()) {
+                collectNextLiteralChildren(child, into);
+            } else {
+                into.computeIfAbsent(child.segment(), key -> new ArrayList<>()).add(child);
+            }
+        }
+    }
+
+    private static String pathArgument(List<String> prefix) {
+        return prefix.isEmpty() ? "" : " " + quotedPath(String.join("/", prefix));
+    }
+
+    /**
+     * A resource path, pre-quoted when it needs it — never left for the caller to notice.
+     *
+     * <p>The one character that ever forces this is the keyword-escaping apostrophe ({@code gists/'public}):
+     * unsafe unquoted in every shell tested. Wrapped in double quotes, the RFC's own verified-safe form.
+     */
+    private static String quotedPath(String path) {
+        return path.contains("'") ? "\"" + path + "\"" : path;
+    }
+
+    // -----------------------------------------------------------------------
+    // The code register — dead from the CLI (no `-r` flag sets Options.resolve() true), left for item 8
+    // -----------------------------------------------------------------------
+
     /**
      * A miss in the code register: what was asked, what the container holds, and the way out — bounded.
-     *
-     * <p>Measured before this existed: {@code client ballerinax/github Client nosuchthingatall -r} answered with
-     * 42,746 bytes, every one of 903 labels joined onto a single line, for a typo. The report register had always
-     * answered the same miss in about 800 by printing the COUNT and pointing at the listing, so the byte budget
-     * held everywhere except the path a caller reaches by making a mistake — the path least worth ten thousand
-     * tokens, and the one where a wall of text is hardest to read past.
-     *
-     * <p>So names are offered only while they are cheap, and the count plus the recovery command carry the rest.
-     * The command matters as much as the bound: a recovery that names no next step is the mistake to avoid.
      */
     private static String missComment(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options) {
         List<Entry> all = entriesOf(container);
-        String asked = options.filtered() ? "\"" + options.search() + "\"" : String.join(" ", selectors);
+        String asked = options.filtered() ? "\"" + options.filter() + "\"" : String.join(" ", selectors);
         String opening = "// Nothing on " + container.label() + " matches " + asked;
         if (all.isEmpty()) {
             return opening + ". It declares nothing callable.";
@@ -1142,12 +1184,11 @@ public final class Containers {
             }
             names.add(entry.label());
         }
-        // The count is of the WHOLE container either way, so "12 of 903" is legible as a sample rather than
-        // readable as the container being smaller than it is.
         String held = names.size() == all.size()
                 ? ". It declares: " + String.join(", ", names)
                 : ". It declares " + all.size() + ", of which: " + String.join(", ", names) + ", …";
-        return opening + held + "\n// Read them: " + command;
+        return opening + held + "\n// Read them: " + command
+                + "\n// Or narrow it: " + command + " --filter \"" + Texts.plain(asked) + "\"";
     }
 
     private static String codeAnswer(
@@ -1169,9 +1210,6 @@ public final class Containers {
         List<String> rendered = signatures(shown, container);
         int spent = rendered.stream().mapToInt(Texts::byteLength).sum();
         if (spent > budget) {
-            // The union across a whole container will usually exceed the budget, and that is expected rather
-            // than an error: it truncates breadth-first and NAMES what it dropped, so an agent that over-asked
-            // gets a bounded answer plus the labels it needs to ask again.
             int kept = 0;
             int running = 0;
             for (String signature : rendered) {
@@ -1183,7 +1221,7 @@ public final class Containers {
             }
             blocks.add("// " + Texts.count(selected.size() - kept) + " of " + Texts.count(selected.size())
                     + " signatures omitted at the " + Texts.count(budget) + "-byte budget. Narrow with a "
-                    + "selector or -s, or ask for one by name.");
+                    + "selector or --filter, or ask for one by name.");
             shown = selected.subList(0, Math.max(1, kept));
             rendered = signatures(shown, container);
         }
@@ -1215,9 +1253,9 @@ public final class Containers {
     // Shared prose
     // -----------------------------------------------------------------------
 
-    // TODO(item 4): rebuild against --filter and the entry/line ceiling once Containers' selection/rendering
-    // itself moves off the byte-budget tiers — this is deliberately minimal until then, not the RFC's final
-    // "Next" shape.
+    // TODO(follow-up): a richer "Next" for the still-Markdown answers (fullAnswer, mixedAnswer) — pointing at
+    // --filter and, for a resource-bearing mixed container, the resource listing directly — once real usage
+    // shows which suggestions are worth the line. Deliberately minimal for now.
     private static List<String> nextBullets(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors) {
         String pkg = loaded.qualified().qualified();
@@ -1234,7 +1272,7 @@ public final class Containers {
      * The selector as the tree spells it, where a path resolved.
      *
      * <p>A pointer offers the CANONICAL form, not the one the caller happened to type: {@code repos/owner/repo},
-     * {@code repos/{owner}/{repo}} and {@code repos/[string owner]/[string repo]} all address one path, and a
+     * {@code repos/:owner/:repo} and {@code repos/[string owner]/[string repo]} all address one path, and a
      * command echoing the typed spelling teaches the reader whichever variant they arrived with.
      */
     private static List<String> canonical(Surface.Container container, List<String> selectors) {

@@ -1,5 +1,5 @@
 Usage: bal discover [<org/name>] [bucket] [args...] [--refresh]
-                    [--output <json|text>]
+                    [--output <json|text>] [--filter <keyword>] [--page <n>]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
@@ -19,3 +19,9 @@ this package has.
                          when a name should exist and does not.
   --output <json|text>   Override the TTY-detected default: human text at an
                          interactive terminal, JSON otherwise.
+  --filter <keyword>     Narrow an already-selected bucket to entries whose name,
+                         path, parameter or type matches this keyword, client-side.
+                         Never sent to Central as a query.
+  --page <n>             1-indexed. Only meaningful once a listing of remote or
+                         normal methods is over the entry ceiling; ignored
+                         otherwise.
