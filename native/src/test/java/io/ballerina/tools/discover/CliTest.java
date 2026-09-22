@@ -331,17 +331,50 @@ public class CliTest {
     }
 
     @Test
-    public void aBarePackageListsItsBuckets() {
+    public void aBarePackageListsItsBucketsAsJsonOffATty() {
+        // Not interactive (the default for this overload), so JSON — the RFC's agent-facing default, no flag
+        // required.
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertTrue(capture.stdout().contains("| Buckets | `client`, `class` |"), capture.stdout());
-        Assert.assertTrue(capture.stdout().contains("`bal discover ballerinax/kafka client`"),
-                capture.stdout());
-        Assert.assertTrue(capture.stdout().contains("`bal discover ballerinax/kafka class`"),
-                capture.stdout());
-        Assert.assertFalse(capture.stdout().contains("funcs`"), "kafka declares no module functions");
+        String out = capture.stdout();
+        Assert.assertTrue(out.contains("\"client\""), out);
+        Assert.assertTrue(out.contains("\"class\""), out);
+        Assert.assertFalse(out.contains("\"funcs\""), "kafka declares no module functions: " + out);
+        // No Markdown-report furniture: this response is on the new result IR, not `Containers`' shape.
+        Assert.assertFalse(out.contains("<!-- bal discover"), out);
+    }
+
+    @Test
+    public void aBarePackageListsItsBucketsAsTextAtATerminal() {
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerinax/kafka"), capture.streams(),
+                centralFor("ballerinax__kafka", "4.6.5"), null, true);
+        Assert.assertEquals(exitCode, 0, capture.stderr());
+        Assert.assertEquals(capture.stdout(), "client, class\n");
+    }
+
+    @Test
+    public void outputOverridesTheTtyDefaultInEitherDirection() {
+        Capture asText = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "text"), asText.streams(),
+                centralFor("ballerinax__kafka", "4.6.5")), 0, asText.stderr());
+        Assert.assertEquals(asText.stdout(), "client, class\n");
+
+        Capture asJson = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "json"), asJson.streams(),
+                centralFor("ballerinax__kafka", "4.6.5"), null, true), 0, asJson.stderr());
+        Assert.assertTrue(asJson.stdout().contains("\"client\""), asJson.stdout());
+    }
+
+    @Test
+    public void anInvalidOutputValueIsAValidationFailure() {
+        Capture capture = new Capture();
+        Assert.assertEquals(
+                Cli.run(List.of("ballerinax/kafka", "--output", "xml"), capture.streams(), never()), 1);
+        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertTrue(capture.field("message").contains("xml"), capture.stderr());
     }
 
     @Test

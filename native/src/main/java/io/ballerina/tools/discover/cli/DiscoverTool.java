@@ -108,7 +108,15 @@ public class DiscoverTool implements BLauncherCmd {
 
         int code;
         try {
-            code = Cli.run(argv, streams, http, discoverProject());
+            // Pre-JDK 22, System.console() returns null if EITHER stream is redirected, not just stdout — so this
+            // under-detects an interactive terminal whose stdin happens to be redirected too, rather than
+            // over-detecting one. That is the safe direction to be wrong in: the RFC's own worked case (an
+            // agent's harness piping stdout) is unaffected either way, and the only cost of under-detecting is a
+            // human at a real terminal getting JSON instead of text — recoverable with --output text, where the
+            // opposite mistake would hand an agent's parser human prose it cannot read. Verified directly against
+            // this project's own JDK 21 (Ballerina 2201.13.x's bre/lib target) rather than assumed.
+            boolean interactive = System.console() != null;
+            code = Cli.run(argv, streams, http, discoverProject(), interactive);
         } catch (RuntimeException cause) {
             // Nothing in the pipeline throws by design; if something does, it is a defect in this tool and the
             // caller still needs a machine-readable line rather than a Java stack trace on stdout.
