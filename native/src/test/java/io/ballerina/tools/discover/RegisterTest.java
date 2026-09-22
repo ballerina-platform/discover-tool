@@ -165,34 +165,44 @@ public class RegisterTest {
         return documents;
     }
 
-    /** One scope's documents: the bare listing, one per container, a filter, and a selector that misses. */
+    /**
+     * One scope's documents: the bare listing, one per container, a filter, and a selector that misses.
+     *
+     * <p>Structured answers (a roster, a grouped or paginated listing over the RFC's entry ceiling) are skipped
+     * here — the report-register rules this class enforces (headings, fences, the {@code <!-- bal discover -->}
+     * marker) are specifically about the Markdown shape {@code Containers} still produces for the cases with no
+     * ceiling problem; a structured answer is neither register, by design, and the {@code render} package's own
+     * tests pin its shape instead.
+     */
     private static List<Document> containerDocuments(LoadedPackage context, Surface.Scope scope) {
         List<Document> documents = new ArrayList<>();
         String verb = scope.verb();
-        documents.add(new Document(verb, expect(Containers.render(context, scope, Containers.Options.bare()))));
-        documents.add(new Document(verb + " -s", expect(Containers.render(
-                context, scope, new Containers.Options(List.of(), "config", false, false)))));
+        addIfMarkdown(documents, verb, Containers.render(context, scope, Containers.Options.bare()));
+        addIfMarkdown(documents, verb + " -s",
+                Containers.render(context, scope, new Containers.Options(List.of(), "config", false, false, 1)));
 
         List<Surface.Container> containers = Surface.of(context.library(), scope);
         for (Surface.Container container : containers) {
             List<String> selector = container.isModule() ? List.of() : List.of(container.name());
             if (!selector.isEmpty()) {
-                documents.add(new Document(verb + " " + container.name(),
-                        expect(Containers.render(context, scope, new Containers.Options(selector)))));
+                addIfMarkdown(documents, verb + " " + container.name(),
+                        Containers.render(context, scope, new Containers.Options(selector)));
             }
             // A selector that matches nothing is answered at exit 0 with what IS there, so it is a report like any
             // other and has to obey the same rules.
             List<String> missing = new ArrayList<>(selector);
             missing.add("zzzznosuchmember");
-            documents.add(new Document(verb + " (missing selector)",
-                    expect(Containers.render(context, scope, new Containers.Options(missing)))));
+            addIfMarkdown(documents, verb + " (missing selector)",
+                    Containers.render(context, scope, new Containers.Options(missing)));
         }
         return documents;
     }
 
-    private static String expect(Result<String> view) {
+    private static void addIfMarkdown(List<Document> documents, String label, Result<Containers.Answer> view) {
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
-        return view.value();
+        if (view.value() instanceof Containers.Answer.Markdown markdown) {
+            documents.add(new Document(label, markdown.text()));
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -387,10 +397,13 @@ public class RegisterTest {
         for (Surface.Scope scope : Surface.Scope.values()) {
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 List<String> selector = container.isModule() ? List.of() : List.of(container.name());
-                Result<String> resolved = Containers.render(context, scope,
-                        new Containers.Options(selector, null, true, false));
+                Result<Containers.Answer> resolved = Containers.render(context, scope,
+                        new Containers.Options(selector, null, true, false, 1));
                 Assert.assertTrue(resolved.isOk(), scope + " " + container.name());
-                documents.add(new Document(scope.verb() + " " + container.name() + " -r", resolved.value()));
+                Assert.assertTrue(resolved.value() instanceof Containers.Answer.Markdown,
+                        scope + " " + container.name() + ": the code register is always Markdown");
+                documents.add(new Document(scope.verb() + " " + container.name() + " -r",
+                        ((Containers.Answer.Markdown) resolved.value()).text()));
             }
         }
 

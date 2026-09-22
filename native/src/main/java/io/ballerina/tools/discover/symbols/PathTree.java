@@ -140,18 +140,21 @@ public record PathTree(
     }
 
     /**
-     * How a path segment reads in prose: {@code repos}, or {@code {owner}} for a parameter.
+     * How a path segment reads in prose and as a shell argument: {@code repos}, or {@code :owner} for a
+     * parameter.
      *
-     * <p>Deliberately NOT the {@code [string owner]} declaration spelling. That form belongs inside a
-     * fenced block where it is a quotation of source; in prose and in a command argument it is three
-     * characters of shell escaping that cost the golden trace two turns.
+     * <p>Deliberately NOT the {@code [string owner]} declaration spelling, which belongs inside a fenced block
+     * where it is a quotation of source. Colon-prefixed rather than brace-wrapped ({@code {owner}}) — the RFC's
+     * own choice, verified safe across bash/zsh/fish/PowerShell where both the bracket declaration spelling and
+     * a brace form were tried first and rejected: brackets fail outright under zsh's default glob-matching, and
+     * braces were never confirmed safe as widely.
      */
     public static String displaySegment(Fn.PathSegment segment) {
         return switch (segment) {
             case Fn.PathSegment.Literal literal -> readableSegment(literal.text());
             case Fn.PathSegment.Parameter parameter -> parameter.type().endsWith("...")
-                    ? "{..." + parameter.name() + "}"
-                    : "{" + parameter.name() + "}";
+                    ? ":..." + parameter.name()
+                    : ":" + parameter.name();
         };
     }
 
@@ -302,10 +305,11 @@ public record PathTree(
      * Does one path token address this node?
      *
      * <p>{@code *} is the wildcard, so {@code repos/*} addresses a level whose segment is a parameter
-     * without spelling the parameter's name. A parameter also answers to its own name with or without
-     * braces, because an agent reading {@code {owner}} off a tree will type either. The escaped and quoted
-     * spellings both answer too, because an agent that copied a path out of a fenced signature will type
-     * {@code code\-scanning} or {@code 'import}.
+     * without spelling the parameter's name. A parameter also answers to its bare name, its brace-wrapped
+     * form, or a colon prefix, because an agent reading {@code :owner} off a tree will type any of the three —
+     * {@code {owner}} is this tool's own earlier display spelling, tolerated as an input even though it is no
+     * longer printed. The escaped and quoted spellings both answer too, because an agent that copied a path out
+     * of a fenced signature will type {@code code\-scanning} or {@code 'import}.
      */
     private static boolean tokenMatches(String token, PathTree node) {
         if ("*".equals(token)) {
@@ -317,12 +321,18 @@ public record PathTree(
         if (!node.isParam()) {
             return false;
         }
-        String bare = node.segment().replaceAll("^\\{\\.{0,3}|\\}$", "");
-        // Three spellings, because a path arrives from three places. `{owner}` is what the tree prints, `owner` is
-        // what an agent types from memory, and `[string owner]` is the DECLARATION form — the one inside every
-        // fenced signature this tool emits, so it is the likeliest thing a caller copies. Rejecting it made the
-        // tool's own output an argument it would not accept.
-        return token.equals(bare) || token.equals("{" + bare + "}") || declaredName(token).equals(bare);
+        String bare = node.segment().replaceFirst("^:\\.{0,3}", "");
+        boolean rest = node.segment().startsWith(":...");
+        // Four spellings, because a path arrives from four places. `:owner` is what the tree prints now,
+        // `{owner}` is what it used to print, `owner` is what an agent types from memory, and
+        // `[string owner]` is the DECLARATION form — the one inside every fenced signature this tool emits, so
+        // it is the likeliest thing a caller copies. Rejecting it made the tool's own output an argument it
+        // would not accept. A REST parameter's brace spelling carries the same leading ellipsis the tree does
+        // (`{...path}`, not `{path}`) — dropping it here would silently reject the one legacy spelling this
+        // tool used to print for exactly this kind of segment.
+        return token.equals(bare) || token.equals(":" + bare)
+                || token.equals("{" + bare + "}") || (rest && token.equals("{..." + bare + "}"))
+                || declaredName(token).equals(bare);
     }
 
     /**

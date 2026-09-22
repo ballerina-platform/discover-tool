@@ -31,15 +31,16 @@ import java.util.List;
  * {@code bucket} is a plain positional value rather than a subcommand keyword, because in the RFC's design a
  * package resolves to its buckets, a bucket resolves to its members, and neither step is a mode switch.
  *
- * <p><b>WHAT IS NOT HERE YET.</b> {@code --module}, {@code --filter} and {@code --page} are real parts of the
- * target grammar but are deliberately absent from this class until the work that actually reads them lands
- * (module addressing, the {@code Containers} rewrite) — a flag that parses and is then silently dropped is the
- * exact class of mistake this grammar refuses everywhere else, so a flag is declared here only once something
- * consumes it. {@code --output} is here, because the dual renderer now exists — though today it only changes the
- * bare-package bucket listing; the buckets {@code Containers} still renders keep their Markdown-report shape
- * regardless of {@code --output} until that view is rewritten onto {@link DiscoverResult} too.
- * {@code -s/--search}, {@code -r/--resolve-types} and {@code --all} are gone for good: the RFC has no equivalent
- * for any of them (see the RFC-alignment plan's "Decisions locked in").
+ * <p><b>WHAT IS NOT HERE YET.</b> {@code --module} is a real part of the target grammar but deliberately absent
+ * from this class until module addressing lands — a flag that parses and is then silently dropped is the exact
+ * class of mistake this grammar refuses everywhere else, so a flag is declared here only once something consumes
+ * it. {@code --filter} and {@code --page} are here now that {@code Containers} reads them. {@code --output} only
+ * changes the bare-package bucket listing and the {@code client}/{@code class}/{@code funcs} buckets' own
+ * over-the-ceiling responses — the still-Markdown answers those buckets can also produce (exactly one result, or
+ * a container mixing resource paths with named methods) keep their Markdown shape regardless of {@code --output}
+ * until they are rewritten onto {@link DiscoverResult} too. {@code -s/--search}, {@code -r/--resolve-types} and
+ * {@code --all} are gone for good: the RFC has no equivalent for any of them (see the RFC-alignment plan's
+ * "Decisions locked in").
  *
  * @since 0.1.0
  */
@@ -85,6 +86,16 @@ final class Commands {
                 description = "Override the TTY-detected default: human text at an interactive terminal, JSON "
                         + "otherwise.")
         String output;
+
+        @CommandLine.Option(names = "--filter", paramLabel = "<keyword>",
+                description = "Narrow an already-selected bucket to entries whose name, path, parameter or type "
+                        + "matches this keyword, client-side. Never sent to Central as a query.")
+        String filter;
+
+        @CommandLine.Option(names = "--page", paramLabel = "<n>", defaultValue = "1",
+                description = "1-indexed. Only meaningful once a listing of remote or normal methods is over "
+                        + "the entry ceiling; ignored otherwise.")
+        int page;
 
         @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org/name>")
         String pkg;

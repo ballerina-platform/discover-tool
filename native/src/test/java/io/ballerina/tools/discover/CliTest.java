@@ -81,22 +81,6 @@ public class CliTest {
         }
     }
 
-    /**
-     * A document opens on its own marker, then on the heading or comment given.
-     *
-     * <p>Asserted through a helper rather than as a literal prefix because line one now carries the document's
-     * LENGTH, which is content-dependent — see {@code Documents.withLength}.
-     */
-    private static void opensWith(String stdout, String marker, String then) {
-        Assert.assertTrue(stdout.startsWith(marker), "expected to open on " + marker + ", got:\n" + stdout);
-        String firstLine = stdout.lines().findFirst().orElse("");
-        Assert.assertTrue(firstLine.matches(".*· \\d+ lines.*"),
-                "line one states no length: " + firstLine);
-        Assert.assertTrue(stdout.lines().skip(1).findFirst().orElse("").equals(then)
-                        || stdout.substring(firstLine.length()).startsWith("\n" + then),
-                "expected " + then + " after the marker, got:\n" + stdout);
-    }
-
     /** Central, replayed: the versions endpoint then the docs endpoint. */
     private static HttpOptions centralFor(String slug, String version) {
         String docs = FixtureCorpus.loadRawFixture(slug).toString();
@@ -271,13 +255,15 @@ public class CliTest {
     // -----------------------------------------------------------------------
 
     @Test
-    public void aContainerVerbNavigatesAClientsPathsAsMarkdown() {
+    public void aContainerVerbNavigatesAClientsPathsAsStructuredJson() {
+        // gmail's Client has enough resource paths that the bare `client` bucket lands on the RFC's structured
+        // IR rather than the legacy Markdown report — this is the JSON default off a TTY.
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerinax/googleapis.gmail", "client"), capture.streams(),
                 centralFor("ballerinax__googleapis.gmail", "4.2.0"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        opensWith(capture.stdout(), "<!-- bal discover client v1 ·",
-                "# Clients — ballerinax/googleapis.gmail `Client`");
+        Assert.assertTrue(capture.stdout().contains("\"resources\":["), capture.stdout());
+        Assert.assertTrue(capture.stdout().contains("\"path\":"), capture.stdout());
     }
 
     @Test
@@ -287,8 +273,9 @@ public class CliTest {
                 centralFor("ballerina__http", "2.16.6"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         for (String name : List.of("Client", "FailoverClient", "LoadBalanceClient", "StatusCodeClient")) {
-            Assert.assertTrue(capture.stdout().contains("`" + name + "`"), name);
-            Assert.assertTrue(capture.stdout().contains("`bal discover ballerina/http client " + name + "`"),
+            Assert.assertTrue(capture.stdout().contains("\"name\":\"" + name + "\""), name);
+            Assert.assertTrue(
+                    capture.stdout().contains("\"call\":\"bal discover ballerina/http client " + name + "\""),
                     name);
         }
     }
