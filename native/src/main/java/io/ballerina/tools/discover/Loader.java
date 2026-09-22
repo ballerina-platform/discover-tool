@@ -19,8 +19,10 @@
 package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.central.CentralClient;
+import io.ballerina.tools.discover.central.CentralRepository;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
+import io.ballerina.tools.discover.central.PackageRepository;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.model.FromCentral;
 import io.ballerina.tools.discover.model.Pipeline;
@@ -51,11 +53,17 @@ public final class Loader {
      *
      * @param http the transport options to fetch and cache through
      * @param projectDir the Ballerina project the lookup is running inside, or {@code null} when it is not in one
+     * @param repository where the package's version and docs payload come from — {@link CentralRepository} in
+     *     every case this phase ships; see {@link PackageRepository}
      */
-    public record LoadOptions(HttpOptions http, String projectDir) {
+    public record LoadOptions(HttpOptions http, String projectDir, PackageRepository repository) {
+
+        public LoadOptions(HttpOptions http, String projectDir) {
+            this(http, projectDir, CentralRepository.INSTANCE);
+        }
 
         public static LoadOptions of(HttpOptions http) {
-            return new LoadOptions(http, null);
+            return new LoadOptions(http, null, CentralRepository.INSTANCE);
         }
     }
 
@@ -79,7 +87,7 @@ public final class Loader {
                 return fixed(locked);
             }
         }
-        return CentralClient.resolveLatestVersion(qualified, options.http());
+        return options.repository().resolveVersion(qualified, options.http());
     }
 
     /** A version a build already locked, taken as given rather than confirmed against the registry. */
@@ -116,7 +124,7 @@ public final class Loader {
         }
         Version version = resolved.value().version();
 
-        Result<CentralDocs> docs = CentralClient.fetchDocs(qualified, resolved.value(), options.http());
+        Result<CentralDocs> docs = options.repository().fetchDocs(qualified, resolved.value(), options.http());
         if (!docs.isOk()) {
             return docs.cast();
         }
