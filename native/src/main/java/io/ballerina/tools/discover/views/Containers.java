@@ -266,13 +266,6 @@ public final class Containers {
                 return render(loaded, other, options, kindNote(loaded, other, token));
             }
         }
-        Declarations index = Declarations.index(loaded.library().addressable());
-        if (Names.match(token, index.names()) instanceof Names.Match.Found found) {
-            return TypeView.render(loaded, new TypeView.Options(
-                    List.of(found.name()), null, options.resolve(),
-                    "// Note: " + found.name() + " is a declaration, not a callable — showing it. Canonical: "
-                            + "bal discover type " + loaded.qualified().qualified() + " " + found.name()));
-        }
         return null;
     }
 
@@ -317,15 +310,15 @@ public final class Containers {
 
     private static String kindNote(LoadedPackage loaded, Surface.Scope actual, String token) {
         return Texts.code(token) + " is addressed by " + Texts.code(actual.verb()) + " — showing it. "
-                + "Canonical: " + Texts.code("bal discover " + actual.verb() + " "
-                + loaded.qualified().qualified() + " " + token);
+                + "Canonical: " + Texts.code("bal discover " + loaded.qualified().qualified()
+                + " " + actual.verb() + " " + token);
     }
 
     private static String ownerNote(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container owner, String token) {
         return Texts.code(token) + " is declared on " + Texts.code(owner.label()) + " — showing it. "
-                + "Canonical: " + Texts.code("bal discover " + scope.verb() + " "
-                + loaded.qualified().qualified() + " " + owner.name() + " " + token);
+                + "Canonical: " + Texts.code("bal discover " + loaded.qualified().qualified()
+                + " " + scope.verb() + " " + owner.name() + " " + token);
     }
 
     /**
@@ -351,10 +344,10 @@ public final class Containers {
             near = Names.nearMisses(token, index.names());
         }
         String suggestion = near.isEmpty()
-                ? "Nothing in " + loaded.label() + " is named anything like that. Search instead: "
-                        + "`bal discover " + scope.verb() + " " + pkg + " -s \"" + token + "\"`."
-                : "The candidates are the closest names in the package. Re-run with one of them, or search: "
-                        + "`bal discover " + scope.verb() + " " + pkg + " -s \"" + token + "\"`.";
+                ? "Nothing in " + loaded.label() + " is named anything like that. List what is there: "
+                        + "`bal discover " + pkg + " " + scope.verb() + "`."
+                : "The candidates are the closest names in the package. Re-run with one of them, or list what "
+                        + "is there: `bal discover " + pkg + " " + scope.verb() + "`.";
         return new Failure.SymbolNotFound(loaded.label(), List.of(token), near, suggestion);
     }
 
@@ -375,14 +368,14 @@ public final class Containers {
             }
             List<Surface.Container> containers = Surface.of(loaded.library(), other);
             if (!containers.isEmpty()) {
-                next.add(Texts.code("bal discover " + other.verb() + " " + pkg) + " — "
+                next.add(Texts.code("bal discover " + pkg + " " + other.verb()) + " — "
                         + Texts.count(containers.size()) + " " + title(other).toLowerCase(java.util.Locale.ROOT)
                         + (other == Surface.Scope.MODULE
                                 ? " (" + Texts.count(containers.get(0).functions().size()) + " functions)"
                                 : ""));
             }
         }
-        next.add(Texts.code("bal discover overview " + pkg) + " — the whole map of this package");
+        next.add(Texts.code("bal discover " + pkg) + " — the buckets this package has");
         report.bullets(next);
         return report.toString();
     }
@@ -426,18 +419,15 @@ public final class Containers {
         report.heading(2, "Next");
         List<String> next = new ArrayList<>();
         if (!selected.isEmpty()) {
-            next.add("open one: " + Texts.code("bal discover " + scope.verb() + " " + pkg + " "
+            next.add("open one: " + Texts.code("bal discover " + pkg + " " + scope.verb() + " "
                     + selected.get(0).name()));
         }
-        next.add("search across all of them: " + Texts.code("bal discover " + scope.verb() + " " + pkg
-                + " -s \"<what it does>\""));
         report.bullets(next);
 
         if (selected.isEmpty()) {
             report.heading(2, "No match");
             report.paragraph("Nothing under " + Texts.code(scope.verb()) + " matches "
-                    + Texts.code(options.search()) + ". Widen the query, or search the whole package with "
-                    + Texts.code("bal discover overview " + pkg + " -s \"" + options.search() + "\"") + ".");
+                    + Texts.code(options.search()) + ".");
             return report.toString();
         }
 
@@ -447,15 +437,14 @@ public final class Containers {
                 .map(container -> rosterRow(pkg, scope, container))
                 .toList());
         if (shown.size() < selected.size()) {
-            report.paragraph(Texts.count(selected.size() - shown.size()) + " more, not listed. Narrow with "
-                    + Texts.code("-s") + " rather than reading them all.");
+            report.paragraph(Texts.count(selected.size() - shown.size()) + " more, not listed.");
         }
         return report.toString();
     }
 
     private static String rosterRow(String pkg, Surface.Scope scope, Surface.Container container) {
         return Texts.code(container.name()) + " — " + counts(container) + " · "
-                + Texts.code("bal discover " + scope.verb() + " " + pkg + " " + container.name());
+                + Texts.code("bal discover " + pkg + " " + scope.verb() + " " + container.name());
     }
 
     /** What a container holds, split by call form because {@code ->} versus {@code .} is the fact a caller wants. */
@@ -498,14 +487,14 @@ public final class Containers {
 
         report.heading(2, "Next");
         Surface.Container first = owners.keySet().iterator().next();
-        report.bullets(List.of("pick one: " + Texts.code("bal discover " + scope.verb() + " " + pkg + " "
+        report.bullets(List.of("pick one: " + Texts.code("bal discover " + pkg + " " + scope.verb() + " "
                 + first.name() + " " + String.join(" ", selectors))));
 
         report.heading(2, Texts.count(owners.size()) + " owners");
         report.bullets(owners.entrySet().stream()
                 .map(entry -> Texts.code(entry.getKey().name()) + " — " + Texts.count(entry.getValue().size())
                         + " match" + (entry.getValue().size() == 1 ? "" : "es") + " · "
-                        + Texts.code("bal discover " + scope.verb() + " " + pkg + " " + entry.getKey().name()
+                        + Texts.code("bal discover " + pkg + " " + scope.verb() + " " + entry.getKey().name()
                                 + " " + String.join(" ", selectors)))
                 .toList());
         return report.toString();
@@ -818,13 +807,10 @@ public final class Containers {
         report.heading(2, "Next");
         List<String> next = new ArrayList<>();
         if (alternatives.size() > 1) {
-            next.add("pick one of the paths below: " + Texts.code("bal discover " + scope.verb() + " " + pkg
+            next.add("pick one of the paths below: " + Texts.code("bal discover " + pkg + " " + scope.verb()
                     + containerArgument(container) + " '" + String.join("/", alternatives.get(0)) + "'"));
         }
-        next.add("widen it: " + Texts.code("bal discover " + scope.verb() + " " + pkg
-                + containerArgument(container) + " -s \"" + asked + "\"")
-                + " — searches parameter and type names, and documentation");
-        next.add("list what is there: " + Texts.code("bal discover " + scope.verb() + " " + pkg
+        next.add("list what is there: " + Texts.code("bal discover " + pkg + " " + scope.verb()
                 + containerArgument(container)));
         report.bullets(next);
 
@@ -888,8 +874,7 @@ public final class Containers {
         }
 
         report.heading(2, "Next");
-        report.bullets(nextBullets(loaded, scope, container, canonical(container, selectors), selected, tier,
-                options));
+        report.bullets(nextBullets(loaded, scope, container, canonical(container, selectors)));
 
         renderTier(report, tier, container, selected, loaded, options);
 
@@ -1231,44 +1216,19 @@ public final class Containers {
     // Shared prose
     // -----------------------------------------------------------------------
 
+    // TODO(item 4): rebuild against --filter and the entry/line ceiling once Containers' selection/rendering
+    // itself moves off the byte-budget tiers — this is deliberately minimal until then, not the RFC's final
+    // "Next" shape.
     private static List<String> nextBullets(
-            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> selected, Tier tier, Options options) {
+            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors) {
         String pkg = loaded.qualified().qualified();
-        String verb = scope.verb();
         List<String> next = new ArrayList<>();
-
-        if (tier == Tier.GROUPED || tier == Tier.INDEX) {
-            next.add("narrow it: " + Texts.code("bal discover " + verb + " " + pkg
-                    + containerArgument(container) + " -s \"<what it does>\"")
-                    + " — matches names, paths, parameter and type names, and documentation");
+        if (!selectors.isEmpty() && !container.isModule()) {
+            next.add("everything on this container: " + Texts.code("bal discover " + pkg + " " + scope.verb()
+                    + " " + container.name()));
         }
-        if (!selected.isEmpty() && tier != Tier.FULL) {
-            Entry first = selected.get(0);
-            next.add("one call and every type it needs: " + Texts.code("bal discover " + verb + " " + pkg
-                    + containerArgument(container) + " " + quoted(first.label()) + " -r"));
-        }
-        if (tier == Tier.FULL && !options.resolve()) {
-            next.add("the whole type closure, not just one level: " + Texts.code("bal discover " + verb + " "
-                    + pkg + containerArgument(container) + " "
-                    + quoted(selected.get(0).label()) + " -r"));
-        }
-        // `--all` is offered here and NOWHERE ELSE: it is an escape hatch, not part of the taught contract, so it
-        // is hidden from `--help` and appears last with its cost stated.
-        if ((tier == Tier.INDEX || tier == Tier.GROUPED) && !options.all() && !selected.isEmpty()) {
-            int bytes = Report.ballerinaBytes(signatures(selected, container));
-            next.add("last resort — every signature, unbudgeted: " + Texts.code("bal discover " + verb + " "
-                    + pkg + containerArgument(container) + selectorArgument(selectors) + " --all")
-                    + " — " + Texts.count(selected.size()) + " signatures, " + Texts.count(bytes) + " bytes");
-        }
-        if (next.isEmpty()) {
-            next.add("read a declaration whole: " + Texts.code("bal discover type " + pkg + " <Name> [-r]"));
-        }
+        next.add("the buckets this package has: " + Texts.code("bal discover " + pkg));
         return next;
-    }
-
-    private static String quoted(String label) {
-        return label.contains(" ") || label.contains("{") ? "'" + label + "'" : label;
     }
 
     /**
@@ -1286,11 +1246,6 @@ public final class Containers {
             return selectors;
         }
         return List.of(String.join("/", node.path()));
-    }
-
-    private static String selectorArgument(List<String> selectors) {
-        return selectors.isEmpty() ? "" : " " + selectors.stream().map(Containers::quoted)
-                .collect(Collectors.joining(" "));
     }
 
     private static String containerArgument(Surface.Container container) {

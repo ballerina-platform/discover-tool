@@ -7,13 +7,12 @@
 
 ## Next
 
-- open one: `bal discover class ballerina/graphql Context`
-- search across all of them: `bal discover class ballerina/graphql -s "<what it does>"`
+- open one: `bal discover ballerina/graphql class Context`
 
 ## 5 classes
 
-- `Context` — 8 normal · `bal discover class ballerina/graphql Context`
-- `Field` — 7 normal · `bal discover class ballerina/graphql Field`
-- `Service` — nothing callable · `bal discover class ballerina/graphql Service`
-- `Interceptor` — 1 remote · `bal discover class ballerina/graphql Interceptor`
-- `Listener` — 5 normal · `bal discover class ballerina/graphql Listener`
+- `Context` — 8 normal · `bal discover ballerina/graphql class Context`
+- `Field` — 7 normal · `bal discover ballerina/graphql class Field`
+- `Service` — nothing callable · `bal discover ballerina/graphql class Service`
+- `Interceptor` — 1 remote · `bal discover ballerina/graphql class Interceptor`
+- `Listener` — 5 normal · `bal discover ballerina/graphql class Listener`

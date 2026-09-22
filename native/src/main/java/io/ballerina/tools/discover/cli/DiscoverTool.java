@@ -205,14 +205,14 @@ public class DiscoverTool implements BLauncherCmd {
 
     @Override
     public void printLongDesc(StringBuilder sb) {
-        sb.append(Usage.root(Commands.Grammar.create()));
+        sb.append(Usage.root());
     }
 
     /** Deprecated on {@link BLauncherCmd} itself, but still abstract, so it has to be implemented. */
     @Override
     @Deprecated
     public void printUsage(StringBuilder sb) {
-        sb.append("  bal discover <find|overview|client|class|funcs|type|guide|api> [args]\n");
+        sb.append("  bal discover <org/name> [bucket] [args...] [--refresh] [-h|--help]\n");
     }
 
     @Override

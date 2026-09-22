@@ -7,7 +7,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal discover funcs ballerina/xlsx fromBytes -r`
+- the buckets this package has: `bal discover ballerina/xlsx`
 
 ## Module-level functions — 6, call with `.`
 

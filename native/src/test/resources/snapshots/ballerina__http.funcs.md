@@ -7,7 +7,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal discover funcs ballerina/http authenticateResource -r`
+- the buckets this package has: `bal discover ballerina/http`
 
 ## Module-level functions — 7, call with `.`
 

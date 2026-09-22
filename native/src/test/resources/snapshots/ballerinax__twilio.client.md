@@ -8,9 +8,7 @@
 
 ## Next
 
-- narrow it: `bal discover client ballerinax/twilio Client -s "<what it does>"` — matches names, paths, parameter and type names, and documentation
-- one call and every type it needs: `bal discover client ballerinax/twilio Client init -r`
-- last resort — every signature, unbudgeted: `bal discover client ballerinax/twilio Client --all` — 200 signatures, 51,608 bytes
+- the buckets this package has: `bal discover ballerinax/twilio`
 
 ## 200 by name
 

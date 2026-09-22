@@ -23,8 +23,6 @@ import io.ballerina.tools.discover.central.HttpTransport;
 import io.ballerina.tools.discover.cli.Cli;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
-import io.ballerina.tools.discover.views.Guide;
-import io.ballerina.tools.discover.views.Overview;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -84,20 +82,18 @@ public class PointersTest {
     }
 
     /**
-     * Every document a fixture can produce, from every verb that reads a package.
+     * Every document a fixture can produce, from every bucket the new grammar dispatches to.
+     *
+     * <p>{@code Overview} and {@code Guide} are deliberately absent here for now: neither is wired into
+     * {@link Cli} any more (the bare-package listing that replaces {@code Overview} is item 5's own work, and
+     * {@code Guide} becomes the {@code readme} bucket in item 7), and both still print pointers in the grammar's
+     * old verb-first order. They return to this method's coverage once their own items land.
      *
      * <p>Deliberately the same breadth {@code RegisterTest} uses: a pointer printed only by the roster of a
      * package with 91 classes is exactly the one nobody checks by hand.
      */
     private static List<String> documentsOf(LoadedPackage context) {
         List<String> documents = new ArrayList<>();
-        documents.add(Overview.render(context));
-        documents.add(Overview.render(context, new Overview.Options("client")));
-        documents.add(expect(Guide.render(context, Guide.Options.ALL)));
-        Result<String> chunk = Guide.render(context, new Guide.Options("1", null, null));
-        if (chunk.isOk()) {
-            documents.add(chunk.value());
-        }
         for (Surface.Scope scope : Surface.Scope.values()) {
             documents.add(expect(Containers.render(context, scope, Containers.Options.bare())));
             documents.add(expect(Containers.render(context, scope,

@@ -1,1 +1,1 @@
-{"kind":"validation","message":"'overview' needs a package.","suggestion":"Pass 'org/name', e.g. bal discover overview ballerinax/github."}
+{"kind":"validation","message":"A package is required.","suggestion":"Pass 'org/name', e.g. bal discover ballerinax/github."}

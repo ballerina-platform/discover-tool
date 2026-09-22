@@ -7,14 +7,13 @@
 
 ## Next
 
-- open one: `bal discover class ballerinax/kafka AvroDeserializer`
-- search across all of them: `bal discover class ballerinax/kafka -s "<what it does>"`
+- open one: `bal discover ballerinax/kafka class AvroDeserializer`
 
 ## 6 classes
 
-- `AvroDeserializer` — 1 normal · `bal discover class ballerinax/kafka AvroDeserializer`
-- `AvroSerializer` — 1 normal · `bal discover class ballerinax/kafka AvroSerializer`
-- `Deserializer` — 1 normal · `bal discover class ballerinax/kafka Deserializer`
-- `Serializer` — 1 normal · `bal discover class ballerinax/kafka Serializer`
-- `Service` — nothing callable · `bal discover class ballerinax/kafka Service`
-- `Listener` — 5 normal · `bal discover class ballerinax/kafka Listener`
+- `AvroDeserializer` — 1 normal · `bal discover ballerinax/kafka class AvroDeserializer`
+- `AvroSerializer` — 1 normal · `bal discover ballerinax/kafka class AvroSerializer`
+- `Deserializer` — 1 normal · `bal discover ballerinax/kafka class Deserializer`
+- `Serializer` — 1 normal · `bal discover ballerinax/kafka class Serializer`
+- `Service` — nothing callable · `bal discover ballerinax/kafka class Service`
+- `Listener` — 5 normal · `bal discover ballerinax/kafka class Listener`

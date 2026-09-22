@@ -59,23 +59,17 @@ public class CacheTest {
     private static final String VERSION = "4.6.5";
 
     /**
-     * Every verb that reads a package, so both cache properties are asserted over the whole surface.
+     * Every form that reads a package, so both cache properties are asserted over the whole surface.
      *
-     * <p>Spelled out rather than read from the grammar on purpose: a verb ADDED and never wired through to the
+     * <p>Spelled out rather than read from the grammar on purpose: a bucket ADDED and never wired through to the
      * cache is the failure these two tests exist to catch, and a list derived from the grammar would grow to
-     * include it silently. {@code DiscoverToolTest} checks the roster against the grammar from the other end.
-     *
-     * <p>{@code find} is absent because it reads no package: a registry query resolves no version and is never
-     * cached, so it declares no {@code --refresh} at all.
+     * include it silently.
      */
     private static final List<List<String>> PACKAGE_VERBS = List.of(
-            List.of("overview", PKG),
-            List.of("client", PKG),
-            List.of("class", PKG),
-            List.of("funcs", PKG),
-            List.of("type", PKG, "TopicPartition"),
-            List.of("guide", PKG),
-            List.of("api", PKG));
+            List.of(PKG),
+            List.of(PKG, "client"),
+            List.of(PKG, "class"),
+            List.of(PKG, "funcs"));
 
     /** Central, replayed, counting how many times each endpoint was hit. */
     private static final class CountingCentral {
@@ -158,11 +152,11 @@ public class CacheTest {
         HttpOptions http = options(central.transport(), cache).build();
 
         Capture cold = new Capture();
-        Assert.assertEquals(Cli.run(List.of("overview", PKG), cold.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of(PKG), cold.streams(), http), 0);
         Assert.assertEquals(central.docs, 1);
 
         Capture warm = new Capture();
-        Assert.assertEquals(Cli.run(List.of("overview", PKG), warm.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of(PKG), warm.streams(), http), 0);
         Assert.assertEquals(central.docs, 1, "the second run must not fetch the docs again");
         Assert.assertEquals(central.versions, 1, "nor re-resolve the version inside the TTL");
 
@@ -261,7 +255,7 @@ public class CacheTest {
             CountingCentral central = new CountingCentral();
             Capture capture = new Capture();
             int exitCode = Cli.run(
-                    List.of("overview", PKG), capture.streams(), options(central.transport(), cache).build());
+                    List.of(PKG), capture.streams(), options(central.transport(), cache).build());
 
             Assert.assertEquals(exitCode, 0, label + ": must still succeed");
             Assert.assertEquals(capture.stderr(), "", label + ": must say nothing");
@@ -280,7 +274,7 @@ public class CacheTest {
         HttpTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
                 ? FakeTransport.ok("{\"docsData\":{\"modules\":[]}}")
                 : FakeTransport.ok("[\"" + VERSION + "\"]"));
-        int exitCode = Cli.run(List.of("overview", PKG), capture.streams(), options(transport, cache).build());
+        int exitCode = Cli.run(List.of(PKG), capture.streams(), options(transport, cache).build());
         Assert.assertEquals(exitCode, 1);
         Assert.assertFalse(Files.exists(docsEntry(root).getParent()), "no directory, let alone an entry");
     }
@@ -297,12 +291,12 @@ public class CacheTest {
         HttpOptions http = options(central.transport(), cache).build();
 
         Capture first = new Capture();
-        Assert.assertEquals(Cli.run(List.of("overview", PKG), first.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of(PKG), first.streams(), http), 0);
         Assert.assertEquals(first.stderr(), "");
         Assert.assertTrue(cache.describe().contains("unusable"));
 
         Capture again = new Capture();
-        Assert.assertEquals(Cli.run(List.of("overview", PKG), again.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of(PKG), again.streams(), http), 0);
         Assert.assertEquals(central.docs, 2, "nothing was cached, so the second run fetches too");
     }
 
@@ -371,15 +365,15 @@ public class CacheTest {
         long[] now = {1_000_000};
 
         HttpOptions http = options(central.transport(), cache).clock(() -> now[0]).build();
-        Cli.run(List.of("overview", PKG), new Capture().streams(), http);
+        Cli.run(List.of(PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 1);
 
         now[0] += CentralClient.LATEST_TTL_MS - 1;
-        Cli.run(List.of("overview", PKG), new Capture().streams(), http);
+        Cli.run(List.of(PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 1, "one millisecond inside the TTL is still inside it");
 
         now[0] += 1;
-        Cli.run(List.of("overview", PKG), new Capture().streams(), http);
+        Cli.run(List.of(PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 2, "at the boundary it is re-asked");
     }
 
@@ -391,10 +385,10 @@ public class CacheTest {
         long[] now = {5_000_000};
         HttpOptions http = options(central.transport(), cache).clock(() -> now[0]).build();
 
-        Cli.run(List.of("overview", PKG), new Capture().streams(), http);
+        Cli.run(List.of(PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 1);
         now[0] = 1_000;
-        Cli.run(List.of("overview", PKG), new Capture().streams(), http);
+        Cli.run(List.of(PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 2, "an entry stamped in the future is not fresh, it is wrong");
     }
 
@@ -408,17 +402,17 @@ public class CacheTest {
         // wiring — which is how `--refresh` came to parse and then be silently dropped.
         HttpOptions http = options(central.transport(), cache).build();
 
-        Cli.run(List.of("overview", PKG), new Capture().streams(), http);
+        Cli.run(List.of(PKG), new Capture().streams(), http);
         Assert.assertEquals(central.docs, 1);
 
         Capture warm = new Capture();
-        Cli.run(List.of("overview", PKG), warm.streams(), http);
+        Cli.run(List.of(PKG), warm.streams(), http);
         Assert.assertEquals(central.docs, 1, "without the flag the second run is a hit");
 
         Capture refreshed = new Capture();
         // Unconditional on purpose. An earlier draft made the re-download conditional on the version having
         // changed, which made the flag a no-op in exactly the case its own error message recommends it for.
-        Assert.assertEquals(Cli.run(List.of("overview", PKG, "--refresh"), refreshed.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of(PKG, "--refresh"), refreshed.streams(), http), 0);
         Assert.assertEquals(central.docs, 2, "--refresh must re-download");
         Assert.assertEquals(central.versions, 2, "and re-resolve");
     }
@@ -452,7 +446,7 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
-        Cli.run(List.of("overview", PKG), new Capture().streams(),
+        Cli.run(List.of(PKG), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
         now[0] += CentralClient.LATEST_TTL_MS * 2;
@@ -461,7 +455,7 @@ public class CacheTest {
             Assert.assertFalse(url.contains("/docs/"), "the docs must come off disk, not the network");
             return FakeTransport.status(503);
         });
-        int exitCode = Cli.run(List.of("overview", PKG), offline.streams(),
+        int exitCode = Cli.run(List.of(PKG), offline.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
@@ -477,7 +471,7 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
-        Cli.run(List.of("overview", PKG), new Capture().streams(),
+        Cli.run(List.of(PKG), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
         // Expire the versions entry, then drop the docs entry so the payload MUST be fetched while the registry
@@ -489,7 +483,7 @@ public class CacheTest {
         Capture capture = new Capture();
         HttpTransport transport = FakeTransport.routing(url ->
                 url.contains("/docs/") ? FakeTransport.ok(payload) : FakeTransport.status(503));
-        int exitCode = Cli.run(List.of("overview", PKG), capture.streams(),
+        int exitCode = Cli.run(List.of(PKG), capture.streams(),
                 options(transport, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
@@ -501,7 +495,7 @@ public class CacheTest {
     public void withTheRegistryUnreachableAndNothingOnDiskTheFailureIsHonest() {
         DocsCache cache = cacheAt(freshRoot());
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("overview", PKG), capture.streams(),
+        int exitCode = Cli.run(List.of(PKG), capture.streams(),
                 options(FakeTransport.always(FakeTransport.status(503)), cache).maxAttempts(1).build());
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");

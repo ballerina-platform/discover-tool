@@ -7,11 +7,10 @@
 
 ## Next
 
-- open one: `bal discover client ballerinax/kafka Caller`
-- search across all of them: `bal discover client ballerinax/kafka -s "<what it does>"`
+- open one: `bal discover ballerinax/kafka client Caller`
 
 ## 3 clients
 
-- `Caller` — 3 remote · `bal discover client ballerinax/kafka Caller`
-- `Consumer` — 24 remote · `bal discover client ballerinax/kafka Consumer`
-- `Producer` — 5 remote · `bal discover client ballerinax/kafka Producer`
+- `Caller` — 3 remote · `bal discover ballerinax/kafka client Caller`
+- `Consumer` — 24 remote · `bal discover ballerinax/kafka client Consumer`
+- `Producer` — 5 remote · `bal discover ballerinax/kafka client Producer`
