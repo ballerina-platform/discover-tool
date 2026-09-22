@@ -446,7 +446,9 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
-        Cli.run(List.of(PKG), new Capture().streams(),
+        // A bucket, not the bare package: the warning row is a fact of the Markdown documents `Containers`
+        // still renders, which is unaffected by the bare package's move onto the JSON/text result IR.
+        Cli.run(List.of(PKG, "client"), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
         now[0] += CentralClient.LATEST_TTL_MS * 2;
@@ -455,7 +457,7 @@ public class CacheTest {
             Assert.assertFalse(url.contains("/docs/"), "the docs must come off disk, not the network");
             return FakeTransport.status(503);
         });
-        int exitCode = Cli.run(List.of(PKG), offline.streams(),
+        int exitCode = Cli.run(List.of(PKG, "client"), offline.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
@@ -471,7 +473,8 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
-        Cli.run(List.of(PKG), new Capture().streams(),
+        // A bucket, not the bare package — see the sibling test above for why.
+        Cli.run(List.of(PKG, "client"), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
         // Expire the versions entry, then drop the docs entry so the payload MUST be fetched while the registry
@@ -483,7 +486,7 @@ public class CacheTest {
         Capture capture = new Capture();
         HttpTransport transport = FakeTransport.routing(url ->
                 url.contains("/docs/") ? FakeTransport.ok(payload) : FakeTransport.status(503));
-        int exitCode = Cli.run(List.of(PKG), capture.streams(),
+        int exitCode = Cli.run(List.of(PKG, "client"), capture.streams(),
                 options(transport, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);

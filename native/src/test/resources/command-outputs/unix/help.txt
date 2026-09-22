@@ -1,4 +1,5 @@
 Usage: bal discover [<org/name>] [bucket] [args...] [--refresh]
+                    [--output <json|text>]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
@@ -14,5 +15,7 @@ Buckets, addressed as the second positional: client, class, funcs so far, growin
 toward the full client/service/class/funcs/readme set. No bucket lists which of them
 this package has.
 
-  --refresh   Ignore any cached copy and rewrite it. Worth passing only when a name
-              should exist and does not.
+  --refresh              Ignore any cached copy and rewrite it. Worth passing only
+                         when a name should exist and does not.
+  --output <json|text>   Override the TTY-detected default: human text at an
+                         interactive terminal, JSON otherwise.

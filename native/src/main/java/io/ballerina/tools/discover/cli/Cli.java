@@ -23,10 +23,11 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Loader;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
-import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.central.HttpOptions;
+import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Documents;
-import io.ballerina.tools.discover.render.Report;
+import io.ballerina.tools.discover.render.JsonRenderer;
+import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import picocli.CommandLine;
@@ -35,7 +36,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * {@code bal discover} — argv in, exit code out.
@@ -84,6 +84,16 @@ public final class Cli {
      *     {@link DiscoverTool}, never by a flag — see {@link Commands}
      */
     public static int run(List<String> argv, Streams streams, HttpOptions http, String projectDir) {
+        return run(argv, streams, http, projectDir, false);
+    }
+
+    /**
+     * @param interactive whether stdout is an interactive terminal — the {@code --output} default in the absence
+     *     of the flag. Discovered by {@link DiscoverTool} from {@code System.console()}, never read here: a test
+     *     drives both defaults without a real terminal, the same reason the cache and the transport are injected.
+     */
+    public static int run(
+            List<String> argv, Streams streams, HttpOptions http, String projectDir, boolean interactive) {
         if (argv.isEmpty()) {
             streams.out().accept(Usage.root());
             return 0;
@@ -118,29 +128,9 @@ public final class Cli {
             return fail(argumentError, streams);
         }
 
-        // `--refresh` is only known once arguments are parsed. The transport and the cache arrive from the process
-        // wrapper, so the options are rebuilt here rather than there.
-        HttpOptions resolved = http.withRefresh(root.refresh);
-        Loader.LoadOptions options = new Loader.LoadOptions(resolved, projectDir);
-
-        Result<String> document = dispatch(root, options);
-        if (!document.isOk()) {
-            return fail(document.failure(), streams);
-        }
-        // The one point every document passes through, which is why the length stamp goes here: a bucket added
-        // later carries it without being told. See Documents.withLength for what it defends against.
-        streams.out().accept(Documents.withLength(document.value()));
-        return 0;
-    }
-
-    // -----------------------------------------------------------------------
-    // Dispatch
-    // -----------------------------------------------------------------------
-
-    private static Result<String> dispatch(Commands.Root root, Loader.LoadOptions options) {
         Result<QualifiedName> qualified = QualifiedName.parse(root.pkg);
         if (!qualified.isOk()) {
-            return qualified.cast();
+            return fail(qualified.failure(), streams);
         }
 
         // Checked before the package is ever fetched: a mistyped bucket is a fact about the argument list, not
@@ -148,25 +138,49 @@ public final class Cli {
         List<String> rest = root.rest == null ? List.of() : root.rest;
         String bucket = rest.isEmpty() ? null : rest.get(0);
         if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
-            return Result.err(unknownBucket(bucket));
+            return fail(unknownBucket(bucket), streams);
         }
 
+        // `--refresh` is only known once arguments are parsed. The transport and the cache arrive from the process
+        // wrapper, so the options are rebuilt here rather than there.
+        HttpOptions resolved = http.withRefresh(root.refresh);
+        Loader.LoadOptions options = new Loader.LoadOptions(resolved, projectDir);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified.value(), options);
         if (!loaded.isOk()) {
-            return loaded.cast();
+            return fail(loaded.failure(), streams);
         }
+
         if (bucket == null) {
-            return Result.ok(bucketListing(loaded.value()));
+            // The one response already built on the RFC's result IR: one source, rendered by whichever of the
+            // two renderers `--output` (or the TTY default) selects. The buckets `Containers` still answers keep
+            // their own Markdown-report shape below, regardless of `--output`, until that view moves onto the
+            // IR too.
+            DiscoverResult result = bucketList(loaded.value());
+            boolean json = jsonOutput(root.output, interactive);
+            streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result)) + "\n");
+            return 0;
         }
 
         Containers.Options containerOptions = new Containers.Options(rest.subList(1, rest.size()));
-        return switch (bucket) {
+        Result<String> document = switch (bucket) {
             case "client" -> Containers.render(loaded.value(), Surface.Scope.CLIENT, containerOptions);
             case "class" -> Containers.render(loaded.value(), Surface.Scope.CLASS, containerOptions);
             case "funcs" -> Containers.render(loaded.value(), Surface.Scope.MODULE, containerOptions);
             default -> throw new IllegalStateException("unreachable: validated above");
         };
+        if (!document.isOk()) {
+            return fail(document.failure(), streams);
+        }
+        // The one point every Markdown document passes through, which is why the length stamp goes here — see
+        // Documents.withLength for what it defends against. The IR path above carries no such stamp: it is not
+        // part of the RFC's shape for that response.
+        streams.out().accept(Documents.withLength(document.value()));
+        return 0;
     }
+
+    // -----------------------------------------------------------------------
+    // Dispatch
+    // -----------------------------------------------------------------------
 
     private static Failure unknownBucket(String token) {
         return new Failure.Validation(
@@ -180,28 +194,19 @@ public final class Cli {
      * <p>Deliberately minimal for now — a bucket list and nothing else. Submodules, once {@code --module} exists
      * to target one, are a bare-package fact too and land beside this.
      */
-    private static String bucketListing(LoadedPackage loaded) {
-        String pkg = loaded.qualified().qualified();
+    private static DiscoverResult.BucketList bucketList(LoadedPackage loaded) {
         List<String> buckets = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
             if (!Surface.of(loaded.library(), scope).isEmpty()) {
                 buckets.add(scope.verb());
             }
         }
+        return new DiscoverResult.BucketList(List.copyOf(buckets), loaded.warning());
+    }
 
-        Report report = new Report("overview");
-        report.heading(1, pkg + " " + loaded.version().text());
-        List<Report.Fact> facts = new ArrayList<>(Report.warning(loaded.warning()));
-        facts.add(new Report.Fact("Buckets", buckets.isEmpty()
-                ? "none"
-                : buckets.stream().map(Texts::code).collect(Collectors.joining(", "))));
-        report.facts(facts);
-
-        report.heading(2, "Next");
-        report.bullets(buckets.stream()
-                .map(bucket -> Texts.code("bal discover " + pkg + " " + bucket))
-                .toList());
-        return report.toString();
+    /** {@code --output}, or the TTY default when it was not passed. */
+    private static boolean jsonOutput(String output, boolean interactive) {
+        return output != null ? "json".equals(output) : !interactive;
     }
 
     // -----------------------------------------------------------------------
@@ -209,7 +214,20 @@ public final class Cli {
     // -----------------------------------------------------------------------
 
     private static Failure validate(Commands.Root root) {
+        Failure output = rejectInvalidOutput(root);
+        if (output != null) {
+            return output;
+        }
         return rejectVersionArguments(root);
+    }
+
+    private static Failure rejectInvalidOutput(Commands.Root root) {
+        if (root.output == null || "json".equals(root.output) || "text".equals(root.output)) {
+            return null;
+        }
+        return new Failure.Validation(
+                "'" + root.output + "' is not a valid --output value.",
+                "Pass --output json or --output text.");
     }
 
     /** A version, as Central publishes them. No bucket name, selector or path can look like one. */

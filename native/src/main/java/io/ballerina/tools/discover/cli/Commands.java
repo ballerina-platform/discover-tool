@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.cli;
 
+import io.ballerina.tools.discover.render.DiscoverResult;
 import picocli.CommandLine;
 
 import java.util.List;
@@ -30,12 +31,15 @@ import java.util.List;
  * {@code bucket} is a plain positional value rather than a subcommand keyword, because in the RFC's design a
  * package resolves to its buckets, a bucket resolves to its members, and neither step is a mode switch.
  *
- * <p><b>WHAT IS NOT HERE YET.</b> {@code --module}, {@code --filter}, {@code --output} and {@code --page} are
- * real parts of the target grammar but are deliberately absent from this class until the work that actually reads
- * them lands (module addressing, the {@code Containers} rewrite, the dual renderer) — a flag that parses and is
- * then silently dropped is the exact class of mistake this grammar refuses everywhere else, so a flag is declared
- * here only once something consumes it. {@code -s/--search}, {@code -r/--resolve-types} and {@code --all} are
- * gone for good: the RFC has no equivalent for any of them (see the RFC-alignment plan's "Decisions locked in").
+ * <p><b>WHAT IS NOT HERE YET.</b> {@code --module}, {@code --filter} and {@code --page} are real parts of the
+ * target grammar but are deliberately absent from this class until the work that actually reads them lands
+ * (module addressing, the {@code Containers} rewrite) — a flag that parses and is then silently dropped is the
+ * exact class of mistake this grammar refuses everywhere else, so a flag is declared here only once something
+ * consumes it. {@code --output} is here, because the dual renderer now exists — though today it only changes the
+ * bare-package bucket listing; the buckets {@code Containers} still renders keep their Markdown-report shape
+ * regardless of {@code --output} until that view is rewritten onto {@link DiscoverResult} too.
+ * {@code -s/--search}, {@code -r/--resolve-types} and {@code --all} are gone for good: the RFC has no equivalent
+ * for any of them (see the RFC-alignment plan's "Decisions locked in").
  *
  * @since 0.1.0
  */
@@ -76,6 +80,11 @@ final class Commands {
                 description = "Ignore any cached copy and rewrite it. Worth passing only when a name should "
                         + "exist and does not.")
         boolean refresh;
+
+        @CommandLine.Option(names = "--output", paramLabel = "<json|text>",
+                description = "Override the TTY-detected default: human text at an interactive terminal, JSON "
+                        + "otherwise.")
+        String output;
 
         @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org/name>")
         String pkg;
