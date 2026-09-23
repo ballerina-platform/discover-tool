@@ -1131,7 +1131,7 @@ public final class Containers {
         if (all.isEmpty()) {
             return opening + ". It declares nothing callable.";
         }
-        String command = "bal discover " + scope.verb() + " " + loaded.qualified().qualified()
+        String command = "bal discover " + loaded.qualified().qualified() + " " + scope.verb()
                 + " " + container.name();
         List<String> names = new ArrayList<>();
         int spent = 0;
@@ -1147,8 +1147,7 @@ public final class Containers {
         String held = names.size() == all.size()
                 ? ". It declares: " + String.join(", ", names)
                 : ". It declares " + all.size() + ", of which: " + String.join(", ", names) + ", …";
-        return opening + held + "\n// Read them: " + command
-                + "\n// Or search inside it: " + command + " -s \"" + Texts.plain(asked) + "\"";
+        return opening + held + "\n// Read them: " + command;
     }
 
     private static String codeAnswer(

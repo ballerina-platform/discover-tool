@@ -490,7 +490,8 @@ public class ViewsTest {
                                 + Texts.byteLength(document) + " bytes:\n" + document);
                 // Still Ballerina, and still a way out.
                 Assert.assertFalse(document.contains("| "), slug + ": a table in the code register");
-                Assert.assertTrue(document.contains("bal discover client"),
+                Assert.assertTrue(
+                        document.contains("bal discover " + loaded.qualified().qualified() + " client"),
                         slug + ": the miss offers no next command:\n" + document);
             }
         }
