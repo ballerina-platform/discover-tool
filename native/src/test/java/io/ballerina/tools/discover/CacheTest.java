@@ -128,8 +128,8 @@ public class CacheTest {
     }
 
     private static Path docsEntry(Path root) {
-        return root.resolve("v1").resolve("docs").resolve("ballerinax").resolve("kafka")
-                .resolve(VERSION + ".json");
+        return root.resolve("v2").resolve("docs").resolve(CentralClient.REPOSITORY_ID)
+                .resolve("ballerinax").resolve("kafka").resolve(VERSION + ".json");
     }
 
     private static HttpOptions.Builder options(HttpTransport transport, DocsCache cache) {
@@ -177,10 +177,41 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         JsonElement payload = FixtureCorpus.loadRawFixture(SLUG);
-        cache.writeDocs(new DocsCache.DocsKey("ballerinax", "kafka", VERSION), payload);
+        cache.writeDocs(new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka", VERSION), payload);
         // No compression level to choose, no bad-gzip corruption mode to handle. Disk is not the constrained
         // resource: a runner's mounts are emptyDirs and the cache dies with the run.
         Assert.assertEquals(readEntry(root), payload);
+    }
+
+    @Test
+    public void twoRepositoriesAnsweringTheSameCoordinatesNeverCollide() {
+        // The property Loader's ordered repository list needs from the cache: a "Local Central" mirror and real
+        // Central are both free to publish different bytes at ballerinax/kafka:4.6.5, so one repository's entry
+        // must never be read, overwritten or deleted as if it were the other's.
+        Path root = freshRoot();
+        DocsCache cache = cacheAt(root);
+        JsonElement fromCentral = FixtureCorpus.loadRawFixture(SLUG);
+        JsonElement fromMirror = JsonParser.parseString("{\"different\":\"payload\"}");
+        DocsCache.DocsKey central = new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka", VERSION);
+        DocsCache.DocsKey mirror = new DocsCache.DocsKey("local-mirror", "ballerinax", "kafka", VERSION);
+
+        cache.writeDocs(central, fromCentral);
+        cache.writeDocs(mirror, fromMirror);
+        Assert.assertEquals(cache.readDocs(central), fromCentral);
+        Assert.assertEquals(cache.readDocs(mirror), fromMirror);
+
+        cache.removeDocs(mirror);
+        Assert.assertEquals(cache.readDocs(central), fromCentral, "removing the mirror's entry must not touch "
+                + "Central's");
+        Assert.assertNull(cache.readDocs(mirror));
+
+        // The versions-list cache is the same story: each repository believes its OWN "latest" answer.
+        DocsCache.PackageKey centralPkg = new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka");
+        DocsCache.PackageKey mirrorPkg = new DocsCache.PackageKey("local-mirror", "ballerinax", "kafka");
+        cache.writeLatest(centralPkg, new DocsCache.LatestEntry("4.6.5", 1_000));
+        cache.writeLatest(mirrorPkg, new DocsCache.LatestEntry("5.0.0", 2_000));
+        Assert.assertEquals(cache.readLatest(centralPkg), new DocsCache.LatestEntry("4.6.5", 1_000));
+        Assert.assertEquals(cache.readLatest(mirrorPkg), new DocsCache.LatestEntry("5.0.0", 2_000));
     }
 
     @Test
@@ -283,16 +314,26 @@ public class CacheTest {
         // `QualifiedName` and `Version` reject all of these first; this is the inner guard, kept because the
         // outer one is a regex someone could loosen.
         for (String version : new String[] {"..", ".", "../../etc/passwd", "a/b", "", "with space"}) {
-            DocsCache.DocsKey key = new DocsCache.DocsKey("ballerinax", "kafka", version);
+            DocsCache.DocsKey key = new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka", version);
             cache.writeDocs(key, anything);
             Assert.assertNull(cache.readDocs(key), "version " + version);
         }
         for (String org : new String[] {"..", ".", "../..", "a/b"}) {
-            DocsCache.DocsKey key = new DocsCache.DocsKey(org, "kafka", VERSION);
+            DocsCache.DocsKey key = new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, org, "kafka", VERSION);
             cache.writeDocs(key, anything);
             Assert.assertNull(cache.readDocs(key), "org " + org);
-            Assert.assertEquals(cache.listVersions(new DocsCache.PackageKey(org, "kafka")), List.of(),
-                    "listVersions " + org);
+            Assert.assertEquals(
+                    cache.listVersions(new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, org, "kafka")),
+                    List.of(), "listVersions " + org);
+        }
+        // The repository dimension is as much a coordinate as org/name/version now — a repository id is never
+        // read off anything but PackageRepository.id() in real code, but this proves the same guard covers it.
+        for (String repository : new String[] {"..", ".", "../..", "a/b"}) {
+            DocsCache.DocsKey key = new DocsCache.DocsKey(repository, "ballerinax", "kafka", VERSION);
+            cache.writeDocs(key, anything);
+            Assert.assertNull(cache.readDocs(key), "repository " + repository);
+            Assert.assertEquals(cache.listVersions(new DocsCache.PackageKey(repository, "ballerinax", "kafka")),
+                    List.of(), "listVersions " + repository);
         }
         Assert.assertEquals(children(root).size(), 0, "not even the format directory should exist");
     }
@@ -308,7 +349,7 @@ public class CacheTest {
         // move onto the same target, and the move is atomic: no third process can observe a partial file.
         DocsCache collide = DiskCache.at(root, 0700, 1234, () -> 0.5);
         JsonElement payload = FixtureCorpus.loadRawFixture(SLUG);
-        DocsCache.DocsKey key = new DocsCache.DocsKey("ballerinax", "kafka", VERSION);
+        DocsCache.DocsKey key = new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka", VERSION);
 
         collide.writeDocs(key, payload);
         collide.writeDocs(key, payload);
@@ -442,7 +483,7 @@ public class CacheTest {
         // Expire the versions entry, then drop the docs entry so the payload MUST be fetched while the registry
         // stays down.
         now[0] += CentralClient.LATEST_TTL_MS * 2;
-        cache.removeDocs(new DocsCache.DocsKey("ballerinax", "kafka", VERSION));
+        cache.removeDocs(new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka", VERSION));
 
         String payload = FixtureCorpus.loadRawFixture(SLUG).toString();
         Capture capture = new Capture();
@@ -472,11 +513,11 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         for (String version : new String[] {"1.9.0", "1.10.0", "2.0.0", "2.0.0-alpha"}) {
-            cache.writeDocs(new DocsCache.DocsKey("ballerinax", "kafka", version),
+            cache.writeDocs(new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka", version),
                     JsonParser.parseString("{\"v\":\"" + version + "\"}"));
         }
         Assert.assertEquals(
-                cache.listVersions(new DocsCache.PackageKey("ballerinax", "kafka")),
+                cache.listVersions(new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka")),
                 List.of("2.0.0", "2.0.0-alpha", "1.10.0", "1.9.0"));
     }
 
@@ -494,8 +535,9 @@ public class CacheTest {
     public void aLatestEntryThatIsNotWellFormedIsAMissRatherThanACrash() {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
-        DocsCache.PackageKey key = new DocsCache.PackageKey("ballerinax", "kafka");
-        Path path = root.resolve("v1").resolve("latest").resolve("ballerinax").resolve("kafka.json");
+        DocsCache.PackageKey key = new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka");
+        Path path = root.resolve("v2").resolve("latest").resolve(CentralClient.REPOSITORY_ID)
+                .resolve("ballerinax").resolve("kafka.json");
         for (String contents : new String[] {
                 "not json", "[]", "{}", "{\"version\":\"\",\"atMs\":1}", "{\"version\":\"1.0.0\"}"}) {
             write(path, contents);
@@ -576,12 +618,13 @@ public class CacheTest {
     @Test
     public void theNullCacheStoresNothingAndSaysSo() {
         // The default everywhere outside the process wrapper, and what keeps every other test hermetic.
-        DocsCache.DocsKey key = new DocsCache.DocsKey("ballerinax", "kafka", VERSION);
+        DocsCache.DocsKey key = new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka", VERSION);
+        DocsCache.PackageKey packageKey =
+                new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, "ballerinax", "kafka");
         DocsCache.NULL.writeDocs(key, JsonParser.parseString("{}"));
         Assert.assertNull(DocsCache.NULL.readDocs(key));
-        Assert.assertNull(DocsCache.NULL.readLatest(new DocsCache.PackageKey("ballerinax", "kafka")));
-        Assert.assertEquals(DocsCache.NULL.listVersions(new DocsCache.PackageKey("ballerinax", "kafka")),
-                List.of());
+        Assert.assertNull(DocsCache.NULL.readLatest(packageKey));
+        Assert.assertEquals(DocsCache.NULL.listVersions(packageKey), List.of());
         Assert.assertEquals(DocsCache.NULL.describe(), "disabled");
     }
 

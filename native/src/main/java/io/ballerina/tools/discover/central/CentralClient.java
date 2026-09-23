@@ -54,6 +54,12 @@ public final class CentralClient {
     public static final String CENTRAL_BASE_URL = "https://api.central.ballerina.io/2.0/";
 
     /**
+     * This repository's own identity, for the cache key's repository dimension — see {@link DocsCache}. Stable
+     * and filesystem-safe, unlike {@link CentralRepository#describe()}, which is free-form prose for a human.
+     */
+    public static final String REPOSITORY_ID = "central";
+
+    /**
      * How long Central's answer to "what is the latest version" is believed.
      *
      * <p>The measured lookup episode runs 70 to 260 seconds, so ten minutes spans a whole episode without a
@@ -276,7 +282,7 @@ public final class CentralClient {
                 // re-walking the prefixes. The entry is as true as the parent's: a module carries its
                 // package's version, which is what makes reading it at that version correct in the first place.
                 options.cache().writeLatest(
-                        new DocsCache.PackageKey(qualified.org(), qualified.name()),
+                        new DocsCache.PackageKey(REPOSITORY_ID, qualified.org(), qualified.name()),
                         new DocsCache.LatestEntry(viaParent.value().version().text(), options.now()));
                 return viaParent;
             }
@@ -331,7 +337,7 @@ public final class CentralClient {
      */
     private static Result<ResolvedVersion> resolvePublishedVersion(QualifiedName qualified, HttpOptions options) {
         DocsCache cache = options.cache();
-        DocsCache.PackageKey key = new DocsCache.PackageKey(qualified.org(), qualified.name());
+        DocsCache.PackageKey key = new DocsCache.PackageKey(REPOSITORY_ID, qualified.org(), qualified.name());
 
         // `--refresh` re-resolves unconditionally. An earlier draft made the re-download conditional on the
         // version having changed, which made the flag a no-op in exactly the case its own error message
@@ -445,7 +451,7 @@ public final class CentralClient {
         Version version = resolved.version();
         DocsCache cache = options.cache();
         DocsCache.DocsKey key =
-                new DocsCache.DocsKey(qualified.org(), qualified.name(), version.text());
+                new DocsCache.DocsKey(REPOSITORY_ID, qualified.org(), qualified.name(), version.text());
         String label = qualified.versioned(version);
 
         if (options.refresh()) {

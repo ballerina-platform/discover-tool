@@ -47,12 +47,17 @@ import java.util.stream.Stream;
  * The cache, on disk.
  *
  * <pre>
- *   &lt;root&gt;/v1/docs/&lt;org&gt;/&lt;name&gt;/&lt;version&gt;.json      mode 0600, no TTL
- *   &lt;root&gt;/v1/latest/&lt;org&gt;/&lt;name&gt;.json              {"version":"6.0.0","atMs":…}
+ *   &lt;root&gt;/v2/docs/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;/&lt;version&gt;.json      mode 0600, no TTL
+ *   &lt;root&gt;/v2/latest/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;.json              {"version":"6.0.0","atMs":…}
  * </pre>
  *
- * <p>{@code v1} is the on-disk format generation, bumped only when the stored bytes change meaning.
- * Deliberately not a build identity — see {@link DocsCache} for why the raw payload is what gets stored.
+ * <p>{@code v2} is the on-disk format generation, bumped only when the stored bytes change meaning — bumped
+ * from {@code v1} here because a {@code v1} path has no repository segment at all, a different shape from
+ * {@code v2} rather than a value that could collide with it. Sharing one generation between the two shapes
+ * would have meant the read path either had to guess which shape an old entry used or lose the repository
+ * dimension entirely; a new generation makes every {@code v1} entry a plain, harmless miss instead, healed on
+ * the next fetch like any other. Deliberately not a build identity — see {@link DocsCache} for why the raw
+ * payload is what gets stored.
  *
  * <p>Entries are stored UNCOMPRESSED, exactly as Central served them. Disk is not the constrained resource:
  * a runner's mounts are emptyDirs and the cache does not outlive the run. Compression would add a level to
@@ -70,7 +75,7 @@ import java.util.stream.Stream;
  */
 public final class DiskCache implements DocsCache {
 
-    private static final String FORMAT = "v1";
+    private static final String FORMAT = "v2";
 
     /** Every path segment has to be one of these before it can reach a join. */
     private static final Pattern SAFE_SEGMENT = Pattern.compile("^[A-Za-z0-9_.-]+$");
@@ -234,18 +239,20 @@ public final class DiskCache implements DocsCache {
 
     private Path docsPath(DocsKey key) {
         return entryPath(
-                List.of(key.org(), key.name(), key.version()),
-                List.of(FORMAT, "docs", key.org(), key.name(), key.version() + ".json"));
+                List.of(key.repository(), key.org(), key.name(), key.version()),
+                List.of(FORMAT, "docs", key.repository(), key.org(), key.name(), key.version() + ".json"));
     }
 
     private Path docsDir(PackageKey key) {
         return entryPath(
-                List.of(key.org(), key.name()), List.of(FORMAT, "docs", key.org(), key.name()));
+                List.of(key.repository(), key.org(), key.name()),
+                List.of(FORMAT, "docs", key.repository(), key.org(), key.name()));
     }
 
     private Path latestPath(PackageKey key) {
         return entryPath(
-                List.of(key.org(), key.name()), List.of(FORMAT, "latest", key.org(), key.name() + ".json"));
+                List.of(key.repository(), key.org(), key.name()),
+                List.of(FORMAT, "latest", key.repository(), key.org(), key.name() + ".json"));
     }
 
     // -----------------------------------------------------------------------
