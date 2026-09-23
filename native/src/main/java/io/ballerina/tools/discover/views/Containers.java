@@ -1045,11 +1045,14 @@ public final class Containers {
         String baseCommand = "bal discover " + pkg + " " + scope.verb() + containerArgument(container);
         List<String> prefix = canonical(container, selectors);
         List<DiscoverResult.ResourceList.Resource> merged = mergedResources(callable, baseCommand);
-        // A relocation or a wildcard's skipped sibling outranks a kind-tolerance note: the two never co-occur in
-        // one request (the first is within-bucket, the second crosses buckets before a container is even named),
-        // and losing which branch a wildcard did NOT take is the one this mechanism exists to prevent.
+        // A kind-tolerance note and a path advisory DO co-occur: `elsewhereIfKnown` re-invokes `render` with the
+        // whole original selector list still attached, so a container reached across buckets can go on to
+        // resolve a wildcard or a relocation in that same call. Concatenated rather than one outranking the
+        // other, for the same reason `pathNote` itself joins a relocation and a skipped sibling instead of
+        // picking one — losing either fact silently is what this mechanism exists to prevent.
         String pathAdvisory = pathNote(container, selectors);
-        String combinedNote = pathAdvisory != null ? pathAdvisory : note;
+        String combinedNote = pathAdvisory == null ? note
+                : note == null ? pathAdvisory : note + "; " + pathAdvisory;
 
         boolean mustStayFlat = options.filtered() || prefix.size() > MAX_GROUP_DEPTH;
         if (mustStayFlat || merged.size() <= MAX_ENTRIES) {
