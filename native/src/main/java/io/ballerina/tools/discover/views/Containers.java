@@ -23,6 +23,7 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
+import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.Report;
@@ -35,6 +36,7 @@ import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -1081,12 +1083,13 @@ public final class Containers {
         }
         List<DiscoverResult.ResourceList.Resource> resources = new ArrayList<>();
         accessorsByPath.forEach((path, accessors) -> {
+            String escaped = escapeKeywordSegments(path);
             // A `call` field only where it is unambiguous — exactly one accessor. A flat field on a
             // multi-accessor path would have to guess which one, which this design refuses to do.
             String call = accessors.size() == 1
-                    ? baseCommand + " " + quotedPath(path) + " " + accessors.get(0)
+                    ? baseCommand + " " + quotedPath(escaped) + " " + accessors.get(0)
                     : null;
-            resources.add(new DiscoverResult.ResourceList.Resource(path, List.copyOf(accessors), call));
+            resources.add(new DiscoverResult.ResourceList.Resource(escaped, List.copyOf(accessors), call));
         });
         return List.copyOf(resources);
     }
@@ -1120,13 +1123,14 @@ public final class Containers {
 
         List<PathGroup> groups = new ArrayList<>();
         if (terminalHere > 0) {
-            groups.add(new PathGroup(prefix.isEmpty() ? "." : String.join("/", prefix), terminalHere));
+            String name = prefix.isEmpty() ? "." : escapeKeywordSegments(String.join("/", prefix));
+            groups.add(new PathGroup(name, terminalHere));
         }
         byLiteralChild.forEach((literal, children) -> {
             List<String> path = new ArrayList<>(prefix);
             path.add(literal);
             int count = children.stream().mapToInt(PathTree::total).sum();
-            groups.add(new PathGroup(String.join("/", path), count));
+            groups.add(new PathGroup(escapeKeywordSegments(String.join("/", path)), count));
         });
         groups.sort(Comparator.comparingInt(PathGroup::count).reversed()
                 .thenComparing(PathGroup::name, Texts.LOCALE_ORDER));
@@ -1153,7 +1157,23 @@ public final class Containers {
     }
 
     private static String pathArgument(List<String> prefix) {
-        return prefix.isEmpty() ? "" : " " + quotedPath(String.join("/", prefix));
+        return prefix.isEmpty() ? "" : " " + quotedPath(escapeKeywordSegments(String.join("/", prefix)));
+    }
+
+    /**
+     * A path, with every segment that collides with a Ballerina keyword quoted — the same keyword set and the
+     * same per-segment rule {@link ModuleRef#importPath()} applies to a module path, here applied to a resource
+     * path instead.
+     *
+     * <p>{@link PathTree#readableSegment} already strips this apostrophe on the way IN, for the tree's own
+     * prose/matching register — so by the time a path reaches this class, {@code gists/'public} has already
+     * become {@code gists/public} and the collision has to be re-derived from the keyword set rather than
+     * recovered from what Central published.
+     */
+    private static String escapeKeywordSegments(String path) {
+        return Arrays.stream(path.split("/", -1))
+                .map(segment -> ModuleRef.isKeyword(segment) ? "'" + segment : segment)
+                .collect(Collectors.joining("/"));
     }
 
     /**

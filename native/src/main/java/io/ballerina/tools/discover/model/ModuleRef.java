@@ -118,9 +118,14 @@ public record ModuleRef(String orgName, String moduleName, String version) {
      */
     public String importPath() {
         String quoted = Arrays.stream(moduleName.split("\\.", -1))
-                .map(segment -> KEYWORDS.contains(segment) ? "'" + segment : segment)
+                .map(segment -> isKeyword(segment) ? "'" + segment : segment)
                 .collect(Collectors.joining("."));
         return orgName + "/" + quoted;
+    }
+
+    /** Does an identifier need {@link #importPath()}'s quoting — a resource path segment included? */
+    public static boolean isKeyword(String identifier) {
+        return KEYWORDS.contains(identifier);
     }
 
     /**
