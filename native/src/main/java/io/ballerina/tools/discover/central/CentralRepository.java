@@ -51,6 +51,11 @@ public final class CentralRepository implements PackageRepository {
     }
 
     @Override
+    public String id() {
+        return CentralClient.REPOSITORY_ID;
+    }
+
+    @Override
     public String describe() {
         return "Ballerina Central (" + CentralClient.CENTRAL_BASE_URL + ")";
     }

@@ -40,10 +40,15 @@ import java.util.List;
  * code, so the coordinates are the whole key. Re-deriving costs about 200ms of parse and transform against
  * 5 to 7 seconds of download.
  *
- * <p>THE KEY HAS NO IDENTITY DIMENSION. That is correct only while the transport sends no headers and only
- * public Central data is reachable. If a Central token is ever threaded through the options, this cache must
- * be disabled or keyed by a token fingerprint: {@code $HOME} outlives the per-task workspace scrub, and a
- * 0600 mode buys nothing against the same user.
+ * <p>THE KEY'S ONLY IDENTITY DIMENSION IS WHICH REPOSITORY ANSWERED. That is deliberate and load-bearing now
+ * that {@code Loader} tries an ORDERED LIST of {@link io.ballerina.tools.discover.central.PackageRepository}
+ * sources for one lookup (the RFC's multi-source interface — Central, a local "Local Central" cache,
+ * Artifactory): two sources are free to publish different bytes at the same {@code org/name/version}, so an
+ * entry from one must never be read back as if it came from another. Beyond that one dimension, the same
+ * caveat as before holds: this is correct only while the transport sends no headers and only public data is
+ * reachable per repository. If a token is ever threaded through the options, this cache must be disabled or
+ * keyed by a token fingerprint too: {@code $HOME} outlives the per-task workspace scrub, and a 0600 mode buys
+ * nothing against the same user.
  *
  * @since 0.1.0
  */
@@ -52,19 +57,23 @@ public interface DocsCache {
     /**
      * A package's immutable coordinates — the whole key of a docs entry.
      *
+     * @param repository which {@link io.ballerina.tools.discover.central.PackageRepository} answered — its own
+     *     {@code id()}, never its {@code describe()}, which is free-form prose and not a stable cache-key value
      * @param org the package organization
      * @param name the package name
      * @param version the package version
      */
-    record DocsKey(String org, String name, String version) { }
+    record DocsKey(String repository, String org, String name, String version) { }
 
     /**
      * A package without a version, which is what the versions list is keyed by.
      *
+     * @param repository which {@link io.ballerina.tools.discover.central.PackageRepository} answered — see
+     *     {@link DocsKey#repository()}
      * @param org the package organization
      * @param name the package name
      */
-    record PackageKey(String org, String name) { }
+    record PackageKey(String repository, String org, String name) { }
 
     /**
      * The one mutable answer Central gives, and when we last believed it.

@@ -42,12 +42,18 @@ public class PackageRepositoryTest {
     /** A repository that never touches HTTP at all — every answer is canned. */
     private static final class FakeRepository implements PackageRepository {
 
+        private final String id;
         private final Result<CentralClient.ResolvedVersion> version;
         private final Result<CentralDocs> docs;
         private int resolveCalls;
         private int fetchCalls;
 
         private FakeRepository(Result<CentralClient.ResolvedVersion> version, Result<CentralDocs> docs) {
+            this("fake", version, docs);
+        }
+
+        private FakeRepository(String id, Result<CentralClient.ResolvedVersion> version, Result<CentralDocs> docs) {
+            this.id = id;
             this.version = version;
             this.docs = docs;
         }
@@ -63,6 +69,11 @@ public class PackageRepositoryTest {
                 QualifiedName qualified, CentralClient.ResolvedVersion resolved, HttpOptions options) {
             fetchCalls++;
             return docs;
+        }
+
+        @Override
+        public String id() {
+            return id;
         }
 
         @Override

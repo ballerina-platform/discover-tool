@@ -43,6 +43,15 @@ public interface PackageRepository {
     /** The API docs for one already-resolved version. */
     Result<CentralDocs> fetchDocs(QualifiedName qualified, CentralClient.ResolvedVersion resolved, HttpOptions options);
 
+    /**
+     * This repository's own stable, filesystem-safe identity — the cache key's repository dimension (see
+     * {@code io.ballerina.tools.discover.cache.DocsCache}), so two repositories answering the same
+     * {@code org/name/version} differently never collide in one entry. Never free-form prose and never derived
+     * from anything a repository's own configuration could change between runs (a URL, a mirror's hostname) —
+     * unlike {@link #describe()}, this is parsed, as a path segment.
+     */
+    String id();
+
     /** A short, human-readable name for this repository — for diagnostics, never parsed. */
     String describe();
 }
