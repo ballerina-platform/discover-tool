@@ -40,7 +40,7 @@ public final class TextRenderer {
     }
 
     private static String renderBucketList(DiscoverResult.BucketList bucketList) {
-        String list = String.join(", ", bucketList.buckets());
+        String list = bucketList.buckets().isEmpty() ? "none" : String.join(", ", bucketList.buckets());
         return bucketList.warning() == null ? list : "Warning: " + bucketList.warning() + "\n" + list;
     }
 }
