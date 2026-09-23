@@ -65,13 +65,21 @@ final class UsageRenderer {
      * <p>Repetition is read off the index range rather than the arity, the same rule this tool's earlier grammar
      * used: a positional occupying an unbounded index repeats, and none of them declares a minimum arity — that
      * is what would let picocli swallow a foreign flag as a value.
+     *
+     * <p>A label that is already bracketed is a hand-written synopsis fragment in its own right — {@code rest}'s
+     * {@code [bucket] [args...]} spells its own optionality and repetition — so it is printed as-is rather than
+     * wrapped again, which would otherwise double the brackets.
      */
     private static String slot(PositionalParamSpec positional) {
+        String label = positional.paramLabel();
+        if (label.startsWith("[")) {
+            return label;
+        }
         boolean repeats = positional.index().max() == Integer.MAX_VALUE || positional.arity().max() > 1;
         if (repeats) {
-            return "[" + positional.paramLabel() + "...]";
+            return "[" + label + "...]";
         }
-        return positional.arity().min() == 0 ? "[" + positional.paramLabel() + "]" : positional.paramLabel();
+        return positional.arity().min() == 0 ? "[" + label + "]" : label;
     }
 
     /** Always optional, so always bracketed, and named by its SHORTEST spelling. */

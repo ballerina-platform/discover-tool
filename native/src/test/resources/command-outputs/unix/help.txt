@@ -1,4 +1,4 @@
-Usage: bal discover [<org/name>] [[bucket] [args...]...] [--refresh]
+Usage: bal discover [<org/name>] [bucket] [args...] [--refresh]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
