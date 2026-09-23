@@ -28,6 +28,9 @@ import io.ballerina.tools.discover.model.FromCentral;
 import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.views.Readmes;
 
+import java.util.List;
+import java.util.function.Function;
+
 /**
  * The whole capability in two steps: resolve which version to read, then read it once.
  *
@@ -53,18 +56,47 @@ public final class Loader {
      *
      * @param http the transport options to fetch and cache through
      * @param projectDir the Ballerina project the lookup is running inside, or {@code null} when it is not in one
-     * @param repository where the package's version and docs payload come from — {@link CentralRepository} in
-     *     every case this phase ships; see {@link PackageRepository}
+     * @param repositories where the package's version and docs payload come from, in priority order — see
+     *     {@link PackageRepository}. Tried in order for each lookup, first success wins; {@link CentralRepository}
+     *     is the only one and the only element this phase ever populates, but the shape is a list because the
+     *     RFC's multi-source repository interface (Central, a local "Local Central" cache, Artifactory) is
+     *     several sources considered for ONE lookup, not one source picked ahead of time.
      */
-    public record LoadOptions(HttpOptions http, String projectDir, PackageRepository repository) {
+    public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories) {
+
+        public LoadOptions {
+            if (repositories.isEmpty()) {
+                throw new IllegalArgumentException("at least one repository is required");
+            }
+        }
 
         public LoadOptions(HttpOptions http, String projectDir) {
-            this(http, projectDir, CentralRepository.INSTANCE);
+            this(http, projectDir, List.of(CentralRepository.INSTANCE));
         }
 
         public static LoadOptions of(HttpOptions http) {
-            return new LoadOptions(http, null, CentralRepository.INSTANCE);
+            return new LoadOptions(http, null, List.of(CentralRepository.INSTANCE));
         }
+    }
+
+    /**
+     * Every repository in priority order, first success wins — the shared shape both {@link #resolveVersion} and
+     * {@link #loadPackage} try candidates with.
+     *
+     * <p>When every repository fails, the LAST failure is returned rather than the first: a fast local source
+     * (a "Local Central" cache) is expected to sit ahead of a slower authoritative one in the list, so the final
+     * attempt is usually the one whose answer is worth reporting.
+     */
+    private static <T> Result<T> tryEachRepository(
+            List<PackageRepository> repositories, Function<PackageRepository, Result<T>> attempt) {
+        Result<T> last = null;
+        for (PackageRepository repository : repositories) {
+            last = attempt.apply(repository);
+            if (last.isOk()) {
+                return last;
+            }
+        }
+        return last;
     }
 
     /**
@@ -87,7 +119,8 @@ public final class Loader {
                 return fixed(locked);
             }
         }
-        return options.repository().resolveVersion(qualified, options.http());
+        return tryEachRepository(options.repositories(),
+                repository -> repository.resolveVersion(qualified, options.http()));
     }
 
     /** A version a build already locked, taken as given rather than confirmed against the registry. */
@@ -117,14 +150,36 @@ public final class Loader {
                 : null;
     }
 
+    /**
+     * Resolve and fetch as one pair per repository, so a version resolved on one source is never fetched from
+     * another — a "Local Central" cache and real Central would not necessarily agree on what a given version
+     * even contains.
+     *
+     * <p>A locked {@code Dependencies.toml} version is the one exception: it names no repository, so every
+     * repository is tried in order to serve THAT version, rather than resolve deciding which one wins.
+     */
     public static Result<LoadedPackage> loadPackage(QualifiedName qualified, LoadOptions options) {
-        Result<CentralClient.ResolvedVersion> resolved = resolveVersion(qualified, options);
-        if (!resolved.isOk()) {
-            return resolved.cast();
+        if (options.projectDir() != null) {
+            String locked = DependenciesToml.lockedVersion(options.projectDir(), qualified);
+            if (locked != null) {
+                Result<CentralClient.ResolvedVersion> resolved = fixed(locked);
+                if (!resolved.isOk()) {
+                    return resolved.cast();
+                }
+                return tryEachRepository(options.repositories(),
+                        repository -> assemble(qualified, resolved.value(), repository, options));
+            }
         }
-        Version version = resolved.value().version();
+        return tryEachRepository(options.repositories(), repository -> {
+            Result<CentralClient.ResolvedVersion> resolved = repository.resolveVersion(qualified, options.http());
+            return resolved.isOk() ? assemble(qualified, resolved.value(), repository, options) : resolved.cast();
+        });
+    }
 
-        Result<CentralDocs> docs = options.repository().fetchDocs(qualified, resolved.value(), options.http());
+    private static Result<LoadedPackage> assemble(
+            QualifiedName qualified, CentralClient.ResolvedVersion resolved, PackageRepository repository,
+            LoadOptions options) {
+        Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved, options.http());
         if (!docs.isOk()) {
             return docs.cast();
         }
@@ -136,9 +191,9 @@ public final class Loader {
 
         return Result.ok(new LoadedPackage(
                 qualified,
-                version,
+                resolved.version(),
                 Pipeline.build(module.value()),
                 Readmes.collect(docs.value()),
-                unverifiedWarning(resolved.value().stale())));
+                unverifiedWarning(resolved.stale())));
     }
 }

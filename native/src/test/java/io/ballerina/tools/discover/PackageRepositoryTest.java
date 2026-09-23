@@ -25,8 +25,10 @@ import io.ballerina.tools.discover.central.schema.CentralDocs;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.util.List;
+
 /**
- * Proof that {@link Loader} reaches a package only through the {@link PackageRepository} it is handed, never
+ * Proof that {@link Loader} reaches a package only through the {@link PackageRepository} list it is handed, never
  * through Ballerina Central by name — the cheapest possible check that the seam introduced ahead of the
  * multi-source repository work is real, not just a type that happens to have one implementer.
  *
@@ -79,7 +81,8 @@ public class PackageRepositoryTest {
         FakeRepository repository = new FakeRepository(
                 Result.ok(new CentralClient.ResolvedVersion(version, false)),
                 Result.ok(FixtureCorpus.loadFixture(SLUG)));
-        Loader.LoadOptions options = new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, repository);
+        Loader.LoadOptions options =
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository));
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
@@ -94,7 +97,8 @@ public class PackageRepositoryTest {
         FakeRepository repository = new FakeRepository(
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "not on this repository")),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")));
-        Loader.LoadOptions options = new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, repository);
+        Loader.LoadOptions options =
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository));
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
@@ -109,11 +113,59 @@ public class PackageRepositoryTest {
         FakeRepository repository = new FakeRepository(
                 Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka:4.6.5", "gone from this repository")));
-        Loader.LoadOptions options = new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, repository);
+        Loader.LoadOptions options =
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository));
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
         Assert.assertFalse(loaded.isOk());
         Assert.assertTrue(loaded.failure() instanceof Failure.PackageNotFound);
+    }
+
+    @Test
+    public void severalRepositoriesAreTriedInOrderUntilOneAnswers() {
+        // The shape the RFC's multi-source interface needs: Central, a "Local Central" cache and Artifactory are
+        // all candidates for the SAME lookup, not one source picked ahead of time. A repository that has nothing
+        // for this package is a routine outcome, not a failure worth stopping on.
+        Version version = Version.parse("4.6.5").value();
+        FakeRepository first = new FakeRepository(
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "not on this repository")),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")));
+        FakeRepository second = new FakeRepository(
+                Result.ok(new CentralClient.ResolvedVersion(version, false)),
+                Result.ok(FixtureCorpus.loadFixture(SLUG)));
+        Loader.LoadOptions options = new Loader.LoadOptions(
+                httpThatMustNotReachTheNetwork(), null, List.of(first, second));
+
+        Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
+
+        Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
+        Assert.assertEquals(loaded.value().version(), version);
+        Assert.assertEquals(first.resolveCalls, 1, "the first repository has to be asked before it is skipped");
+        Assert.assertEquals(first.fetchCalls, 0, "a repository that never resolved must not be fetched from");
+        Assert.assertEquals(second.resolveCalls, 1);
+        Assert.assertEquals(second.fetchCalls, 1);
+    }
+
+    @Test
+    public void aVersionResolvedOnOneRepositoryIsFetchedFromThatSameRepositoryNotTheNext() {
+        // The bug this pairing exists to prevent: a version resolved on repository A but fetched from B, which a
+        // "Local Central" cache next to real Central would not necessarily agree with.
+        FakeRepository resolvesButFailsToFetch = new FakeRepository(
+                Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka:4.6.5", "gone from this repository")));
+        FakeRepository second = new FakeRepository(
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")));
+        Loader.LoadOptions options = new Loader.LoadOptions(
+                httpThatMustNotReachTheNetwork(), null, List.of(resolvesButFailsToFetch, second));
+
+        Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
+
+        // The first repository's own docs failure is the one that surfaces, not a resolve retried on the second.
+        Assert.assertFalse(loaded.isOk());
+        Assert.assertTrue(loaded.failure() instanceof Failure.PackageNotFound);
+        Assert.assertEquals(second.resolveCalls, 1, "the second repository still gets its own attempt");
+        Assert.assertEquals(second.fetchCalls, 0, "the second repository never resolved, so it is never fetched");
     }
 }
