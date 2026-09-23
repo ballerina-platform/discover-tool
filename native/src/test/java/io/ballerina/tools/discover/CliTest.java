@@ -315,8 +315,8 @@ public class CliTest {
     @Test
     public void aBarePackageIsRejectedWithTheVerbItProbablyMeant() {
         // The deliberate departure from the Node CLI, which defaulted a leading package to `overview`. Under
-        // `bal`, `bal discover ballerinax/github` reads as a subcommand typo, so it is `validation` — and the suggestion
-        // hands back the exact command rather than making the caller read the usage block.
+        // `bal`, `bal discover ballerinax/github` reads as a subcommand typo, so it is `validation` — and the
+        // suggestion hands back the exact command rather than making the caller read the usage block.
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/github"), capture.streams(), never()), 1);
         Assert.assertEquals(capture.field("kind"), "validation");
@@ -575,7 +575,8 @@ public class CliTest {
         int exitCode = Cli.run(List.of("client", "ballerinax/googleapis.gmail"), capture.streams(),
                 centralFor("ballerinax__googleapis.gmail", "4.2.0"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        opensWith(capture.stdout(), "<!-- bal discover client v1 ·", "# Clients — ballerinax/googleapis.gmail `Client`");
+        opensWith(capture.stdout(), "<!-- bal discover client v1 ·",
+                "# Clients — ballerinax/googleapis.gmail `Client`");
     }
 
     @Test

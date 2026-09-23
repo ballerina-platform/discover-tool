@@ -86,7 +86,12 @@ public final class Closure {
     private Closure() {
     }
 
-    /** One reference to a declaration in another package, as written. */
+    /**
+     * One reference to a declaration in another package, as written.
+     *
+     * @param prefix the module alias it was written under
+     * @param name the declaration's name
+     */
     public record ExternalRef(String prefix, String name) { }
 
     /**
@@ -150,7 +155,12 @@ public final class Closure {
         return new Result(List.copyOf(order), List.copyOf(omitted));
     }
 
-    /** One entry of the walk, carrying how far from a root it was reached. */
+    /**
+     * One entry of the walk, carrying how far from a root it was reached.
+     *
+     * @param name the declaration reached
+     * @param depth how many steps from a root it took to reach it
+     */
     private record Step(String name, int depth) { }
 
     private static int cost(String name, Declarations index) {
@@ -236,7 +246,12 @@ public final class Closure {
         return List.copyOf(types);
     }
 
-    /** An expression's identifiers, split into same-package names and foreign ones. */
+    /**
+     * An expression's identifiers, split into same-package names and foreign ones.
+     *
+     * @param local the identifiers that name a declaration in this package
+     * @param external the identifiers that name a declaration in another package
+     */
     public record Partition(List<String> local, List<ExternalRef> external) { }
 
     /**

@@ -37,6 +37,7 @@ import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.DoubleSupplier;
 import java.util.regex.Pattern;
@@ -274,7 +275,11 @@ public final class DiskCache implements DocsCache {
         }
         Path temp = tempPathFor(target);
         try {
-            createDirectories(target.getParent(), mode);
+            Path parent = target.getParent();
+            if (parent == null) {
+                return;
+            }
+            createDirectories(parent, mode);
             Files.writeString(temp, contents, StandardCharsets.UTF_8);
             restrict(temp);
             move(temp, target);
@@ -399,7 +404,9 @@ public final class DiskCache implements DocsCache {
         }
         try (Stream<Path> entries = Files.list(directory)) {
             List<String> versions = new ArrayList<>();
-            entries.map(path -> path.getFileName().toString())
+            entries.map(Path::getFileName)
+                    .filter(Objects::nonNull)
+                    .map(Path::toString)
                     .filter(file -> file.endsWith(".json"))
                     .map(file -> file.substring(0, file.length() - ".json".length()))
                     .forEach(versions::add);

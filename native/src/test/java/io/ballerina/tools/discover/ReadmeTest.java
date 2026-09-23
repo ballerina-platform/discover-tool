@@ -46,7 +46,12 @@ public class ReadmeTest {
         return FixtureCorpus.fixtureRows();
     }
 
-    /** One module of an assembled payload. A {@code null} guide means the key is absent entirely. */
+    /**
+     * One module of an assembled payload. A {@code null} guide means the key is absent entirely.
+     *
+     * @param id the module's name
+     * @param guide the module's readme, or {@code null} to omit the key entirely
+     */
     private record Stub(String id, String guide) { }
 
     /**

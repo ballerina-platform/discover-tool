@@ -50,7 +50,12 @@ import java.util.regex.Pattern;
 public record PathTree(
         String segment, boolean isParam, List<Operation> operations, List<PathTree> children, int total) {
 
-    /** A resource function plus its path in the display spelling the tree navigates by. */
+    /**
+     * A resource function plus its path in the display spelling the tree navigates by.
+     *
+     * @param fn the resource function
+     * @param segments its path, in display spelling
+     */
     public record Operation(Fn.Resource fn, List<String> segments) { }
 
     /** How a requested path resolved against the tree. */
@@ -66,6 +71,10 @@ public record PathTree(
          * nothing in the header to say so. The level view already had this discipline for auto-descent —
          * "the skipping cannot be silent" — and the wildcard, which is the idiom the README recommends, did
          * not.
+         *
+         * @param node the tree node the path resolved to
+         * @param path the resolved path, in display spelling
+         * @param alsoMatched the branches a wildcard token matched and did not take
          */
         record Found(PathTree node, List<String> path, List<Descent.Sibling> alsoMatched)
                 implements Resolution { }
@@ -75,6 +84,10 @@ public record PathTree(
          *
          * <p>Carries the child NODES rather than their names, because recovery advice has to know whether a
          * child is a path parameter to offer an example from the tree the caller is actually navigating.
+         *
+         * @param matched the prefix that did resolve, in display spelling
+         * @param token the token that matched nothing
+         * @param children what was there instead
          */
         record Missing(List<String> matched, String token, List<PathTree> children) implements Resolution {
 
@@ -85,7 +98,13 @@ public record PathTree(
         }
     }
 
-    /** Levels stepped through, the node landed on, and the sibling branches not taken at each. */
+    /**
+     * Levels stepped through, the node landed on, and the sibling branches not taken at each.
+     *
+     * @param node the tree node descended to
+     * @param path the path descended, in display spelling
+     * @param skipped the sibling branches not taken at each level
+     */
     public record Descent(PathTree node, List<String> path, List<Sibling> skipped) {
 
         public record Sibling(List<String> path, int total) { }

@@ -505,7 +505,11 @@ public final class Schema {
         }
     }
 
-    /** One nested shape's reader. */
+    /**
+     * One nested shape's reader.
+     *
+     * @param <T> the type it reads into
+     */
     private interface Nested<T> {
         T read(Cursor cursor, JsonObject json, String path);
     }

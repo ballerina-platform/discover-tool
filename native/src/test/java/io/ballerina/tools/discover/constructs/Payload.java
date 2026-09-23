@@ -48,7 +48,8 @@ import java.util.List;
  * fails the closed-record case by name and leaves the other fifty-odd alone, which is the property that
  * makes the fidelity register's stages safe to land one at a time.
  *
- * <p>The package is {@code test/pkg} rather than a real name so that no per-package patch applies. Cases that exist to test a patch name the package the patch keys on.
+ * <p>The package is {@code test/pkg} rather than a real name so that no per-package patch applies. Cases
+ * that exist to test a patch name the package the patch keys on.
  *
  * @since 0.1.0
  */

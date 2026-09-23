@@ -50,7 +50,13 @@ public class DiscoverToolTest {
     private static final Path COMMAND_OUTPUTS =
             Path.of("src", "test", "resources", "command-outputs", "unix");
 
-    /** The tool driven the way {@code bal} drives it: through picocli, into the raw argument list. */
+    /**
+     * The tool driven the way {@code bal} drives it: through picocli, into the raw argument list.
+     *
+     * @param exitCode the code the run finished with
+     * @param stdout everything written to stdout
+     * @param stderr everything written to stderr
+     */
     private record Run(int exitCode, String stdout, String stderr) { }
 
     private static Run run(String... argv) {
@@ -126,8 +132,9 @@ public class DiscoverToolTest {
     /**
      * The grammar and the text that describes it cannot disagree, because one renders the other.
      *
-     * <p>This is the drift closed by rendering both from one model, and it had already happened: the hand-written synopsis advertised
-     * {@code --client C} while the flag list two paragraphs below it — and all five verb texts — said
+     * <p>This is the drift closed by rendering both from one model, and it had already happened: the
+     * hand-written synopsis advertised {@code --client C} while the flag list two paragraphs below it —
+     * and all five verb texts — said
      * {@code --client <Name>}. Nothing failed, because nothing compared them.
      */
     @Test

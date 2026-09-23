@@ -26,6 +26,8 @@ package io.ballerina.tools.discover.model;
  * it {@code ()} — so twelve of http's declarations named a type the compiler does not have. Saying nothing is
  * both correct and what the source says: a function with no return has no clause.
  *
+ * @param type the returned type, or empty for "returns nothing"
+ * @param description the return's own documentation, or {@code null} when Central published none
  * @since 0.1.0
  */
 public record ReturnDef(TypeRef type, String description) {

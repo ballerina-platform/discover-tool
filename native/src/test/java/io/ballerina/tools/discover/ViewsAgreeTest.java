@@ -188,8 +188,9 @@ public class ViewsAgreeTest {
     /**
      * A {@code -r} response is the code register, and its declarations are {@code renderTypeDef} exactly.
      *
-     * <p>The register is a property of the document, not the verb. A {@code -r} answer is reached through a container verb but is nothing but
-     * declarations, so it is pasteable whole — and every one of its lines is still a line of the API document.
+     * <p>The register is a property of the document, not the verb. A {@code -r} answer is reached through a
+     * container verb but is nothing but declarations, so it is pasteable whole — and every one of its lines
+     * is still a line of the API document.
      */
     @Test(dataProvider = "fixtures")
     public void everyLineAResolvedAnswerPrintsIsInTheApiSnapshotVerbatim(String slug) {

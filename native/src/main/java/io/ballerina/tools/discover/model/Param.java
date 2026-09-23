@@ -30,6 +30,12 @@ package io.ballerina.tools.discover.model;
  * <p>{@code unwritableDefault} is set by {@link Defaults} when the default expression names something the
  * document does not declare — {@code string serviceUrl = BASE_URL}, where {@code BASE_URL} is module-private.
  *
+ * @param name the parameter's name
+ * @param description the parameter's own documentation, verbatim
+ * @param type the parameter's declared type
+ * @param defaultValue the default, as source text, or {@code null} when the parameter is required
+ * @param form how the parameter is written
+ * @param unwritableDefault whether the default names something the document does not declare
  * @since 0.1.0
  */
 public record Param(

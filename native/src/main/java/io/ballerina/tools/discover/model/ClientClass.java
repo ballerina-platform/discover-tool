@@ -27,6 +27,10 @@ import java.util.List;
  * rather than decoration: a caller whose own function is {@code isolated} can only construct and call into an
  * isolated one, and the client class is the first thing they construct.
  *
+ * @param name the client class's name
+ * @param description the class's own documentation, verbatim
+ * @param isIsolated whether Central declared the class {@code isolated}
+ * @param functions everything callable on the client
  * @since 0.1.0
  */
 public record ClientClass(String name, String description, boolean isIsolated, List<Fn> functions) {

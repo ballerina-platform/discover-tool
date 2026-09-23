@@ -49,6 +49,7 @@ public final class Loader {
      * <p>There is no {@code version} field and no way for a caller to supply one. That is the design: version
      * resolution is INTERNAL (§3.8), and the only input to it is which project the process is standing in.
      *
+     * @param http the transport options to fetch and cache through
      * @param projectDir the Ballerina project the lookup is running inside, or {@code null} when it is not in one
      */
     public record LoadOptions(HttpOptions http, String projectDir) {

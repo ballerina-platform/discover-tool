@@ -59,6 +59,7 @@ public final class Filter {
     /**
      * What a query selected: the entries whose SURFACE matched, and the ones only their prose did.
      *
+     * @param <T> the kind of entry being split
      * @param surface rendered at whatever tier the budget allows
      * @param documented named, never rendered
      */
@@ -104,8 +105,9 @@ public final class Filter {
      *
      * <p>THE SLASH IS WHY {@code -s} DID NOT MATCH PATHS. A resource function's searchable text joins its
      * segments with spaces ({@code get repos &#123;owner&#125; &#123;repo&#125; issues}), so a query containing
-     * {@code /} could never be a substring of it. Measured: {@code -s "repos/&#123;owner&#125;/&#123;repo&#125;/issues"}
-     * matched nothing on a client declaring 903 resource functions, while the identical string resolved as a
+     * {@code /} could never be a substring of it. Measured:
+     * {@code -s "repos/&#123;owner&#125;/&#123;repo&#125;/issues"} matched nothing on a client declaring 903
+     * resource functions, while the identical string resolved as a
      * positional selector — and the flag's own description had claimed path matching all along.
      *
      * <p>Splitting keeps the flag's existing meaning rather than bolting a second one on: every token must

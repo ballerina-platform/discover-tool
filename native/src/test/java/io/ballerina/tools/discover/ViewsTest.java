@@ -803,8 +803,9 @@ public class ViewsTest {
     /**
      * {@code -s} matches a PATH, which its own flag description has always claimed and it never did.
      *
-     * <p>Measured on a real run: {@code client ballerinax/github Client -s "repos/&#123;owner&#125;/&#123;repo&#125;/issues"}
-     * matched nothing on a client declaring 903 resource functions, and the agent fell back to the bare noun —
+     * <p>Measured on a real run:
+     * {@code client ballerinax/github Client -s "repos/&#123;owner&#125;/&#123;repo&#125;/issues"} matched
+     * nothing on a client declaring 903 resource functions, and the agent fell back to the bare noun —
      * one wasted turn. The same string works perfectly as a POSITIONAL selector, so the failure was purely in
      * the filter.
      *

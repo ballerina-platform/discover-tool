@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * {@code type <pkg> [<Name>...] [-s <q>] [-r]} — declarations, addressed by name or by search.
+ * {@code type <pkg> [<Name>...] [-s &lt;q&gt;] [-r]} — declarations, addressed by name or by search.
  *
  * <p>The CODE register: nothing but real declarations and the tool's own {@code //} annotations. This is the verb
  * that replaces the grep-then-sed loop, and it replaces it by removing the thing being navigated rather than by

@@ -23,6 +23,11 @@ import java.util.List;
 /**
  * One package Central's registry search returned.
  *
+ * @param org the package's organization
+ * @param name the package's name
+ * @param version the package's version
+ * @param summary the package's one-line summary
+ * @param keywords the package's own keywords
  * @param pullCount how many times the package has been pulled; the reader re-ranks on it
  * @since 0.1.0
  */
@@ -33,6 +38,11 @@ public record SearchHit(
         return org + "/" + name;
     }
 
-    /** The whole answer, so the report can say how much of Central's index it is showing. */
+    /**
+     * The whole answer, so the report can say how much of Central's index it is showing.
+     *
+     * @param hits the matching packages, already ranked
+     * @param total how many packages matched, before any page limit was applied
+     */
     public record Results(List<SearchHit> hits, int total) { }
 }

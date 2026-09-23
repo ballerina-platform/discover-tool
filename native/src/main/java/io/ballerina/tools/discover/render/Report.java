@@ -68,7 +68,12 @@ public final class Report {
         blocks.add("<!-- bal discover " + verb + " " + REPORT_FORMAT + " -->");
     }
 
-    /** A left-hand label and its value, for {@link #facts}. */
+    /**
+     * A left-hand label and its value, for {@link #facts}.
+     *
+     * @param label the left-hand text
+     * @param value the right-hand text
+     */
     public record Fact(String label, String value) { }
 
     /**

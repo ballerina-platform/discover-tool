@@ -36,7 +36,13 @@ public interface HttpTransport {
     /** What one attempt produced. */
     sealed interface Reply {
 
-        /** Central answered. {@code retryAfter} is the raw header, or {@code null}. */
+        /**
+         * Central answered. {@code retryAfter} is the raw header, or {@code null}.
+         *
+         * @param status the HTTP status Central answered with
+         * @param body the response body
+         * @param retryAfter the raw {@code Retry-After} header, or {@code null}
+         */
         record Answered(int status, String body, String retryAfter) implements Reply {
 
             public Answered(int status, String body) {
@@ -51,7 +57,11 @@ public interface HttpTransport {
         /** The attempt ran out of time. */
         record TimedOut() implements Reply { }
 
-        /** The request never produced a response — DNS, TLS, a refused connection. */
+        /**
+         * The request never produced a response — DNS, TLS, a refused connection.
+         *
+         * @param message what the transport said
+         */
         record Failed(String message) implements Reply { }
     }
 }

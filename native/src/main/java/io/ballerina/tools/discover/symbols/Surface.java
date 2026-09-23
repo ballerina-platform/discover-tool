@@ -88,6 +88,7 @@ public final class Surface {
      *
      * @param name the declaration's name, or empty for the module's own functions
      * @param scope which verb addresses it
+     * @param description the declaration's own documentation, verbatim
      * @param functions everything callable on it, in the package's own order
      */
     public record Container(String name, Scope scope, String description, List<Fn> functions) {
