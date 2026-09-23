@@ -48,9 +48,9 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
-    public void anEmptyBucketListRendersAsAnEmptyLineAndAnEmptyArray() {
+    public void anEmptyBucketListRendersAsNoneInTextAndAnEmptyArrayInJson() {
         DiscoverResult result = new DiscoverResult.BucketList(List.of());
-        Assert.assertEquals(TextRenderer.render(result), "");
+        Assert.assertEquals(TextRenderer.render(result), "none");
         Assert.assertEquals(JsonRenderer.render(result), "{\"buckets\":[]}");
     }
 
