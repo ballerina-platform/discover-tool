@@ -1013,11 +1013,14 @@ public final class Containers {
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<Entry> callable,
             Options options, String note) {
         String pkg = loaded.qualified().qualified();
-        String command = "bal discover " + pkg + " " + scope.verb() + containerArgument(container);
+        // A filtered listing pages against the SAME filter — never dropped from `next`, or paging would
+        // silently widen back out to the container's full, unfiltered roster.
+        String command = "bal discover " + pkg + " " + scope.verb() + containerArgument(container)
+                + (options.filtered() ? " --filter \"" + Texts.plain(options.filter()) + "\"" : "");
         List<String> names = callable.stream().map(Entry::label).sorted(Texts.LOCALE_ORDER).toList();
         int total = names.size();
 
-        if (options.filtered() || total <= MAX_ENTRIES) {
+        if (total <= MAX_ENTRIES) {
             return Answer.structured(
                     new DiscoverResult.MethodList(names, total, total, null, loaded.warning(), note));
         }
