@@ -1116,11 +1116,11 @@ public final class Containers {
 
     private static List<PathGroup> groupsUnder(PathTree node, List<String> prefix) {
         Map<String, List<PathTree>> byLiteralChild = new LinkedHashMap<>();
-        collectNextLiteralChildren(node, byLiteralChild);
+        int terminalHere = collectNextLiteralChildren(node, byLiteralChild);
 
         List<PathGroup> groups = new ArrayList<>();
-        if (!node.operations().isEmpty()) {
-            groups.add(new PathGroup(prefix.isEmpty() ? "." : String.join("/", prefix), node.operations().size()));
+        if (terminalHere > 0) {
+            groups.add(new PathGroup(prefix.isEmpty() ? "." : String.join("/", prefix), terminalHere));
         }
         byLiteralChild.forEach((literal, children) -> {
             List<String> path = new ArrayList<>(prefix);
@@ -1133,14 +1133,23 @@ public final class Containers {
         return groups;
     }
 
-    private static void collectNextLiteralChildren(PathTree node, Map<String, List<PathTree>> into) {
+    /**
+     * Literal children into {@code into}, keyed by their own segment; a running count of operations that
+     * terminate transparently through {@code node} and every purely-parameter level walked through to reach
+     * them, returned rather than collected — a parameter node can carry its own terminal operations AND further
+     * literal children at once (github's {@code repos/:owner/:repo} declares get/update/delete of the repo
+     * itself alongside 63 literal children like {@code issues}), and both have to survive the same walk.
+     */
+    private static int collectNextLiteralChildren(PathTree node, Map<String, List<PathTree>> into) {
+        int terminal = node.operations().size();
         for (PathTree child : node.children()) {
             if (child.isParam()) {
-                collectNextLiteralChildren(child, into);
+                terminal += collectNextLiteralChildren(child, into);
             } else {
                 into.computeIfAbsent(child.segment(), key -> new ArrayList<>()).add(child);
             }
         }
+        return terminal;
     }
 
     private static String pathArgument(List<String> prefix) {
