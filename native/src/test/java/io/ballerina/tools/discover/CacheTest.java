@@ -447,7 +447,8 @@ public class CacheTest {
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
         // A bucket, not the bare package: the warning row is a fact of the Markdown documents `Containers`
-        // still renders, which is unaffected by the bare package's move onto the JSON/text result IR.
+        // still renders, which is unaffected by the bare package's move onto the JSON/text result IR — see
+        // aBarePackageWarningFlowsThroughBothRenderers below for that path.
         Cli.run(List.of(PKG, "client"), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
@@ -492,6 +493,38 @@ public class CacheTest {
         Assert.assertEquals(exitCode, 0);
         Assert.assertTrue(capture.stdout().contains("\n| Warning | the registry was unreachable, so this "
                 + "version came off disk unchecked |\n"));
+    }
+
+    @Test
+    public void aBarePackageWarningFlowsThroughBothRenderers() {
+        // The bare package's own path, this time: a stale cache plus a dead registry, threaded through
+        // `Cli.bucketList` and out through both `JsonRenderer` and `TextRenderer`, not the hand-built
+        // `DiscoverResult` the renderer unit tests use.
+        Path root = freshRoot();
+        DocsCache cache = cacheAt(root);
+        long[] now = {1_000_000};
+        Cli.run(List.of(PKG), new Capture().streams(),
+                options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
+
+        now[0] += CentralClient.LATEST_TTL_MS * 2;
+        HttpTransport blip = FakeTransport.routing(url -> {
+            Assert.assertFalse(url.contains("/docs/"), "the docs must come off disk, not the network");
+            return FakeTransport.status(503);
+        });
+
+        Capture json = new Capture();
+        int jsonExit = Cli.run(List.of(PKG), json.streams(),
+                options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
+        Assert.assertEquals(jsonExit, 0);
+        Assert.assertTrue(json.stdout().contains(
+                "\"warning\":\"the registry was unreachable, so this version came off disk unchecked\""),
+                json.stdout());
+
+        Capture text = new Capture();
+        int textExit = Cli.run(List.of(PKG, "--output", "text"), text.streams(),
+                options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
+        Assert.assertEquals(textExit, 0);
+        Assert.assertTrue(text.stdout().startsWith("Warning: the registry was unreachable"), text.stdout());
     }
 
     @Test
