@@ -161,22 +161,51 @@ public class PackageRepositoryTest {
     @Test
     public void aVersionResolvedOnOneRepositoryIsFetchedFromThatSameRepositoryNotTheNext() {
         // The bug this pairing exists to prevent: a version resolved on repository A but fetched from B, which a
-        // "Local Central" cache next to real Central would not necessarily agree with.
+        // "Local Central" cache next to real Central would not necessarily agree with. `second` fails too, so
+        // `tryEachRepository`'s documented last-wins policy makes ITS failure the one that surfaces — the pairing
+        // itself is what `resolvesButFailsToFetch.fetchCalls` below actually pins down.
         FakeRepository resolvesButFailsToFetch = new FakeRepository(
                 Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka:4.6.5", "gone from this repository")));
         FakeRepository second = new FakeRepository(
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "second repository has no answer")),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")));
         Loader.LoadOptions options = new Loader.LoadOptions(
                 httpThatMustNotReachTheNetwork(), null, List.of(resolvesButFailsToFetch, second));
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
-        // The first repository's own docs failure is the one that surfaces, not a resolve retried on the second.
         Assert.assertFalse(loaded.isOk());
         Assert.assertTrue(loaded.failure() instanceof Failure.PackageNotFound);
+        Assert.assertEquals(((Failure.PackageNotFound) loaded.failure()).suggestion(),
+                "second repository has no answer", "last-wins means the second repository's own failure surfaces");
+        Assert.assertEquals(resolvesButFailsToFetch.fetchCalls, 1,
+                "the version it resolved must be fetched from itself, not left unfetched");
         Assert.assertEquals(second.resolveCalls, 1, "the second repository still gets its own attempt");
         Assert.assertEquals(second.fetchCalls, 0, "the second repository never resolved, so it is never fetched");
+    }
+
+    @Test
+    public void aModuleMismatchOnAnAnsweringRepositoryIsNotRetriedAgainstTheNext() {
+        // The other half of the seam: a repository that resolves and fetches successfully but does not contain
+        // the requested module has ANSWERED, not failed to find the package — every repository serving the same
+        // immutable version would disagree with the caller the same way, so trying `second` at all would only
+        // risk `tryEachRepository`'s last-wins policy burying this failure under an unrelated one.
+        FakeRepository answersButWrongModule = new FakeRepository(
+                Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
+                Result.ok(FixtureCorpus.loadFixture(SLUG)));
+        FakeRepository second = new FakeRepository(
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")));
+        Loader.LoadOptions options = new Loader.LoadOptions(
+                httpThatMustNotReachTheNetwork(), null, List.of(answersButWrongModule, second));
+
+        Result<LoadedPackage> loaded = Loader.loadPackage(QualifiedName.parse("ballerinax/nosuchmodule").value(),
+                options);
+
+        Assert.assertFalse(loaded.isOk());
+        Assert.assertTrue(loaded.failure() instanceof Failure.SchemaDrift);
+        Assert.assertEquals(second.resolveCalls, 0, "a module mismatch must not trigger fallback to a repository");
+        Assert.assertEquals(second.fetchCalls, 0);
     }
 }

@@ -157,6 +157,12 @@ public final class Loader {
      *
      * <p>A locked {@code Dependencies.toml} version is the one exception: it names no repository, so every
      * repository is tried in order to serve THAT version, rather than resolve deciding which one wins.
+     *
+     * <p>Module selection happens exactly once, after some repository has actually answered — never inside the
+     * per-repository retry. A repository that has nothing for this package is a routine fallback case, but a
+     * repository that answered with a package that just doesn't contain the requested module is not: every
+     * repository serving the same immutable version would disagree with the caller the same way, so retrying
+     * the rest would only risk burying that specific failure under an unrelated one from a later repository.
      */
     public static Result<LoadedPackage> loadPackage(QualifiedName qualified, LoadOptions options) {
         if (options.projectDir() != null) {
@@ -166,25 +172,28 @@ public final class Loader {
                 if (!resolved.isOk()) {
                     return resolved.cast();
                 }
-                return tryEachRepository(options.repositories(),
-                        repository -> assemble(qualified, resolved.value(), repository, options));
+                Result<CentralDocs> docs = tryEachRepository(options.repositories(),
+                        repository -> repository.fetchDocs(qualified, resolved.value(), options.http()));
+                return docs.isOk() ? build(qualified, resolved.value(), docs.value()) : docs.cast();
             }
         }
-        return tryEachRepository(options.repositories(), repository -> {
+        Result<Fetched> fetched = tryEachRepository(options.repositories(), repository -> {
             Result<CentralClient.ResolvedVersion> resolved = repository.resolveVersion(qualified, options.http());
-            return resolved.isOk() ? assemble(qualified, resolved.value(), repository, options) : resolved.cast();
+            if (!resolved.isOk()) {
+                return resolved.cast();
+            }
+            Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved.value(), options.http());
+            return docs.isOk() ? Result.ok(new Fetched(resolved.value(), docs.value())) : docs.cast();
         });
+        return fetched.isOk() ? build(qualified, fetched.value().resolved(), fetched.value().docs())
+                : fetched.cast();
     }
 
-    private static Result<LoadedPackage> assemble(
-            QualifiedName qualified, CentralClient.ResolvedVersion resolved, PackageRepository repository,
-            LoadOptions options) {
-        Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved, options.http());
-        if (!docs.isOk()) {
-            return docs.cast();
-        }
+    private record Fetched(CentralClient.ResolvedVersion resolved, CentralDocs docs) { }
 
-        Result<CentralDocs.Module> module = FromCentral.selectModule(docs.value(), qualified);
+    private static Result<LoadedPackage> build(
+            QualifiedName qualified, CentralClient.ResolvedVersion resolved, CentralDocs docs) {
+        Result<CentralDocs.Module> module = FromCentral.selectModule(docs, qualified);
         if (!module.isOk()) {
             return module.cast();
         }
@@ -193,7 +202,7 @@ public final class Loader {
                 qualified,
                 resolved.version(),
                 Pipeline.build(module.value()),
-                Readmes.collect(docs.value()),
+                Readmes.collect(docs),
                 unverifiedWarning(resolved.stale())));
     }
 }
