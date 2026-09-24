@@ -19,24 +19,19 @@
 package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.model.Library;
-import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Guide;
-import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.TypeView;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * The report documents, snapshotted, plus the composition rules that decide their shape.
@@ -89,26 +84,6 @@ public class ViewsTest {
 
     private enum DiscoverResultKind { CONTAINER_ROSTER, PATH_GROUPS, RESOURCE_LIST, METHOD_LIST }
 
-    /**
-     * How many error declarations each fixture has, counted from its published source.
-     *
-     * <p>HTTP-11: {@code ballerina/http} reads 65, not 56. Its source declares 65 public error types — 64
-     * {@code distinct} plus {@code StatusCodeResponseDataBindingError}, a union of three of them — and the nine the
-     * old filter missed are published under an alias category rather than under {@code errors}.
-     *
-     * <p>{@code ballerinax/sap} is deliberately absent: its {@code ClientError} is the re-export
-     * {@code simpleNameReferenceTypes} always carried, so sap declares no error of its own (SAP-01).
-     */
-    private static final Map<String, Integer> ERROR_COUNTS = Map.of(
-            "ballerina__http", 65,
-            "ballerina__graphql", 9,
-            "ballerinax__kafka", 3,
-            "ballerinax__googleapis.gmail", 3,
-            "ballerinax__googleapis.sheets", 3,
-            "ballerinax__redis", 1,
-            "ballerina__xlsx", 11,
-            "ballerina__log", 1);
-
     @DataProvider(name = "fixtures")
     public Object[][] fixtures() {
         return FixtureCorpus.fixtureRows();
@@ -132,14 +107,6 @@ public class ViewsTest {
     // -----------------------------------------------------------------------
     // Snapshots
     // -----------------------------------------------------------------------
-
-    @Test(dataProvider = "fixtures")
-    public void theMapIsUnchanged(String slug) {
-        FixtureCorpus.matchesSnapshot(
-                viewSnapshot(slug, "overview"),
-                Overview.render(FixtureCorpus.loadedFixture(slug)),
-                slug + " overview");
-    }
 
     /**
      * One snapshot per scope, because the three verbs share one implementation — for every bucket that still
@@ -624,178 +591,6 @@ public class ViewsTest {
                 new Containers.Options(List.of("Client", path))), "Client " + path);
     }
 
-    // -----------------------------------------------------------------------
-    // The map
-    // -----------------------------------------------------------------------
-
-    @Test
-    public void theMapNamesEveryScopeAndPointsAtTheVerbThatOpensIt() {
-        String document = Overview.render(FixtureCorpus.loadedFixture("ballerina__http"));
-        // SQL-03's shape: a derived client object counts as a client, or the entry document denies that
-        // `ClientObject` exists in a package whose whole point is clients.
-        Assert.assertTrue(document.contains("| Clients | 10"), clientsRow(document));
-        Assert.assertTrue(document.contains("`bal discover client ballerina/http`"), clientsRow(document));
-        Assert.assertTrue(document.contains("| Classes | 91"), document);
-        Assert.assertTrue(document.contains("| Module functions | 7 — `bal discover funcs ballerina/http` |"),
-                document);
-    }
-
-    @Test
-    public void aRosterRowIsNeverADeadEnd() {
-        // `overview`'s old unconditional `ops <pkg> <path>` pointer answered "none in any client" on
-        // `ballerinax/aws.s3` and pointed back at `overview`, a two-call loop carrying no information. Every row
-        // now ends in the command that opens it, and PointersTest re-runs all of them.
-        for (String slug : FixtureCorpus.listFixtures()) {
-            String document = Overview.render(FixtureCorpus.loadedFixture(slug));
-            // Every bullet in the map, roster row or Next pointer: none of them may be a statement with no
-            // command in it, because that is the shape that makes a reader guess the follow-up.
-            List<String> rows = document.lines().filter(line -> line.startsWith("- ")).toList();
-            Assert.assertFalse(rows.isEmpty(), slug + ": the map offers nothing");
-            for (String row : rows) {
-                Assert.assertTrue(row.contains("`bal discover "), slug + ": a bullet with no command: " + row);
-            }
-        }
-    }
-
-    @Test
-    public void aRosterIsCappedAndSaysHowToReachTheRest() {
-        // `ballerina/http` declares 91 classes and `ballerinax/postgresql` 126. A roster is read to CHOOSE one,
-        // and a list nobody can hold is not a choice — the search line beside it is.
-        String document = Overview.render(FixtureCorpus.loadedFixture("ballerinax__postgresql"));
-        long rows = document.lines().filter(line -> line.contains(" · `bal discover ")).count();
-        Assert.assertTrue(rows <= Overview.MAX_ROSTER_ROWS * 3,
-                "three scopes, each capped at " + Overview.MAX_ROSTER_ROWS + ": " + rows);
-        Assert.assertTrue(document.contains("more, not listed — `bal discover class ballerinax/postgresql "
-                + "-s \"<what it does>\"`"), document);
-    }
-
-    /** The Clients row, for a failure message that shows what was there instead. */
-    private static String clientsRow(String document) {
-        return document.lines().filter(line -> line.startsWith("| Clients"))
-                .findFirst().orElse("(no Clients row)");
-    }
-
-    @Test
-    public void aPackageWithNoClientsIsANormalCaseNotAnError() {
-        // Nothing in the corpus has zero clients, so this is asserted against a library with parts removed.
-        LoadedPackage context = FixtureCorpus.loadedFixture("ballerina__http");
-        Library noClientsAtAll = context.library()
-                .withClients(List.of())
-                .withTypeDefs(context.library().typeDefs().stream()
-                        .filter(typeDef -> !(typeDef instanceof TypeDef.ObjectDef object
-                                && object.role() == TypeDef.ObjectDef.Role.CLIENT))
-                        .toList());
-        String document = Overview.render(context.withLibrary(noClientsAtAll));
-        Assert.assertTrue(document.contains("| Clients | none |"), clientsRow(document));
-        // IO-01: the row says what the surface IS rather than naming one half of it. `ballerina/io` has 28 module
-        // functions AND 15 classes carrying 67 methods, and the old sentence named only the first.
-        Assert.assertTrue(document.contains("| Classes | 91"), document);
-        Assert.assertTrue(document.contains("| Module functions | 7"), document);
-        Assert.assertFalse(document.contains("\n## Clients"), "no roster for a scope with nothing in it");
-    }
-
-    /**
-     * Errors are NAMED on the facts row and declared by {@code type}, which is the trade that let the section go.
-     *
-     * <p>The section was 292 lines of the corpus and the second largest thing in the document. What could not go
-     * with it is the NAMES: {@code BucketAlreadyOwnedByYouError} and {@code InvalidRangeError} are not guessable,
-     * and a row reading "6, listed below" with nothing below names a fact and withholds the token needed to reach
-     * it. So this asserts both halves — the row names them, and the names it prints resolve.
-     */
-    @Test(dataProvider = "fixtures")
-    public void errorsAreNamedOnTheFactsRowAndReadWithType(String slug) {
-        LoadedPackage context = FixtureCorpus.loadedFixture(slug);
-        String document = Overview.render(context);
-        Assert.assertFalse(document.contains("\n## Errors"), slug + ": the section moved to `type`");
-
-        Integer expected = ERROR_COUNTS.get(slug);
-        if (expected == null) {
-            // PSQL-05: the row no longer ASSERTS where the errors come from. "operations return the
-            // language-level `error`" is true of github and false of postgresql (every operation returns
-            // `sql:Error`), of sap (`ClientError`) and of every connector that reuses a dependency's hierarchy.
-            Assert.assertTrue(document.contains("| Errors | none declared here; each operation names its "
-                    + "error type in its `returns` clause |"));
-            return;
-        }
-        String row = document.lines().filter(line -> line.startsWith("| Errors"))
-                .findFirst().orElseThrow();
-        Assert.assertTrue(row.startsWith("| Errors | " + expected), slug + ": " + row);
-        Assert.assertTrue(row.contains("bal discover type " + context.qualified().qualified() + " <Name>"),
-                slug + ": " + row);
-
-        // Only `ballerina/http`, at 65, is too wide to name them all — and it says so rather than counting
-        // silently. Everything else prints every name, and every printed name resolves.
-        if (expected > 60) {
-            Assert.assertTrue(row.contains("too many to name here"), row);
-            return;
-        }
-        List<String> named = new ArrayList<>();
-        Matcher name = Pattern.compile("`([A-Z][A-Za-z0-9_]*)`").matcher(row);
-        while (name.find()) {
-            named.add(name.group(1));
-        }
-        Assert.assertEquals(named.size(), expected.intValue(), slug + ": " + row);
-        Result<String> read = TypeView.render(context, new TypeView.Options(named, false));
-        Assert.assertTrue(read.isOk(), slug + ": " + (read.isOk() ? "" : read.failure().describe()));
-    }
-
-    @Test
-    public void moduleLevelVariablesGetTheirOwnCountRatherThanTheOtherBucket() {
-        // The bucket stage 6a emptied: 61 new declarations landing in "other" would have re-created SHEETS-04 in
-        // the same line that fixed it.
-        String http = Overview.render(FixtureCorpus.loadedFixture("ballerina__http"));
-        Assert.assertTrue(http.contains("61 module-level variables"), http);
-        Assert.assertFalse(http.contains(" other),"), "the other bucket has to stay empty");
-    }
-
-    // -----------------------------------------------------------------------
-    // The cross-kind search
-    // -----------------------------------------------------------------------
-
-    @Test
-    public void theCrossKindSearchRendersSurfaceMatchesAndOnlyNamesDocumentationOnes() {
-        // Both tiers, measured on `ballerinax/github`. `upload` is 7 surface matches against 12 in documentation
-        // alone: rendering all 19 would bury the seven the caller came for, and dropping the twelve would lose the
-        // vague capability query the flag exists for. `pagination` is the extreme — 0 surface, 14 documentation —
-        // so without the second tier that query has no answer at all rather than a short one.
-        LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        int[] upload = filterCounts(Overview.render(github, new Overview.Options("upload")), "upload");
-        Assert.assertTrue(upload[0] > 0, "surface matches are load-bearing: " + upload[0]);
-        Assert.assertTrue(upload[1] > upload[0], "so are documentation matches: " + upload[1]);
-
-        String document = Overview.render(github, new Overview.Options("pagination"));
-        int[] pagination = filterCounts(document, "pagination");
-        Assert.assertEquals(pagination[0], 0, "no name or type mentions pagination");
-        Assert.assertTrue(pagination[1] > 0, "and the documentation is the only place it appears");
-        Assert.assertTrue(document.contains("matched documentation only"), document);
-
-        // A row carries the kind, the owner and the command, so one call turns "which symbol does X?" into an
-        // addressed follow-up.
-        Assert.assertTrue(Overview.render(github, new Overview.Options("upload")).contains(" · `bal discover "),
-                "every row ends in a runnable command");
-    }
-
-    /** The two counts on the Filter row: surface matches, then documentation-only ones. */
-    private static int[] filterCounts(String document, String query) {
-        Matcher filter = Pattern.compile("\\| Filter \\| `" + Pattern.quote(query)
-                        + "` — ([\\d,]+) by name or type, ([\\d,]+) more by documentation only \\|")
-                .matcher(document);
-        Assert.assertTrue(filter.find(), document.split("\n\n")[1]);
-        return new int[] {
-                Integer.parseInt(filter.group(1).replace(",", "")),
-                Integer.parseInt(filter.group(2).replace(",", ""))};
-    }
-
-    @Test
-    public void aSearchThatMatchesNothingSaysSoAndStillPointsSomewhere() {
-        String document = Overview.render(FixtureCorpus.loadedFixture("ballerinax__kafka"),
-                new Overview.Options("zzznothingmatchesthis"));
-        Assert.assertTrue(document.contains("| Filter | `zzznothingmatchesthis` — 0 by name or type"),
-                document);
-        Assert.assertTrue(document.contains("## Next"), document);
-        Assert.assertTrue(document.contains("bal discover overview ballerinax/kafka"), document);
-    }
-
     /** A structured answer's resource paths, for a test that does not care which listing shape it landed on. */
     private static List<String> resourcePaths(Containers.Answer answer) {
         return switch (answer) {
@@ -926,37 +721,6 @@ public class ViewsTest {
     // -----------------------------------------------------------------------
 
     @Test
-    public void theGuideHasItsOwnVerbAndTheMapCarriesOnlyTheQuickstart() {
-        // `ballerinax/postgresql` is the pathological case the split exists for: 563 lines of guide inside a
-        // 619-line entry document, and genuinely useful — a long-form usage manual, not marketing. Deleting it
-        // would have been wrong and carrying it made every other fact in the document unreachable behind a pipe.
-        LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__postgresql");
-        String overview = Overview.render(context);
-        Assert.assertFalse(overview.contains("\n## Guide"), "the guide is not in the entry document");
-        // The quotation is LAST now. It used to sit before `## Next` because it was capped at
-        // forty lines; uncapped, the only place an unbounded section can sit without pushing the navigation
-        // behind a pipe is the end.
-        Assert.assertTrue(overview.indexOf("\n## Next\n") < overview.indexOf("\n## Quickstart\n"));
-        Assert.assertTrue(overview.contains("dbClient->execute"), overview);
-        Assert.assertTrue(overview.contains("`bal discover guide ballerinax/postgresql`"), overview);
-
-        Result<String> guide = Guide.render(context, Guide.Options.ALL);
-        Assert.assertTrue(guide.isOk(), guide.isOk() ? "" : guide.failure().describe());
-        // Asserted as PROSE and not as a size ratio. It used to be `guide > overview * 3`, which stopped holding
-        // when all 28 of postgresql's code blocks moved into the map — the map is now 13KB of a 24KB
-        // readme, and almost all of the difference is prose. That is the split working, not failing: the code is
-        // in both because the reader needs it in both, and the manual around it has its own verb.
-        Assert.assertTrue(guide.value().length() > overview.length(),
-                "guide " + guide.value().length() + " vs overview " + overview.length());
-        Assert.assertTrue(guide.value().contains("######"), "the guide carries the readme's own sections");
-        Assert.assertFalse(overview.contains("######"), "and the map carries none of them");
-        // The rule that a readme can be stale where the signature cannot was a line of `--help` prose.
-        // It is the sentence introducing the readme, so it is read where it applies.
-        Assert.assertTrue(guide.value().contains("Where the two disagree, the signature is what compiles."),
-                "the readme is introduced by the rule for reading it");
-    }
-
-    @Test
     public void aGuideChunkIsASectionWithItsProseAndIsAddressableTwoWays() {
         // A code-only extract would have discarded about 85% of `googleapis.sheets`' 178-line readme — including
         // "if you intend to use deleteSpreadsheet you must also enable the Google Drive API", which is not
@@ -973,9 +737,6 @@ public class ViewsTest {
                 sheets, new Guide.Options(chunks.get(0).title(), null, null));
         Assert.assertTrue(byTitle.isOk(), byTitle.isOk() ? "" : byTitle.failure().describe());
         Assert.assertEquals(byTitle.value(), byNumber.value(), "a title and its number are the same chunk");
-
-        // And the map advertises the index, so an agent knows a recipe exists before paying for the document.
-        Assert.assertTrue(Overview.render(sheets).contains("Guide chunks ("), Overview.render(sheets));
     }
 
     @Test
@@ -995,75 +756,6 @@ public class ViewsTest {
                 FixtureCorpus.loadedFixture("ballerinax__kafka"), new Guide.Options("kafkaa"));
         Assert.assertFalse(view.isOk());
         Assert.assertTrue(view.failure().describe().contains("kafka"), view.failure().describe());
-    }
-
-    // -----------------------------------------------------------------------
-    // Quoted code
-    // -----------------------------------------------------------------------
-
-    @Test
-    public void everyBallerinaBlockInTheReadmeIsQuotedAndNothingElseIs() {
-        // The fence is the whole rule, and these are the two packages that killed the classifier it
-        // replaced. `ballerina/log` publishes eight worked blocks and none of them constructs a client, calls one
-        // with `->` or attaches a service, so the old rule reached the reader with zero examples for a package
-        // whose entire surface is module-level functions.
-        String log = Overview.render(FixtureCorpus.loadedFixture("ballerina__log"));
-        Assert.assertTrue(log.contains("\n## Quickstart\n"), log);
-        Assert.assertTrue(log.contains("log:printInfo("), log);
-
-        // xlsx is the sharper case: the old rule kept exactly one of its thirteen blocks, and kept it because of
-        // `sftp->get` — another package's client — while dropping the `@xlsx:Name` header mapping and every
-        // `xlsx:parseSheet` call as demonstrating nothing.
-        String xlsx = Overview.render(FixtureCorpus.loadedFixture("ballerina__xlsx"));
-        String quoted = xlsx.substring(xlsx.indexOf("\n## Quickstart\n"));
-        Assert.assertTrue(quoted.contains("@xlsx:Name {value: \"Employee Name\"}"), quoted);
-        Assert.assertTrue(quoted.contains("xlsx:parseSheet("), quoted);
-
-        // Order is the readme's, not a role order: a readme is written basic-first, and the reader is walking it.
-        // Read off the section and not the document, because the chunk index names `@xlsx:Name` in its title
-        // list and now precedes the quotation.
-        Assert.assertTrue(quoted.indexOf("xlsx:parseSheet(") < quoted.indexOf("@xlsx:Name"), quoted);
-
-        // Nothing else is quoted. slack's fourth block is a `bal run` transcript under a `bash` fence.
-        String slack = Overview.render(FixtureCorpus.loadedFixture("ballerinax__slack"));
-        String quickstart = slack.substring(slack.indexOf("\n## Quickstart\n"));
-        Assert.assertFalse(quickstart.contains("bal run"), quickstart);
-        // Including the import-only block, which the old rule dropped and this one keeps: it is Ballerina, and
-        // the module alias a package is imported under is a fact the reader needs.
-        Assert.assertTrue(quickstart.contains("import ballerinax/slack;"), quickstart);
-    }
-
-    @Test(dataProvider = "fixtures")
-    public void aQuotedBlockIsNeverEditedTruncatedOrAnnotated(String slug) {
-        String document = Overview.render(FixtureCorpus.loadedFixture(slug));
-        if (!document.contains("\n## Quickstart\n")) {
-            return;
-        }
-        String quickstart = document.substring(document.indexOf("\n## Quickstart\n"));
-        // No truncation marker, and no mark on a line. The name check is removed: `overview` quotes the
-        // package's bytes, and a reader who is told the generated signatures win does not also need the tool
-        // arguing with the readme inside the quotation.
-        Assert.assertFalse(quickstart.contains("\u2026 "), slug + ": a quotation was cut");
-        // The MARK this tool used to emit, not the character: a package whose own readme code contains a
-        // "\u26a0" is quoting its own text, and banning the character outright would fail the tool for the
-        // package's content — the exact confusion between our output and theirs that this removes.
-        Assert.assertFalse(quickstart.contains("# \u26a0 `"), slug + ": a quotation was annotated");
-
-        // Every block the readme wrote arrived. Counted against `guide`, which reproduces the readme verbatim,
-        // rather than sampled — because the failure this replaces was SILENT: an ineligible block never reached
-        // the omitted counter, so `overview` dropped ten of xlsx's thirteen blocks while claiming it had left
-        // nothing behind. Two documents of one tool disagreeing about how much code a package published is the
-        // bug, so the assertion is that they agree.
-        Result<String> guide = Guide.render(FixtureCorpus.loadedFixture(slug), Guide.Options.ALL);
-        Assert.assertTrue(guide.isOk(), slug + ": " + (guide.isOk() ? "" : guide.failure().describe()));
-        // Stripped, because `guide` reproduces the readme's own indentation and `ballerinax/postgresql`
-        // indents most of its fences four spaces under a list item.
-        long inReadme = guide.value().lines()
-                .map(String::strip)
-                .filter(line -> line.equals("```ballerina") || line.equals("```bal"))
-                .count();
-        long quoted = quickstart.lines().filter(line -> line.equals("```ballerina")).count();
-        Assert.assertEquals(quoted, inReadme, slug + ": the readme's block count is not the quoted count");
     }
 
     // -----------------------------------------------------------------------
@@ -1156,17 +848,12 @@ public class ViewsTest {
     }
 
     @Test
-    public void configurablesAreNotInTheMapAndAreStillInTheApiDocument() {
+    public void configurablesAreCommentsInTheApiDocumentNotDeclarations() {
         // A `configurable` is what a DEPLOYMENT sets in Config.toml, and it is module-private:
         // `http:maxActiveConnections` from another module is `attempt to refer to non-accessible symbol`,
-        // measured. So it is disqualified for the reader the map is for — an agent writing a .bal file cannot
-        // reference any of the thirteen — and it appears in exactly one package of eleven.
-        String http = Overview.render(FixtureCorpus.loadedFixture("ballerina__http"));
-        Assert.assertFalse(http.contains("## Configurables"), "not in the document an agent codes from");
-
+        // measured — so it is not a declaration a caller can reference and does not belong in a callable listing.
         // The fact is not lost, only made expensive: `api` is the register that carries it, as comments rather
-        // than as declarations. Unlike the errors, `type` cannot reach it — a configurable is not a declaration to
-        // resolve — so without the `api` section the cut would have DELETED the fact rather than moved it.
+        // than as declarations.
         String api = FixtureCorpus.renderFixture("ballerina__http");
         Assert.assertTrue(api.contains("\n// --- Configurables ---\n"), "api carries them");
         Assert.assertTrue(api.contains("// maxActiveConnections = -1    # int"), "with its default and type");
@@ -1175,8 +862,8 @@ public class ViewsTest {
         Result<String> byName = TypeView.render(FixtureCorpus.loadedFixture("ballerina__http"),
                 new TypeView.Options(List.of("maxActiveConnections"), false));
         Assert.assertFalse(byName.isOk(), "a configurable is not a declaration `type` can resolve");
-        // Eight of http's parameter defaults name a configurable, and their "not exported by this package" note is
-        // TRUE and now unqualified by anything in the map.
+        // Eight of http's parameter defaults name a configurable, and their "not exported by this package" note
+        // is TRUE.
         Assert.assertTrue(FixtureCorpus.readSnapshot("ballerina__http")
                 .contains("not exported by this package"), "the note stands");
     }

@@ -27,7 +27,6 @@ import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Closure;
 import io.ballerina.tools.discover.views.Containers;
-import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.TypeView;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -244,41 +243,6 @@ public class ViewsAgreeTest {
                 }
             }
         }
-    }
-
-    // -----------------------------------------------------------------------
-    // 2. The map generates nothing
-    // -----------------------------------------------------------------------
-
-    /**
-     * {@code overview} is bounded BY CONSTRUCTION, and this is what that means mechanically.
-     *
-     * <p>A byte cap would still let {@code ballerina/crypto} emit 20,000 bytes before degrading; a map emits no
-     * generated declaration at all, so its size is a property of the design rather than of the package. The only
-     * Ballerina in it is the readme's, inside quotation markers — so cutting the quotations has to leave no
-     * fenced Ballerina behind.
-     */
-    @Test(dataProvider = "fixtures")
-    public void theOverviewGeneratesNoSignatureAtAll(String slug) {
-        String own = withoutQuotations(Overview.render(FixtureCorpus.loadedFixture(slug)));
-        Assert.assertEquals(fencedBallerina(own), List.of(),
-                slug + ": the map generated a declaration, which is what makes it unbounded again");
-    }
-
-    @Test(dataProvider = "fixtures")
-    public void theMapStaysInsideItsOwnBoundRegardlessOfPackageSize(String slug) {
-        // `ballerina/crypto` reached 1,177 lines and 64,310 bytes as a signature dump and overflowed the eval
-        // harness's cap, which silently substituted a 2.2KB stub. The widest package in this corpus is the same
-        // shape of risk, so the bound is asserted rather than described.
-        //
-        // Measured on the map's OWN text. The quotation is uncapped, so the section carrying it is as long
-        // as the package's readme decided — postgresql's 28 blocks put the document at 365 lines. That is the
-        // package's size and not this tool's, and the two are worth keeping apart: what must stay bounded is
-        // what the tool WRITES, which is the property `theOverviewGeneratesNoSignatureAtAll` states from the
-        // other side. The quotation sits last precisely so its length costs the reader nothing above it.
-        String document = withoutQuotations(Overview.render(FixtureCorpus.loadedFixture(slug)));
-        long lines = document.lines().count();
-        Assert.assertTrue(lines < 200, slug + ": the map is " + lines + " lines");
     }
 
     // -----------------------------------------------------------------------

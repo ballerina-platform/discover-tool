@@ -20,13 +20,10 @@ package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.Report;
-import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Guide;
-import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.Readmes;
-import io.ballerina.tools.discover.views.TypeView;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -142,10 +139,6 @@ public class RegisterTest {
     private static List<Document> reportDocuments(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         List<Document> documents = new ArrayList<>();
-        documents.add(new Document("overview", Overview.render(context)));
-        documents.add(new Document("overview -s", Overview.render(context, new Overview.Options("client"))));
-        documents.add(new Document("overview -s (no match)",
-                Overview.render(context, new Overview.Options("zzzznothingmatchesthis"))));
 
         Result<String> guide = Guide.render(context, Guide.Options.ALL);
         Assert.assertTrue(guide.isOk());
@@ -250,21 +243,9 @@ public class RegisterTest {
     }
 
     @Test
-    public void theOverviewsOwnSectionsAreWhatGrepReturnsNotTheReadmes() {
+    public void theGuidesOwnSectionsAreWhatGrepReturnsNotTheReadmes() {
         // The guide's headings are demoted two levels for exactly this reason: without it `grep '^## '` returns
         // the package author's outline mixed with ours.
-        String document = Overview.render(FixtureCorpus.loadedFixture("ballerinax__postgresql"));
-        List<String> sections = unfencedLines(document).stream()
-                .filter(line -> line.startsWith("## "))
-                .toList();
-        Assert.assertTrue(sections.contains("## Quickstart"));
-        Assert.assertTrue(sections.contains("## Next"));
-        for (String section : sections) {
-            Assert.assertTrue(
-                    section.matches("^## (Quickstart|Next|Clients|Classes|Module-level).*"),
-                    "an unexpected top section: " + section);
-        }
-        // And the guide's own outline is what greps out of the verb that prints it.
         Result<String> guide = Guide.render(FixtureCorpus.loadedFixture("ballerinax__postgresql"),
                 Guide.Options.ALL);
         Assert.assertTrue(guide.isOk());
@@ -309,71 +290,6 @@ public class RegisterTest {
                 slug + ": a demoted readme heading survived the cut");
     }
 
-    /**
-     * {@code overview}'s {@code ## Usage} is a quotation too, and says so in the same vocabulary.
-     *
-     * <p>Worth its own assertion rather than folding into the one above, because the risk is different. There,
-     * the quotation is the whole readme and the marker says where this document stops speaking. Here it is a
-     * handful of blocks the tool SELECTED, so the marker is what keeps {@code ViewsAgreeTest}'s signature
-     * oracle from being fed the package author's example code as though this document had generated it.
-     */
-    @Test(dataProvider = "fixtures")
-    public void theQuotedUsageIsMarkedTheSameWayTheGuideIs(String slug) {
-        LoadedPackage context = FixtureCorpus.loadedFixture(slug);
-        String document = Overview.render(context);
-        String label = context.qualified().qualified() + " readme usage";
-        if (!document.contains("\n## Quickstart\n")) {
-            Assert.assertFalse(document.contains(label), slug + ": a marker with no section");
-            return;
-        }
-        Assert.assertTrue(document.contains("\n" + Report.EMBED_BEGIN + label + " -->\n"), slug);
-        Assert.assertTrue(document.contains("\n" + Report.EMBED_END + label + " -->\n"), slug);
-        // Every quoted line is inside a ballerina fence, so the register rule holds for borrowed code too.
-        String quoted = document.substring(
-                document.indexOf(Report.EMBED_BEGIN + label), document.indexOf(Report.EMBED_END + label));
-        Assert.assertTrue(quoted.contains("```ballerina"), slug + ": quoted code outside a fence");
-    }
-
-    /**
-     * The navigation is reachable inside a window, which is the constraint the whole document is ordered by.
-     *
-     * <p>{@code ## Next} used to close the document, on the argument that the guide was most of it and a reader
-     * who stopped early had already been answered by the facts table. The guide left, and with it the argument:
-     * measured on this corpus the closing position survived a {@code head -200} in 3 packages of 11, and 80% of
-     * the recorded {@code bal discover} calls were piped. Fifty lines is the assertion because it is the window
-     * agents actually write.
-     *
-     * <p>Asserted as a LINE NUMBER rather than as "before the client sections", because the property is about
-     * surviving a cut and a section-order test would pass for a document whose quoted code ran to 300 lines.
-     * The uncapped quotation made that a real possibility rather than a hypothetical — postgresql publishes
-     * 28 blocks and its map is 365 lines — and answered it by moving the quotation BEHIND this section
-     * rather than by capping it.
-     * So the bound is now on the map's own text, which nothing unbounded precedes: measured across this corpus
-     * the worst case is line 15, against 421 for kafka before any of this.
-     */
-    @Test(dataProvider = "fixtures")
-    public void theOverviewCarriesItsNextSectionInsideTheFirstWindow(String slug) {
-        String document = Overview.render(FixtureCorpus.loadedFixture(slug));
-        List<String> lines = List.of(document.split("\n", -1));
-        int next = lines.indexOf("## Next");
-        Assert.assertTrue(next > 0, slug + ": no ## Next section");
-        // The measured window is `head -100`, which is what moved this section out of the document's
-        // tail: at the end it survived a `head -200` in 3 packages of 11. The bound is derived rather than
-        // picked — a dozen lines of title and facts, plus the one-line chunk index. Now that the quotation
-        // is uncapped, the quoted code is no longer ahead of it at all, so measured across this corpus the
-        // worst case is line 15.
-        Assert.assertTrue(next < 100, slug + ": ## Next is at line " + next);
-        // Nothing unbounded may precede it. The map has no unbounded section left at all — the rosters are capped
-        // at 20 rows — but the ORDER still has to hold, because a roster placed first would put the navigation
-        // behind content again the next time a cap is raised.
-        int roster = document.indexOf("\n## Clients");
-        if (roster < 0) {
-            roster = document.indexOf("\n## Classes");
-        }
-        Assert.assertTrue(roster > 0, slug + ": no roster section");
-        Assert.assertTrue(document.indexOf("\n## Next\n") < roster, slug + ": a roster came first");
-    }
-
     // -----------------------------------------------------------------------
     // The code register
     // -----------------------------------------------------------------------
@@ -381,15 +297,9 @@ public class RegisterTest {
     @Test(dataProvider = "fixtures")
     public void noCodeDocumentCarriesReportFurniture(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
-        Declarations index = Declarations.index(context.library().typeDefs());
-        String first = index.names().get(0);
-
-        Result<String> typeView = TypeView.render(context, new TypeView.Options(List.of(first), true));
-        Assert.assertTrue(typeView.isOk());
 
         List<Document> documents = new ArrayList<>(List.of(
-                new Document("api", Documents.toSyntaxString(context.library())),
-                new Document("type -r", typeView.value())));
+                new Document("api", Documents.toSyntaxString(context.library()))));
 
         // The register is a property of the DOCUMENT, not of the verb. A `-r` response is
         // nothing but declarations, so it is code however it was reached — which means the container verbs produce

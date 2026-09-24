@@ -16,6 +16,12 @@
  *  under the License.
  */
 
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'net.researchgate.release'
+}
+
 allprojects {
     repositories {
         mavenCentral()
@@ -27,10 +33,22 @@ allprojects {
             }
         }
     }
-
     ext {
-        snapshotVersion = '-SNAPSHOT'
         timestampedVersionRegex = '.*-\\d{8}-\\d{6}-\\w.*$'
+        snapshotVersion = "-SNAPSHOT"
     }
 }
 
+final String moduleVersion = project.version.replace(project.ext.snapshotVersion, '')
+
+release {
+    failOnPublishNeeded = false
+    buildTasks = ['build']
+    versionPropertyFile = 'gradle.properties'
+    tagTemplate = 'v${version}'
+    git {
+        // To release from any branch
+        requireBranch = "release-${moduleVersion}"
+        pushToRemote = 'origin'
+    }
+}
