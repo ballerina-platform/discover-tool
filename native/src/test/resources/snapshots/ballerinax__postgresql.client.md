@@ -8,7 +8,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal discover client ballerinax/postgresql Client init -r`
+- the buckets this package has: `bal discover ballerinax/postgresql`
 
 ## Constructor — 1
 

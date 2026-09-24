@@ -7,11 +7,10 @@
 
 ## Next
 
-- open one: `bal discover class ballerina/log Logger`
-- search across all of them: `bal discover class ballerina/log -s "<what it does>"`
+- open one: `bal discover ballerina/log class Logger`
 
 ## 3 classes
 
-- `Logger` — 7 normal · `bal discover class ballerina/log Logger`
-- `LoggerRegistry` — 2 normal · `bal discover class ballerina/log LoggerRegistry`
-- `PrintableRawTemplate` — nothing callable · `bal discover class ballerina/log PrintableRawTemplate`
+- `Logger` — 7 normal · `bal discover ballerina/log class Logger`
+- `LoggerRegistry` — 2 normal · `bal discover ballerina/log class LoggerRegistry`
+- `PrintableRawTemplate` — nothing callable · `bal discover ballerina/log class PrintableRawTemplate`

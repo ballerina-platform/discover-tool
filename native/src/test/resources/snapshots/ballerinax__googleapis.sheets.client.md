@@ -8,7 +8,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal discover client ballerinax/googleapis.sheets Client init -r`
+- the buckets this package has: `bal discover ballerinax/googleapis.sheets`
 
 ## Constructor — 1
 

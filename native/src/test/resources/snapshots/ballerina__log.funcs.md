@@ -7,7 +7,7 @@
 
 ## Next
 
-- one call and every type it needs: `bal discover funcs ballerina/log evaluateTemplate -r`
+- the buckets this package has: `bal discover ballerina/log`
 
 ## Module-level functions — 11, call with `.`
 

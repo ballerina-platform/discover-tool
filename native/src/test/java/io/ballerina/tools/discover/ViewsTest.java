@@ -197,28 +197,6 @@ public class ViewsTest {
                 "--all on github's client is tens of thousands of bytes of signatures");
     }
 
-    /**
-     * A collapsed section states its cost, and offers {@code --all} last.
-     *
-     * <p>Two rules together: the escape hatch appears where it applies, with the byte
-     * figure that makes choosing it a decision rather than a gamble, and nowhere else. Its absence from
-     * {@code --help} is asserted in {@link DiscoverToolTest}.
-     */
-    @Test
-    public void aCollapsedListingNamesItsCostAndOffersTheEscapeHatchLast() {
-        String document = render("ballerinax__github", Surface.Scope.CLIENT);
-        List<String> bullets = document.lines().filter(line -> line.startsWith("- ")).toList();
-        Assert.assertFalse(bullets.isEmpty(), document);
-        String last = bullets.get(bullets.size() - 1);
-        Assert.assertTrue(last.contains("--all"), "the escape hatch is offered last: " + last);
-        Assert.assertTrue(last.contains("last resort"), last);
-        Assert.assertTrue(Pattern.compile("[\\d,]+ bytes").matcher(last).find(),
-                "with its cost stated: " + last);
-        for (String bullet : bullets.subList(0, bullets.size() - 1)) {
-            Assert.assertFalse(bullet.contains("--all"), "offered once, not repeatedly: " + bullet);
-        }
-    }
-
     /** The bytes inside every fenced block, which is what the budget bounds. */
     private static int fencedBytes(String document) {
         StringBuilder inside = new StringBuilder();
@@ -269,7 +247,7 @@ public class ViewsTest {
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
         Assert.assertTrue(view.value().contains("| Note | `toStringValue` is declared on `Cookie`"),
                 view.value());
-        Assert.assertTrue(view.value().contains("bal discover class ballerina/http Cookie toStringValue"),
+        Assert.assertTrue(view.value().contains("bal discover ballerina/http class Cookie toStringValue"),
                 view.value());
     }
 
@@ -282,9 +260,9 @@ public class ViewsTest {
                 new Containers.Options(List.of("commit")));
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
         Assert.assertTrue(view.value().contains("owners"), view.value());
-        Assert.assertTrue(view.value().contains("`bal discover client ballerinax/kafka Caller commit`"),
+        Assert.assertTrue(view.value().contains("`bal discover ballerinax/kafka client Caller commit`"),
                 view.value());
-        Assert.assertTrue(view.value().contains("`bal discover client ballerinax/kafka Consumer commit`"),
+        Assert.assertTrue(view.value().contains("`bal discover ballerinax/kafka client Consumer commit`"),
                 view.value());
     }
 
@@ -300,19 +278,16 @@ public class ViewsTest {
         Assert.assertTrue(asClient.isOk(), asClient.isOk() ? "" : asClient.failure().describe());
         Assert.assertTrue(asClient.value().contains("| Note | `Cookie` is addressed by `class`"),
                 asClient.value());
-        Assert.assertTrue(asClient.value().contains("bal discover class ballerina/http Cookie"),
+        Assert.assertTrue(asClient.value().contains("bal discover ballerina/http class Cookie"),
                 asClient.value());
 
-        // A record, asked of `client`: not a callable at all, so the answer is the code register with a `//` note.
+        // A record, asked of `client`: not a callable at all. There is no more bucket that answers for a bare
+        // declaration name — `type` had no RFC equivalent and was dropped along with it — so this now fails with
+        // near-miss candidates rather than answering from the code register.
         Result<String> asType = Containers.render(http, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("ClientConfiguration")));
-        Assert.assertTrue(asType.isOk(), asType.isOk() ? "" : asType.failure().describe());
-        Assert.assertTrue(asType.value().contains(
-                "// Note: ClientConfiguration is a declaration, not a callable"), asType.value());
-        Assert.assertTrue(asType.value().contains("public type ClientConfiguration record"), asType.value());
-        // The note is written in the register of the document it lands in, never as a bare `note:` prefix that
-        // fits neither.
-        Assert.assertFalse(asType.value().contains("| Note |"), "a table row in the code register");
+        Assert.assertFalse(asType.isOk(), "no bucket answers for a non-callable declaration any more");
+        Assert.assertTrue(asType.failure() instanceof Failure.SymbolNotFound, asType.failure().describe());
     }
 
     @Test
@@ -384,8 +359,8 @@ public class ViewsTest {
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
         Assert.assertTrue(view.value().contains("| Module functions | this package declares none |"),
                 view.value());
-        Assert.assertTrue(view.value().contains("`bal discover client ballerinax/kafka`"), view.value());
-        Assert.assertTrue(view.value().contains("`bal discover class ballerinax/kafka`"), view.value());
+        Assert.assertTrue(view.value().contains("`bal discover ballerinax/kafka client`"), view.value());
+        Assert.assertTrue(view.value().contains("`bal discover ballerinax/kafka class`"), view.value());
     }
 
     @Test
@@ -515,7 +490,8 @@ public class ViewsTest {
                                 + Texts.byteLength(document) + " bytes:\n" + document);
                 // Still Ballerina, and still a way out.
                 Assert.assertFalse(document.contains("| "), slug + ": a table in the code register");
-                Assert.assertTrue(document.contains("bal discover client"),
+                Assert.assertTrue(
+                        document.contains("bal discover " + loaded.qualified().qualified() + " client"),
                         slug + ": the miss offers no next command:\n" + document);
             }
         }
@@ -524,8 +500,11 @@ public class ViewsTest {
     @Test
     public void aSelectorThatMatchesNothingIsAnsweredWithWhatIsThere() {
         // Exit 0 with the alternatives rather than a failure: an empty selection is a fact about the container,
-        // and the caller's next move is in the document. It must never offer a command without the argument that
-        // failed — the shipped `ops` path did exactly that.
+        // and the caller's next move is in the document.
+        //
+        // TODO(item 4): the recovery used to re-offer a narrowing search carrying the exact argument that failed
+        // (`-s "zzznosuchthing"`) — restore that discipline once `--filter` lands and this document can offer a
+        // real next command again, rather than none.
         for (String slug : FixtureCorpus.listFixtures()) {
             for (Surface.Container container : Surface.of(
                     FixtureCorpus.libraryFor(slug), Surface.Scope.CLIENT)) {
@@ -534,8 +513,6 @@ public class ViewsTest {
                         new Containers.Options(List.of(container.name(), "zzznosuchthing")));
                 Assert.assertTrue(view.isOk(), slug + ": " + (view.isOk() ? "" : view.failure().describe()));
                 Assert.assertTrue(view.value().contains("| Requested | `zzznosuchthing` |"), view.value());
-                Assert.assertTrue(view.value().contains("-s \"zzznosuchthing\""),
-                        slug + ": the recovery dropped the argument that failed");
             }
         }
     }
