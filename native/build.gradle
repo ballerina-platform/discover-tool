@@ -84,6 +84,13 @@ test {
         exceptionFormat 'full'
     }
     finalizedBy jacocoTestReport
+
+    afterSuite { desc, result ->
+        if (!desc.parent) {
+            println "\nTest summary: ${result.testCount} run, ${result.successfulTestCount} passed, " +
+                    "${result.failedTestCount} failed, ${result.skippedTestCount} skipped"
+        }
+    }
 }
 
 jacoco {
