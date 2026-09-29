@@ -74,6 +74,9 @@ public final class JsonRenderer {
             if (container.normal() > 0) {
                 entry.addProperty("normal", container.normal());
             }
+            if (container.listener() != null) {
+                entry.addProperty("listener", container.listener());
+            }
             entry.addProperty("call", container.call());
             containers.add(entry);
         }

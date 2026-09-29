@@ -11,9 +11,9 @@ Typical session:
                                    bal discover ballerinax/github client Client
   3. One call, fully addressed:   bal discover ballerinax/github client Client repos
 
-Buckets, addressed as the second positional: client, class, funcs so far, growing
-toward the full client/service/class/funcs/readme set. No bucket lists which of them
-this package has.
+Buckets, addressed as the second positional: client, service, class, funcs so far,
+growing toward the full client/service/class/funcs/readme set. No bucket lists which
+of them this package has.
 
   --refresh              Ignore any cached copy and rewrite it. Worth passing only
                          when a name should exist and does not.

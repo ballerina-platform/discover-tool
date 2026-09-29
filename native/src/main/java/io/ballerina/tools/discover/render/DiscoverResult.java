@@ -79,9 +79,16 @@ public sealed interface DiscoverResult {
          * @param resources how many resource paths it declares
          * @param remote how many remote methods it declares
          * @param normal how many plain (non-remote) methods it declares
+         * @param listener the listener(s) this service type binds to, joined, or {@code null} outside the
+         *     {@code service} bucket
          * @param call the command that opens it
          */
-        public record Container(String name, int resources, int remote, int normal, String call) { }
+        public record Container(String name, int resources, int remote, int normal, String listener, String call) {
+
+            public Container(String name, int resources, int remote, int normal, String call) {
+                this(name, resources, remote, normal, null, call);
+            }
+        }
     }
 
     /**
@@ -93,9 +100,10 @@ public sealed interface DiscoverResult {
      * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
-     * @param note this answer was reached by kind tolerance — the selector named something in a different
-     *     bucket, and this is that bucket's own answer instead — or {@code null} when the request already named
-     *     the bucket that holds it
+     * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
+     *     tolerance (the selector named something in a different bucket, and this is that bucket's own answer
+     *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
+     *     {@code null} when neither applies
      */
     record PathGroups(List<Group> groups, int total, String next, String warning, String note)
             implements DiscoverResult {
@@ -122,9 +130,10 @@ public sealed interface DiscoverResult {
      * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
-     * @param note this answer was reached by kind tolerance — the selector named something in a different
-     *     bucket, and this is that bucket's own answer instead — or {@code null} when the request already named
-     *     the bucket that holds it
+     * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
+     *     tolerance (the selector named something in a different bucket, and this is that bucket's own answer
+     *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
+     *     {@code null} when neither applies
      */
     record ResourceList(List<Resource> resources, int shown, int total, String next, String warning, String note)
             implements DiscoverResult {
@@ -153,9 +162,10 @@ public sealed interface DiscoverResult {
      *     was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
-     * @param note this answer was reached by kind tolerance — the selector named something in a different
-     *     bucket, and this is that bucket's own answer instead — or {@code null} when the request already named
-     *     the bucket that holds it
+     * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
+     *     tolerance (the selector named something in a different bucket, and this is that bucket's own answer
+     *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
+     *     {@code null} when neither applies
      */
     record MethodList(List<String> methods, int shown, int total, String next, String warning, String note)
             implements DiscoverResult {

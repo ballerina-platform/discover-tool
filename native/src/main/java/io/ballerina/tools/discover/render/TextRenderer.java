@@ -53,7 +53,9 @@ public final class TextRenderer {
 
     private static String renderContainerRoster(DiscoverResult.ContainerRoster roster) {
         String list = roster.containers().stream()
-                .map(DiscoverResult.ContainerRoster.Container::name)
+                .map(container -> container.listener() == null
+                        ? container.name()
+                        : container.name() + " (binds to " + container.listener() + ")")
                 .collect(Collectors.joining(", "));
         return withWarning(
                 withNext(list, roster.containers().size(), roster.total(), roster.next()), roster.warning());
