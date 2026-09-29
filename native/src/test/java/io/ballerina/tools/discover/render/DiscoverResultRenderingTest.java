@@ -96,6 +96,25 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
+    public void aContainerRosterNamesTheBoundListenerInBothRenderingsWhenOneIsCarried() {
+        DiscoverResult result = new DiscoverResult.ContainerRoster(
+                List.of(
+                        new DiscoverResult.ContainerRoster.Container(
+                                "Service", 0, 1, 0, "kafka:Listener",
+                                "bal discover ballerinax/kafka service Service"),
+                        new DiscoverResult.ContainerRoster.Container(
+                                "Plain", 0, 1, 0, "bal discover ballerinax/kafka service Plain")),
+                2, null);
+        Assert.assertEquals(TextRenderer.render(result), "Service (binds to kafka:Listener), Plain");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        JsonArray containers = json.getAsJsonArray("containers");
+        Assert.assertEquals(containers.get(0).getAsJsonObject().get("listener").getAsString(), "kafka:Listener");
+        Assert.assertFalse(containers.get(1).getAsJsonObject().has("listener"),
+                "no listener to report is omitted rather than printed null");
+    }
+
+    @Test
     public void aTruncatedContainerRosterNamesWhatWasCutInBothRenderings() {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(new DiscoverResult.ContainerRoster.Container(

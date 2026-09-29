@@ -24,6 +24,7 @@ import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.ModuleRef;
+import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.Report;
@@ -48,11 +49,13 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * {@code client} / {@code class} / {@code funcs} — one implementation, three scopes.
+ * {@code client} / {@code service} / {@code class} / {@code funcs} — one implementation, four scopes.
  *
- * <p>The three verbs differ ONLY in which slice of {@link Surface} they address. Everything below — how a
+ * <p>The four verbs differ ONLY in which slice of {@link Surface} they address. Everything below — how a
  * positional resolves, how a selector is parsed, how much is printed and what {@code Next} offers — is one code
- * path, because three copies of it would be three places for the same rule to rot separately.
+ * path, because four copies of it would be four places for the same rule to rot separately. {@code service} adds
+ * exactly one thing the other three do not carry — the listener a container's pairings name — folded into the
+ * shared {@code note}/roster machinery ({@link #listenerNote}, {@link #listenerNames}) rather than a parallel path.
  *
  * <p><b>THE PARSER CANNOT BE DECIDED PER VERB.</b> In Ballerina a client IS a class, so {@code ballerina/http:Client}
  * is a legal argument to both {@code client} and {@code class} and declares seven resource functions either way.
@@ -328,6 +331,43 @@ public final class Containers {
                 + " " + scope.verb() + " " + owner.name() + " " + token);
     }
 
+    /** Two notes, concatenated when both are present — the same join every other combined note in this class uses. */
+    private static String mergeNotes(String first, String second) {
+        if (first == null) {
+            return second;
+        }
+        return second == null ? first : first + "; " + second;
+    }
+
+    /**
+     * The listener(s) a service container's own pairings name, joined — the attachable ones where the payload
+     * confirms at least one, every pairing otherwise, since withholding the fact entirely would lose it for a
+     * caller who never asks {@code -r} to see the unconfirmed-attachment prose {@code Documents} prints instead.
+     */
+    private static String listenerNames(Surface.Container container) {
+        List<Service> pairings = container.pairings();
+        if (pairings.isEmpty()) {
+            return null;
+        }
+        List<Service> attachable = pairings.stream().filter(Service::isAttachable).toList();
+        return (attachable.isEmpty() ? pairings : attachable).stream()
+                .map(service -> service.listener().name())
+                .distinct()
+                .collect(Collectors.joining(", "));
+    }
+
+    /** {@link #listenerNames} as a one-line fact, for the containers the ceiling has no room to list a fact row for. */
+    private static String listenerNote(Surface.Container container) {
+        String names = listenerNames(container);
+        if (names == null) {
+            return null;
+        }
+        boolean confirmed = container.pairings().stream().anyMatch(Service::isAttachable);
+        return confirmed
+                ? "binds to " + names
+                : "binds to " + names + " — not confirmed by the package's own attach() signature";
+    }
+
     /**
      * Nothing matched anywhere, with the names that came closest.
      *
@@ -414,6 +454,7 @@ public final class Containers {
                         container.operations().size(),
                         (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
                         (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
+                        listenerNames(container),
                         "bal discover " + pkg + " " + scope.verb() + " " + container.name()))
                 .toList();
         String next = shown.size() < selected.size()
@@ -748,6 +789,7 @@ public final class Containers {
     private static Result<Answer> answer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, String note) {
+        note = mergeNotes(note, listenerNote(container));
         List<Entry> selected = select(container, selectors);
         List<Entry> documented = List.of();
 
@@ -765,7 +807,7 @@ public final class Containers {
                     codeAnswer(loaded, scope, container, selected, selectors, options, note)));
         }
         if (selected.isEmpty() && documented.isEmpty()) {
-            return Result.ok(Answer.markdown(nothingMatched(loaded, scope, container, selectors, options)));
+            return Result.ok(Answer.markdown(nothingMatched(loaded, scope, container, selectors, options, note)));
         }
         if (selected.size() == 1) {
             return Result.ok(Answer.markdown(
@@ -802,7 +844,7 @@ public final class Containers {
      */
     private static String nothingMatched(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            Options options) {
+            Options options, String note) {
         String pkg = loaded.qualified().qualified();
         String asked = options.filtered() ? options.filter() : String.join(" ", selectors);
         List<Entry> all = entriesOf(container);
@@ -810,6 +852,9 @@ public final class Containers {
         Report report = new Report(scope.verb());
         report.heading(1, title(scope) + " — " + pkg + containerSuffix(container));
         List<Report.Fact> facts = new ArrayList<>(Report.warning(loaded.warning()));
+        if (note != null) {
+            facts.add(new Report.Fact("Note", note));
+        }
         facts.add(new Report.Fact("Requested", Texts.code(asked)));
         facts.add(new Report.Fact("Matched", "nothing on " + Texts.code(container.label()) + ", which declares "
                 + counts(container)));
@@ -1331,6 +1376,7 @@ public final class Containers {
     private static String title(Surface.Scope scope) {
         return switch (scope) {
             case CLIENT -> "Clients";
+            case SERVICE -> "Services";
             case CLASS -> "Classes";
             case MODULE -> "Module functions";
         };

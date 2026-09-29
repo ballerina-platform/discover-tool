@@ -43,8 +43,8 @@ import java.util.List;
  * {@code validation} rather than resolving as something else and reporting a Central failure the agent will
  * retry.
  *
- * <p>Buckets covered here are {@code client}/{@code class}/{@code funcs} — the ones actually wired into
- * {@link Cli} so far. {@code service} and {@code readme} join this file's coverage as their own items land.
+ * <p>Buckets covered here are {@code client}/{@code service}/{@code class}/{@code funcs} — the ones actually
+ * wired into {@link Cli} so far. {@code readme} joins this file's coverage once its own item lands.
  *
  * @since 0.1.0
  */
@@ -178,13 +178,14 @@ public class CliTest {
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("nosuchbucket"), capture.stderr());
-        Assert.assertTrue(capture.field("suggestion").contains("client, class, funcs"), capture.stderr());
+        Assert.assertTrue(capture.field("suggestion").contains("client, service, class, funcs"), capture.stderr());
     }
 
     @Test
     public void aVersionShapedArgumentIsRejectedWithTheRuleThatReplacedIt() {
         for (List<String> argv : List.of(
                 List.of("ballerinax/kafka", "client", "4.6.5"),
+                List.of("ballerinax/kafka", "service", "4.6.5"),
                 List.of("ballerinax/kafka", "class", "4.6.5"),
                 List.of("ballerinax/kafka", "funcs", "4.6.5"))) {
             Capture capture = new Capture();
@@ -218,6 +219,7 @@ public class CliTest {
         for (List<String> argv : List.of(
                 List.of("ballerinax/kafka"),
                 List.of("ballerinax/kafka", "client"),
+                List.of("ballerinax/kafka", "service"),
                 List.of("ballerinax/kafka", "class"),
                 List.of("ballerinax/kafka", "funcs"))) {
             Capture capture = new Capture();
@@ -339,7 +341,7 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertEquals(capture.stdout(), "client, class\n");
+        Assert.assertEquals(capture.stdout(), "client, service, class\n");
     }
 
     @Test
@@ -347,7 +349,7 @@ public class CliTest {
         Capture asText = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "text"), asText.streams(),
                 centralFor("ballerinax__kafka", "4.6.5")), 0, asText.stderr());
-        Assert.assertEquals(asText.stdout(), "client, class\n");
+        Assert.assertEquals(asText.stdout(), "client, service, class\n");
 
         Capture asJson = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "json"), asJson.streams(),

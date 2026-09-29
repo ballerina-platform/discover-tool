@@ -112,7 +112,7 @@ public class DiscoverToolTest {
     @Test
     public void theHelpTextNamesEveryBucketWiredSoFar() {
         String text = usage("--help");
-        for (String bucket : List.of("client", "class", "funcs")) {
+        for (String bucket : List.of("client", "service", "class", "funcs")) {
             Assert.assertTrue(text.contains(bucket), bucket);
         }
         Assert.assertFalse(text.contains("language server"), "no document mentions the language server");

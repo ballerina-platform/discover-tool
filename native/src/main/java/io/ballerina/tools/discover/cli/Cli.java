@@ -165,6 +165,7 @@ public final class Cli {
                 new Containers.Options(rest.subList(1, rest.size()), root.filter, false, false, root.page);
         Result<Containers.Answer> answer = switch (bucket) {
             case "client" -> Containers.render(loaded.value(), Surface.Scope.CLIENT, containerOptions);
+            case "service" -> Containers.render(loaded.value(), Surface.Scope.SERVICE, containerOptions);
             case "class" -> Containers.render(loaded.value(), Surface.Scope.CLASS, containerOptions);
             case "funcs" -> Containers.render(loaded.value(), Surface.Scope.MODULE, containerOptions);
             default -> throw new IllegalStateException("unreachable: validated above");

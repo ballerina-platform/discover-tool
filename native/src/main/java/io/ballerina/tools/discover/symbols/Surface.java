@@ -20,16 +20,19 @@ package io.ballerina.tools.discover.symbols;
 
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.Library;
+import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.model.TypeDef;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * The callable surface of a package, cut into the three scopes the three container verbs address.
+ * The callable surface of a package, cut into the four scopes the four container verbs address.
  *
  * <p>THE CUT IS BY DERIVED ROLE, NOT BY CENTRAL'S BUCKET, and that is the whole reason this class exists.
  * Central publishes no {@code isClient} key at all, and its {@code clients} array is not the callable surface: for
@@ -40,12 +43,17 @@ import java.util.Set;
  * <p>So {@code Role} decides, and {@code Role} is derived from the grammar by {@code FromCentral.roleOf}: an
  * object with a {@code remote} method is a CLIENT, a {@code serviceTypes} entry is a SERVICE, everything else is
  * PLAIN. {@link Library#addressable()} is the one list that already merges both of Central's filings, so it is
- * what this partitions.
+ * what this partitions — except for {@code SERVICE}, which is paired with the listener it binds to and so is
+ * sourced from {@link Library#services()} instead; see {@link Scope#SERVICE}.
  *
- * <p>{@link Scope#MODULE} is the odd one and it is deliberately shaped like the other two. A module's functions
- * have no container to name, so they get an anonymous one — which lets {@code funcs} share every line of
- * resolution, filtering, budgeting and rendering with {@code client} and {@code class} instead of being a fourth
- * code path that drifts from them.
+ * <p>A listener is never independently addressable, in any scope: it is presented only alongside the service
+ * type(s) it binds, under {@code SERVICE}. It still appears in {@link Library#addressable()} — {@code type} and
+ * closure resolution both need to reach it by name — this class is the only place that excludes it.
+ *
+ * <p>{@link Scope#MODULE} is the odd one and it is deliberately shaped like the other two callable scopes. A
+ * module's functions have no container to name, so they get an anonymous one — which lets {@code funcs} share
+ * every line of resolution, filtering, budgeting and rendering with {@code client} and {@code class} instead of
+ * being a fifth code path that drifts from them.
  *
  * @since 0.1.0
  */
@@ -65,7 +73,14 @@ public final class Surface {
         /** Objects reached with {@code ->}: every derived-CLIENT declaration, from either Central bucket. */
         CLIENT("client"),
 
-        /** Objects reached with {@code .}: classes, object types, service types and listeners. */
+        /**
+         * A service type, paired with the listener it binds to in one leaf — a service cannot run without
+         * attaching to a listener, and a listener with no service attached does nothing, so neither half is
+         * independently addressable.
+         */
+        SERVICE("service"),
+
+        /** Objects reached with {@code .}: classes and object types that are neither clients nor services. */
         CLASS("class"),
 
         /** Functions at module scope, which belong to no object. */
@@ -90,8 +105,15 @@ public final class Surface {
      * @param scope which verb addresses it
      * @param description the declaration's own documentation, verbatim
      * @param functions everything callable on it, in the package's own order
+     * @param pairings the listener(s) this service type binds to, one entry per listener the module declares —
+     *     empty outside {@link Scope#SERVICE}
      */
-    public record Container(String name, Scope scope, String description, List<Fn> functions) {
+    public record Container(String name, Scope scope, String description, List<Fn> functions,
+            List<Service> pairings) {
+
+        public Container(String name, Scope scope, String description, List<Fn> functions) {
+            this(name, scope, description, functions, List.of());
+        }
 
         /** The module's anonymous container has no name to address, so it is never resolved by one. */
         public boolean isModule() {
@@ -185,10 +207,19 @@ public final class Surface {
                     : List.of(new Container("", Scope.MODULE, library.description(),
                             List.copyOf(library.functions())));
         }
+        if (scope == Scope.SERVICE) {
+            return serviceContainers(library);
+        }
+        // The listener is addressed only alongside the service type(s) it binds, under Scope.SERVICE — never
+        // here, whichever role it happens to derive as.
+        Set<String> listenerNames = new LinkedHashSet<>();
+        library.listeners().forEach(listener -> listenerNames.add(listener.name()));
+
         List<Container> containers = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (TypeDef typeDef : library.addressable()) {
-            if (!(typeDef instanceof TypeDef.ObjectDef object) || !seen.add(object.name())) {
+            if (!(typeDef instanceof TypeDef.ObjectDef object) || !seen.add(object.name())
+                    || listenerNames.contains(object.name())) {
                 continue;
             }
             if (scopeOf(object) == scope) {
@@ -199,9 +230,43 @@ public final class Surface {
         return List.copyOf(containers);
     }
 
-    /** Which verb addresses an object: {@code client} for a {@code ->} surface, {@code class} for the rest. */
+    /**
+     * A service type, paired with every listener the module declares — {@link Library#services()} already holds
+     * the cross product, so this only has to group it back by service type name.
+     *
+     * <p>Sourced from {@link Library#typeDefs()} for the name, description and BARE-NAME methods (the same
+     * declaration {@code type} and the code register quote), and from {@link Library#services()} only for the
+     * listener pairing — {@code services()}' own methods are qualified for the CALLER's module instead, which is
+     * a different rendering job ({@code Documents#renderService}), not a second copy of this one.
+     */
+    private static List<Container> serviceContainers(Library library) {
+        Map<String, List<Service>> pairingsByName = new LinkedHashMap<>();
+        for (Service service : library.services()) {
+            pairingsByName.computeIfAbsent(service.name(), key -> new ArrayList<>()).add(service);
+        }
+        List<Container> containers = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (TypeDef typeDef : library.addressable()) {
+            if (!(typeDef instanceof TypeDef.ObjectDef object)
+                    || object.role() != TypeDef.ObjectDef.Role.SERVICE || !seen.add(object.name())) {
+                continue;
+            }
+            containers.add(new Container(object.name(), Scope.SERVICE, object.description(), object.methods(),
+                    pairingsByName.getOrDefault(object.name(), List.of())));
+        }
+        return List.copyOf(containers);
+    }
+
+    /**
+     * Which verb addresses an object: {@code client} for a {@code ->} surface, {@code service} for a service
+     * type, {@code class} for the rest.
+     */
     public static Scope scopeOf(TypeDef.ObjectDef object) {
-        return object.role() == TypeDef.ObjectDef.Role.CLIENT ? Scope.CLIENT : Scope.CLASS;
+        return switch (object.role()) {
+            case CLIENT -> Scope.CLIENT;
+            case SERVICE -> Scope.SERVICE;
+            case PLAIN -> Scope.CLASS;
+        };
     }
 
     /**

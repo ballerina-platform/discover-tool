@@ -33,11 +33,13 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The cut the three container verbs address, and the one property that makes it safe.
+ * The cut the four container verbs address, and the one property that makes it safe.
  *
- * <p>{@code client}, {@code class} and {@code funcs} are only worth splitting if the split is EXHAUSTIVE and
- * DISJOINT: every callable declaration is addressed by exactly one of them. A declaration in neither is
- * unreachable, and one in both is a document that says two different things about the same name.
+ * <p>{@code client}, {@code service}, {@code class} and {@code funcs} are only worth splitting if the split is
+ * EXHAUSTIVE and DISJOINT: every callable declaration is addressed by exactly one of them, with one deliberate
+ * exception — a listener is never independently addressable (see {@link #aListenerIsNeverIndependentlyAddressable}).
+ * A declaration in neither is unreachable, and one in both is a document that says two different things about the
+ * same name.
  *
  * @since 0.1.0
  */
@@ -55,17 +57,73 @@ public class SurfaceTest {
         library.addressable().stream()
                 .filter(TypeDef.ObjectDef.class::isInstance)
                 .forEach(typeDef -> objects.add(typeDef.name()));
+        // The listener is excluded on purpose — see aListenerIsNeverIndependentlyAddressable — so the
+        // exhaustiveness check below is over every OTHER object, not literally every one `addressable()` holds.
+        library.listeners().forEach(listener -> objects.remove(listener.name()));
 
         Set<String> clients = names(Surface.of(library, Surface.Scope.CLIENT));
+        Set<String> services = names(Surface.of(library, Surface.Scope.SERVICE));
         Set<String> classes = names(Surface.of(library, Surface.Scope.CLASS));
 
-        Set<String> both = new HashSet<>(clients);
-        both.retainAll(classes);
-        Assert.assertTrue(both.isEmpty(), slug + " addresses these under two verbs: " + both);
+        Set<String> pairwise = new HashSet<>(clients);
+        pairwise.retainAll(services);
+        Assert.assertTrue(pairwise.isEmpty(), slug + " addresses these under both client and service: " + pairwise);
+        pairwise = new HashSet<>(clients);
+        pairwise.retainAll(classes);
+        Assert.assertTrue(pairwise.isEmpty(), slug + " addresses these under both client and class: " + pairwise);
+        pairwise = new HashSet<>(services);
+        pairwise.retainAll(classes);
+        Assert.assertTrue(pairwise.isEmpty(), slug + " addresses these under both service and class: " + pairwise);
 
         Set<String> covered = new HashSet<>(clients);
+        covered.addAll(services);
         covered.addAll(classes);
         Assert.assertEquals(covered, objects, slug + " left an object addressable by no verb");
+    }
+
+    /**
+     * The one exception to exhaustive-and-disjoint: a service cannot run without attaching to a listener, and a
+     * listener with no service attached does nothing, so the RFC treats the pairing as one leaf rather than two
+     * independently addressable declarations. {@code ballerina/http} makes the point concretely — its listener
+     * would otherwise land in {@code class}, indistinguishable from 80 near-identical plain classes.
+     */
+    @Test
+    public void aListenerIsNeverIndependentlyAddressable() {
+        Library library = FixtureCorpus.libraryFor("ballerina__http");
+        String listener = library.listeners().get(0).name();
+
+        Assert.assertFalse(names(Surface.of(library, Surface.Scope.CLIENT)).contains(listener));
+        Assert.assertFalse(names(Surface.of(library, Surface.Scope.SERVICE)).contains(listener));
+        Assert.assertFalse(names(Surface.of(library, Surface.Scope.CLASS)).contains(listener));
+    }
+
+    /**
+     * A service type is paired with the listener it binds to in one leaf, sourced from {@code library.services()}
+     * and grouped back by name — {@code ballerinax/kafka} declares exactly one of each, the common shape across
+     * every real fixture surveyed.
+     */
+    @Test
+    public void aServiceTypeCarriesTheListenerItBindsTo() {
+        Library library = FixtureCorpus.libraryFor("ballerinax__kafka");
+        List<Surface.Container> services = Surface.of(library, Surface.Scope.SERVICE);
+        Assert.assertEquals(services.size(), 1);
+        Surface.Container service = services.get(0);
+        Assert.assertEquals(service.name(), "Service");
+        Assert.assertEquals(service.pairings().size(), 1);
+        Assert.assertEquals(service.pairings().get(0).listener().name(), "kafka:Listener");
+    }
+
+    /**
+     * {@code ballerina/http} is the RFC's own representative case: 80 plain classes against exactly one listener
+     * and seven real service types (its own {@code Service}, {@code ServiceContract} and five interceptor
+     * types) — every one of the seven is a {@code service}, none is a {@code class}.
+     */
+    @Test
+    public void httpsSevenServiceTypesAreAllUnderServiceNoneUnderClass() {
+        Library library = FixtureCorpus.libraryFor("ballerina__http");
+        Assert.assertEquals(names(Surface.of(library, Surface.Scope.SERVICE)), Set.of(
+                "Service", "ServiceContract", "RequestInterceptor", "ResponseInterceptor",
+                "RequestErrorInterceptor", "ResponseErrorInterceptor", "InterceptableService"));
     }
 
     /**
