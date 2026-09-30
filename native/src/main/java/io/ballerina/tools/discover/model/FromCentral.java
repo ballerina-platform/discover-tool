@@ -826,8 +826,7 @@ public final class FromCentral {
      */
     private static Failure noSuchSubmodule(CentralDocs docs, QualifiedName qualified, String submodule) {
         String prefix = qualified.name() + ".";
-        List<String> candidates = docs.modules().stream()
-                .filter(module -> module.orgName().equals(qualified.org()) && module.id().startsWith(prefix))
+        List<String> candidates = submodulesOf(docs, qualified).stream()
                 .map(module -> module.id().substring(prefix.length()))
                 .toList();
         return new Failure.SymbolNotFound(
@@ -838,6 +837,18 @@ public final class FromCentral {
                         ? "This package publishes no submodules at all. Drop --module."
                         : "No submodule answers to that. The candidates are every submodule this package "
                                 + "publishes; pass one of them, or drop --module for the default one.");
+    }
+
+    /**
+     * Every module in this package's own submodule family — org matches, id starts with {@code name.} — Central's
+     * raw records. The shared base {@link #noSuchSubmodule} and {@code Loader.submodulesOf} both filter down to
+     * their own shape from, so "which modules are this package's submodules" is computed in exactly one place.
+     */
+    public static List<CentralDocs.Module> submodulesOf(CentralDocs docs, QualifiedName qualified) {
+        String prefix = qualified.name() + ".";
+        return docs.modules().stream()
+                .filter(module -> module.orgName().equals(qualified.org()) && module.id().startsWith(prefix))
+                .toList();
     }
 
     public static Library fromCentral(CentralDocs.Module module) {
