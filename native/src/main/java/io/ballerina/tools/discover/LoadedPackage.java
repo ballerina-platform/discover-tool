@@ -20,6 +20,7 @@ package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.model.Library;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,6 +30,10 @@ import java.util.Optional;
  * @param version the resolved version
  * @param library the package's API, as the IR
  * @param readme the resolved module's own readme, verbatim, or empty when it publishes none
+ * @param module the {@code --module} value that resolved this module, or {@code null} for the package's own
+ *     default module
+ * @param submodules every OTHER module this package publishes, name and summary only — the bare-package fact
+ *     shown as {@code Submodules:}, regardless of which module {@code module} itself addresses
  * @param warning why this version cannot be trusted, or {@code null} when it was confirmed against the
  *     registry — see {@link Loader#unverifiedWarning}
  * @since 0.1.0
@@ -38,15 +43,31 @@ public record LoadedPackage(
         Version version,
         Library library,
         Optional<String> readme,
+        String module,
+        List<Submodule> submodules,
         String warning) {
+
+    /**
+     * @param name the bare name {@code --module} itself takes, e.g. {@code dataloader}
+     * @param summary the submodule's own one-line summary, or empty when it publishes none
+     */
+    public record Submodule(String name, String summary) { }
 
     /** {@code org/name:version} — the label every document and every failure identifies this lookup by. */
     public String label() {
         return qualified.versioned(version);
     }
 
+    /**
+     * The argument a caller types to reach this SAME (package, module) pair again — what every "next command"
+     * this tool prints builds on, so drilling further never silently falls back to the default module.
+     */
+    public String pkgArgument() {
+        return module == null ? qualified.qualified() : qualified.qualified() + " --module " + module;
+    }
+
     /** The same package with a different IR, which is what a test that removes every client needs. */
     public LoadedPackage withLibrary(Library replacement) {
-        return new LoadedPackage(qualified, version, replacement, readme, warning);
+        return new LoadedPackage(qualified, version, replacement, readme, module, submodules, warning);
     }
 }

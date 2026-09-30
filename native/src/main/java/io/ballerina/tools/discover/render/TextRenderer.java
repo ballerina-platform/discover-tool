@@ -50,6 +50,11 @@ public final class TextRenderer {
 
     private static String renderBucketList(DiscoverResult.BucketList bucketList) {
         String list = bucketList.buckets().isEmpty() ? "none" : String.join(", ", bucketList.buckets());
+        if (!bucketList.submodules().isEmpty()) {
+            list += "\n\nSubmodules:\n" + bucketList.submodules().stream()
+                    .map(submodule -> "  " + submodule.name() + " — " + submodule.summary())
+                    .collect(Collectors.joining("\n"));
+        }
         return withWarning(list, bucketList.warning());
     }
 

@@ -61,8 +61,11 @@ public final class Loader {
      *     is the only one and the only element this phase ever populates, but the shape is a list because the
      *     RFC's multi-source repository interface (Central, a local "Local Central" cache, Artifactory) is
      *     several sources considered for ONE lookup, not one source picked ahead of time.
+     * @param module the {@code --module} value, or {@code null} for the package's own default module — never a
+     *     second fetch: the payload a repository already served for the package carries every module's data
      */
-    public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories) {
+    public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
+            String module) {
 
         public LoadOptions {
             if (repositories.isEmpty()) {
@@ -70,12 +73,20 @@ public final class Loader {
             }
         }
 
+        public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories) {
+            this(http, projectDir, repositories, null);
+        }
+
         public LoadOptions(HttpOptions http, String projectDir) {
-            this(http, projectDir, List.of(CentralRepository.INSTANCE));
+            this(http, projectDir, List.of(CentralRepository.INSTANCE), null);
+        }
+
+        public LoadOptions(HttpOptions http, String projectDir, String module) {
+            this(http, projectDir, List.of(CentralRepository.INSTANCE), module);
         }
 
         public static LoadOptions of(HttpOptions http) {
-            return new LoadOptions(http, null, List.of(CentralRepository.INSTANCE));
+            return new LoadOptions(http, null, List.of(CentralRepository.INSTANCE), null);
         }
     }
 
@@ -174,7 +185,9 @@ public final class Loader {
                 }
                 Result<CentralDocs> docs = tryEachRepository(options.repositories(),
                         repository -> repository.fetchDocs(qualified, resolved.value(), options.http()));
-                return docs.isOk() ? build(qualified, resolved.value(), docs.value()) : docs.cast();
+                return docs.isOk()
+                        ? build(qualified, resolved.value(), docs.value(), options.module())
+                        : docs.cast();
             }
         }
         Result<Fetched> fetched = tryEachRepository(options.repositories(), repository -> {
@@ -185,15 +198,16 @@ public final class Loader {
             Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved.value(), options.http());
             return docs.isOk() ? Result.ok(new Fetched(resolved.value(), docs.value())) : docs.cast();
         });
-        return fetched.isOk() ? build(qualified, fetched.value().resolved(), fetched.value().docs())
+        return fetched.isOk()
+                ? build(qualified, fetched.value().resolved(), fetched.value().docs(), options.module())
                 : fetched.cast();
     }
 
     private record Fetched(CentralClient.ResolvedVersion resolved, CentralDocs docs) { }
 
     private static Result<LoadedPackage> build(
-            QualifiedName qualified, CentralClient.ResolvedVersion resolved, CentralDocs docs) {
-        Result<CentralDocs.Module> module = FromCentral.selectModule(docs, qualified);
+            QualifiedName qualified, CentralClient.ResolvedVersion resolved, CentralDocs docs, String submodule) {
+        Result<CentralDocs.Module> module = FromCentral.selectModule(docs, qualified, submodule);
         if (!module.isOk()) {
             return module.cast();
         }
@@ -203,6 +217,22 @@ public final class Loader {
                 resolved.version(),
                 Pipeline.build(module.value()),
                 Readmes.of(module.value()),
+                submodule,
+                submodulesOf(docs, qualified),
                 unverifiedWarning(resolved.stale())));
+    }
+
+    /**
+     * Every OTHER module this package publishes, name and summary only — computed off the SAME payload a
+     * repository already served, never a second fetch, since Central's docs response for a package already
+     * carries every module's id and summary alongside the addressed one's full surface.
+     */
+    private static List<LoadedPackage.Submodule> submodulesOf(CentralDocs docs, QualifiedName qualified) {
+        String prefix = qualified.name() + ".";
+        return docs.modules().stream()
+                .filter(module -> module.orgName().equals(qualified.org()) && module.id().startsWith(prefix))
+                .map(module -> new LoadedPackage.Submodule(
+                        module.id().substring(prefix.length()), module.summary().orElse("").trim()))
+                .toList();
     }
 }

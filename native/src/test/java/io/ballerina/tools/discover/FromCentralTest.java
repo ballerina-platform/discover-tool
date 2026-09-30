@@ -30,6 +30,7 @@ import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Which module of a payload gets rendered.
@@ -111,6 +112,42 @@ public class FromCentralTest {
         Failure.SchemaDrift failure = (Failure.SchemaDrift) selected.failure();
         Assert.assertTrue(failure.describe().contains("ballerinax/notkafka"));
         Assert.assertFalse(failure.suggestion().isEmpty());
+    }
+
+    /**
+     * T10's audit target. An earlier reader matched a module whose id merely STARTED WITH
+     * {@code qualified.name() + "."}, meant to catch the hierarchical-package-name form — but that also matches
+     * a genuine submodule's id, and the loop returned on whichever candidate iteration happened to reach first.
+     * A payload listing the submodule before the exact default module used to render the wrong one for a caller
+     * who asked for neither {@code --module} nor anything but the default.
+     */
+    @Test
+    public void anExactDefaultModuleWinsOverAPrefixedSubmoduleWhicheverComesFirst() {
+        CentralDocs docs = multiModule(List.of("kafka.other", "kafka"), "ballerinax");
+        Result<CentralDocs.Module> selected = FromCentral.selectModule(docs, qualified("ballerinax/kafka"));
+        Assert.assertTrue(selected.isOk());
+        Assert.assertEquals(selected.value().id(), "kafka");
+        Assert.assertEquals(FromCentral.fromCentral(selected.value()).description(), "I am kafka");
+    }
+
+    @Test
+    public void aModuleFlagIsReachedByComposingItOntoThePackageName() {
+        CentralDocs docs = multiModule(List.of("graphql", "graphql.dataloader", "graphql.subgraph"), "ballerina");
+        Result<CentralDocs.Module> selected =
+                FromCentral.selectModule(docs, qualified("ballerina/graphql"), "dataloader");
+        Assert.assertTrue(selected.isOk());
+        Assert.assertEquals(selected.value().id(), "graphql.dataloader");
+    }
+
+    @Test
+    public void aModuleFlagThatNamesNoSubmoduleFailsWithEveryBareSubmoduleName() {
+        CentralDocs docs = multiModule(List.of("graphql", "graphql.dataloader", "graphql.subgraph"), "ballerina");
+        Result<CentralDocs.Module> selected =
+                FromCentral.selectModule(docs, qualified("ballerina/graphql"), "nosuch");
+        Assert.assertFalse(selected.isOk());
+        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) selected.failure();
+        Assert.assertEquals(failure.requested(), List.of("nosuch"));
+        Assert.assertEquals(Set.copyOf(failure.candidates()), Set.of("dataloader", "subgraph"));
     }
 
     @Test

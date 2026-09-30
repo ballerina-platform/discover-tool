@@ -31,16 +31,16 @@ import java.util.List;
  * {@code bucket} is a plain positional value rather than a subcommand keyword, because in the RFC's design a
  * package resolves to its buckets, a bucket resolves to its members, and neither step is a mode switch.
  *
- * <p><b>WHAT IS NOT HERE YET.</b> {@code --module} is a real part of the target grammar but deliberately absent
- * from this class until module addressing lands — a flag that parses and is then silently dropped is the exact
- * class of mistake this grammar refuses everywhere else, so a flag is declared here only once something consumes
- * it. {@code --filter} and {@code --page} are here now that {@code Containers} and {@code Readme} both read them.
- * {@code --output} only changes the bare-package bucket listing, {@code readme}, and the
- * {@code client}/{@code service}/{@code class}/{@code funcs} buckets' own over-the-ceiling responses — the
- * still-Markdown answers those four buckets can also produce (exactly one result, or a container mixing resource
- * paths with named methods) keep their Markdown shape regardless of {@code --output} until they are rewritten onto
- * {@link DiscoverResult} too. {@code -s/--search}, {@code -r/--resolve-types} and {@code --all} are gone for good:
- * the RFC has no equivalent for any of them (see the RFC-alignment plan's "Decisions locked in").
+ * <p>{@code --module}/{@code -m} applies uniformly across every bucket including {@code readme} — it is read once,
+ * by {@link Cli} itself before any bucket is dispatched, since which module a coordinate resolves to is a fact
+ * about the PACKAGE lookup, not about any one bucket. {@code --filter} and {@code --page} are here now that
+ * {@code Containers} and {@code Readme} both read them. {@code --output} only changes the bare-package bucket
+ * listing, {@code readme}, and the {@code client}/{@code service}/{@code class}/{@code funcs} buckets' own
+ * over-the-ceiling responses — the still-Markdown answers those four buckets can also produce (exactly one result,
+ * or a container mixing resource paths with named methods) keep their Markdown shape regardless of {@code --output}
+ * until they are rewritten onto {@link DiscoverResult} too. {@code -s/--search}, {@code -r/--resolve-types} and
+ * {@code --all} are gone for good: the RFC has no equivalent for any of them (see the RFC-alignment plan's
+ * "Decisions locked in").
  *
  * @since 0.1.0
  */
@@ -96,6 +96,12 @@ final class Commands {
                 description = "1-indexed. Only meaningful once a listing of remote or normal methods is over "
                         + "the entry ceiling; ignored otherwise.")
         int page;
+
+        @CommandLine.Option(names = {"--module", "-m"}, paramLabel = "<name>",
+                description = "Target this submodule instead of the package's default module, the same "
+                        + "everywhere including readme. The bare submodule name only — <org/name> is always "
+                        + "resolved as one literal, complete package coordinate.")
+        String module;
 
         @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org/name>")
         String pkg;

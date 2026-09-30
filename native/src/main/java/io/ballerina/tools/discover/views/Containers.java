@@ -320,14 +320,14 @@ public final class Containers {
 
     private static String kindNote(LoadedPackage loaded, Surface.Scope actual, String token) {
         return Texts.code(token) + " is addressed by " + Texts.code(actual.verb()) + " — showing it. "
-                + "Canonical: " + Texts.code("bal discover " + loaded.qualified().qualified()
+                + "Canonical: " + Texts.code("bal discover " + loaded.pkgArgument()
                 + " " + actual.verb() + " " + token);
     }
 
     private static String ownerNote(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container owner, String token) {
         return Texts.code(token) + " is declared on " + Texts.code(owner.label()) + " — showing it. "
-                + "Canonical: " + Texts.code("bal discover " + loaded.qualified().qualified()
+                + "Canonical: " + Texts.code("bal discover " + loaded.pkgArgument()
                 + " " + scope.verb() + " " + owner.name() + " " + token);
     }
 
@@ -375,7 +375,7 @@ public final class Containers {
      */
     private static Failure notFound(
             LoadedPackage loaded, Surface.Scope scope, String token, Declarations index) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         List<String> candidates = new ArrayList<>();
         for (Surface.Scope other : Surface.Scope.values()) {
             Surface.of(loaded.library(), other).forEach(container -> {
@@ -399,7 +399,7 @@ public final class Containers {
 
     /** A scope with nothing in it, saying where the callable surface actually is. */
     private static String emptyScope(LoadedPackage loaded, Surface.Scope scope, String why) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         Report report = new Report(scope.verb());
         report.heading(1, title(scope) + " — " + pkg);
         List<Report.Fact> facts = new ArrayList<>(Report.warning(loaded.warning()));
@@ -436,7 +436,7 @@ public final class Containers {
      */
     private static Answer roster(
             LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers, Options options) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         List<Surface.Container> selected = options.filtered()
                 ? containers.stream()
                         .filter(container -> !filterEntries(container, options).surface().isEmpty())
@@ -465,7 +465,7 @@ public final class Containers {
 
     private static String noRosterMatch(
             LoadedPackage loaded, Surface.Scope scope, int total, Options options) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         Report report = new Report(scope.verb());
         report.heading(1, title(scope) + " — " + pkg);
         List<Report.Fact> facts = new ArrayList<>(Report.warning(loaded.warning()));
@@ -505,7 +505,7 @@ public final class Containers {
     private static String ownerRoster(
             LoadedPackage loaded, Surface.Scope scope, Map<Surface.Container, List<Entry>> owners,
             List<String> selectors) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         String token = selectors.get(0);
         Report report = new Report(scope.verb());
         report.heading(1, title(scope) + " — " + pkg + " " + Texts.code(token));
@@ -845,7 +845,7 @@ public final class Containers {
     private static String nothingMatched(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, String note) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         String asked = options.filtered() ? options.filter() : String.join(" ", selectors);
         List<Entry> all = entriesOf(container);
 
@@ -902,7 +902,7 @@ public final class Containers {
     private static String fullAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Entry entry, List<Entry> documented, Options options, String note) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         Report report = new Report(scope.verb());
         report.heading(1, title(scope) + " — " + pkg + containerSuffix(container));
 
@@ -986,7 +986,7 @@ public final class Containers {
     private static String mixedAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> selected, List<Entry> documented, Options options, String note) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         Report report = new Report(scope.verb());
         report.heading(1, title(scope) + " — " + pkg + containerSuffix(container));
 
@@ -1057,7 +1057,7 @@ public final class Containers {
     private static Answer methodAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<Entry> callable,
             Options options, String note) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         // A filtered listing pages against the SAME filter — never dropped from `next`, or paging would
         // silently widen back out to the container's full, unfiltered roster.
         String command = "bal discover " + pkg + " " + scope.verb() + containerArgument(container)
@@ -1086,7 +1086,7 @@ public final class Containers {
     private static Answer resourceAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> callable, Options options, String note) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         String baseCommand = "bal discover " + pkg + " " + scope.verb() + containerArgument(container);
         List<String> prefix = canonical(container, selectors);
         List<DiscoverResult.ResourceList.Resource> merged = mergedResources(callable, baseCommand);
@@ -1253,7 +1253,7 @@ public final class Containers {
         if (all.isEmpty()) {
             return opening + ". It declares nothing callable.";
         }
-        String command = "bal discover " + loaded.qualified().qualified() + " " + scope.verb()
+        String command = "bal discover " + loaded.pkgArgument() + " " + scope.verb()
                 + " " + container.name();
         List<String> names = new ArrayList<>();
         int spent = 0;
@@ -1338,7 +1338,7 @@ public final class Containers {
     // shows which suggestions are worth the line. Deliberately minimal for now.
     private static List<String> nextBullets(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors) {
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         List<String> next = new ArrayList<>();
         if (!selectors.isEmpty() && !container.isModule()) {
             next.add("everything on this container: " + Texts.code("bal discover " + pkg + " " + scope.verb()

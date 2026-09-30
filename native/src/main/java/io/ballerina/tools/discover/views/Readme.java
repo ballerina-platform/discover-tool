@@ -159,7 +159,7 @@ public final class Readme {
         if (chunks.isEmpty()) {
             return Result.err(new Failure.Validation(
                     loaded.label() + " publishes no readme chunk — no section carries code.",
-                    "Read the readme whole: `bal discover " + loaded.qualified().qualified() + " readme`."));
+                    "Read the readme whole: `bal discover " + loaded.pkgArgument() + " readme`."));
         }
         Optional<Chunk> found = byNumber(chunks, requested).or(() -> byTitle(chunks, requested));
         if (found.isEmpty()) {
@@ -169,7 +169,7 @@ public final class Readme {
                     chunks.stream().map(chunk -> chunk.number() + ". " + chunk.title()).toList(),
                     "No chunk answers to that. The candidates are every chunk this readme publishes; pass one "
                             + "of the numbers, or read the readme whole: `bal discover "
-                            + loaded.qualified().qualified() + " readme`."));
+                            + loaded.pkgArgument() + " readme`."));
         }
         return Result.ok(toResult(found.get(), chunks.size(), loaded));
     }
@@ -228,7 +228,7 @@ public final class Readme {
             return Result.ok(toResult(matched.get(0), chunks.size(), loaded));
         }
 
-        String pkg = loaded.qualified().qualified();
+        String pkg = loaded.pkgArgument();
         List<DiscoverResult.ReadmeChunks.Chunk> items = matched.stream()
                 .map(chunk -> new DiscoverResult.ReadmeChunks.Chunk(
                         chunk.number(), chunk.title(), chunk.lines(),
