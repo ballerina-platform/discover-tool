@@ -156,9 +156,7 @@ public final class Cli {
             // two renderers `--output` (or the TTY default) selects. The buckets `Containers` still answers keep
             // their own Markdown-report shape below, regardless of `--output`, until that view moves onto the
             // IR too.
-            DiscoverResult result = bucketList(loaded.value());
-            boolean json = jsonOutput(root.output, interactive);
-            streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result)) + "\n");
+            emit(bucketList(loaded.value()), streams, root.output, interactive);
             return 0;
         }
 
@@ -173,10 +171,7 @@ public final class Cli {
             if (!readme.isOk()) {
                 return fail(readme.failure(), streams);
             }
-            boolean json = jsonOutput(root.output, interactive);
-            streams.out().accept((json
-                    ? JsonRenderer.render(readme.value())
-                    : TextRenderer.render(readme.value())) + "\n");
+            emit(readme.value(), streams, root.output, interactive);
             return 0;
         }
 
@@ -198,14 +193,16 @@ public final class Cli {
                     // here — see Documents.withLength for what it defends against. The structured case below
                     // carries no such stamp: it is not part of the RFC's shape for that response.
                     streams.out().accept(Documents.withLength(markdown.text()));
-            case Containers.Answer.Structured structured -> {
-                boolean json = jsonOutput(root.output, interactive);
-                streams.out().accept((json
-                        ? JsonRenderer.render(structured.result())
-                        : TextRenderer.render(structured.result())) + "\n");
-            }
+            case Containers.Answer.Structured structured ->
+                    emit(structured.result(), streams, root.output, interactive);
         }
         return 0;
+    }
+
+    /** Renders a result with whichever of the two renderers {@code --output} (or the TTY default) selects. */
+    private static void emit(DiscoverResult result, Streams streams, String output, boolean interactive) {
+        boolean json = jsonOutput(output, interactive);
+        streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result)) + "\n");
     }
 
     // -----------------------------------------------------------------------
