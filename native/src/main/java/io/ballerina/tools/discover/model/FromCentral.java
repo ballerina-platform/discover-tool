@@ -771,24 +771,42 @@ public final class FromCentral {
     // -----------------------------------------------------------------------
 
     /**
-     * The module of the payload that the caller actually asked for.
+     * The package's own default module — the one {@code import org/name;} puts in scope.
      *
-     * <p>Reading the first module instead is untested by construction, because every fixture in the
-     * corpus is single-module: a multi-module package would render whichever module Central happened to
-     * put first, under the name the caller typed. It is also what makes the cache's coordinate check
-     * meaningful; verifying one module and then rendering another verifies nothing.
-     *
-     * <p>{@code id.equals(name)} is the package's default module — the one {@code import org/name;} puts
-     * in scope. {@code id.startsWith(name + ".")} catches the submodule form ({@code googleapis.gmail}
-     * under {@code googleapis}), which Central names the same way.
+     * <p>Reading the first module instead is untested by construction, because every recorded fixture is
+     * single-module: a multi-module package would render whichever module Central happened to put first. It is
+     * also what makes the cache's coordinate check meaningful; verifying one module and then rendering another
+     * verifies nothing.
      */
     public static Result<CentralDocs.Module> selectModule(CentralDocs docs, QualifiedName qualified) {
+        return selectModule(docs, qualified, null);
+    }
+
+    /**
+     * The exact module this coordinate names, literally — never a guess.
+     *
+     * <p>An earlier reader also matched a module whose id merely STARTED WITH {@code qualified.name() + "."},
+     * meant to catch the hierarchical-package-name form ({@code googleapis.gmail}, which Central already
+     * matches by {@code equals} since the caller types the whole dotted name as the package coordinate). What it
+     * actually did, for a package that also publishes a submodule, was match on iteration order rather than on
+     * which id was ACTUALLY requested: a payload listing {@code kafka.other} before {@code kafka} would render
+     * the submodule for a caller who typed neither {@code --module} nor anything but {@code kafka}. The RFC's own
+     * rule replaces the guess outright — {@code <org>/<package>} is always one literal, complete coordinate, and
+     * a submodule is reached only through the explicit {@code submodule} parameter here, composed onto it as
+     * Central names the pair ({@code kafka.other}, not a bare {@code other}).
+     *
+     * @param submodule the {@code --module} value, or {@code null} to select the package's own default module
+     */
+    public static Result<CentralDocs.Module> selectModule(
+            CentralDocs docs, QualifiedName qualified, String submodule) {
+        String wanted = submodule == null ? qualified.name() : qualified.name() + "." + submodule;
         for (CentralDocs.Module module : docs.modules()) {
-            boolean named = module.id().equals(qualified.name())
-                    || module.id().startsWith(qualified.name() + ".");
-            if (module.orgName().equals(qualified.org()) && named) {
+            if (module.orgName().equals(qualified.org()) && module.id().equals(wanted)) {
                 return Result.ok(module);
             }
+        }
+        if (submodule != null) {
+            return Result.err(noSuchSubmodule(docs, qualified, submodule));
         }
         String returned = docs.modules().stream()
                 .map(module -> module.orgName() + "/" + module.id())
@@ -798,6 +816,28 @@ public final class FromCentral {
                 List.of(new Failure.SchemaIssue(
                         "docsData.modules", "no module matches; Central returned " + returned)),
                 Failure.SCHEMA_DRIFT_SUGGESTION));
+    }
+
+    /**
+     * {@code --module} named a submodule this package does not publish — a caller mistake, not a schema
+     * problem, so it is {@code symbol-not-found} rather than {@code schema-drift}. The candidates are every
+     * OTHER module's bare submodule name (the part after {@code org/name.}), which is exactly what
+     * {@code --module} itself takes.
+     */
+    private static Failure noSuchSubmodule(CentralDocs docs, QualifiedName qualified, String submodule) {
+        String prefix = qualified.name() + ".";
+        List<String> candidates = docs.modules().stream()
+                .filter(module -> module.orgName().equals(qualified.org()) && module.id().startsWith(prefix))
+                .map(module -> module.id().substring(prefix.length()))
+                .toList();
+        return new Failure.SymbolNotFound(
+                qualified.qualified(),
+                List.of(submodule),
+                candidates,
+                candidates.isEmpty()
+                        ? "This package publishes no submodules at all. Drop --module."
+                        : "No submodule answers to that. The candidates are every submodule this package "
+                                + "publishes; pass one of them, or drop --module for the default one.");
     }
 
     public static Library fromCentral(CentralDocs.Module module) {

@@ -47,14 +47,27 @@ public sealed interface DiscoverResult {
      * {@code bal discover <org/name>} with no bucket and no selector.
      *
      * @param buckets the buckets this package actually declares, in a fixed order
+     * @param submodules every OTHER module this package publishes, regardless of which one {@code buckets} itself
+     *     describes — empty for a package that publishes only its default module
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      */
-    record BucketList(List<String> buckets, String warning) implements DiscoverResult {
+    record BucketList(List<String> buckets, List<Submodule> submodules, String warning) implements DiscoverResult {
 
         public BucketList(List<String> buckets) {
-            this(buckets, null);
+            this(buckets, List.of(), null);
         }
+
+        public BucketList(List<String> buckets, String warning) {
+            this(buckets, List.of(), warning);
+        }
+
+        /**
+         * @param name the bare name {@code --module} itself takes
+         * @param summary the submodule's own one-line summary, or empty when it publishes none
+         * @param call the command that opens it
+         */
+        public record Submodule(String name, String summary, String call) { }
     }
 
     /**

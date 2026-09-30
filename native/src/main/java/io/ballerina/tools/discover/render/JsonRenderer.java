@@ -55,6 +55,17 @@ public final class JsonRenderer {
         JsonArray buckets = new JsonArray();
         bucketList.buckets().forEach(buckets::add);
         json.add("buckets", buckets);
+        if (!bucketList.submodules().isEmpty()) {
+            JsonArray submodules = new JsonArray();
+            for (DiscoverResult.BucketList.Submodule submodule : bucketList.submodules()) {
+                JsonObject entry = new JsonObject();
+                entry.addProperty("name", submodule.name());
+                entry.addProperty("summary", submodule.summary());
+                entry.addProperty("call", submodule.call());
+                submodules.add(entry);
+            }
+            json.add("submodules", submodules);
+        }
         if (bucketList.warning() != null) {
             json.addProperty("warning", bucketList.warning());
         }

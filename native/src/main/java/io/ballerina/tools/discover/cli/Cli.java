@@ -145,7 +145,7 @@ public final class Cli {
         // `--refresh` is only known once arguments are parsed. The transport and the cache arrive from the process
         // wrapper, so the options are rebuilt here rather than there.
         HttpOptions resolved = http.withRefresh(root.refresh);
-        Loader.LoadOptions options = new Loader.LoadOptions(resolved, projectDir);
+        Loader.LoadOptions options = new Loader.LoadOptions(resolved, projectDir, root.module);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified.value(), options);
         if (!loaded.isOk()) {
             return fail(loaded.failure(), streams);
@@ -236,7 +236,12 @@ public final class Cli {
         if (loaded.readme().isPresent()) {
             buckets.add("readme");
         }
-        return new DiscoverResult.BucketList(List.copyOf(buckets), loaded.warning());
+        List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
+                .map(submodule -> new DiscoverResult.BucketList.Submodule(
+                        submodule.name(), submodule.summary(),
+                        "bal discover " + loaded.qualified().qualified() + " --module " + submodule.name()))
+                .toList();
+        return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
     }
 
     /** {@code --output}, or the TTY default when it was not passed. */

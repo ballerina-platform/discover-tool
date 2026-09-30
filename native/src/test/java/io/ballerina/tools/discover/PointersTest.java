@@ -137,9 +137,10 @@ public class PointersTest {
     private static List<String> commandsOf(DiscoverResult result) {
         List<String> commands = new ArrayList<>();
         switch (result) {
-            case DiscoverResult.BucketList ignored -> {
-                // No embedded command fields — the buckets are the whole answer.
-            }
+            case DiscoverResult.BucketList bucketList ->
+                    // Empty for every recorded fixture — all single-module — but not for a package with
+                    // submodules, so this is wired correctly rather than left for whenever one is added.
+                    bucketList.submodules().forEach(submodule -> commands.add(submodule.call()));
             case DiscoverResult.ContainerRoster roster -> {
                 roster.containers().forEach(entry -> commands.add(entry.call()));
                 addIfPresent(commands, roster.next());

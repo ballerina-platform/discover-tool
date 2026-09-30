@@ -1,5 +1,6 @@
 Usage: bal discover [<org/name>] [bucket] [args...] [--refresh]
                     [--output <json|text>] [--filter <keyword>] [--page <n>]
+                    [-m <name>]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
@@ -24,3 +25,7 @@ No bucket lists which of them this package has.
   --page <n>             1-indexed. Only meaningful once a listing of remote or
                          normal methods is over the entry ceiling; ignored
                          otherwise.
+  -m, --module <name>    Target this submodule instead of the package's default
+                         module, the same everywhere including readme. The bare
+                         submodule name only — <org/name> is always resolved as one
+                         literal, complete package coordinate.

@@ -57,6 +57,38 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
+    public void submodulesAppearAfterTheBucketListInTextAndAsTheirOwnArrayInJson() {
+        DiscoverResult result = new DiscoverResult.BucketList(
+                List.of("client", "service", "funcs", "readme"),
+                List.of(
+                        new DiscoverResult.BucketList.Submodule("dataloader",
+                                "load data from a source with batching and caching",
+                                "bal discover ballerina/graphql --module dataloader"),
+                        new DiscoverResult.BucketList.Submodule("subgraph",
+                                "create subgraphs for a federated GraphQL service",
+                                "bal discover ballerina/graphql --module subgraph")),
+                null);
+        Assert.assertEquals(TextRenderer.render(result),
+                "client, service, funcs, readme\n\nSubmodules:\n"
+                        + "  dataloader — load data from a source with batching and caching\n"
+                        + "  subgraph — create subgraphs for a federated GraphQL service");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        JsonArray submodules = json.getAsJsonArray("submodules");
+        Assert.assertEquals(submodules.size(), 2);
+        Assert.assertEquals(submodules.get(0).getAsJsonObject().get("name").getAsString(), "dataloader");
+        Assert.assertEquals(submodules.get(0).getAsJsonObject().get("call").getAsString(),
+                "bal discover ballerina/graphql --module dataloader");
+    }
+
+    @Test
+    public void noSubmodulesOmitsTheFieldEntirelyInJson() {
+        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"));
+        Assert.assertFalse(JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject().has("submodules"),
+                "a package with no submodules carries no submodules key at all");
+    }
+
+    @Test
     public void anUnverifiedVersionsWarningAppearsInBothRenderings() {
         DiscoverResult result = new DiscoverResult.BucketList(
                 List.of("client"), "the registry was unreachable, so this version came off disk unchecked");

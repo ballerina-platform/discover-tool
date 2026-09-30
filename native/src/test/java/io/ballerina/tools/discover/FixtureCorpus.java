@@ -180,6 +180,8 @@ public final class FixtureCorpus {
                 FIXTURE_VERSION,
                 libraryFor(slug),
                 Readmes.of(module.value()),
+                null,
+                List.of(),
                 Loader.unverifiedWarning(false));
     }
 
