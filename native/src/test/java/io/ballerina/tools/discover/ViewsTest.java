@@ -744,6 +744,16 @@ public class ViewsTest {
     }
 
     @Test
+    public void aChunkSelectorCombinedWithAFilterThatDoesNotMatchFailsRatherThanIgnoringTheFilter() {
+        LoadedPackage sheets = FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets");
+        Result<DiscoverResult> view = Readme.render(
+                sheets, new Readme.Options("1", "zzz_no_such_keyword_anywhere", 1));
+        Assert.assertFalse(view.isOk());
+        Assert.assertTrue(view.failure() instanceof Failure.Validation, view.failure().describe());
+        Assert.assertTrue(view.failure().describe().contains("does not match"), view.failure().describe());
+    }
+
+    @Test
     public void aChunkThatDoesNotExistNamesEveryChunkThatDoes() {
         Result<DiscoverResult> view = Readme.render(FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"),
                 new Readme.Options("999", null, 1));

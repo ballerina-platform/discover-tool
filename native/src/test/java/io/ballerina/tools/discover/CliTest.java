@@ -428,6 +428,21 @@ public class CliTest {
     }
 
     @Test
+    public void aValidModuleThatPublishesNoReadmeFailsLoudlyRatherThanAnEmptyBody() {
+        JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader"), "ballerina");
+        docs.getAsJsonObject("docsData").getAsJsonArray("modules")
+                .get(1).getAsJsonObject().addProperty("description", "   ");
+
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader", "readme"), capture.streams(),
+                centralForDocs(docs, "1.0.0"));
+        Assert.assertEquals(exitCode, 1);
+        Assert.assertEquals(capture.stdout(), "");
+        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertTrue(capture.field("message").contains("no readme"), capture.stderr());
+    }
+
+    @Test
     public void theBarePackageListsItsSubmodulesAlongsideItsOwnBucketsInText() {
         JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader", "graphql.subgraph"), "ballerina");
         Capture capture = new Capture();

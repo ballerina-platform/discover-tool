@@ -81,15 +81,33 @@ public final class Readme {
 
     public static Result<DiscoverResult> render(LoadedPackage loaded, Options options) {
         String markdown = loaded.readme().orElse("");
+        if (markdown.isEmpty() && options.selector() == null && !options.filtered()) {
+            return Result.err(noReadme(loaded));
+        }
         List<Chunk> chunks = chunksOf(markdown);
 
         if (options.selector() != null) {
-            return oneChunk(loaded, chunks, options.selector());
+            return oneChunk(loaded, chunks, options.selector(), options.filtered() ? options.filter() : null);
         }
         if (options.filtered()) {
             return filtered(loaded, chunks, options);
         }
         return Result.ok(new DiscoverResult.Readme(markdown, lineCount(markdown), loaded.warning()));
+    }
+
+    /**
+     * A resolved module that simply publishes no readme — a real, addressable module, distinct from a bad
+     * {@code --module} value ({@link io.ballerina.tools.discover.model.FromCentral#selectModule} rejects those
+     * before this class ever sees them), so this fails loudly rather than the old silent exit-0-empty-body this
+     * class used to answer with.
+     */
+    private static Failure noReadme(LoadedPackage loaded) {
+        return new Failure.Validation(
+                loaded.label() + " publishes no readme"
+                        + (loaded.module() == null ? "." : " for module " + loaded.module() + "."),
+                loaded.submodules().isEmpty()
+                        ? "This package publishes no other module either."
+                        : "Check its other modules: `bal discover " + loaded.qualified().qualified() + "`.");
     }
 
     // -----------------------------------------------------------------------
@@ -155,7 +173,8 @@ public final class Readme {
     // One chunk, by number or by title
     // -----------------------------------------------------------------------
 
-    private static Result<DiscoverResult> oneChunk(LoadedPackage loaded, List<Chunk> chunks, String requested) {
+    private static Result<DiscoverResult> oneChunk(
+            LoadedPackage loaded, List<Chunk> chunks, String requested, String filter) {
         if (chunks.isEmpty()) {
             return Result.err(new Failure.Validation(
                     loaded.label() + " publishes no readme chunk — no section carries code.",
@@ -171,7 +190,15 @@ public final class Readme {
                             + "of the numbers, or read the readme whole: `bal discover "
                             + loaded.pkgArgument() + " readme`."));
         }
-        return Result.ok(toResult(found.get(), chunks.size(), loaded));
+        Chunk chunk = found.get();
+        if (filter != null && !matches(chunk, filter)) {
+            return Result.err(new Failure.Validation(
+                    "Chunk " + requested + " (\"" + chunk.title() + "\") does not match --filter \""
+                            + filter + "\".",
+                    "Drop --filter to read it anyway: `bal discover " + loaded.pkgArgument() + " readme "
+                            + requested + "`."));
+        }
+        return Result.ok(toResult(chunk, chunks.size(), loaded));
     }
 
     private static Optional<Chunk> byNumber(List<Chunk> chunks, String requested) {
@@ -203,6 +230,12 @@ public final class Readme {
         return partial.size() == 1 ? Optional.of(partial.get(0)) : Optional.empty();
     }
 
+    private static boolean matches(Chunk chunk, String filter) {
+        String needle = filter.toLowerCase(Locale.ROOT);
+        return chunk.markdown().toLowerCase(Locale.ROOT).contains(needle)
+                || chunk.title().toLowerCase(Locale.ROOT).contains(needle);
+    }
+
     private static DiscoverResult.Readme toResult(Chunk chunk, int total, LoadedPackage loaded) {
         return new DiscoverResult.Readme(
                 chunk.markdown(), chunk.lines(), chunk.number(), total, chunk.title(), loaded.warning());
@@ -218,11 +251,7 @@ public final class Readme {
      * from, paginated past {@value Containers#MAX_ENTRIES} like any other listing this tool ceilings.
      */
     private static Result<DiscoverResult> filtered(LoadedPackage loaded, List<Chunk> chunks, Options options) {
-        String needle = options.filter().toLowerCase(Locale.ROOT);
-        List<Chunk> matched = chunks.stream()
-                .filter(chunk -> chunk.markdown().toLowerCase(Locale.ROOT).contains(needle)
-                        || chunk.title().toLowerCase(Locale.ROOT).contains(needle))
-                .toList();
+        List<Chunk> matched = chunks.stream().filter(chunk -> matches(chunk, options.filter())).toList();
 
         if (matched.size() == 1) {
             return Result.ok(toResult(matched.get(0), chunks.size(), loaded));
