@@ -218,21 +218,24 @@ public final class Loader {
                 Pipeline.build(module.value()),
                 Readmes.of(module.value()),
                 submodule,
-                submodulesOf(docs, qualified),
+                submodulesOf(docs, qualified, submodule),
                 unverifiedWarning(resolved.stale())));
     }
 
     /**
      * Every OTHER module this package publishes, name and summary only — computed off the SAME payload a
      * repository already served, never a second fetch, since Central's docs response for a package already
-     * carries every module's id and summary alongside the addressed one's full surface.
+     * carries every module's id and summary alongside the addressed one's full surface. Excludes the module
+     * already being addressed (the default module when {@code submodule} is {@code null}, otherwise the named
+     * submodule itself) so the currently-selected module never lists itself as one of the "other" ones.
      */
-    private static List<LoadedPackage.Submodule> submodulesOf(CentralDocs docs, QualifiedName qualified) {
+    private static List<LoadedPackage.Submodule> submodulesOf(
+            CentralDocs docs, QualifiedName qualified, String submodule) {
         String prefix = qualified.name() + ".";
-        return docs.modules().stream()
-                .filter(module -> module.orgName().equals(qualified.org()) && module.id().startsWith(prefix))
+        return FromCentral.submodulesOf(docs, qualified).stream()
                 .map(module -> new LoadedPackage.Submodule(
                         module.id().substring(prefix.length()), module.summary().orElse("").trim()))
+                .filter(sub -> !sub.name().equals(submodule))
                 .toList();
     }
 }

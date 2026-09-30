@@ -456,6 +456,18 @@ public class CliTest {
     }
 
     @Test
+    public void theSelectedModuleNeverListsItselfAmongItsOwnOtherSubmodules() {
+        JsonObject docs = multiModuleDocs(
+                List.of("graphql", "graphql.dataloader", "graphql.subgraph"), "ballerina");
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader"), capture.streams(),
+                centralForDocs(docs, "1.0.0"));
+        Assert.assertEquals(exitCode, 0, capture.stderr());
+        Assert.assertFalse(capture.stdout().contains("\"name\":\"dataloader\""), capture.stdout());
+        Assert.assertTrue(capture.stdout().contains("\"name\":\"subgraph\""), capture.stdout());
+    }
+
+    @Test
     public void aModuleFlagThatNamesNoSubmoduleFailsWithCandidates() {
         JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader"), "ballerina");
         Capture capture = new Capture();
