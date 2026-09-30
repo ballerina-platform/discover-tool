@@ -340,17 +340,16 @@ public final class Containers {
     }
 
     /**
-     * The listener(s) a service container's own pairings name, joined — the attachable ones where the payload
-     * confirms at least one, every pairing otherwise, since withholding the fact entirely would lose it for a
-     * caller who never asks {@code -r} to see the unconfirmed-attachment prose {@code Documents} prints instead.
+     * The listener(s) a service container's own pairings name, joined — every pairing, confirmed or not, since
+     * dropping an unconfirmed sibling would lose it for a caller who only ever sees this joined form (the roster's
+     * {@code listener} field never carries a per-name confirmation hedge the way {@link #listenerNote} does).
      */
     private static String listenerNames(Surface.Container container) {
         List<Service> pairings = container.pairings();
         if (pairings.isEmpty()) {
             return null;
         }
-        List<Service> attachable = pairings.stream().filter(Service::isAttachable).toList();
-        return (attachable.isEmpty() ? pairings : attachable).stream()
+        return pairings.stream()
                 .map(service -> service.listener().name())
                 .distinct()
                 .collect(Collectors.joining(", "));
@@ -362,8 +361,8 @@ public final class Containers {
         if (names == null) {
             return null;
         }
-        boolean confirmed = container.pairings().stream().anyMatch(Service::isAttachable);
-        return confirmed
+        boolean allConfirmed = container.pairings().stream().allMatch(Service::isAttachable);
+        return allConfirmed
                 ? "binds to " + names
                 : "binds to " + names + " — not confirmed by the package's own attach() signature";
     }
