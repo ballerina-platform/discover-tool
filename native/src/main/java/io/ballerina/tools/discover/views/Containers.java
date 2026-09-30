@@ -93,6 +93,24 @@ public final class Containers {
     public static final int MAX_ENTRIES = 40;
 
     /**
+     * The {@code number}-th {@value #MAX_ENTRIES}-wide window into a {@code total}-sized list — the page-clamping
+     * arithmetic every paginated listing in this tool shares (a flat method listing here, a filtered readme-chunk
+     * listing in {@link Readme}), so a future fix to the page-boundary rule only has to be made once.
+     *
+     * @param number the page actually served (1-indexed, clamped up from whatever was requested)
+     * @param from the inclusive start index into the full list
+     * @param to the exclusive end index into the full list
+     */
+    public record Page(int number, int from, int to) {
+        public static Page of(int requested, int total) {
+            int number = Math.max(1, requested);
+            int from = Math.min((number - 1) * MAX_ENTRIES, total);
+            int to = Math.min(from + MAX_ENTRIES, total);
+            return new Page(number, from, to);
+        }
+    }
+
+    /**
      * How many bytes a whole container's signatures may take — used only by the still-Markdown, still-dead
      * {@code -r} code register path ({@link #codeAnswer}) and its miss case, which this phase does not reach
      * from the CLI (there is no {@code -r} flag left to set {@code Options.resolve()} true) and does not delete
@@ -1069,11 +1087,9 @@ public final class Containers {
                     new DiscoverResult.MethodList(names, total, total, null, loaded.warning(), note));
         }
 
-        int page = Math.max(1, options.page());
-        int from = Math.min((page - 1) * MAX_ENTRIES, total);
-        int to = Math.min(from + MAX_ENTRIES, total);
-        List<String> shown = names.subList(from, to);
-        String next = to < total ? command + " --page " + (page + 1) : null;
+        Page page = Page.of(options.page(), total);
+        List<String> shown = names.subList(page.from(), page.to());
+        String next = page.to() < total ? command + " --page " + (page.number() + 1) : null;
         return Answer.structured(
                 new DiscoverResult.MethodList(shown, shown.size(), total, next, loaded.warning(), note));
     }

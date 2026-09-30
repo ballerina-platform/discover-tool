@@ -263,12 +263,11 @@ public final class Readme {
                         chunk.number(), chunk.title(), chunk.lines(),
                         "bal discover " + pkg + " readme " + chunk.number()))
                 .toList();
-        int page = Math.max(1, options.page());
-        int from = Math.min((page - 1) * Containers.MAX_ENTRIES, items.size());
-        int to = Math.min(from + Containers.MAX_ENTRIES, items.size());
-        List<DiscoverResult.ReadmeChunks.Chunk> shown = items.subList(from, to);
-        String next = to < items.size()
-                ? "bal discover " + pkg + " readme --filter \"" + options.filter() + "\" --page " + (page + 1)
+        Containers.Page page = Containers.Page.of(options.page(), items.size());
+        List<DiscoverResult.ReadmeChunks.Chunk> shown = items.subList(page.from(), page.to());
+        String next = page.to() < items.size()
+                ? "bal discover " + pkg + " readme --filter \"" + options.filter() + "\" --page "
+                        + (page.number() + 1)
                 : null;
         return Result.ok(new DiscoverResult.ReadmeChunks(shown, items.size(), next, loaded.warning()));
     }
