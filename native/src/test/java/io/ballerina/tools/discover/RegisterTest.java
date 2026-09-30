@@ -19,11 +19,8 @@
 package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.render.Documents;
-import io.ballerina.tools.discover.render.Report;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
-import io.ballerina.tools.discover.views.Guide;
-import io.ballerina.tools.discover.views.Readmes;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -99,58 +96,18 @@ public class RegisterTest {
     }
 
     /**
-     * A report document without the guides embedded in it, and with everything else kept.
-     *
-     * <p>The guide is the package author's verbatim Markdown, so its blank-line runs and heading depth are its own
-     * business. Rules about THIS document's structure have to stop where the quotation starts — and start again
-     * where it ends, which is why this cuts on the begin/end markers rather than truncating at the {@code ## Guide}
-     * heading. Truncating stopped checking the document at the guide, so the {@code ## Next} section that now
-     * follows it was unchecked; the markers are what make the resumption exact.
-     */
-    private static String ownStructure(String document) {
-        StringBuilder own = new StringBuilder();
-        int from = 0;
-        while (true) {
-            int begin = document.indexOf(Report.EMBED_BEGIN, from);
-            if (begin == -1) {
-                return own.append(document.substring(from)).toString();
-            }
-            int end = document.indexOf(Report.EMBED_END, begin);
-            Assert.assertTrue(end > begin, "an embedded quotation with no end marker");
-            // Both marker lines are kept and only the quotation between them goes, so the surrounding blocks
-            // stay one blank line apart and the blank-run check below still means what it says.
-            own.append(document, from, lineEnd(document, begin) + 1);
-            from = end;
-        }
-    }
-
-    private static int lineEnd(String document, int from) {
-        int newline = document.indexOf('\n', from);
-        return newline == -1 ? document.length() - 1 : newline;
-    }
-
-    /**
      * Every report document a fixture can produce, keyed by what produced it.
      *
      * <p>Breadth is the point. The register rules have to hold for documents nobody has written yet, so this walks
      * every verb over every container of every fixture rather than sampling one shape per verb — which is how the
-     * one document that reads as source stays out of the corpus.
+     * one document that reads as source stays out of the corpus. {@code readme} is absent here on purpose: it
+     * answers on the result IR from the start (see {@code DiscoverResultRenderingTest}) rather than through this
+     * still-Markdown register, and its content is the package author's own bytes rather than this tool's prose —
+     * neither register's rules were ever about a quotation.
      */
     private static List<Document> reportDocuments(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         List<Document> documents = new ArrayList<>();
-
-        Result<String> guide = Guide.render(context, Guide.Options.ALL);
-        Assert.assertTrue(guide.isOk());
-        documents.add(new Document("guide", guide.value()));
-
-        Result<String> chunk = Guide.render(context, new Guide.Options("1", null, null));
-        if (chunk.isOk()) {
-            documents.add(new Document("guide 1", chunk.value()));
-        }
-        Result<String> guideSearch = Guide.render(context, new Guide.Options(null, "client", null));
-        Assert.assertTrue(guideSearch.isOk());
-        documents.add(new Document("guide -s", guideSearch.value()));
 
         for (Surface.Scope scope : Surface.Scope.values()) {
             documents.addAll(containerDocuments(context, scope));
@@ -237,57 +194,9 @@ public class RegisterTest {
                     slug + " " + document.label() + ": no marker and title");
             Assert.assertTrue(document.text().endsWith("\n"),
                     slug + " " + document.label() + ": no trailing newline");
-            Assert.assertFalse(ownStructure(document.text()).contains("\n\n\n"),
+            Assert.assertFalse(document.text().contains("\n\n\n"),
                     slug + " " + document.label() + ": blank-line runs mean a block was emitted empty");
         }
-    }
-
-    @Test
-    public void theGuidesOwnSectionsAreWhatGrepReturnsNotTheReadmes() {
-        // The guide's headings are demoted two levels for exactly this reason: without it `grep '^## '` returns
-        // the package author's outline mixed with ours.
-        Result<String> guide = Guide.render(FixtureCorpus.loadedFixture("ballerinax__postgresql"),
-                Guide.Options.ALL);
-        Assert.assertTrue(guide.isOk());
-        for (String section : unfencedLines(guide.value()).stream()
-                .filter(line -> line.startsWith("## ")).toList()) {
-            Assert.assertTrue(section.matches("^## (Guide|Next).*"), "an unexpected top section: " + section);
-        }
-    }
-
-    /**
-     * Where this document stops speaking is stated, not left to be inferred.
-     *
-     * <p>Demoting the guide's headings keeps the outline; it does not tell a reader which Markdown they are in.
-     * The markers do, they match by label rather than by counting, and everything between them is the package
-     * author's bytes — so a reader or a script can cut the quotation out exactly.
-     */
-    @Test(dataProvider = "fixtures")
-    public void theEmbeddedGuideIsMarkedAtBothEnds(String slug) {
-        LoadedPackage context = FixtureCorpus.loadedFixture(slug);
-        Result<String> rendered = Guide.render(context, Guide.Options.ALL);
-        Assert.assertTrue(rendered.isOk());
-        String document = rendered.value();
-        Assert.assertFalse(context.readmes().isEmpty(), slug + ": this fixture publishes no guide");
-
-        for (Readmes.ModuleReadme readme : context.readmes()) {
-            String label = (context.readmes().size() == 1
-                    ? context.qualified().qualified()
-                    : readme.module()) + " readme";
-            String begin = Report.EMBED_BEGIN + label + " -->";
-            String end = Report.EMBED_END + label + " -->";
-            Assert.assertTrue(document.contains("\n" + begin + "\n"), slug + ": no begin marker for " + label);
-            Assert.assertTrue(document.contains("\n" + end + "\n"), slug + ": no end marker for " + label);
-
-            String quoted = document.substring(
-                    document.indexOf(begin) + begin.length(),
-                    document.indexOf(end));
-            Assert.assertEquals(quoted.strip(), Readmes.demoteHeadings(readme.markdown(), 2).strip(),
-                    slug + ": the markers do not wrap the guide exactly");
-        }
-        // The guide is a quotation, so nothing inside it may read as one of this document's own sections.
-        Assert.assertFalse(ownStructure(document).contains("\n#### "),
-                slug + ": a demoted readme heading survived the cut");
     }
 
     // -----------------------------------------------------------------------

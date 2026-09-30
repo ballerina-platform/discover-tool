@@ -168,35 +168,6 @@ public final class Report {
         return this;
     }
 
-    /** Opens the quotation. The label names whose Markdown follows. */
-    public static final String EMBED_BEGIN = "<!-- guide: begin ";
-
-    /** Closes it, carrying the same label, so the two can be matched rather than counted. */
-    public static final String EMBED_END = "<!-- guide: end ";
-
-    /**
-     * Markdown from somewhere else, embedded verbatim between a begin and an end marker.
-     *
-     * <p>A paragraph is this document's claim; an embedding is a quotation whose blank-line runs and heading
-     * depth are its author's business. Demoting the quoted headings keeps ONE outline, but demotion alone is
-     * invisible: a reader landing mid-document meets Markdown that looks like this document's and has no way
-     * to tell where the tool stopped speaking. The markers say it — and they say it in the same vocabulary as
-     * the format marker on line one, so they survive {@code grep}, render as nothing, and leave the quotation
-     * byte-for-byte copyable, which a fence around a document that carries its own fences would not.
-     *
-     * <p>{@code RegisterTest} cuts on them when it stops checking this document's structure at the guide, so
-     * the boundary the reader sees and the boundary the tests trust are the same one.
-     */
-    public Report embedded(String label, String markdown) {
-        if (markdown.trim().isEmpty()) {
-            return this;
-        }
-        blocks.add(EMBED_BEGIN + label + " -->");
-        blocks.add(markdown);
-        blocks.add(EMBED_END + label + " -->");
-        return this;
-    }
-
     /**
      * Blocks separated by one blank line, with exactly one trailing newline. The format marker is joined
      * directly to the title instead, so the document opens on its heading for a human reader.

@@ -43,8 +43,10 @@ import java.util.List;
  * {@code validation} rather than resolving as something else and reporting a Central failure the agent will
  * retry.
  *
- * <p>Buckets covered here are {@code client}/{@code service}/{@code class}/{@code funcs} — the ones actually
- * wired into {@link Cli} so far. {@code readme} joins this file's coverage once its own item lands.
+ * <p>Every bucket wired into {@link Cli} is covered here: {@code client}/{@code service}/{@code class}/
+ * {@code funcs} through {@code Containers}, and {@code readme} through its own dispatch branch — the one bucket
+ * not built on {@code Containers} at all, so its own end-to-end wiring gets its own test below rather than
+ * riding along with the other four's.
  *
  * @since 0.1.0
  */
@@ -319,6 +321,56 @@ public class CliTest {
                 capture.stdout());
     }
 
+    // -----------------------------------------------------------------------
+    // Bucket dispatch — readme
+    //
+    // Not built on Containers at all — see Readme's own class comment — so its dispatch is exercised here on
+    // its own rather than riding along with the other four buckets' tests above.
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void theReadmeBucketIsTheWholeReadmeVerbatimAtATerminal() {
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme"), capture.streams(),
+                centralFor("ballerinax__kafka", "4.6.5"), null, true);
+        Assert.assertEquals(exitCode, 0, capture.stderr());
+        // Verbatim means no report furniture at all — not even the format marker every other still-Markdown
+        // answer opens on.
+        Assert.assertFalse(capture.stdout().startsWith("<!-- bal discover"), capture.stdout());
+        Assert.assertTrue(capture.stdout().length() > 500, capture.stdout());
+    }
+
+    @Test
+    public void theReadmeBucketIsJsonOffATerminal() {
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme"), capture.streams(),
+                centralFor("ballerinax__kafka", "4.6.5"));
+        Assert.assertEquals(exitCode, 0, capture.stderr());
+        Assert.assertTrue(capture.stdout().contains("\"readme\":"), capture.stdout());
+        Assert.assertTrue(capture.stdout().contains("\"lines\":"), capture.stdout());
+        Assert.assertFalse(capture.stdout().contains("\"chunk\":"), "the whole readme names no chunk");
+    }
+
+    @Test
+    public void aReadmeChunkSelectorNarrowsToOneSection() {
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme", "1"), capture.streams(),
+                centralFor("ballerinax__kafka", "4.6.5"));
+        Assert.assertEquals(exitCode, 0, capture.stderr());
+        Assert.assertTrue(capture.stdout().contains("\"chunk\":1"), capture.stdout());
+        Assert.assertTrue(capture.stdout().contains("\"of\":"), capture.stdout());
+    }
+
+    @Test
+    public void aReadmeChunkThatDoesNotExistFailsWithCandidates() {
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme", "999"), capture.streams(),
+                centralFor("ballerinax__kafka", "4.6.5"));
+        Assert.assertEquals(exitCode, 1);
+        Assert.assertEquals(capture.stdout(), "");
+        Assert.assertEquals(capture.field("kind"), "symbol-not-found");
+    }
+
     @Test
     public void aBarePackageListsItsBucketsAsJsonOffATty() {
         // Not interactive (the default for this overload), so JSON — the RFC's agent-facing default, no flag
@@ -341,7 +393,7 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertEquals(capture.stdout(), "client, service, class\n");
+        Assert.assertEquals(capture.stdout(), "client, service, class, readme\n");
     }
 
     @Test
@@ -349,7 +401,7 @@ public class CliTest {
         Capture asText = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "text"), asText.streams(),
                 centralFor("ballerinax__kafka", "4.6.5")), 0, asText.stderr());
-        Assert.assertEquals(asText.stdout(), "client, service, class\n");
+        Assert.assertEquals(asText.stdout(), "client, service, class, readme\n");
 
         Capture asJson = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "json"), asJson.streams(),

@@ -189,4 +189,67 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.get("shown").getAsInt(), 40);
         Assert.assertEquals(json.get("total").getAsInt(), 199);
     }
+
+    // -----------------------------------------------------------------------
+    // Readme — no entry ceiling, unlike every listing above
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void theWholeReadmeIsPrintedVerbatimWithNoWrappingInText() {
+        DiscoverResult result = new DiscoverResult.Readme("## Overview\n\nbody", 3, null);
+        Assert.assertEquals(TextRenderer.render(result), "## Overview\n\nbody");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("readme").getAsString(), "## Overview\n\nbody");
+        Assert.assertEquals(json.get("lines").getAsInt(), 3);
+        Assert.assertFalse(json.has("chunk"), "the whole readme names no chunk");
+    }
+
+    @Test
+    public void aPackageWithNoReadmeIsNoneInTextAndAnEmptyStringInJson() {
+        DiscoverResult result = new DiscoverResult.Readme("", 0, null);
+        Assert.assertEquals(TextRenderer.render(result), "none");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("readme").getAsString(), "");
+        Assert.assertEquals(json.get("lines").getAsInt(), 0);
+    }
+
+    @Test
+    public void oneChunkCarriesItsPositionInJsonAndAHeaderLineInText() {
+        DiscoverResult result = new DiscoverResult.Readme("## Quickstart\n\ncode", 3, 2, 5, "Quickstart", null);
+        Assert.assertEquals(TextRenderer.render(result),
+                "Chunk 2 of 5 — Quickstart\n\n## Quickstart\n\ncode");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("chunk").getAsInt(), 2);
+        Assert.assertEquals(json.get("of").getAsInt(), 5);
+        Assert.assertEquals(json.get("title").getAsString(), "Quickstart");
+    }
+
+    @Test
+    public void severalMatchingChunksAreARosterInBothRenderings() {
+        DiscoverResult result = new DiscoverResult.ReadmeChunks(
+                List.of(
+                        new DiscoverResult.ReadmeChunks.Chunk(1, "Overview", 10, "bal discover pkg readme 1"),
+                        new DiscoverResult.ReadmeChunks.Chunk(3, "Quickstart", 25, "bal discover pkg readme 3")),
+                2, null);
+        Assert.assertEquals(TextRenderer.render(result),
+                "1. Overview (10 lines)\n3. Quickstart (25 lines)");
+
+        JsonArray chunks = JsonParser.parseString(JsonRenderer.render(result))
+                .getAsJsonObject().getAsJsonArray("chunks");
+        Assert.assertEquals(chunks.get(1).getAsJsonObject().get("number").getAsInt(), 3);
+        Assert.assertEquals(chunks.get(1).getAsJsonObject().get("call").getAsString(), "bal discover pkg readme 3");
+    }
+
+    @Test
+    public void noChunkMatchingTheFilterIsNoneInTextAndAnEmptyArrayInJson() {
+        DiscoverResult result = new DiscoverResult.ReadmeChunks(List.of(), 0, null);
+        Assert.assertEquals(TextRenderer.render(result), "none");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.getAsJsonArray("chunks").size(), 0);
+        Assert.assertEquals(json.get("total").getAsInt(), 0);
+    }
 }

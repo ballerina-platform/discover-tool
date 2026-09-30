@@ -70,6 +70,5 @@ final class Usage {
 
     private static final String BUCKETS =
             "Buckets, addressed as the second positional: " + String.join(", ", Commands.BUCKETS)
-                    + " so far, growing toward the full client/service/class/funcs/readme set. No bucket lists "
-                    + "which of them this package has.";
+                    + ". No bucket lists which of them this package has.";
 }

@@ -19,17 +19,16 @@
 package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.model.Library;
-import io.ballerina.tools.discover.views.Readmes;
 
-import java.util.List;
+import java.util.Optional;
 
 /**
- * One package, read once: its coordinates, its API as the IR, and its guide.
+ * One package, read once: its coordinates, its API as the IR, and its readme.
  *
  * @param qualified the package's organization and name
  * @param version the resolved version
  * @param library the package's API, as the IR
- * @param readmes every module of the payload that wrote a guide, in Central's order
+ * @param readme the resolved module's own readme, verbatim, or empty when it publishes none
  * @param warning why this version cannot be trusted, or {@code null} when it was confirmed against the
  *     registry — see {@link Loader#unverifiedWarning}
  * @since 0.1.0
@@ -38,7 +37,7 @@ public record LoadedPackage(
         QualifiedName qualified,
         Version version,
         Library library,
-        List<Readmes.ModuleReadme> readmes,
+        Optional<String> readme,
         String warning) {
 
     /** {@code org/name:version} — the label every document and every failure identifies this lookup by. */
@@ -48,6 +47,6 @@ public record LoadedPackage(
 
     /** The same package with a different IR, which is what a test that removes every client needs. */
     public LoadedPackage withLibrary(Library replacement) {
-        return new LoadedPackage(qualified, version, replacement, readmes, warning);
+        return new LoadedPackage(qualified, version, replacement, readme, warning);
     }
 }

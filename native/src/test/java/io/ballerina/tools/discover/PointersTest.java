@@ -24,6 +24,7 @@ import io.ballerina.tools.discover.cli.Cli;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
+import io.ballerina.tools.discover.views.Readme;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -85,11 +86,7 @@ public class PointersTest {
 
     /**
      * Every command a fixture's buckets can print, from every {@link Containers.Answer} shape a bucket query can
-     * produce.
-     *
-     * <p>{@code Guide} is deliberately absent here for now: it is not wired into {@link Cli} any more (it becomes
-     * the {@code readme} bucket in a later item) and still prints pointers in the grammar's old verb-first order.
-     * It returns to this method's coverage once that item lands. {@code Overview} is gone outright — the
+     * produce, plus every shape {@code readme} can answer with. {@code Overview} is gone outright — the
      * bare-package listing replaced it, and its own pointer coverage lives wherever that listing's is tested.
      *
      * <p>Deliberately the same breadth {@code RegisterTest} uses: a pointer printed only by the roster of a
@@ -110,6 +107,13 @@ public class PointersTest {
                 commands.addAll(commandsOf(expect(Containers.render(context, scope,
                         new Containers.Options(List.of(container.name(), "zzznosuchmember"))))));
             }
+        }
+
+        commands.addAll(commandsOf(expectResult(Readme.render(context, Readme.Options.BARE))));
+        commands.addAll(commandsOf(expectResult(Readme.render(context, new Readme.Options(null, "config", 1)))));
+        for (Readme.Chunk chunk : Readme.chunksOf(context)) {
+            commands.addAll(commandsOf(expectResult(
+                    Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1)))));
         }
         return commands;
     }
@@ -149,6 +153,13 @@ public class PointersTest {
                 addIfPresent(commands, resources.next());
             }
             case DiscoverResult.MethodList methods -> addIfPresent(commands, methods.next());
+            case DiscoverResult.Readme ignored -> {
+                // No embedded command fields on the whole-readme/single-chunk answer.
+            }
+            case DiscoverResult.ReadmeChunks chunks -> {
+                chunks.chunks().forEach(chunk -> commands.add(chunk.call()));
+                addIfPresent(commands, chunks.next());
+            }
         }
         return commands;
     }
@@ -160,6 +171,11 @@ public class PointersTest {
     }
 
     private static Containers.Answer expect(Result<Containers.Answer> view) {
+        Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
+        return view.value();
+    }
+
+    private static DiscoverResult expectResult(Result<DiscoverResult> view) {
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
         return view.value();
     }

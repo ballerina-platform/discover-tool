@@ -34,13 +34,13 @@ import java.util.List;
  * <p><b>WHAT IS NOT HERE YET.</b> {@code --module} is a real part of the target grammar but deliberately absent
  * from this class until module addressing lands — a flag that parses and is then silently dropped is the exact
  * class of mistake this grammar refuses everywhere else, so a flag is declared here only once something consumes
- * it. {@code --filter} and {@code --page} are here now that {@code Containers} reads them. {@code --output} only
- * changes the bare-package bucket listing and the {@code client}/{@code service}/{@code class}/{@code funcs}
- * buckets' own over-the-ceiling responses — the still-Markdown answers those buckets can also produce (exactly one
- * result, or a container mixing resource paths with named methods) keep their Markdown shape regardless of
- * {@code --output} until they are rewritten onto {@link DiscoverResult} too. {@code -s/--search},
- * {@code -r/--resolve-types} and {@code --all} are gone for good: the RFC has no equivalent for any of them (see
- * the RFC-alignment plan's "Decisions locked in").
+ * it. {@code --filter} and {@code --page} are here now that {@code Containers} and {@code Readme} both read them.
+ * {@code --output} only changes the bare-package bucket listing, {@code readme}, and the
+ * {@code client}/{@code service}/{@code class}/{@code funcs} buckets' own over-the-ceiling responses — the
+ * still-Markdown answers those four buckets can also produce (exactly one result, or a container mixing resource
+ * paths with named methods) keep their Markdown shape regardless of {@code --output} until they are rewritten onto
+ * {@link DiscoverResult} too. {@code -s/--search}, {@code -r/--resolve-types} and {@code --all} are gone for good:
+ * the RFC has no equivalent for any of them (see the RFC-alignment plan's "Decisions locked in").
  *
  * @since 0.1.0
  */
@@ -64,8 +64,8 @@ final class Commands {
         }
     }
 
-    /** Buckets wired into dispatch so far. {@code readme} joins this set once its own item lands. */
-    static final List<String> BUCKETS = List.of("client", "service", "class", "funcs");
+    /** Every bucket wired into dispatch. */
+    static final List<String> BUCKETS = List.of("client", "service", "class", "funcs", "readme");
 
     /**
      * The one command. {@code pkg} is optional at the grammar level — {@code bal discover} with nothing else is a

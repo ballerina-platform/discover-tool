@@ -23,7 +23,7 @@ import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
-import io.ballerina.tools.discover.views.Guide;
+import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.TypeView;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -152,7 +152,10 @@ public class ViewsTest {
                 case DiscoverResult.PathGroups groups -> groups.groups().size();
                 case DiscoverResult.ResourceList resources -> resources.shown();
                 case DiscoverResult.MethodList methods -> methods.shown();
+                // Neither reachable from Containers, which is all this loop drives — readme is its own bucket.
                 case DiscoverResult.BucketList ignored -> 0;
+                case DiscoverResult.Readme ignored -> 0;
+                case DiscoverResult.ReadmeChunks ignored -> 0;
             };
             Assert.assertTrue(shown <= Containers.MAX_ENTRIES,
                     slug + " " + scope.verb() + ": " + shown + " entries shown, over the ceiling");
@@ -717,45 +720,36 @@ public class ViewsTest {
     }
 
     // -----------------------------------------------------------------------
-    // The guide
+    // The readme
     // -----------------------------------------------------------------------
 
     @Test
-    public void aGuideChunkIsASectionWithItsProseAndIsAddressableTwoWays() {
+    public void aReadmeChunkIsASectionWithItsProseAndIsAddressableTwoWays() {
         // A code-only extract would have discarded about 85% of `googleapis.sheets`' 178-line readme — including
         // "if you intend to use deleteSpreadsheet you must also enable the Google Drive API", which is not
         // inferable from any signature and is the difference between a connector that works and one that 403s.
         LoadedPackage sheets = FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets");
-        List<Guide.Chunk> chunks = Guide.chunksOf(sheets);
+        List<Readme.Chunk> chunks = Readme.chunksOf(sheets);
         Assert.assertFalse(chunks.isEmpty(), "sheets' readme carries code in several sections");
 
-        Result<String> byNumber = Guide.render(sheets, new Guide.Options("1", null, null));
+        Result<DiscoverResult> byNumber = Readme.render(sheets, new Readme.Options("1", null, 1));
         Assert.assertTrue(byNumber.isOk(), byNumber.isOk() ? "" : byNumber.failure().describe());
-        Assert.assertTrue(byNumber.value().contains("| Chunk | 1 of "), byNumber.value());
+        DiscoverResult.Readme numberResult = (DiscoverResult.Readme) byNumber.value();
+        Assert.assertEquals(numberResult.chunk(), Integer.valueOf(1));
 
-        Result<String> byTitle = Guide.render(
-                sheets, new Guide.Options(chunks.get(0).title(), null, null));
+        Result<DiscoverResult> byTitle = Readme.render(sheets, new Readme.Options(chunks.get(0).title(), null, 1));
         Assert.assertTrue(byTitle.isOk(), byTitle.isOk() ? "" : byTitle.failure().describe());
-        Assert.assertEquals(byTitle.value(), byNumber.value(), "a title and its number are the same chunk");
+        Assert.assertEquals(((DiscoverResult.Readme) byTitle.value()).markdown(), numberResult.markdown(),
+                "a title and its number are the same chunk");
     }
 
     @Test
     public void aChunkThatDoesNotExistNamesEveryChunkThatDoes() {
-        Result<String> view = Guide.render(FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"),
-                new Guide.Options("999", null, null));
+        Result<DiscoverResult> view = Readme.render(FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"),
+                new Readme.Options("999", null, 1));
         Assert.assertFalse(view.isOk());
         Assert.assertTrue(view.failure() instanceof Failure.SymbolNotFound);
         Assert.assertTrue(view.failure().describe().contains("1. "), view.failure().describe());
-    }
-
-    @Test
-    public void aModuleThatPublishesNoGuideIsAFailureThatNamesTheOnesThatDo() {
-        // All-or-nothing, like `type`: a `--module` typo answering with every module's readme would be a partial
-        // answer under exit 0, which is the silent class this CLI refuses everywhere.
-        Result<String> view = Guide.render(
-                FixtureCorpus.loadedFixture("ballerinax__kafka"), new Guide.Options("kafkaa"));
-        Assert.assertFalse(view.isOk());
-        Assert.assertTrue(view.failure().describe().contains("kafka"), view.failure().describe());
     }
 
     // -----------------------------------------------------------------------
