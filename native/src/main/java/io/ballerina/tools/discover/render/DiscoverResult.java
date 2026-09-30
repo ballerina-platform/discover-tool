@@ -174,4 +174,51 @@ public sealed interface DiscoverResult {
             this(methods, shown, total, next, null, null);
         }
     }
+
+    /**
+     * The {@code readme} bucket's own answer: the whole readme verbatim, or — when a chunk selector resolved to
+     * exactly one section — that section alone. No entry ceiling applies here; unlike every other listing this
+     * bucket answers, the RFC's own text for it is "returns that module's README, verbatim", with no size limit
+     * of any kind.
+     *
+     * @param markdown the readme, or the one resolved chunk, verbatim
+     * @param lines how many lines {@code markdown} holds
+     * @param chunk the chunk's 1-based number, or {@code null} for the whole readme
+     * @param of how many chunks the readme carries, or {@code null} for the whole readme
+     * @param title the chunk's own heading, or {@code null} for the whole readme
+     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
+     *     registry — see {@code Loader.unverifiedWarning}
+     */
+    record Readme(String markdown, int lines, Integer chunk, Integer of, String title, String warning)
+            implements DiscoverResult {
+
+        public Readme(String markdown, int lines, String warning) {
+            this(markdown, lines, null, null, null, warning);
+        }
+    }
+
+    /**
+     * More than one readme chunk matches a selector or {@code --filter} — the roster to choose one from, the same
+     * ceiling every other listing in this tool obeys.
+     *
+     * @param chunks the chunks shown, up to the ceiling
+     * @param total how many chunks actually match
+     * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
+     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
+     *     registry — see {@code Loader.unverifiedWarning}
+     */
+    record ReadmeChunks(List<Chunk> chunks, int total, String next, String warning) implements DiscoverResult {
+
+        public ReadmeChunks(List<Chunk> chunks, int total, String next) {
+            this(chunks, total, next, null);
+        }
+
+        /**
+         * @param number the 1-based address a caller types
+         * @param title the heading it sits under
+         * @param lines how many lines the chunk holds
+         * @param call the command that opens it
+         */
+        public record Chunk(int number, String title, int lines, String call) { }
+    }
 }

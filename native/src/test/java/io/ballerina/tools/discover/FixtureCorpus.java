@@ -169,11 +169,17 @@ public final class FixtureCorpus {
 
     /** A fixture as the views receive it, under a FIXED version and a verified load. */
     public static LoadedPackage loadedFixture(String slug) {
+        Result<CentralDocs.Module> module =
+                FromCentral.selectModule(loadFixture(slug), qualifiedForSlug(slug));
+        if (!module.isOk()) {
+            throw new AssertionError("fixture " + slug + " has no module named after it: "
+                    + module.failure().describe());
+        }
         return new LoadedPackage(
                 qualifiedForSlug(slug),
                 FIXTURE_VERSION,
                 libraryFor(slug),
-                Readmes.collect(loadFixture(slug)),
+                Readmes.of(module.value()),
                 Loader.unverifiedWarning(false));
     }
 

@@ -30,6 +30,7 @@ import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
+import io.ballerina.tools.discover.views.Readme;
 import picocli.CommandLine;
 
 import java.util.ArrayList;
@@ -161,6 +162,24 @@ public final class Cli {
             return 0;
         }
 
+        if ("readme".equals(bucket)) {
+            // Not derived from call-site grammar, so it shares no code with Containers — see Readme's own class
+            // comment for why. Already on the result IR from the start, both cases: unlike the four container
+            // verbs, there is no still-Markdown answer here to keep around until item 11 gets to it.
+            List<String> readmeSelectors = rest.subList(1, rest.size());
+            Readme.Options readmeOptions = new Readme.Options(
+                    readmeSelectors.isEmpty() ? null : String.join(" ", readmeSelectors), root.filter, root.page);
+            Result<DiscoverResult> readme = Readme.render(loaded.value(), readmeOptions);
+            if (!readme.isOk()) {
+                return fail(readme.failure(), streams);
+            }
+            boolean json = jsonOutput(root.output, interactive);
+            streams.out().accept((json
+                    ? JsonRenderer.render(readme.value())
+                    : TextRenderer.render(readme.value())) + "\n");
+            return 0;
+        }
+
         Containers.Options containerOptions =
                 new Containers.Options(rest.subList(1, rest.size()), root.filter, false, false, root.page);
         Result<Containers.Answer> answer = switch (bucket) {
@@ -211,6 +230,11 @@ public final class Cli {
             if (!Surface.of(loaded.library(), scope).isEmpty()) {
                 buckets.add(scope.verb());
             }
+        }
+        // Not a Surface.Scope — it is not part of the callable surface at all — so it is appended here rather
+        // than found by the loop above, last, matching the RFC's own worked examples.
+        if (loaded.readme().isPresent()) {
+            buckets.add("readme");
         }
         return new DiscoverResult.BucketList(List.copyOf(buckets), loaded.warning());
     }

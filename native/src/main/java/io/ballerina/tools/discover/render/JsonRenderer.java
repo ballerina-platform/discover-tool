@@ -45,6 +45,8 @@ public final class JsonRenderer {
             case DiscoverResult.PathGroups groups -> pathGroups(groups);
             case DiscoverResult.ResourceList resources -> resourceList(resources);
             case DiscoverResult.MethodList methods -> methodList(methods);
+            case DiscoverResult.Readme readme -> readme(readme);
+            case DiscoverResult.ReadmeChunks chunks -> readmeChunks(chunks);
         };
     }
 
@@ -163,6 +165,44 @@ public final class JsonRenderer {
         }
         if (methods.note() != null) {
             json.addProperty("note", methods.note());
+        }
+        return json;
+    }
+
+    private static JsonObject readme(DiscoverResult.Readme readme) {
+        JsonObject json = new JsonObject();
+        json.addProperty("readme", readme.markdown());
+        json.addProperty("lines", readme.lines());
+        if (readme.chunk() != null) {
+            json.addProperty("chunk", readme.chunk());
+            json.addProperty("of", readme.of());
+            json.addProperty("title", readme.title());
+        }
+        if (readme.warning() != null) {
+            json.addProperty("warning", readme.warning());
+        }
+        return json;
+    }
+
+    private static JsonObject readmeChunks(DiscoverResult.ReadmeChunks chunks) {
+        JsonObject json = new JsonObject();
+        JsonArray array = new JsonArray();
+        for (DiscoverResult.ReadmeChunks.Chunk chunk : chunks.chunks()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("number", chunk.number());
+            entry.addProperty("title", chunk.title());
+            entry.addProperty("lines", chunk.lines());
+            entry.addProperty("call", chunk.call());
+            array.add(entry);
+        }
+        json.add("chunks", array);
+        json.addProperty("shown", chunks.chunks().size());
+        json.addProperty("total", chunks.total());
+        if (chunks.next() != null) {
+            json.addProperty("next", chunks.next());
+        }
+        if (chunks.warning() != null) {
+            json.addProperty("warning", chunks.warning());
         }
         return json;
     }

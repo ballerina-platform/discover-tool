@@ -202,7 +202,7 @@ public final class Loader {
                 qualified,
                 resolved.version(),
                 Pipeline.build(module.value()),
-                Readmes.collect(docs),
+                Readmes.of(module.value()),
                 unverifiedWarning(resolved.stale())));
     }
 }

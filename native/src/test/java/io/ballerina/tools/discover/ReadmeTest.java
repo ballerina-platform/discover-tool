@@ -22,20 +22,16 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.central.schema.Schema;
+import io.ballerina.tools.discover.model.FromCentral;
 import io.ballerina.tools.discover.views.Readmes;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.util.List;
+import java.util.Optional;
 
 /**
- * The package's own guide: that it is there, that it is passed through untouched, and that embedding it does not
- * corrupt the code samples inside it.
- *
- * <p>The last one is the risk worth a test. The guide is the section an agent copies a working call out of, and a
- * heading transform that reached inside a fenced block would rewrite {@code #} comment lines in Ballerina, shell
- * and Python samples.
+ * The resolved module's own readme: that it is there, and that it is passed through untouched.
  *
  * @since 0.1.0
  */
@@ -47,33 +43,31 @@ public class ReadmeTest {
     }
 
     /**
-     * One module of an assembled payload. A {@code null} guide means the key is absent entirely.
+     * One module of an assembled payload. A {@code null} readme means the key is absent entirely.
      *
      * @param id the module's name
-     * @param guide the module's readme, or {@code null} to omit the key entirely
+     * @param readme the module's readme, or {@code null} to omit the key entirely
      */
-    private record Stub(String id, String guide) { }
+    private record Stub(String id, String readme) { }
 
     /**
-     * One module's worth of payload, built by taking a real module and replacing only its guide — the schema
+     * One module's worth of payload, built by taking a real module and replacing only its readme — the schema
      * requires every array, so a hand-written stub could not be parsed.
      */
-    private static CentralDocs docsWith(List<Stub> modules) {
+    private static CentralDocs.Module moduleWith(Stub stub) {
         JsonObject template = FixtureCorpus.loadRawFixture("ballerinax__kafka")
                 .getAsJsonObject().getAsJsonObject("docsData").getAsJsonArray("modules")
                 .get(0).getAsJsonObject();
 
-        JsonArray built = new JsonArray();
-        for (Stub module : modules) {
-            JsonObject entry = template.deepCopy().getAsJsonObject();
-            entry.addProperty("id", module.id());
-            if (module.guide() == null) {
-                entry.remove("description");
-            } else {
-                entry.addProperty("description", module.guide());
-            }
-            built.add(entry);
+        JsonObject entry = template.deepCopy().getAsJsonObject();
+        entry.addProperty("id", stub.id());
+        if (stub.readme() == null) {
+            entry.remove("description");
+        } else {
+            entry.addProperty("description", stub.readme());
         }
+        JsonArray built = new JsonArray();
+        built.add(entry);
         JsonObject docsData = new JsonObject();
         docsData.add("modules", built);
         JsonObject wrapper = new JsonObject();
@@ -81,69 +75,31 @@ public class ReadmeTest {
 
         Result<CentralDocs> parsed = Schema.parse(wrapper, "assembled");
         Assert.assertTrue(parsed.isOk(), parsed.isOk() ? "" : parsed.failure().describe());
-        return parsed.value();
+        return parsed.value().modules().get(0);
     }
 
     @Test(dataProvider = "fixtures")
-    public void everyPackageInTheCorpusPublishesAGuide(String slug) {
-        // The overview leans on this: the guide is most packages' largest section and the answer to "how is this
-        // used". A fixture without one would make the overview tests pass for the wrong reason.
-        List<Readmes.ModuleReadme> readmes = Readmes.collect(FixtureCorpus.loadFixture(slug));
-        Assert.assertTrue(readmes.size() >= 1, slug + " publishes no guide");
-        Assert.assertTrue(readmes.get(0).markdown().length() > 500, slug + "'s guide is suspiciously short");
+    public void everyPackageInTheCorpusPublishesAReadme(String slug) {
+        // The readme bucket leans on this: it is most packages' largest section and the answer to "how is this
+        // used". A fixture without one would make its own tests pass for the wrong reason.
+        Result<CentralDocs.Module> module =
+                FromCentral.selectModule(FixtureCorpus.loadFixture(slug), FixtureCorpus.qualifiedForSlug(slug));
+        Assert.assertTrue(module.isOk());
+        Optional<String> readme = Readmes.of(module.value());
+        Assert.assertTrue(readme.isPresent(), slug + " publishes no readme");
+        Assert.assertTrue(readme.get().length() > 500, slug + "'s readme is suspiciously short");
     }
 
     @Test
-    public void theGuideIsPassedThroughUntouchedOnlyTrimmed() {
-        CentralDocs docs = docsWith(List.of(new Stub("kafka", "\n\n## Overview\n\nbody\n\n")));
-        Assert.assertEquals(Readmes.collect(docs),
-                List.of(new Readmes.ModuleReadme("kafka", "## Overview\n\nbody")));
+    public void theReadmeIsPassedThroughUntouchedOnlyTrimmed() {
+        Optional<String> readme = Readmes.of(moduleWith(new Stub("kafka", "\n\n## Overview\n\nbody\n\n")));
+        Assert.assertEquals(readme, Optional.of("## Overview\n\nbody"));
     }
 
     @Test
-    public void aModuleWithoutAGuideIsDropped() {
-        // Rather than carried as an empty section: a heading with nothing under it reads as a truncated download.
-        CentralDocs docs = docsWith(List.of(
-                new Stub("a", "   "), new Stub("b", null), new Stub("c", "real")));
-        Assert.assertEquals(
-                Readmes.collect(docs).stream().map(Readmes.ModuleReadme::module).toList(), List.of("c"));
-    }
-
-    @Test
-    public void headingsAreDemotedSoTheHostDocumentKeepsOneOutline() {
-        Assert.assertEquals(
-                Readmes.demoteHeadings("# Top\n## Second\ntext", 2), "### Top\n#### Second\ntext");
-    }
-
-    @Test
-    public void aHeadingCannotBeDemotedPastLevelSix() {
-        // Because that stops being a heading: HTML has no h7.
-        Assert.assertEquals(
-                Readmes.demoteHeadings("##### Five\n###### Six", 2), "###### Five\n###### Six");
-    }
-
-    @Test
-    public void aHashInsideAFencedBlockIsLeftAlone() {
-        // Because it is a comment in someone's sample.
-        String guide = String.join("\n", List.of(
-                "## Setup", "", "```ballerina", "# The star count.", "int stars = 0;", "```", "", "## Next"));
-        String demoted = Readmes.demoteHeadings(guide, 2);
-        Assert.assertTrue(demoted.contains("\n#### Setup") || demoted.startsWith("#### Setup"));
-        Assert.assertTrue(demoted.contains("#### Next"));
-        Assert.assertTrue(demoted.contains("\n# The star count.\n"),
-                "a Ballerina doc comment must survive verbatim");
-    }
-
-    @Test
-    public void aTildeFenceCountsAsAFenceToo() {
-        Assert.assertEquals(
-                Readmes.demoteHeadings("~~~\n# not a heading\n~~~", 2), "~~~\n# not a heading\n~~~");
-    }
-
-    @Test
-    public void aLineThatOnlyLooksLikeAHeadingIsLeftAlone() {
-        // No space after the hashes, so it is not an ATX heading.
-        Assert.assertEquals(
-                Readmes.demoteHeadings("#hashtag\n####### seven", 2), "#hashtag\n####### seven");
+    public void aModuleWithoutAReadmeIsEmpty() {
+        Assert.assertEquals(Readmes.of(moduleWith(new Stub("a", "   "))), Optional.empty());
+        Assert.assertEquals(Readmes.of(moduleWith(new Stub("b", null))), Optional.empty());
+        Assert.assertEquals(Readmes.of(moduleWith(new Stub("c", "real"))), Optional.of("real"));
     }
 }

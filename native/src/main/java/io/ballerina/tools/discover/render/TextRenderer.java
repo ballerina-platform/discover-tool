@@ -43,6 +43,8 @@ public final class TextRenderer {
             case DiscoverResult.PathGroups groups -> renderPathGroups(groups);
             case DiscoverResult.ResourceList resources -> renderResourceList(resources);
             case DiscoverResult.MethodList methods -> renderMethodList(methods);
+            case DiscoverResult.Readme readme -> renderReadme(readme);
+            case DiscoverResult.ReadmeChunks chunks -> renderReadmeChunks(chunks);
         };
     }
 
@@ -81,6 +83,28 @@ public final class TextRenderer {
         String list = "Methods: " + String.join(", ", methods.methods());
         return withNotices(withNext(list, methods.shown(), methods.total(), methods.next()),
                 methods.warning(), methods.note());
+    }
+
+    /** Verbatim, per the RFC's own words for this bucket — no heading, no wrapping, for the whole-readme case. */
+    private static String renderReadme(DiscoverResult.Readme readme) {
+        if (readme.markdown().isEmpty()) {
+            return withWarning("none", readme.warning());
+        }
+        String body = readme.chunk() == null
+                ? readme.markdown()
+                : "Chunk " + readme.chunk() + " of " + readme.of() + " — " + readme.title()
+                        + "\n\n" + readme.markdown();
+        return withWarning(body, readme.warning());
+    }
+
+    private static String renderReadmeChunks(DiscoverResult.ReadmeChunks chunks) {
+        if (chunks.chunks().isEmpty()) {
+            return withWarning("none", chunks.warning());
+        }
+        String list = chunks.chunks().stream()
+                .map(chunk -> chunk.number() + ". " + chunk.title() + " (" + chunk.lines() + " lines)")
+                .collect(Collectors.joining("\n"));
+        return withWarning(withNext(list, chunks.chunks().size(), chunks.total(), chunks.next()), chunks.warning());
     }
 
     private static String withWarning(String body, String warning) {

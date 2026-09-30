@@ -19,7 +19,6 @@
 package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.model.TypeDef;
-import io.ballerina.tools.discover.render.Report;
 import io.ballerina.tools.discover.render.TypeDefs;
 import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.Names;
@@ -75,32 +74,6 @@ public class ViewsAgreeTest {
     @DataProvider(name = "fixtures")
     public Object[][] fixtures() {
         return FixtureCorpus.fixtureRows();
-    }
-
-    /**
-     * The document with every QUOTATION cut out of it.
-     *
-     * <p>A quotation is the package author's own Markdown, embedded verbatim, and its Ballerina samples are USAGE
-     * — {@code github:Client github = check new (config);} — not declarations. They are the reason the text is
-     * worth carrying and they have no business in an oracle that checks signatures against the API document.
-     *
-     * <p>Cut on {@code Report}'s begin/end markers rather than on a heading name, which is what made this survive
-     * the guide moving to its own verb and {@code ## Usage} being renamed {@code ## Quickstart}. The markers are
-     * the structural statement that something is a quotation, so they are what a rule about quotations keys on.
-     */
-    private static String withoutQuotations(String document) {
-        StringBuilder own = new StringBuilder();
-        int from = 0;
-        while (true) {
-            int begin = document.indexOf(Report.EMBED_BEGIN, from);
-            if (begin == -1) {
-                return own.append(document.substring(from)).toString();
-            }
-            int end = document.indexOf(Report.EMBED_END, begin);
-            Assert.assertTrue(end > begin, "an embedded quotation with no end marker");
-            own.append(document, from, begin);
-            from = end;
-        }
     }
 
     /** Ballerina lines inside fenced ballerina blocks, the only place a report may hold any. */
@@ -188,7 +161,7 @@ public class ViewsAgreeTest {
                 if (!(answer instanceof Containers.Answer.Markdown markdown)) {
                     continue;
                 }
-                for (String line : fencedBallerina(withoutQuotations(markdown.text()))) {
+                for (String line : fencedBallerina(markdown.text())) {
                     Assert.assertTrue(snapshot.contains(line.stripLeading()),
                             slug + " " + scope.verb() + " " + container.name()
                                     + " quotes a line api does not:\n  " + line);
