@@ -90,8 +90,9 @@ final class Commands {
         String filter;
 
         @CommandLine.Option(names = "--page", paramLabel = "<n>", defaultValue = "1",
-                description = "1-indexed. Only meaningful once a listing of remote or normal methods is over "
-                        + "the entry ceiling; ignored otherwise.")
+                description = "1-indexed. Turns the page of any listing that pages over the entry ceiling: "
+                        + "remote or normal methods, resource paths that cannot be grouped, and readme sections "
+                        + "narrowed by --filter. A page outside the listing is an error.")
         int page;
 
         @CommandLine.Option(names = {"--module", "-m"}, paramLabel = "<name>",

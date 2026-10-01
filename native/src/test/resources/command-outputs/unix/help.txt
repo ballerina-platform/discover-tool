@@ -7,9 +7,9 @@ compiles; a readme, a web search and a remembered API are not.
 
 Typical session:
 
-  1. What can I ask?             bal discover ballerinax/github
+  1. What can I ask?              bal discover ballerinax/github
   2. A bucket, listed or one:     bal discover ballerinax/github client
-                                   bal discover ballerinax/github client Client
+                                  bal discover ballerinax/github client Client
   3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
 
 Buckets, addressed as the second positional: client, service, class, funcs, readme.
@@ -22,9 +22,10 @@ No bucket lists which of them this package has.
   --filter <keyword>     Narrow an already-selected bucket to entries whose name,
                          path, parameter or type matches this keyword, client-side.
                          Never sent to Central as a query.
-  --page <n>             1-indexed. Only meaningful once a listing of remote or
-                         normal methods is over the entry ceiling; ignored
-                         otherwise.
+  --page <n>             1-indexed. Turns the page of any listing that pages over
+                         the entry ceiling: remote or normal methods, resource paths
+                         that cannot be grouped, and readme sections narrowed by
+                         --filter. A page outside the listing is an error.
   -m, --module <name>    Target this submodule instead of the package's default
                          module, the same everywhere including readme. The bare
                          submodule name only — <org/name> is always resolved as one
