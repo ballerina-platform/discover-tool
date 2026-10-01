@@ -37,7 +37,7 @@ left out.
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
-| `--page <n>`           | Turn the page of a listing that pages over the entry ceiling: methods, resource paths that cannot be grouped, a container's resources and methods listed together, and readme sections narrowed by `--filter`. A page outside the listing is a `validation` failure. |
+| `--page <n>`           | Turn the page of a listing that pages over the entry ceiling: methods, resource paths that cannot be grouped, a container listed by call form (resources, remote, normal), and readme sections narrowed by `--filter`. A page outside the listing is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`.                 |
 | `--refresh`            | Ignore the cached payload and fetch it again.                                                          |
 
@@ -393,7 +393,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `calls`), `groups` (`name`, `count`, `call`), `shown`, `total`, `next` |
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `calls`), `shown`, `total`, `page`, `pages`, `next`              |
 | methods of one call form             | `container`, `methods` (`name`, `call`), `shown`, `total`, `page`, `pages`, `next`                              |
-| more than one call form              | `container`, `resources` (`path`, `accessors`, `calls`), `remote` (`name`, `call`), `normal` (`name`, `call`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
+| more than one call form              | `container`, `resources` (`path`, `accessors`, `calls`), `remote` (`name`, `call`), `normal` (`name`, `call`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
 | one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented` |
 | nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `call`), `available`, `next`, `documented`              |
 | member on several containers         | `requested`, `owners` (`name`, `matches`, `call`), `shown`, `total`, `next`                                      |
@@ -404,7 +404,8 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 Any answer can also carry `warning` (the version could not be confirmed against the registry) and most can
 carry `note` (the symbol was found in a different bucket than the one asked, the path selector was relocated
 or a wildcard skipped a branch, or the service's listener). `documented` lists entries a `--filter` matched
-only in their documentation.
+only in their documentation — at most 40 of them, with `documentedTotal` giving how many there are (in text, a
+`Matched by documentation only (40 of 102)` heading).
 
 ### The entry ceiling
 
@@ -413,13 +414,15 @@ No listing shows more than **40 entries**. Over that:
 - resource paths selected by a path (or by nothing) **group** by their next literal path segment, up to four
   literal levels below the top; path parameters never form a group of their own, and a group carries the
   accessor the listing was narrowed by into its `call`;
-- remote and normal methods **page**, alphabetically, with `--page <n>`, and so do resource paths that cannot
+- methods of one call form **page**, alphabetically, with `--page <n>`, and so do resource paths that cannot
   be grouped — selected by a name substring or `--filter`, or already four literal levels deep — and readme
   sections narrowed by `--filter`. Every page keeps the selector and the `--filter`;
 - a container mixing call forms (resources with methods, or remote methods with normal ones) pages the same
   way, as one sequence — resource paths, then remote methods, then normal ones — so a page can end partway
   through one section and pick up the next; each page keeps the section headings (`resources`, `remote`,
-  `normal` in JSON) for whatever it holds and omits the ones it holds nothing of;
+  `normal` in JSON) for whatever it holds and omits the ones it holds nothing of, while `counts` (and the text
+  header, `111 remote methods, 1 normal method`) gives every form's size across the whole listing, so a form
+  that only appears on a later page is never hidden. Documentation-only matches come on the first page only;
 - a roster of containers is cut at 40 and points at `--filter`.
 
 A cut listing always says so: `shown`/`total` plus `next` (the command that continues it) in JSON, or a
