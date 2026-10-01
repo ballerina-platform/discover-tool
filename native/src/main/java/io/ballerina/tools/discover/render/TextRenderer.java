@@ -204,9 +204,11 @@ public final class TextRenderer {
         layout.top(methods.container() == null
                 ? counted(methods.total(), "function", "functions")
                 : counted(methods.total(), "method", "methods"));
-        layout.block(names(methods.methods()).lines(INDENT));
+        Drill drill = methodDrill(methods.methods());
+        layout.block(methodTable(methods.methods(), drill).lines(INDENT));
         layout.notices(methods.note(), methods.warning());
         layout.more(remaining(methods.shown(), methods.total(), methods.paging()), methods.paging());
+        layout.next(drill.pattern());
         layout.next(methods.next());
     }
 
@@ -280,12 +282,16 @@ public final class TextRenderer {
         }
         Drill drill = resourceDrill(mixed.resources());
         layout.section("Resources (->)", resourceTable(mixed.resources(), drill));
-        layout.section("Remote (->)", names(mixed.remote()));
-        layout.section("Normal (.)", names(mixed.normal()));
+        List<DiscoverResult.Method> methods = new ArrayList<>(mixed.remote());
+        methods.addAll(mixed.normal());
+        Drill methodDrill = methodDrill(methods);
+        layout.section("Remote (->)", methodTable(mixed.remote(), methodDrill, 0));
+        layout.section("Normal (.)", methodTable(mixed.normal(), methodDrill, mixed.remote().size()));
         documented(layout, mixed.documented());
         layout.notices(mixed.note(), mixed.warning());
         layout.more(remaining(mixed.shown(), mixed.total(), mixed.paging()), mixed.paging());
         layout.next(drill.pattern());
+        layout.next(methodDrill.pattern());
         layout.next(mixed.next());
     }
 
@@ -401,6 +407,24 @@ public final class TextRenderer {
         boolean shared = unfit.stream().allMatch(call -> call.lastIndexOf(' ') == prefix.length()
                 && call.startsWith(prefix));
         return shared ? prefix + " <accessor>" : String.join("  ", unfit);
+    }
+
+    private static Drill methodDrill(List<DiscoverResult.Method> methods) {
+        return Drill.of(methods.stream().map(DiscoverResult.Method::name).toList(),
+                methods.stream().map(DiscoverResult.Method::call).toList(), "<name>");
+    }
+
+    private static TextTable methodTable(List<DiscoverResult.Method> methods, Drill drill) {
+        return methodTable(methods, drill, 0);
+    }
+
+    /** {@code methods}, whose rows sit at {@code offset} in the list {@code drill} was derived from. */
+    private static TextTable methodTable(List<DiscoverResult.Method> methods, Drill drill, int offset) {
+        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
+        for (int i = 0; i < methods.size(); i++) {
+            table.row(methods.get(i).name(), drill.explicit(offset + i));
+        }
+        return table;
     }
 
     private static TextTable names(List<String> names) {

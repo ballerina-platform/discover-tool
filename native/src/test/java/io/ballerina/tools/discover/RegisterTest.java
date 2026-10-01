@@ -302,11 +302,12 @@ public class RegisterTest {
             }
             case DiscoverResult.ResourceList resources ->
                     resources.resources().forEach(resource -> entries.add(resource.path()));
-            case DiscoverResult.MethodList methods -> entries.addAll(methods.methods());
+            case DiscoverResult.MethodList methods ->
+                    methods.methods().forEach(method -> entries.add(method.name()));
             case DiscoverResult.MixedListing mixed -> {
                 mixed.resources().forEach(resource -> entries.add(resource.path()));
-                entries.addAll(mixed.remote());
-                entries.addAll(mixed.normal());
+                mixed.remote().forEach(method -> entries.add(method.name()));
+                mixed.normal().forEach(method -> entries.add(method.name()));
                 entries.addAll(mixed.documented());
             }
             case DiscoverResult.NoMatch noMatch -> {
@@ -332,8 +333,13 @@ public class RegisterTest {
             }
             case DiscoverResult.ResourceList resources ->
                     resources.resources().forEach(resource -> addResourceCalls(calls, resource));
-            case DiscoverResult.MixedListing mixed ->
-                    mixed.resources().forEach(resource -> addResourceCalls(calls, resource));
+            case DiscoverResult.MethodList methods ->
+                    methods.methods().forEach(method -> calls.add(new String[] {method.name(), method.call()}));
+            case DiscoverResult.MixedListing mixed -> {
+                mixed.resources().forEach(resource -> addResourceCalls(calls, resource));
+                mixed.remote().forEach(method -> calls.add(new String[] {method.name(), method.call()}));
+                mixed.normal().forEach(method -> calls.add(new String[] {method.name(), method.call()}));
+            }
             case DiscoverResult.NoMatch noMatch -> noMatch.paths()
                     .forEach(alternative -> calls.add(new String[] {alternative.path(), alternative.call()}));
             case DiscoverResult.Owners owners -> owners.owners()

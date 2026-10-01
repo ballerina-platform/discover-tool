@@ -44,6 +44,7 @@ ballerinax/googleapis.sheets · client · Client
   setCell
 
 ... 3 more (page 1 of 2)
+Next: bal discover ballerinax/googleapis.sheets client Client <name>
 Next: bal discover ballerinax/googleapis.sheets client Client --page 2
 == service ==
 ballerinax/googleapis.sheets · service

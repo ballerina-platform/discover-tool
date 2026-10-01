@@ -44,6 +44,7 @@ ballerinax/twilio · client · Client
   deleteCallRecording
 
 ... 159 more (page 1 of 5)
+Next: bal discover ballerinax/twilio client Client <name>
 Next: bal discover ballerinax/twilio client Client --page 2
 == service ==
 ballerinax/twilio · service

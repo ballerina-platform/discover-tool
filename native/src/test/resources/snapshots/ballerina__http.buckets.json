@@ -62,11 +62,11 @@
 {"name":"StatusLoopDetected","call":"bal discover ballerina/http class StatusLoopDetected"}
 ],"shown":40,"total":83,"next":"bal discover ballerina/http class --filter <keyword>"}
 {"methods":[
-"authenticateResource",
-"createHttpCachingClient",
-"createHttpSecureClient",
-"getDefaultListener",
-"getHeaderMap",
-"getQueryMap",
-"parseHeader"
+{"name":"authenticateResource","call":"bal discover ballerina/http funcs authenticateResource"},
+{"name":"createHttpCachingClient","call":"bal discover ballerina/http funcs createHttpCachingClient"},
+{"name":"createHttpSecureClient","call":"bal discover ballerina/http funcs createHttpSecureClient"},
+{"name":"getDefaultListener","call":"bal discover ballerina/http funcs getDefaultListener"},
+{"name":"getHeaderMap","call":"bal discover ballerina/http funcs getHeaderMap"},
+{"name":"getQueryMap","call":"bal discover ballerina/http funcs getQueryMap"},
+{"name":"parseHeader","call":"bal discover ballerina/http funcs parseHeader"}
 ],"shown":7,"total":7}

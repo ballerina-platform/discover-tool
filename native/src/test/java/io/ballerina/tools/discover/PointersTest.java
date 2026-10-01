@@ -158,7 +158,10 @@ public class PointersTest {
                 resources.resources().forEach(resource -> commands.addAll(resource.calls().values()));
                 addIfPresent(commands, resources.next());
             }
-            case DiscoverResult.MethodList methods -> addIfPresent(commands, methods.next());
+            case DiscoverResult.MethodList methods -> {
+                methods.methods().forEach(method -> commands.add(method.call()));
+                addIfPresent(commands, methods.next());
+            }
             case DiscoverResult.Readme ignored -> {
                 // No embedded command fields on the whole-readme/single-chunk answer.
             }
@@ -171,6 +174,8 @@ public class PointersTest {
             }
             case DiscoverResult.MixedListing mixed -> {
                 mixed.resources().forEach(resource -> commands.addAll(resource.calls().values()));
+                mixed.remote().forEach(method -> commands.add(method.call()));
+                mixed.normal().forEach(method -> commands.add(method.call()));
                 addIfPresent(commands, mixed.next());
             }
             case DiscoverResult.NoMatch noMatch -> {
@@ -270,6 +275,39 @@ public class PointersTest {
                 });
             }
         }
+    }
+
+    /** Every method row's {@code call} opens exactly that method's signature, never another listing. */
+    @Test(dataProvider = "fixtures")
+    public void everyMethodRowsCallOpensItsOwnSignature(String slug) {
+        LoadedPackage context = FixtureCorpus.loadedFixture(slug);
+        HttpOptions http = centralFor(slug);
+        Set<String> seen = new LinkedHashSet<>();
+        for (DiscoverResult answer : answersOf(context)) {
+            for (DiscoverResult.Method method : methodsOf(answer)) {
+                if (!seen.add(method.call())) {
+                    continue;
+                }
+                JsonObject signature = run(slug, http, method.call());
+                Assert.assertTrue(signature.has("declaration"),
+                        slug + ": `" + method.call() + "` is not a signature:\n" + signature);
+                Assert.assertEquals(signature.get("name").getAsString(), method.name(), method.call());
+            }
+        }
+    }
+
+    private static List<DiscoverResult.Method> methodsOf(DiscoverResult answer) {
+        return switch (answer) {
+            case DiscoverResult.MethodList methods -> methods.methods();
+            case DiscoverResult.MixedListing mixed -> {
+                List<DiscoverResult.Method> methods = new ArrayList<>(mixed.remote());
+                methods.addAll(mixed.normal());
+                yield methods;
+            }
+            case DiscoverResult.NoMatch noMatch -> noMatch.available() == null ? List.of()
+                    : methodsOf(noMatch.available());
+            default -> List.of();
+        };
     }
 
     private static List<DiscoverResult.ResourceList.Resource> resourcesOf(DiscoverResult answer) {

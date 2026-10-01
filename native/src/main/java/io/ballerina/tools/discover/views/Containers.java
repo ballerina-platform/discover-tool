@@ -902,8 +902,8 @@ public final class Containers {
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
         List<DiscoverResult.ResourceList.Resource> resources = mergedResources(
                 callable.stream().filter(entry -> entry.fn() instanceof Fn.Resource).toList(), base);
-        List<String> remote = namesOf(callable, Fn.Remote.class);
-        List<String> normal = namesOf(callable, Fn.Normal.class);
+        List<DiscoverResult.Method> remote = methodsOf(callable, Fn.Remote.class, base);
+        List<DiscoverResult.Method> normal = methodsOf(callable, Fn.Normal.class, base);
         int total = resources.size() + remote.size() + normal.size();
 
         Result<Page> page = Page.of(options.page(), total, command);
@@ -919,11 +919,13 @@ public final class Containers {
                 mergeNotes(note, pathNote(container, selectors))));
     }
 
-    private static List<String> namesOf(List<Entry> entries, Class<? extends Fn> form) {
+    /** Each method of one call form, alphabetical, with the command that opens its signature. */
+    private static List<DiscoverResult.Method> methodsOf(List<Entry> entries, Class<? extends Fn> form, String base) {
         return entries.stream()
                 .filter(entry -> form.isInstance(entry.fn()))
                 .map(Entry::label)
                 .sorted(Texts.LOCALE_ORDER)
+                .map(name -> new DiscoverResult.Method(name, base + " " + shellWord(name)))
                 .toList();
     }
 
@@ -936,17 +938,17 @@ public final class Containers {
             List<Entry> callable, Options options, String warning, String note) {
         // A page is turned on the SAME selection — selector and filter both — or paging would silently widen
         // back out to the container's full roster.
-        String command = baseCommand(loaded, scope, container) + selectorArguments(container, selectors)
-                + filterArgument(options);
-        List<String> names = callable.stream().map(Entry::label).sorted(Texts.LOCALE_ORDER).toList();
-        Result<Page> page = Page.of(options.page(), names.size(), command);
+        String base = baseCommand(loaded, scope, container);
+        String command = base + selectorArguments(container, selectors) + filterArgument(options);
+        List<DiscoverResult.Method> methods = methodsOf(callable, Fn.class, base);
+        Result<Page> page = Page.of(options.page(), methods.size(), command);
         if (!page.isOk()) {
             return page.cast();
         }
         Page window = page.value();
-        List<String> shown = names.subList(window.from(), window.to());
-        return Result.ok(new DiscoverResult.MethodList(containerName(container), shown, shown.size(), names.size(),
-                window.paging(), window.next(command), warning, note));
+        List<DiscoverResult.Method> shown = methods.subList(window.from(), window.to());
+        return Result.ok(new DiscoverResult.MethodList(containerName(container), shown, shown.size(),
+                methods.size(), window.paging(), window.next(command), warning, note));
     }
 
     // -----------------------------------------------------------------------

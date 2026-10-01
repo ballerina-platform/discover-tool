@@ -163,9 +163,7 @@ public final class JsonRenderer {
     private static JsonObject methodList(DiscoverResult.MethodList methods) {
         JsonObject json = new JsonObject();
         addIfPresent(json, "container", methods.container());
-        JsonArray array = new JsonArray();
-        methods.methods().forEach(array::add);
-        json.add("methods", array);
+        json.add("methods", methods(methods.methods()));
         json.addProperty("shown", methods.shown());
         json.addProperty("total", methods.total());
         addPaging(json, methods.paging());
@@ -236,6 +234,17 @@ public final class JsonRenderer {
         return array;
     }
 
+    private static JsonArray methods(List<DiscoverResult.Method> methods) {
+        JsonArray array = new JsonArray();
+        for (DiscoverResult.Method method : methods) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", method.name());
+            entry.addProperty("call", method.call());
+            array.add(entry);
+        }
+        return array;
+    }
+
     private static JsonObject signature(DiscoverResult.Signature signature) {
         JsonObject json = new JsonObject();
         addIfPresent(json, "container", signature.container());
@@ -282,8 +291,12 @@ public final class JsonRenderer {
         if (!mixed.resources().isEmpty()) {
             json.add("resources", resources(mixed.resources()));
         }
-        addIfNotEmpty(json, "remote", mixed.remote());
-        addIfNotEmpty(json, "normal", mixed.normal());
+        if (!mixed.remote().isEmpty()) {
+            json.add("remote", methods(mixed.remote()));
+        }
+        if (!mixed.normal().isEmpty()) {
+            json.add("normal", methods(mixed.normal()));
+        }
         json.addProperty("shown", mixed.shown());
         json.addProperty("total", mixed.total());
         addPaging(json, mixed.paging());

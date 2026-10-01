@@ -87,3 +87,5 @@ ballerina/http · funcs
   getHeaderMap
   getQueryMap
   parseHeader
+
+Next: bal discover ballerina/http funcs <name>

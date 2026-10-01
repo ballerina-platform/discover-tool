@@ -8,6 +8,8 @@ ballerinax/postgresql · client · Client
   execute
   query
   queryRow
+
+Next: bal discover ballerinax/postgresql client Client <name>
 == service ==
 ballerinax/postgresql · service
 This package declares nothing in service.

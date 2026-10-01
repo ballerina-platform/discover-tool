@@ -15,6 +15,7 @@ Remote (->)
   put
 
 Next: bal discover ballerinax/sap client Client <path> <accessor>
+Next: bal discover ballerinax/sap client Client <name>
 == service ==
 ballerinax/sap · service
 This package declares nothing in service.

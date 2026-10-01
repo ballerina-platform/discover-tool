@@ -31,3 +31,5 @@ ballerina/xlsx · funcs
   parseTable
   writeSheet
   writeTable
+
+Next: bal discover ballerina/xlsx funcs <name>
