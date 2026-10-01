@@ -314,7 +314,7 @@ public class CliTest {
         for (String name : List.of("Client", "FailoverClient", "LoadBalanceClient", "StatusCodeClient")) {
             Assert.assertTrue(capture.stdout().contains("\"name\":\"" + name + "\""), name);
             Assert.assertTrue(
-                    capture.stdout().contains("\"call\":\"bal discover ballerina/http client " + name + "\""),
+                    capture.stdout().contains("\"command\":\"bal discover ballerina/http client " + name + "\""),
                     name);
         }
     }
@@ -352,7 +352,8 @@ public class CliTest {
         JsonObject empty = JsonParser.parseString(json.stdout()).getAsJsonObject();
         Assert.assertEquals(empty.get("bucket").getAsString(), "funcs");
         Assert.assertEquals(empty.get("total").getAsInt(), 0);
-        Assert.assertTrue(json.stdout().contains("\"call\":\"bal discover ballerinax/kafka client\""), json.stdout());
+        Assert.assertTrue(json.stdout().contains("\"command\":\"bal discover ballerinax/kafka client\""),
+                json.stdout());
 
         Capture text = run(List.of("ballerinax/kafka", "funcs"), "ballerinax__kafka", "4.6.5", true);
         Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka · funcs\n"
@@ -409,12 +410,12 @@ public class CliTest {
     }
 
     /**
-     * The RFC's own worked example: every entry under github's {@code gists} carries a {@code calls} object, one
-     * command per accessor in {@code accessors} order and never a flat {@code call}, and running each opens exactly
+     * The RFC's own worked example: every entry under github's {@code gists} carries a {@code commands} object, one
+     * command per accessor in {@code accessors} order and never a flat {@code command}, and running each opens exactly
      * that resource and accessor's signature — never the listing it came from again.
      */
     @Test
-    public void everyResourceCallOpensExactlyThatSignature() {
+    public void everyResourceCommandOpensExactlyThatSignature() {
         for (String[] listing : new String[][] {
                 {"ballerinax/github", "ballerinax__github", "gists"},
                 {"ballerinax/googleapis.gmail", "ballerinax__googleapis.gmail", null}}) {
@@ -427,19 +428,19 @@ public class CliTest {
             boolean several = false;
             for (JsonElement element : resources) {
                 JsonObject resource = element.getAsJsonObject();
-                Assert.assertFalse(resource.has("call"), resource.toString());
-                JsonObject calls = resource.getAsJsonObject("calls");
+                Assert.assertFalse(resource.has("command"), resource.toString());
+                JsonObject commands = resource.getAsJsonObject("commands");
                 List<String> accessors = new java.util.ArrayList<>();
                 resource.getAsJsonArray("accessors").forEach(accessor -> accessors.add(accessor.getAsString()));
-                Assert.assertEquals(List.copyOf(calls.keySet()), accessors, resource.toString());
+                Assert.assertEquals(List.copyOf(commands.keySet()), accessors, resource.toString());
                 several |= accessors.size() > 1;
                 for (String accessor : accessors) {
-                    List<String> call = argv(calls.get(accessor).getAsString());
-                    JsonObject signature = JsonParser.parseString(run(call, listing[1], "1.0.0", false).stdout())
+                    List<String> command = argv(commands.get(accessor).getAsString());
+                    JsonObject signature = JsonParser.parseString(run(command, listing[1], "1.0.0", false).stdout())
                             .getAsJsonObject();
                     Assert.assertEquals(signature.get("path").getAsString(), resource.get("path").getAsString(),
-                            String.join(" ", call));
-                    Assert.assertEquals(signature.get("accessor").getAsString(), accessor, String.join(" ", call));
+                            String.join(" ", command));
+                    Assert.assertEquals(signature.get("accessor").getAsString(), accessor, String.join(" ", command));
                     followed++;
                 }
             }
@@ -510,7 +511,7 @@ public class CliTest {
                 .getAsJsonObject();
         Assert.assertEquals(json.get("requested").getAsString(), "commit");
         Assert.assertTrue(json.toString().contains(
-                "\"call\":\"bal discover ballerinax/kafka client Consumer commit\""), json.toString());
+                "\"command\":\"bal discover ballerinax/kafka client Consumer commit\""), json.toString());
         Assert.assertEquals(json.get("shown").getAsInt(), json.get("total").getAsInt());
 
         String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
@@ -648,7 +649,7 @@ public class CliTest {
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\"submodules\":["), capture.stdout());
         Assert.assertTrue(
-                capture.stdout().contains("\"call\":\"bal discover ballerina/graphql --module dataloader\""),
+                capture.stdout().contains("\"command\":\"bal discover ballerina/graphql --module dataloader\""),
                 capture.stdout());
     }
 

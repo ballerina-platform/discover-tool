@@ -277,9 +277,10 @@ public class ViewsTest {
         DiscoverResult.Owners owners = as(DiscoverResult.Owners.class,
                 render(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, List.of("commit")));
         Assert.assertEquals(owners.requested(), "commit");
-        List<String> calls = owners.owners().stream().map(DiscoverResult.Owners.Owner::call).toList();
-        Assert.assertTrue(calls.contains("bal discover ballerinax/kafka client Caller commit"), calls.toString());
-        Assert.assertTrue(calls.contains("bal discover ballerinax/kafka client Consumer commit"), calls.toString());
+        List<String> commands = owners.owners().stream().map(DiscoverResult.Owners.Owner::command).toList();
+        Assert.assertTrue(commands.contains("bal discover ballerinax/kafka client Caller commit"), commands.toString());
+        Assert.assertTrue(commands.contains("bal discover ballerinax/kafka client Consumer commit"),
+                commands.toString());
         Assert.assertEquals(owners.total(), owners.owners().size());
     }
 
@@ -362,9 +363,9 @@ public class ViewsTest {
         DiscoverResult.EmptyBucket empty = as(DiscoverResult.EmptyBucket.class,
                 render(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.MODULE, List.of()));
         Assert.assertEquals(empty.bucket(), "funcs");
-        List<String> calls = empty.elsewhere().stream().map(DiscoverResult.EmptyBucket.Elsewhere::call).toList();
-        Assert.assertTrue(calls.contains("bal discover ballerinax/kafka client"), calls.toString());
-        Assert.assertTrue(calls.contains("bal discover ballerinax/kafka class"), calls.toString());
+        List<String> commands = empty.elsewhere().stream().map(DiscoverResult.EmptyBucket.Elsewhere::command).toList();
+        Assert.assertTrue(commands.contains("bal discover ballerinax/kafka client"), commands.toString());
+        Assert.assertTrue(commands.contains("bal discover ballerinax/kafka class"), commands.toString());
     }
 
     @Test
@@ -523,8 +524,8 @@ public class ViewsTest {
         Assert.assertEquals(paths.size(), 3, paths.toString());
         Assert.assertTrue(paths.contains("repos/:owner/:repo/actions/secrets"), paths.toString());
         Assert.assertTrue(paths.contains("repos/:owner/:repo/dependabot/secrets"), paths.toString());
-        Assert.assertTrue(miss.paths().get(0).call().startsWith("bal discover ballerinax/github client Client "),
-                miss.paths().get(0).call());
+        Assert.assertTrue(miss.paths().get(0).command().startsWith("bal discover ballerinax/github client Client "),
+                miss.paths().get(0).command());
         // The paths ARE the way forward, so no generic listing competes with them.
         Assert.assertNull(miss.available());
     }

@@ -170,7 +170,7 @@ public class SelectionCarryTest {
     public void aRosterEntryOpensItsContainerUnderTheSameFilter() {
         JsonObject roster = answer("ballerinax__kafka", "bal discover ballerinax/kafka client --filter commit");
         for (JsonElement element : roster.getAsJsonArray("containers")) {
-            Assert.assertTrue(element.getAsJsonObject().get("call").getAsString().endsWith(" --filter commit"),
+            Assert.assertTrue(element.getAsJsonObject().get("command").getAsString().endsWith(" --filter commit"),
                     element.toString());
         }
     }
@@ -208,9 +208,9 @@ public class SelectionCarryTest {
         JsonObject actions = groupNamed(groups.getAsJsonArray("groups"), "repos/:owner/:repo/actions");
         int count = actions.get("count").getAsInt();
         Assert.assertTrue(count < 72, "repos/:owner/:repo/actions counted every accessor: " + count);
-        Assert.assertEquals(actions.get("call").getAsString(), GITHUB + " repos/:owner/:repo/actions get");
+        Assert.assertEquals(actions.get("command").getAsString(), GITHUB + " repos/:owner/:repo/actions get");
 
-        JsonObject opened = answer("ballerinax__github", actions.get("call").getAsString());
+        JsonObject opened = answer("ballerinax__github", actions.get("command").getAsString());
         Assert.assertEquals(opened.get("total").getAsInt(), count, opened.toString());
         for (JsonElement element : opened.getAsJsonArray("resources")) {
             Assert.assertEquals(element.getAsJsonObject().getAsJsonArray("accessors").toString(), "[\"get\"]");
@@ -222,16 +222,16 @@ public class SelectionCarryTest {
         String command = GITHUB + " repos";
         JsonObject groups = answer("ballerinax__github", command);
         for (JsonElement element : groups.getAsJsonArray("groups")) {
-            Assert.assertNotEquals(element.getAsJsonObject().get("call").getAsString(), command, element.toString());
+            Assert.assertNotEquals(element.getAsJsonObject().get("command").getAsString(), command, element.toString());
         }
         JsonObject here = groups.getAsJsonArray("resources").get(0).getAsJsonObject();
         Assert.assertEquals(here.get("path").getAsString(), "repos/:owner/:repo");
-        JsonObject calls = here.getAsJsonObject("calls");
-        Assert.assertEquals(calls.size(), here.getAsJsonArray("accessors").size(), here.toString());
+        JsonObject commands = here.getAsJsonObject("commands");
+        Assert.assertEquals(commands.size(), here.getAsJsonArray("accessors").size(), here.toString());
         for (JsonElement accessor : here.getAsJsonArray("accessors")) {
-            String call = calls.get(accessor.getAsString()).getAsString();
-            Assert.assertEquals(call, GITHUB + " repos/:owner/:repo " + accessor.getAsString());
-            JsonObject signature = answer("ballerinax__github", call);
+            String opens = commands.get(accessor.getAsString()).getAsString();
+            Assert.assertEquals(opens, GITHUB + " repos/:owner/:repo " + accessor.getAsString());
+            JsonObject signature = answer("ballerinax__github", opens);
             Assert.assertEquals(signature.get("path").getAsString(), "repos/:owner/:repo");
             Assert.assertEquals(signature.get("accessor").getAsString(), accessor.getAsString());
         }

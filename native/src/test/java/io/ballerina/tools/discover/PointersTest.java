@@ -52,7 +52,7 @@ import java.util.regex.Pattern;
  * followed it ran the same wrong shape again.
  *
  * <p>All three are the same defect, and this is the general form of the test: extract every {@code bal discover}
- * command a bucket can print — read off every answer's own {@code call}/{@code calls}/{@code next} fields — run
+ * command a bucket can print — read off every answer's own {@code command}/{@code commands}/{@code next} fields — run
  * it through the real CLI against the recorded payload, and require exit 0 with something other than "nothing
  * matched". A new pointer cannot be added wrong.
  *
@@ -144,53 +144,53 @@ public class PointersTest {
             case DiscoverResult.BucketList bucketList ->
                     // Empty for every recorded fixture — all single-module — but not for a package with
                     // submodules, so this is wired correctly rather than left for whenever one is added.
-                    bucketList.submodules().forEach(submodule -> commands.add(submodule.call()));
+                    bucketList.submodules().forEach(submodule -> commands.add(submodule.command()));
             case DiscoverResult.ContainerRoster roster -> {
-                roster.containers().forEach(entry -> commands.add(entry.call()));
+                roster.containers().forEach(entry -> commands.add(entry.command()));
                 addIfPresent(commands, roster.next());
             }
             case DiscoverResult.PathGroups groups -> {
-                groups.resources().forEach(resource -> commands.addAll(resource.calls().values()));
-                groups.groups().forEach(group -> commands.add(group.call()));
+                groups.resources().forEach(resource -> commands.addAll(resource.commands().values()));
+                groups.groups().forEach(group -> commands.add(group.command()));
                 addIfPresent(commands, groups.next());
             }
             case DiscoverResult.ResourceList resources -> {
-                resources.resources().forEach(resource -> commands.addAll(resource.calls().values()));
+                resources.resources().forEach(resource -> commands.addAll(resource.commands().values()));
                 addIfPresent(commands, resources.next());
             }
             case DiscoverResult.MethodList methods -> {
-                methods.methods().forEach(method -> commands.add(method.call()));
+                methods.methods().forEach(method -> commands.add(method.command()));
                 addIfPresent(commands, methods.next());
             }
             case DiscoverResult.Readme ignored -> {
                 // No embedded command fields on the whole-readme/single-chunk answer.
             }
             case DiscoverResult.ReadmeChunks chunks -> {
-                chunks.chunks().forEach(chunk -> commands.add(chunk.call()));
+                chunks.chunks().forEach(chunk -> commands.add(chunk.command()));
                 addIfPresent(commands, chunks.next());
             }
             case DiscoverResult.Signature ignored -> {
                 // The end of a drill-down: nothing further to open.
             }
             case DiscoverResult.MixedListing mixed -> {
-                mixed.resources().forEach(resource -> commands.addAll(resource.calls().values()));
-                mixed.remote().forEach(method -> commands.add(method.call()));
-                mixed.normal().forEach(method -> commands.add(method.call()));
+                mixed.resources().forEach(resource -> commands.addAll(resource.commands().values()));
+                mixed.remote().forEach(method -> commands.add(method.command()));
+                mixed.normal().forEach(method -> commands.add(method.command()));
                 addIfPresent(commands, mixed.next());
             }
             case DiscoverResult.NoMatch noMatch -> {
-                noMatch.paths().forEach(alternative -> commands.add(alternative.call()));
+                noMatch.paths().forEach(alternative -> commands.add(alternative.command()));
                 if (noMatch.available() != null) {
                     commands.addAll(commandsOf(noMatch.available()));
                 }
                 commands.add(noMatch.next());
             }
             case DiscoverResult.Owners owners -> {
-                owners.owners().forEach(owner -> commands.add(owner.call()));
+                owners.owners().forEach(owner -> commands.add(owner.command()));
                 addIfPresent(commands, owners.next());
             }
             case DiscoverResult.EmptyBucket empty ->
-                    empty.elsewhere().forEach(other -> commands.add(other.call()));
+                    empty.elsewhere().forEach(other -> commands.add(other.command()));
         }
         return commands;
     }
@@ -250,56 +250,56 @@ public class PointersTest {
     }
 
     /**
-     * Every resource row's {@code calls}, one per accessor, opens exactly that path and accessor's signature — the
+     * Every resource row's {@code commands}, one per accessor, opens exactly that path and accessor's signature — the
      * end of the drill-down, never another listing. A multi-accessor row is followed accessor by accessor, the
      * same as a single-accessor one.
      */
     @Test(dataProvider = "fixtures")
-    public void everyResourceRowsCallsOpenTheirOwnSignatures(String slug) {
+    public void everyResourceRowsCommandsOpenTheirOwnSignatures(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         HttpOptions http = centralFor(slug);
         Set<String> seen = new LinkedHashSet<>();
         for (DiscoverResult answer : answersOf(context)) {
             for (DiscoverResult.ResourceList.Resource resource : resourcesOf(answer)) {
-                Assert.assertEquals(List.copyOf(resource.calls().keySet()), resource.accessors(),
+                Assert.assertEquals(List.copyOf(resource.commands().keySet()), resource.accessors(),
                         slug + ": " + resource);
-                resource.calls().forEach((accessor, call) -> {
-                    if (!seen.add(call)) {
+                resource.commands().forEach((accessor, command) -> {
+                    if (!seen.add(command)) {
                         return;
                     }
-                    JsonObject signature = run(slug, http, call);
+                    JsonObject signature = run(slug, http, command);
                     Assert.assertEquals(signature.has("declaration") ? signature.get("kind").getAsString() : null,
-                            "resource", slug + ": `" + call + "` is not a signature:\n" + signature);
-                    Assert.assertEquals(signature.get("path").getAsString(), resource.path(), call);
-                    Assert.assertEquals(signature.get("accessor").getAsString(), accessor, call);
+                            "resource", slug + ": `" + command + "` is not a signature:\n" + signature);
+                    Assert.assertEquals(signature.get("path").getAsString(), resource.path(), command);
+                    Assert.assertEquals(signature.get("accessor").getAsString(), accessor, command);
                 });
             }
         }
     }
 
     /**
-     * Every method row's {@code call} opens exactly that method's signature, never another listing: the same name,
+     * Every method row's {@code command} opens exactly that method's signature, never another listing: the same name,
      * on the same container, and — under a mixed listing's section — the call form that section names.
      */
     @Test(dataProvider = "fixtures")
-    public void everyMethodRowsCallOpensItsOwnSignature(String slug) {
+    public void everyMethodRowsCommandOpensItsOwnSignature(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         HttpOptions http = centralFor(slug);
         Set<String> seen = new LinkedHashSet<>();
         for (DiscoverResult answer : answersOf(context)) {
             for (Row row : methodRowsOf(answer)) {
-                String call = row.method().call();
-                if (!seen.add(call)) {
+                String command = row.method().command();
+                if (!seen.add(command)) {
                     continue;
                 }
-                JsonObject signature = run(slug, http, call);
-                Assert.assertTrue(signature.has("declaration"), slug + ": `" + call + "` is not a signature:\n"
+                JsonObject signature = run(slug, http, command);
+                Assert.assertTrue(signature.has("declaration"), slug + ": `" + command + "` is not a signature:\n"
                         + signature);
-                Assert.assertEquals(signature.get("name").getAsString(), row.method().name(), call);
+                Assert.assertEquals(signature.get("name").getAsString(), row.method().name(), command);
                 Assert.assertEquals(signature.has("container") ? signature.get("container").getAsString() : null,
-                        row.container(), call);
+                        row.container(), command);
                 if (row.form() != null) {
-                    Assert.assertEquals(signature.get("form").getAsString(), row.form(), call);
+                    Assert.assertEquals(signature.get("form").getAsString(), row.form(), command);
                 }
             }
         }
@@ -393,12 +393,12 @@ public class PointersTest {
             element.getAsJsonArray().forEach(child -> collectCommands(child, into));
         } else if (element.isJsonObject()) {
             for (Map.Entry<String, JsonElement> field : element.getAsJsonObject().entrySet()) {
-                if ((field.getKey().equals("call") || field.getKey().equals("next"))
+                if ((field.getKey().equals("command") || field.getKey().equals("next"))
                         && field.getValue().isJsonPrimitive()) {
                     into.add(field.getValue().getAsString());
-                } else if (field.getKey().equals("calls") && field.getValue().isJsonObject()) {
+                } else if (field.getKey().equals("commands") && field.getValue().isJsonObject()) {
                     field.getValue().getAsJsonObject().entrySet()
-                            .forEach(call -> into.add(call.getValue().getAsString()));
+                            .forEach(command -> into.add(command.getValue().getAsString()));
                 } else {
                     collectCommands(field.getValue(), into);
                 }

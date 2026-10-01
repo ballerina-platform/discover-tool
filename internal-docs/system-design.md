@@ -136,36 +136,36 @@ override and a parser could not.
 
 The text rendering is laid out for a person at a terminal: a header naming where the answer is (package,
 `--module`, bucket, container, selectors, `--filter` — from a `TextRenderer.Context` `Cli` builds out of the
-argument list, since the JSON never needs to echo the request), a count line, one entry per line in columns
-padded to the longest name (`TextTable`), plain section headings, and a footer of notes, the truncation line
-and `Next:` commands. Where every row of a large listing has a command — a `call`, or a resource row's
-`calls`, every accessor's command counting toward the shape — the footer prints the shape they share once, with
-a placeholder (`Next: bal discover ballerinax/github client Client <group>`, `<name>` for methods,
-`<path> <accessor>` for resources), and only a row its name cannot be substituted into — one needing shell
-quoting (`'flush`), a group opened without the listing's accessor — prints its own (a quoted resource path with
-several accessors prints one command with an `<accessor>` slot, which the row's own accessor list fills);
-owners, alternatives, `Elsewhere` and submodules keep a command on every row, since those commands are the
-answer. No colour and no wrapping, so it pipes to `grep` and `less` intact; the whole readme
-stays verbatim.
+argument list, since the JSON never needs to echo the request), a count line, one entry per line in columns padded
+to the longest name (`TextTable`), plain section headings, and a footer of notes, the truncation line and `Next:`
+commands. Where every row of a large listing has a command — a `command`, or a resource row's `commands`, every
+accessor's command counting toward the shape — the footer prints the shape they share once, with a placeholder
+(`Next: bal discover ballerinax/github client Client <group>`, `<name>` for methods, `<path> <accessor>` for
+resources), and only a row its name cannot be substituted into — one needing shell quoting (`'flush`), a group
+opened without the listing's accessor — prints its own (a quoted resource path with several accessors prints one
+command with an `<accessor>` slot, which the row's own accessor list fills); owners, alternatives, `Elsewhere` and
+submodules keep a command on every row, since those commands are the answer. No colour and no wrapping, so it
+pipes to `grep` and `less` intact; the whole readme stays verbatim.
 
 JSON field names follow the RFC's worked examples where one exists (`buckets`, `groups`, `resources`,
-`path`, `accessors`, `calls`, `methods`, `shown`, `total`, `next`, `call`). Every JSON answer — and the
+`path`, `accessors`, `commands`, `methods`, `shown`, `total`, `next`, `command`). Every JSON answer — and the
 `Failure` on stderr — is exactly ONE line, Gson's own compact form with fields in the order `JsonRenderer` adds
 them: an agent's tooling cuts output by line (`head`, `tail`), and any cut inside a multi-line answer leaves
 JSON that does not parse. `RegisterTest` holds every answer across the corpus, readmes included, to one line.
 
 **Every row carries its exact next command.** A method, a group, a container, a submodule and a readme section
-each open one thing and carry a `call` (a method row is `{"name", "call"}`, never a bare string). A resource row
-carries `calls` instead — an object keyed by accessor, in `accessors` order, one command per accessor — whether
-it has one accessor or several: a flat `call` on a multi-accessor path would have to guess which accessor, and
-one shape for every resource row means a caller never branches on the accessor count. A `call`, `calls` value or `next` re-types the selection it came from: a
-path selection canonically (path, then accessor), anything else exactly as given, one shell word per argument
-(`Texts.shellWord`), with any `--filter` kept. `PointersTest` runs every `call`, `calls` value and `next` that
-the first answers of every bucket and container print — bare, filtered, by name substring and by path plus accessor —
-against the recorded payloads, then follows what those answers print two levels further on a bounded sample;
-each must exit 0 with something other than a `NoMatch`, and none may print the command that produced it.
-Commands with a `<slot>` are templates and are checked for shape, not run. It also runs every resource row's
-`calls`, accessor by accessor, and requires each to open exactly that path and accessor's `Signature`.
+each open one thing and carry a `command` (a method row is `{"name", "command"}`, never a bare string). A resource
+row carries `commands` instead — an object keyed by accessor, in `accessors` order, one command per accessor —
+whether it has one accessor or several: a flat `command` on a multi-accessor path would have to guess which
+accessor, and one shape for every resource row means a caller never branches on the accessor count. A `command`,
+`commands` value or `next` re-types the selection it came from: a path selection canonically (path, then
+accessor), anything else exactly as given, one shell word per argument (`Texts.shellWord`), with any `--filter`
+kept. `PointersTest` runs every `command`, `commands` value and `next` that the first answers of every bucket and
+container print — bare, filtered, by name substring and by path plus accessor — against the recorded payloads,
+then follows what those answers print two levels further on a bounded sample; each must exit 0 with something
+other than a `NoMatch`, and none may print the command that produced it. Commands with a `<slot>` are templates
+and are checked for shape, not run. It also runs every resource row's `commands`, accessor by accessor, and
+requires each to open exactly that path and accessor's `Signature`.
 
 Every answer about one container names it in `container` (in the header line, in text). A `Signature`'s `form`
 is `->`, `.` or, for a constructor, `new`.
@@ -188,9 +188,9 @@ Over the ceiling:
 
 - **Resource paths group** by their next literal segment — only when the selection is anchored at a path (or
   is the bare container), and counting the SELECTED operations, so an accessor narrows each `count` and rides
-  into each group's `call`. Path parameters are transparent to grouping but spelled out in a group's name
+  into each group's `command`. Path parameters are transparent to grouping but spelled out in a group's name
   (`repos/:owner/:repo/actions`), since the literal segments alone can name two places. Operations that end
-  exactly at the grouped prefix are listed beside the groups as resources, never as a group whose `call` would
+  exactly at the grouped prefix are listed beside the groups as resources, never as a group whose `command` would
   be the command that produced it. A group subdivides only while it is still over the ceiling, to at most four
   LITERAL levels below the top — surveyed against real connectors, three were always enough
   (`ballerinax/jira` needed the most), and the fourth is margin.
@@ -380,12 +380,12 @@ ballerina-platform's GitHub Packages, so building needs a `read:packages` token 
 |---|---|
 | `CorpusTest` | Thirteen recorded payloads render byte-for-byte to thirteen committed `.bal` API snapshots — the oracle every quoted declaration is checked against. |
 | `ViewsAgreeTest` | **What makes the drill-down safe.** Every exact member name and every exact path plus accessor resolves to one `Signature` (over a corpus-wide floor), and every line it quotes appears in the API snapshot verbatim; every path the tree offers is reachable and nothing unoffered is; closures terminate, do not repeat and stay bounded. |
-| `PointersTest` | Every `call`/`calls`/`next` command the first answers print (bare, filtered, per container, by name substring, by path plus accessor) is RUN through the real CLI against the recorded payload, then what those print is followed two levels further on a bounded sample; each must exit 0 with something other than "nothing matched", and none may point back at the command that printed it. Every resource row's `calls`, one per accessor, must open exactly that path and accessor's signature, every method row's `call` exactly that method's, and every answer the CLI prints must be one line. |
+| `PointersTest` | Every `command`/`commands`/`next` command the first answers print (bare, filtered, per container, by name substring, by path plus accessor) is RUN through the real CLI against the recorded payload, then what those print is followed two levels further on a bounded sample; each must exit 0 with something other than "nothing matched", and none may point back at the command that printed it. Every resource row's `commands`, one per accessor, must open exactly that path and accessor's signature, every method row's `command` exactly that method's, and every answer the CLI prints must be one line. |
 | `SelectionCarryTest` | A page, a group and a canonical command re-select exactly what the listing was a window onto: the selector, the accessor and the `--filter` ride along, a substring never becomes a path, the depth cap counts literal segments, and an out-of-range `--page` fails. A mixed listing over the ceiling pages across its section boundaries without repeating or skipping an entry — the recorded redis `Client` (111 remote, then `close`) and an edited http payload that also crosses resources into remote and a boundary on a middle page — and documentation-only matches stay under the ceiling. |
 | `ViewsTest` | The `.buckets.txt`/`.buckets.json` snapshots, the entry ceiling over every fixture (listed sizes, `shown` against what is listed, a `next` on every cut listing, nested `NoMatch.available` listings included), and the resolution and tolerance rules. Also where path ordering is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
-| `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object on exactly one line (readmes included), no text rendering carries Markdown report furniture, no `note` carries a Markdown backtick, every text listing puts one entry per line with its columns lined up and every JSON `call`/`calls`/`next` reachable from the text, and quoted Ballerina carries no fences of the tool's own. |
+| `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object on exactly one line (readmes included), no text rendering carries Markdown report furniture, no `note` carries a Markdown backtick, every text listing puts one entry per line with its columns lined up and every JSON `command`/`commands`/`next` reachable from the text, and quoted Ballerina carries no fences of the tool's own. |
 | `render/DiscoverResultRenderingTest` | Every result shape, in both renderers, driven directly. |
-| `CliTest` | Parsing, streams, exit codes and `--output` together, in-process against a recorded payload, including following every resource row's `calls`, accessor by accessor, to the signatures they name. |
+| `CliTest` | Parsing, streams, exit codes and `--output` together, in-process against a recorded payload, including following every resource row's `commands`, accessor by accessor, to the signatures they name. |
 | `SurfaceTest` | That the bucket partition is exhaustive and disjoint, and that a `client object` type Central files as an ordinary declaration is still a `client`. |
 | `ReadmeTest` | That the resolved module's readme is there and passed through untouched. |
 | `FromCentralTest`, `PackageRepositoryTest` | Module selection (`--module`, exact default-module match) and the provider seam. |

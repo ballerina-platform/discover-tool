@@ -67,9 +67,9 @@ $ bal discover ballerinax/kafka | cat
 Every JSON answer is exactly one line, however long, so cutting the output with `head` or `tail` never
 leaves half an answer. The JSON samples below are that real output, unwrapped.
 
-At a terminal every answer opens with a header naming where it is — package, bucket, container, selector —
-and a count, lists one entry per line in aligned columns, and ends with a footer: notes, how much was left
-out, and the `Next:` commands. A listing whose JSON gives every row its own command (`call`, or `calls` on a
+At a terminal every answer opens with a header naming where it is — package, bucket, container, selector — and
+a count, lists one entry per line in aligned columns, and ends with a footer: notes, how much was left out,
+and the `Next:` commands. A listing whose JSON gives every row its own command (`command`, or `commands` on a
 resource row) prints the shape those commands share once, as a `Next:` line with a placeholder; a row whose
 command does not fit that shape (a path that needs shell quoting, say) carries its own beside it.
 
@@ -203,19 +203,19 @@ Next: bal discover ballerinax/github client Client <group>
 Next: bal discover ballerinax/github client Client repos --filter <keyword>
 ```
 
-In JSON, every resource entry carries a `calls` object keyed by accessor, in `accessors` order: for each
+In JSON, every resource entry carries a `commands` object keyed by accessor, in `accessors` order: for each
 accessor, the ready-to-run command that opens that signature. A path with one accessor has the same shape with
 one key, so a caller reads every resource row the same way, and a path with several gets a command for each
 rather than a guess at one:
 
 ```
 $ bal discover ballerinax/github client gists --filter star | cat
-{"container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"calls":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},{"path":"gists/starred","accessors":["get"],"calls":{"get":"bal discover ballerinax/github client Client gists/starred get"}}],"shown":2,"total":2}
+{"container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover ballerinax/github client Client gists/starred get"}}],"shown":2,"total":2}
 ```
 
 Everything else that opens exactly one thing — a method, a group, a container, a submodule, a readme section —
-carries a plain `call`. A method row is `name` plus that `call`, the name quoted as one shell word where it
-needs it (`'flush`):
+carries a plain `command`. A method row is `name` plus that `command`, the name quoted as one shell word where
+it needs it (`'flush`):
 
 ```
 $ bal discover ballerinax/kafka client Producer
@@ -231,7 +231,7 @@ ballerinax/kafka · client · Producer
 Next: bal discover ballerinax/kafka client Producer <name>
 
 $ bal discover ballerinax/kafka client Producer | cat
-{"container":"Producer","methods":[{"name":"'flush","call":"bal discover ballerinax/kafka client Producer \"'flush\""},{"name":"close","call":"bal discover ballerinax/kafka client Producer close"},{"name":"getTopicPartitions","call":"bal discover ballerinax/kafka client Producer getTopicPartitions"},{"name":"send","call":"bal discover ballerinax/kafka client Producer send"},{"name":"sendWithMetadata","call":"bal discover ballerinax/kafka client Producer sendWithMetadata"}],"shown":5,"total":5}
+{"container":"Producer","methods":[{"name":"'flush","command":"bal discover ballerinax/kafka client Producer \"'flush\""},{"name":"close","command":"bal discover ballerinax/kafka client Producer close"},{"name":"getTopicPartitions","command":"bal discover ballerinax/kafka client Producer getTopicPartitions"},{"name":"send","command":"bal discover ballerinax/kafka client Producer send"},{"name":"sendWithMetadata","command":"bal discover ballerinax/kafka client Producer sendWithMetadata"}],"shown":5,"total":5}
 ```
 
 A container whose methods come in more than one call form is split by form, since `->` against `.` is what a
@@ -255,7 +255,7 @@ Normal (.)
 Next: bal discover ballerinax/postgresql client Client <name>
 
 $ bal discover ballerinax/postgresql client | cat
-{"container":"Client","remote":[{"name":"batchExecute","call":"bal discover ballerinax/postgresql client Client batchExecute"},{"name":"call","call":"bal discover ballerinax/postgresql client Client call"},{"name":"execute","call":"bal discover ballerinax/postgresql client Client execute"},{"name":"query","call":"bal discover ballerinax/postgresql client Client query"},{"name":"queryRow","call":"bal discover ballerinax/postgresql client Client queryRow"}],"normal":[{"name":"close","call":"bal discover ballerinax/postgresql client Client close"}],"shown":6,"total":6}
+{"container":"Client","remote":[{"name":"batchExecute","command":"bal discover ballerinax/postgresql client Client batchExecute"},{"name":"call","command":"bal discover ballerinax/postgresql client Client call"},{"name":"execute","command":"bal discover ballerinax/postgresql client Client execute"},{"name":"query","command":"bal discover ballerinax/postgresql client Client query"},{"name":"queryRow","command":"bal discover ballerinax/postgresql client Client queryRow"}],"normal":[{"name":"close","command":"bal discover ballerinax/postgresql client Client close"}],"shown":6,"total":6}
 ```
 
 One callable is the end of a drill-down: its declaration with its doc comment, then the declarations its
@@ -388,18 +388,18 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| bare package                         | `buckets`, `submodules` (`name`, `summary`, `call`)                                                              |
-| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `call`), `shown`, `total`, `next`             |
-| resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `calls`), `groups` (`name`, `count`, `call`), `shown`, `total`, `next` |
-| resource paths                       | `container`, `resources` (`path`, `accessors`, `calls`), `shown`, `total`, `page`, `pages`, `next`              |
-| methods of one call form             | `container`, `methods` (`name`, `call`), `shown`, `total`, `page`, `pages`, `next`                              |
-| more than one call form              | `container`, `resources` (`path`, `accessors`, `calls`), `remote` (`name`, `call`), `normal` (`name`, `call`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
+| bare package                         | `buckets`, `submodules` (`name`, `summary`, `command`)                                                              |
+| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `command`), `shown`, `total`, `next`             |
+| resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `shown`, `total`, `next` |
+| resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `next`              |
+| methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `next`                              |
+| more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
 | one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented` |
-| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `call`), `available`, `next`, `documented`              |
-| member on several containers         | `requested`, `owners` (`name`, `matches`, `call`), `shown`, `total`, `next`                                      |
-| empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `call`)                                                       |
+| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented`              |
+| member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `next`                                      |
+| empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
 | readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
-| readme sections                      | `chunks` (`number`, `title`, `lines`, `call`), `shown`, `total`, `page`, `pages`, `next`                       |
+| readme sections                      | `chunks` (`number`, `title`, `lines`, `command`), `shown`, `total`, `page`, `pages`, `next`                       |
 
 Any answer can also carry `warning` (the version could not be confirmed against the registry) and most can
 carry `note` (the symbol was found in a different bucket than the one asked, the path selector was relocated
@@ -413,7 +413,7 @@ No listing shows more than **40 entries**. Over that:
 
 - resource paths selected by a path (or by nothing) **group** by their next literal path segment, up to four
   literal levels below the top; path parameters never form a group of their own, and a group carries the
-  accessor the listing was narrowed by into its `call`;
+  accessor the listing was narrowed by into its `command`;
 - methods of one call form **page**, alphabetically, with `--page <n>`, and so do resource paths that cannot
   be grouped — selected by a name substring or `--filter`, or already four literal levels deep — and readme
   sections narrowed by `--filter`. Every page keeps the selector and the `--filter`;
