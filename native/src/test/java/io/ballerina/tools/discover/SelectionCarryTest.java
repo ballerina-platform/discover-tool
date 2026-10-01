@@ -397,6 +397,7 @@ public class SelectionCarryTest {
         Assert.assertEquals(second.code(), 0, second.err());
         Assert.assertEquals(second.json().get("total").getAsInt(), first.get("total").getAsInt(),
                 "page 2 widened back out to the whole client");
+        Assert.assertFalse(second.json().has("documented"), "documentation-only matches repeated past page 1");
 
         Run outside = run(http, HTTP + " --page 4");
         Assert.assertEquals(outside.code(), 1, outside.out());
@@ -436,5 +437,20 @@ public class SelectionCarryTest {
         Run text = run("ballerinax__redis", command + " --output text");
         Assert.assertTrue(text.out().startsWith(
                 "ballerinax/redis · client · Client\n111 remote methods, 1 normal method\n"), text.out());
+    }
+
+    /**
+     * A common word matches most of a package in its documentation alone: redis's {@code the} matches no name but
+     * 102 entries' docs. Those are held to the same ceiling as every listing, with the full count beside them.
+     */
+    @Test
+    public void documentationOnlyMatchesStayUnderTheCeiling() {
+        String command = "bal discover ballerinax/redis client Client --filter the";
+        JsonObject miss = answer("ballerinax__redis", command);
+        Assert.assertEquals(miss.getAsJsonArray("documented").size(), 40, miss.toString());
+        Assert.assertEquals(miss.get("documentedTotal").getAsInt(), 102, miss.toString());
+
+        Run text = run("ballerinax__redis", command + " --output text");
+        Assert.assertTrue(text.out().contains("\nMatched by documentation only (40 of 102)\n"), text.out());
     }
 }

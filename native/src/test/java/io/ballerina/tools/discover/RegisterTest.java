@@ -328,7 +328,7 @@ public class RegisterTest {
                 mixed.resources().forEach(resource -> entries.add(resource.path()));
                 mixed.remote().forEach(method -> entries.add(method.name()));
                 mixed.normal().forEach(method -> entries.add(method.name()));
-                entries.addAll(mixed.documented());
+                entries.addAll(mixed.documented().names());
             }
             case DiscoverResult.NoMatch noMatch -> {
                 entries.addAll(noMatch.candidates());

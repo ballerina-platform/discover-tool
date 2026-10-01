@@ -279,7 +279,7 @@ public final class JsonRenderer {
         }
         json.add("types", types);
         addIfNotEmpty(json, "omitted", signature.omitted());
-        addIfNotEmpty(json, "documented", signature.documented());
+        addDocumented(json, signature.documented());
         addNotices(json, signature.warning(), signature.note());
         return json;
     }
@@ -305,7 +305,7 @@ public final class JsonRenderer {
         json.addProperty("total", mixed.total());
         addPaging(json, mixed.paging());
         addIfPresent(json, "next", mixed.next());
-        addIfNotEmpty(json, "documented", mixed.documented());
+        addDocumented(json, mixed.documented());
         addNotices(json, mixed.warning(), mixed.note());
         return json;
     }
@@ -329,7 +329,7 @@ public final class JsonRenderer {
             json.add("available", toJson(noMatch.available()));
         }
         json.addProperty("next", noMatch.next());
-        addIfNotEmpty(json, "documented", noMatch.documented());
+        addDocumented(json, noMatch.documented());
         addNotices(json, noMatch.warning(), noMatch.note());
         return json;
     }
@@ -379,6 +379,13 @@ public final class JsonRenderer {
     private static void addIfPresent(JsonObject json, String field, String value) {
         if (value != null) {
             json.addProperty(field, value);
+        }
+    }
+
+    private static void addDocumented(JsonObject json, DiscoverResult.Documented documented) {
+        if (documented.total() > 0) {
+            json.add("documented", strings(documented.names()));
+            json.addProperty("documentedTotal", documented.total());
         }
     }
 

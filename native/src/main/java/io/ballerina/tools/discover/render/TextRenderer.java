@@ -428,8 +428,11 @@ public final class TextRenderer {
         return table;
     }
 
-    private static void documented(Layout layout, List<String> documented) {
-        layout.section("Matched by documentation only", names(documented));
+    private static void documented(Layout layout, DiscoverResult.Documented documented) {
+        int shown = documented.names().size();
+        layout.section("Matched by documentation only"
+                + (shown < documented.total() ? " (" + shown + " of " + documented.total() + ")" : ""),
+                names(documented.names()));
     }
 
     private static List<String> indented(List<String> lines) {

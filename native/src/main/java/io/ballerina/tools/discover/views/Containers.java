@@ -447,7 +447,7 @@ public final class Containers {
             List<String> names = containers.stream().map(Surface.Container::name).toList();
             return new DiscoverResult.NoMatch(options.filter(), null, Names.nearMisses(options.filter(), names),
                     List.of(), roster(loaded, scope, containers, Options.bare(), null),
-                    "bal discover " + pkg + " " + scope.verb(), List.of(), warning, null);
+                    "bal discover " + pkg + " " + scope.verb(), DiscoverResult.Documented.NONE, warning, null);
         }
 
         List<Surface.Container> shown = selected.subList(0, Math.min(MAX_ENTRIES, selected.size()));
@@ -735,13 +735,15 @@ public final class Containers {
             Options options, String note) {
         note = mergeNotes(note, listenerNote(container));
         List<Entry> selected = select(container, selectors);
-        List<String> documented = List.of();
+        DiscoverResult.Documented documented = DiscoverResult.Documented.NONE;
 
         if (options.filtered()) {
             Filter.Split<Entry> split = Filter.apply(options.filter(), selected,
                     entry -> Filter.surfaceOf(entry.fn()), entry -> Filter.docsOf(entry.fn()));
             selected = split.surface();
-            documented = split.documented().stream().map(Entry::label).toList();
+            List<String> names = split.documented().stream().map(Entry::label).toList();
+            documented = new DiscoverResult.Documented(names.subList(0, Math.min(MAX_ENTRIES, names.size())),
+                    names.size());
         }
 
         if (selected.isEmpty() && selectors.isEmpty() && !options.filtered()) {
@@ -765,7 +767,8 @@ public final class Containers {
      */
     private static Result<DiscoverResult> listing(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> selected, Options options, List<String> documented, String warning, String note) {
+            List<Entry> selected, Options options, DiscoverResult.Documented documented, String warning,
+            String note) {
         List<Entry> callable = selected.stream()
                 .filter(entry -> !(entry.fn() instanceof Fn.Constructor))
                 .toList();
@@ -788,7 +791,7 @@ public final class Containers {
      */
     private static DiscoverResult nothingMatched(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            Options options, List<String> documented, String note) {
+            Options options, DiscoverResult.Documented documented, String note) {
         String asked = options.filtered() ? options.filter() : String.join(" ", selectors);
         String command = baseCommand(loaded, scope, container);
 
@@ -814,7 +817,8 @@ public final class Containers {
             }
         }
         DiscoverResult available = alternatives.isEmpty() && !all.isEmpty()
-                ? listing(loaded, scope, container, List.of(), all, Options.bare(), List.of(), null, null).value()
+                ? listing(loaded, scope, container, List.of(), all, Options.bare(),
+                        DiscoverResult.Documented.NONE, null, null).value()
                 : null;
         return new DiscoverResult.NoMatch(asked, containerName(container),
                 Names.nearMisses(asked, names), alternatives, available, command, documented,
@@ -834,7 +838,7 @@ public final class Containers {
      */
     private static DiscoverResult signature(
             LoadedPackage loaded, Surface.Container container, List<String> selectors, Entry entry,
-            List<String> documented, String note) {
+            DiscoverResult.Documented documented, String note) {
         Fn fn = entry.fn();
         String declaration = container.isModule() && fn instanceof Fn.Standalone standalone
                 ? Signatures.renderStandaloneFunction(standalone)
@@ -898,7 +902,8 @@ public final class Containers {
      */
     private static Result<DiscoverResult> mixedAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> callable, Options options, List<String> documented, String warning, String note) {
+            List<Entry> callable, Options options, DiscoverResult.Documented documented, String warning,
+            String note) {
         String base = baseCommand(loaded, scope, container);
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
         List<DiscoverResult.ResourceList.Resource> resources = mergedResources(
@@ -917,7 +922,8 @@ public final class Containers {
                 window.slice(remote, resources.size()),
                 window.slice(normal, resources.size() + remote.size()),
                 new DiscoverResult.MixedListing.Counts(resources.size(), remote.size(), normal.size()),
-                window.to() - window.from(), total, window.paging(), window.next(command), documented, warning,
+                window.to() - window.from(), total, window.paging(), window.next(command),
+                window.number() == 1 ? documented : DiscoverResult.Documented.NONE, warning,
                 mergeNotes(note, pathNote(container, selectors))));
     }
 
