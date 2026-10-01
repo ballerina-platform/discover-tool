@@ -1,6 +1,6 @@
 == client ==
 ballerinax/redis · client · Client
-112 entries
+111 remote methods, 1 normal method
 
 Remote (->)
   append

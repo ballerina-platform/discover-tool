@@ -265,21 +265,18 @@ public final class TextRenderer {
     }
 
     private static void mixedListing(Layout layout, DiscoverResult.MixedListing mixed) {
-        if (mixed.paging() != null || mixed.shown() < mixed.total()) {
-            layout.top(counted(mixed.total(), "entry", "entries"));
-        } else {
-            List<String> parts = new ArrayList<>();
-            if (!mixed.resources().isEmpty()) {
-                parts.add(counted(mixed.resources().size(), "resource path", "resource paths"));
-            }
-            if (!mixed.remote().isEmpty()) {
-                parts.add(counted(mixed.remote().size(), "remote method", "remote methods"));
-            }
-            if (!mixed.normal().isEmpty()) {
-                parts.add(counted(mixed.normal().size(), "normal method", "normal methods"));
-            }
-            layout.top(String.join(", ", parts));
+        DiscoverResult.MixedListing.Counts counts = mixed.counts();
+        List<String> parts = new ArrayList<>();
+        if (counts.resources() > 0) {
+            parts.add(counted(counts.resources(), "resource path", "resource paths"));
         }
+        if (counts.remote() > 0) {
+            parts.add(counted(counts.remote(), "remote method", "remote methods"));
+        }
+        if (counts.normal() > 0) {
+            parts.add(counted(counts.normal(), "normal method", "normal methods"));
+        }
+        layout.top(String.join(", ", parts));
         Drill drill = resourceDrill(mixed.resources());
         layout.section("Resources (->)", resourceTable(mixed.resources(), drill));
         List<DiscoverResult.Method> methods = new ArrayList<>(mixed.remote());

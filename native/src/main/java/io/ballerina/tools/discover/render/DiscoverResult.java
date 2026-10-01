@@ -324,6 +324,8 @@ public sealed interface DiscoverResult {
      * @param resources the resource paths on this page
      * @param remote the remote methods on this page, alphabetical
      * @param normal the plain methods on this page, alphabetical
+     * @param counts how many of each form the whole listing holds, every page included — a page can hold
+     *     nothing of a form the container still declares
      * @param shown how many entries across all three are in this response
      * @param total how many exist across all three
      * @param paging which page this is, or {@code null} when the whole listing fit on one
@@ -334,8 +336,16 @@ public sealed interface DiscoverResult {
      */
     record MixedListing(
             String container, List<ResourceList.Resource> resources, List<Method> remote, List<Method> normal,
-            int shown, int total, Paging paging, String next, List<String> documented, String warning, String note)
-            implements DiscoverResult { }
+            Counts counts, int shown, int total, Paging paging, String next, List<String> documented,
+            String warning, String note) implements DiscoverResult {
+
+        /**
+         * @param resources resource paths in the whole listing
+         * @param remote remote methods in the whole listing
+         * @param normal normal methods in the whole listing
+         */
+        public record Counts(int resources, int remote, int normal) { }
+    }
 
     /**
      * A selector or {@code --filter} that matched nothing — exit 0, with what IS there.
