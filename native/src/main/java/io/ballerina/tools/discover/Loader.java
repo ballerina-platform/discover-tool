@@ -67,9 +67,11 @@ public final class Loader {
      *     several sources considered for ONE lookup, not one source picked ahead of time.
      * @param module the {@code --module} value, or {@code null} for the package's own default module — never a
      *     second fetch: the payload a repository already served for the package carries every module's data
+     * @param readsSource whether the answer shows which listener each service type binds to — the one thing the
+     *     package's source is read for, so every other answer never reads or downloads it
      */
     public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
-            String module) {
+            String module, boolean readsSource) {
 
         public LoadOptions {
             if (repositories.isEmpty()) {
@@ -77,8 +79,18 @@ public final class Loader {
             }
         }
 
+        public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
+                String module) {
+            this(http, projectDir, repositories, module, false);
+        }
+
         public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories) {
             this(http, projectDir, repositories, null);
+        }
+
+        /** The same options, reading the package source when it can settle a service binding. */
+        public LoadOptions readingSource() {
+            return new LoadOptions(http, projectDir, repositories, module, true);
         }
 
         public LoadOptions(HttpOptions http, String projectDir) {
@@ -225,9 +237,9 @@ public final class Loader {
         if (!module.isOk()) {
             return module.cast();
         }
-        // The source is read only when it can change which service types bind to which listener — never for a
-        // package without listeners, and never when every service type is already some listener's attach target.
-        Optional<ObjectInclusions> inclusions = Bindings.needsSource(module.value())
+        // The source is read only for an answer that shows service bindings, and only when it can change them —
+        // never for a package without listeners, nor when every service type is already an attach target.
+        Optional<ObjectInclusions> inclusions = options.readsSource() && Bindings.needsSource(module.value())
                 ? SourceInclusions.load(fetched.repository(), qualified, resolved.version(), module.value().id(),
                         options.http())
                 : Optional.empty();
