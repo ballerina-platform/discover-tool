@@ -24,8 +24,9 @@ No bucket lists which of them this package has.
                          Never sent to Central as a query.
   --page <n>             1-indexed. Turns the page of any listing that pages over
                          the entry ceiling: remote or normal methods, resource paths
-                         that cannot be grouped, and readme sections narrowed by
-                         --filter. A page outside the listing is an error.
+                         that cannot be grouped, a container's resources and methods
+                         listed together, and readme sections narrowed by --filter.
+                         A page outside the listing is an error.
   -m, --module <name>    Target this submodule instead of the package's default
                          module, the same everywhere including readme. The bare
                          submodule name only — <org/name> is always resolved as one

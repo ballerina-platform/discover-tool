@@ -279,11 +279,14 @@ public final class JsonRenderer {
     private static JsonObject mixedListing(DiscoverResult.MixedListing mixed) {
         JsonObject json = new JsonObject();
         addIfPresent(json, "container", mixed.container());
-        json.add("resources", resources(mixed.resources()));
+        if (!mixed.resources().isEmpty()) {
+            json.add("resources", resources(mixed.resources()));
+        }
         addIfNotEmpty(json, "remote", mixed.remote());
         addIfNotEmpty(json, "normal", mixed.normal());
         json.addProperty("shown", mixed.shown());
         json.addProperty("total", mixed.total());
+        addPaging(json, mixed.paging());
         addIfPresent(json, "next", mixed.next());
         addIfNotEmpty(json, "documented", mixed.documented());
         addNotices(json, mixed.warning(), mixed.note());

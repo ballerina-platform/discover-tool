@@ -175,7 +175,7 @@ public class ViewsTest {
                     methods.next());
             case DiscoverResult.MixedListing mixed -> new Window(
                     mixed.resources().size() + mixed.remote().size() + mixed.normal().size(), mixed.shown(),
-                    mixed.total(), mixed.next());
+                    mixed.total() - pagesBefore(mixed.paging(), mixed.total(), mixed.shown()), mixed.next());
             case DiscoverResult.Owners owners -> new Window(owners.owners().size(), owners.owners().size(),
                     owners.total(), owners.next());
             case DiscoverResult.NoMatch noMatch -> noMatch.available() == null ? null

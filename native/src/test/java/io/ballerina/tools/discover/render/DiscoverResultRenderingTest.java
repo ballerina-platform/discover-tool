@@ -511,7 +511,7 @@ public class DiscoverResultRenderingTest {
     public void aMixedListingIsSectionedByCallFormInTextAndThreeArraysInJson() {
         DiscoverResult result = new DiscoverResult.MixedListing("Client",
                 List.of(resource(":...path", null, "get", "post")),
-                List.of("execute", "get"), List.of("getCookieStore"), 4, 4, null, List.of(), null, null);
+                List.of("execute", "get"), List.of("getCookieStore"), 4, 4, null, null, List.of(), null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "1 resource path, 2 remote methods, 1 normal method",
@@ -538,26 +538,32 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
-    public void aTruncatedMixedListingSaysSoAndNamesDocumentationOnlyMatches() {
+    public void aPagedMixedListingNamesItsPageAndDocumentationOnlyMatches() {
+        String next = "bal discover pkg client Client --page 2";
         DiscoverResult result = new DiscoverResult.MixedListing(null,
-                List.of(), List.of("execute"), List.of(), 1, 45, "bal discover pkg client Client --filter <keyword>",
+                List.of(), List.of("execute"), List.of("close"), 2, 4, new DiscoverResult.Paging(1, 2, 2), next,
                 List.of("forward"), null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
-                "45 entries",
+                "4 entries",
                 "",
                 "Remote (->)",
                 "  execute",
                 "",
+                "Normal (.)",
+                "  close",
+                "",
                 "Matched by documentation only",
                 "  forward",
                 "",
-                "... 44 more, narrow further",
-                "Next: bal discover pkg client Client --filter <keyword>"));
+                "... 2 more (page 1 of 2)",
+                "Next: " + next));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
-        Assert.assertEquals(json.get("next").getAsString(), "bal discover pkg client Client --filter <keyword>");
+        Assert.assertEquals(json.get("next").getAsString(), next);
+        Assert.assertEquals(json.get("page").getAsInt(), 1);
+        Assert.assertEquals(json.get("pages").getAsInt(), 2);
         Assert.assertEquals(json.getAsJsonArray("documented").get(0).getAsString(), "forward");
-        Assert.assertFalse(json.has("normal"), "an empty call-form section is omitted, as in every other shape");
+        Assert.assertFalse(json.has("resources"), "a section with nothing on this page is omitted");
         Assert.assertFalse(json.has("container"));
     }
 

@@ -263,7 +263,7 @@ public final class TextRenderer {
     }
 
     private static void mixedListing(Layout layout, DiscoverResult.MixedListing mixed) {
-        if (mixed.shown() < mixed.total()) {
+        if (mixed.paging() != null || mixed.shown() < mixed.total()) {
             layout.top(counted(mixed.total(), "entry", "entries"));
         } else {
             List<String> parts = new ArrayList<>();
@@ -284,7 +284,7 @@ public final class TextRenderer {
         layout.section("Normal (.)", names(mixed.normal()));
         documented(layout, mixed.documented());
         layout.notices(mixed.note(), mixed.warning());
-        layout.more(mixed.total() - mixed.shown(), null);
+        layout.more(remaining(mixed.shown(), mixed.total(), mixed.paging()), mixed.paging());
         layout.next(drill.pattern());
         layout.next(mixed.next());
     }

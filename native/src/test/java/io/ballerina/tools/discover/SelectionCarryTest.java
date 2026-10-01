@@ -279,4 +279,125 @@ public class SelectionCarryTest {
         Assert.assertEquals(parameters.code(), 0, parameters.err());
         Assert.assertFalse(parameters.json().has("groups"), "parameters counted toward depth: " + parameters.out());
     }
+    // -----------------------------------------------------------------------
+    // A mixed listing pages as one sequence, sections kept
+    // -----------------------------------------------------------------------
+
+    private static final String HTTP = "bal discover ballerina/http client Client";
+
+    /**
+     * http's {@code Client} with 45 more remote and 26 more normal methods: 1 resource path, 60 remote and 30
+     * normal, 91 entries on three pages — page 1 spans resources into remote, page 2 remote into normal. No
+     * recorded container is a mixed one over the ceiling, which is the only reason this is an edited payload.
+     */
+    private static HttpOptions bulkyHttp() {
+        JsonObject docs = FixtureCorpus.loadRawFixture("ballerina__http").deepCopy().getAsJsonObject();
+        JsonObject client = null;
+        for (JsonElement element : docs.getAsJsonObject("docsData").getAsJsonArray("modules").get(0)
+                .getAsJsonObject().getAsJsonArray("clients")) {
+            if (element.getAsJsonObject().get("name").getAsString().equals("Client")) {
+                client = element.getAsJsonObject();
+            }
+        }
+        Assert.assertNotNull(client);
+        JsonArray methods = client.getAsJsonArray("methods");
+        JsonObject remote = null;
+        JsonObject normal = null;
+        for (JsonElement element : methods) {
+            String name = element.getAsJsonObject().get("name").getAsString();
+            if (name.equals("execute")) {
+                remote = element.getAsJsonObject();
+            } else if (name.equals("getCookieStore")) {
+                normal = element.getAsJsonObject();
+            }
+        }
+        Assert.assertNotNull(remote);
+        Assert.assertNotNull(normal);
+        for (int i = 1; i <= 45; i++) {
+            JsonObject copy = remote.deepCopy();
+            copy.addProperty("name", String.format("bulkRemote%02d", i));
+            methods.add(copy);
+        }
+        for (int i = 1; i <= 26; i++) {
+            JsonObject copy = normal.deepCopy();
+            copy.addProperty("name", String.format("bulkNormal%02d", i));
+            methods.add(copy);
+        }
+        return centralFor(docs.toString());
+    }
+
+    private static List<String> strings(JsonObject json, String field) {
+        List<String> values = new ArrayList<>();
+        if (json.has(field)) {
+            json.getAsJsonArray(field).forEach(value -> values.add(value.getAsString()));
+        }
+        return values;
+    }
+
+    @Test
+    public void aMixedListingOverTheCeilingPagesWithItsSectionsKept() {
+        HttpOptions http = bulkyHttp();
+        Run run = run(http, HTTP);
+        Assert.assertEquals(run.code(), 0, run.err());
+        JsonObject first = run.json();
+        Assert.assertEquals(first.getAsJsonArray("resources").size(), 1, first.toString());
+        Assert.assertEquals(strings(first, "remote").size(), 39, first.toString());
+        Assert.assertFalse(first.has("normal"), first.toString());
+        Assert.assertEquals(first.get("shown").getAsInt(), 40);
+        Assert.assertEquals(first.get("total").getAsInt(), 91);
+        Assert.assertEquals(first.get("page").getAsInt(), 1);
+        Assert.assertEquals(first.get("pages").getAsInt(), 3);
+        Assert.assertEquals(first.get("next").getAsString(), HTTP + " --page 2");
+
+        Run middle = run(http, first.get("next").getAsString());
+        Assert.assertEquals(middle.code(), 0, middle.err());
+        JsonObject second = middle.json();
+        Assert.assertFalse(second.has("resources"), second.toString());
+        Assert.assertEquals(strings(second, "remote").size(), 21, second.toString());
+        Assert.assertEquals(strings(second, "normal").size(), 19, second.toString());
+        Assert.assertEquals(second.get("next").getAsString(), HTTP + " --page 3");
+
+        Run last = run(http, second.get("next").getAsString());
+        Assert.assertEquals(last.code(), 0, last.err());
+        JsonObject third = last.json();
+        Assert.assertFalse(third.has("resources") || third.has("remote"), third.toString());
+        Assert.assertEquals(strings(third, "normal").size(), 11, third.toString());
+        Assert.assertEquals(third.get("page").getAsInt(), 3);
+        Assert.assertFalse(third.has("next"), third.toString());
+
+        List<String> remote = new ArrayList<>(strings(first, "remote"));
+        remote.addAll(strings(second, "remote"));
+        Assert.assertEquals(remote.stream().distinct().count(), 60L, "a page repeated or skipped an entry");
+        List<String> normal = new ArrayList<>(strings(second, "normal"));
+        normal.addAll(strings(third, "normal"));
+        Assert.assertEquals(normal.stream().distinct().count(), 30L, "a page repeated or skipped an entry");
+
+        Run text = run(http, HTTP + " --page 2 --output text");
+        Assert.assertTrue(text.out().contains("\n\nRemote (->)\n  "), text.out());
+        Assert.assertTrue(text.out().contains("\n\nNormal (.)\n  "), text.out());
+        Assert.assertTrue(text.out().contains("\n... 11 more (page 2 of 3)\nNext: " + HTTP + " --page 3"),
+                text.out());
+    }
+
+    @Test
+    public void aMixedListingsPageKeepsTheFilterAndFailsOutsideItsRange() {
+        HttpOptions http = bulkyHttp();
+        Run filtered = run(http, HTTP + " --filter e");
+        Assert.assertEquals(filtered.code(), 0, filtered.err());
+        JsonObject first = filtered.json();
+        Assert.assertTrue(first.has("resources") && first.get("total").getAsInt() > 40, first.toString());
+        Assert.assertEquals(first.get("next").getAsString(), HTTP + " --filter e --page 2");
+        Run second = run(http, first.get("next").getAsString());
+        Assert.assertEquals(second.code(), 0, second.err());
+        Assert.assertEquals(second.json().get("total").getAsInt(), first.get("total").getAsInt(),
+                "page 2 widened back out to the whole client");
+
+        Run outside = run(http, HTTP + " --page 4");
+        Assert.assertEquals(outside.code(), 1, outside.out());
+        Assert.assertEquals(outside.out(), "");
+        JsonObject failure = JsonParser.parseString(outside.err()).getAsJsonObject();
+        Assert.assertEquals(failure.get("kind").getAsString(), "validation");
+        Assert.assertTrue(failure.get("message").getAsString().contains("3 pages"), outside.err());
+        Assert.assertTrue(failure.get("suggestion").getAsString().contains(HTTP + " --page 3"), outside.err());
+    }
 }
