@@ -7,7 +7,7 @@
 "head",
 "get",
 "options"
-]}
+],"calls":{"post":"bal discover ballerinax/sap client Client :...path post","put":"bal discover ballerinax/sap client Client :...path put","patch":"bal discover ballerinax/sap client Client :...path patch","delete":"bal discover ballerinax/sap client Client :...path delete","head":"bal discover ballerinax/sap client Client :...path head","get":"bal discover ballerinax/sap client Client :...path get","options":"bal discover ballerinax/sap client Client :...path options"}}
 ],"remote":[
 "delete",
 "get",

@@ -18,7 +18,10 @@
 
 package io.ballerina.tools.discover.render;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * One structured shape {@code bal discover} can answer with — the "one source, multiple renderers" the RFC asks
@@ -26,10 +29,10 @@ import java.util.List;
  * it into bytes, so the two renderers can never drift into describing different data.
  *
  * <p>Field names follow the RFC's own worked examples wherever one exists ({@code buckets}, {@code groups}/
- * {@code name}/{@code count}, {@code resources}/{@code path}/{@code accessors}, {@code methods}, {@code shown}/
- * {@code total}/{@code next}/{@code call}). {@link ContainerRoster} has no RFC example to match — several
- * containers in one bucket is existing, pre-RFC behaviour — so its field names are this rewrite's own choice, as
- * are those of every other shape the RFC shows no example for ({@link Signature}, {@link MixedListing},
+ * {@code name}/{@code count}, {@code resources}/{@code path}/{@code accessors}/{@code calls}, {@code methods},
+ * {@code shown}/{@code total}/{@code next}/{@code call}). {@link ContainerRoster} has no RFC example to match —
+ * several containers in one bucket is existing, pre-RFC behaviour — so its field names are this rewrite's own
+ * choice, as are those of every other shape the RFC shows no example for ({@link Signature}, {@link MixedListing},
  * {@link NoMatch}, {@link Owners}, {@link EmptyBucket}).
  *
  * @since 0.1.0
@@ -169,10 +172,16 @@ public sealed interface DiscoverResult {
         /**
          * @param path the resource's path, {@code :name}-spelled for parameters, {@code .} for the root
          * @param accessors every accessor this path answers to
-         * @param call the exact next-step command, or {@code null} on a multi-accessor entry — a flat field
-         *     would have to guess which accessor
+         * @param calls the exact next-step command per accessor, in {@code accessors} order — one shape whether a
+         *     path answers to one accessor or several, and every accessor gets its own, so none is preferred
          */
-        public record Resource(String path, List<String> accessors, String call) { }
+        public record Resource(String path, List<String> accessors, Map<String, String> calls) {
+
+            public Resource {
+                accessors = List.copyOf(accessors);
+                calls = Collections.unmodifiableMap(new LinkedHashMap<>(calls));
+            }
+        }
     }
 
     /**

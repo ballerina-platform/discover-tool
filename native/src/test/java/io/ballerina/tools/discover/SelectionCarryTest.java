@@ -225,10 +225,14 @@ public class SelectionCarryTest {
         }
         JsonObject here = groups.getAsJsonArray("resources").get(0).getAsJsonObject();
         Assert.assertEquals(here.get("path").getAsString(), "repos/:owner/:repo");
+        JsonObject calls = here.getAsJsonObject("calls");
+        Assert.assertEquals(calls.size(), here.getAsJsonArray("accessors").size(), here.toString());
         for (JsonElement accessor : here.getAsJsonArray("accessors")) {
-            JsonObject signature = answer("ballerinax__github",
-                    GITHUB + " " + here.get("path").getAsString() + " " + accessor.getAsString());
+            String call = calls.get(accessor.getAsString()).getAsString();
+            Assert.assertEquals(call, GITHUB + " repos/:owner/:repo " + accessor.getAsString());
+            JsonObject signature = answer("ballerinax__github", call);
             Assert.assertEquals(signature.get("path").getAsString(), "repos/:owner/:repo");
+            Assert.assertEquals(signature.get("accessor").getAsString(), accessor.getAsString());
         }
     }
 

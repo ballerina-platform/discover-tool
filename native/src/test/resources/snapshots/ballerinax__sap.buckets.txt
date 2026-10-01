@@ -13,6 +13,8 @@ Remote (->)
   patch
   post
   put
+
+Next: bal discover ballerinax/sap client Client <path> <accessor>
 == service ==
 ballerinax/sap · service
 This package declares nothing in service.
