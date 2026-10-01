@@ -10,7 +10,7 @@ Typical session:
   1. What can I ask?             bal discover ballerinax/github
   2. A bucket, listed or one:     bal discover ballerinax/github client
                                    bal discover ballerinax/github client Client
-  3. One call, fully addressed:   bal discover ballerinax/github client Client repos
+  3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
 
 Buckets, addressed as the second positional: client, service, class, funcs, readme.
 No bucket lists which of them this package has.
