@@ -188,6 +188,9 @@ public sealed interface DiscoverResult {
             public Resource {
                 accessors = List.copyOf(accessors);
                 calls = Collections.unmodifiableMap(new LinkedHashMap<>(calls));
+                if (accessors.isEmpty() || !List.copyOf(calls.keySet()).equals(accessors)) {
+                    throw new IllegalArgumentException("one command per accessor, in order: " + path);
+                }
             }
         }
     }

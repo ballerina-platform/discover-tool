@@ -403,10 +403,8 @@ public final class TextRenderer {
         if (unfit.size() < 2) {
             return unfit.isEmpty() ? null : unfit.get(0);
         }
-        String prefix = unfit.get(0).substring(0, unfit.get(0).lastIndexOf(' '));
-        boolean shared = unfit.stream().allMatch(call -> call.lastIndexOf(' ') == prefix.length()
-                && call.startsWith(prefix));
-        return shared ? prefix + " <accessor>" : String.join("  ", unfit);
+        String first = unfit.get(0);
+        return first.substring(0, first.lastIndexOf(' ')) + " <accessor>";
     }
 
     private static Drill methodDrill(List<DiscoverResult.Method> methods) {
