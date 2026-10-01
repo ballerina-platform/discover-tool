@@ -20,11 +20,15 @@ package io.ballerina.tools.discover.render;
 
 import io.ballerina.tools.discover.model.ClientClass;
 import io.ballerina.tools.discover.model.Library;
+import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Param;
 import io.ballerina.tools.discover.model.Service;
+import io.ballerina.tools.discover.model.TypeDef;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -85,7 +89,7 @@ public final class Documents {
         // types only the declaration gives.
         section(output, "// --- Listeners ---",
                 library.listeners().stream().map(TypeDefs::renderTypeDef).toList());
-        section(output, "// --- Service ---", serviceSection(library.services()));
+        section(output, "// --- Service ---", serviceSection(library));
         section(output, "// --- Annotations ---",
                 library.annotations().stream().map(Documents::renderAnnotation).toList());
         section(output, "// --- Configurables ---", configurableSection(library));
@@ -164,26 +168,26 @@ public final class Documents {
     }
 
     /**
-     * How a service is written against this package: a template per service type a listener accepts, then one
-     * note naming the types whose attachability cannot be established.
+     * How a service is written against this package: a template per service type a listener accepts, then a note
+     * naming the types whose attachment could not be settled, then one naming the types no listener accepts.
      *
      * <p>HTTP-14. Every service object type used to get {@code service X on new Listener(…)}, and 5 of the 10
      * the corpus produced do not compile: {@code ballerina/http}'s four interceptor types and
      * {@code ballerina/graphql}'s {@code Interceptor} are service objects a listener does not accept — an
-     * interceptor reaches the runtime through {@code createInterceptors()}, not through an attachment.
-     *
-     * <p>The test is narrow — the listener's {@code attach} names this exact type — and it costs two forms that
-     * WOULD have compiled: {@code http:ServiceContract} and {@code http:InterceptableService} both write
-     * {@code *Service;} in the published source, and Central publishes no inclusion for an object type, so in
-     * the payload they are indistinguishable from the four interceptors. Printing a declaration that does not
-     * compile is the failure this document exists to prevent; withholding a template whose validity cannot be
-     * established is a gap, and the note is what keeps it from being a silent one. Each of these types is
-     * declared in full in the Types section either way, so no contract is lost.
+     * interceptor reaches the runtime through {@code createInterceptors()}, not through an attachment. Which
+     * types a listener accepts is {@code Bindings}' call; a pairing it could not confirm gets no template,
+     * because printing a declaration that does not compile is the failure this document exists to prevent, and
+     * the note is what keeps the gap from being a silent one. Each of these types is declared in full in the
+     * Types section either way, so no contract is lost.
      */
-    private static List<String> serviceSection(List<Service> services) {
+    private static List<String> serviceSection(Library library) {
         List<String> rendered = new ArrayList<>();
         List<Service> unconfirmed = new ArrayList<>();
-        for (Service service : services) {
+        Set<String> paired = new HashSet<>();
+        for (Service service : library.services()) {
+            if (service.declaredIn().isEmpty()) {
+                paired.add(service.name());
+            }
             if (service.isAttachable()) {
                 rendered.add(renderService(service));
             } else {
@@ -192,6 +196,16 @@ public final class Documents {
         }
         if (!unconfirmed.isEmpty()) {
             rendered.add(unconfirmedAttachments(unconfirmed));
+        }
+        List<String> unattachable = library.typeDefs().stream()
+                .filter(TypeDef.ObjectDef.class::isInstance)
+                .map(TypeDef.ObjectDef.class::cast)
+                .filter(object -> object.role() == TypeDef.ObjectDef.Role.SERVICE && !paired.contains(object.name()))
+                .map(TypeDef::name)
+                .distinct()
+                .toList();
+        if (!library.listeners().isEmpty() && !unattachable.isEmpty()) {
+            rendered.add(unattachableTypes(library, unattachable));
         }
         return List.copyOf(rendered);
     }
@@ -206,16 +220,22 @@ public final class Documents {
         for (Service service : unconfirmed) {
             lines.add("//   " + (alias == null ? "" : alias + ":") + service.name());
         }
-        lines.add("// " + listener + ".attach takes one specific type. A `distinct service object` type "
-                + "reaches it only");
-        lines.add("// by INCLUDING that type, and Central publishes no inclusion for an object type — so some "
-                + "of these");
-        lines.add("// do attach and some do not, and the payload cannot say which. An interceptor type, for "
-                + "one, reaches");
-        lines.add("// the runtime as a `createInterceptors()` return rather than as an attachment. The "
-                + "package's own");
-        lines.add("// guide is where the usage of each is written; `bal discover <org>/<name> readme` "
-                + "reproduces it.");
+        lines.add("// A listener accepts the type its `attach` takes and any `distinct service object` type that");
+        lines.add("// INCLUDES it; for these, that could not be read — the listener publishes no `attach`, or the");
+        lines.add("// package source that shows inclusions was unavailable. The package's own guide is where the");
+        lines.add("// usage of each is written; `bal discover <org>/<name> readme` reproduces it.");
+        return String.join("\n", lines);
+    }
+
+    /** The service types no listener of the package accepts — named, so their absence above is not a gap. */
+    private static String unattachableTypes(Library library, List<String> names) {
+        String moduleId = library.name().substring(library.name().indexOf('/') + 1);
+        String alias = moduleId.substring(moduleId.lastIndexOf('.') + 1);
+        List<String> lines = new ArrayList<>();
+        lines.add("// Declared above, but no listener of this package accepts them, so no template is written:");
+        for (String name : names) {
+            lines.add("//   " + alias + ":" + name);
+        }
         return String.join("\n", lines);
     }
 
@@ -224,11 +244,16 @@ public final class Documents {
         if (service.isDeprecated()) {
             lines.add("@deprecated");
         }
-        String alias = deriveListenerAlias(service.listener().name());
+        String alias = service.declaredIn().map(ModuleRef::prefix)
+                .orElseGet(() -> deriveListenerAlias(service.listener().name()));
         String prefix = !service.name().isEmpty() && alias != null ? alias + ":" + service.name() + " " : "";
         lines.add("service " + prefix + "on new " + service.listener().name()
                 + "(" + listenerArguments(service.listener()) + ") {");
-        if (service.methods().isEmpty()) {
+        if (service.declaredIn().isPresent()) {
+            String coordinate = service.declaredIn().get().coordinate();
+            lines.add("    // " + coordinate + " declares this service type's contract: `bal discover " + coordinate
+                    + " service " + service.name() + "`.");
+        } else if (service.methods().isEmpty()) {
             // A SKELETON with a named hole, rather than a block that silently does not compile. Central
             // publishes no methods for `graphql:Service` or `kafka:Service`, and both listeners require one —
             // measured: `a GraphQL service must include at least one resource method with the accessor 'get'`

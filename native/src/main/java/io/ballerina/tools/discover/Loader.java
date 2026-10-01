@@ -24,11 +24,15 @@ import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.PackageRepository;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
+import io.ballerina.tools.discover.model.Bindings;
 import io.ballerina.tools.discover.model.FromCentral;
+import io.ballerina.tools.discover.model.ObjectInclusions;
 import io.ballerina.tools.discover.model.Pipeline;
+import io.ballerina.tools.discover.source.SourceInclusions;
 import io.ballerina.tools.discover.views.Readmes;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -183,11 +187,13 @@ public final class Loader {
                 if (!resolved.isOk()) {
                     return resolved.cast();
                 }
-                Result<CentralDocs> docs = tryEachRepository(options.repositories(),
-                        repository -> repository.fetchDocs(qualified, resolved.value(), options.http()));
-                return docs.isOk()
-                        ? build(qualified, resolved.value(), docs.value(), options.module())
-                        : docs.cast();
+                Result<Fetched> fetched = tryEachRepository(options.repositories(), repository -> {
+                    Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved.value(), options.http());
+                    return docs.isOk()
+                            ? Result.ok(new Fetched(repository, resolved.value(), docs.value()))
+                            : docs.cast();
+                });
+                return fetched.isOk() ? build(qualified, fetched.value(), options) : fetched.cast();
             }
         }
         Result<Fetched> fetched = tryEachRepository(options.repositories(), repository -> {
@@ -196,26 +202,40 @@ public final class Loader {
                 return resolved.cast();
             }
             Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved.value(), options.http());
-            return docs.isOk() ? Result.ok(new Fetched(resolved.value(), docs.value())) : docs.cast();
+            return docs.isOk() ? Result.ok(new Fetched(repository, resolved.value(), docs.value())) : docs.cast();
         });
-        return fetched.isOk()
-                ? build(qualified, fetched.value().resolved(), fetched.value().docs(), options.module())
-                : fetched.cast();
+        return fetched.isOk() ? build(qualified, fetched.value(), options) : fetched.cast();
     }
 
-    private record Fetched(CentralClient.ResolvedVersion resolved, CentralDocs docs) { }
+    /**
+     * What one repository served, kept together so anything read later — the package source — comes from the
+     * repository that served the docs, for the same reason resolve and fetch are paired.
+     *
+     * @param repository the repository that answered
+     * @param resolved the version it was read at
+     * @param docs the docs payload it served
+     */
+    private record Fetched(PackageRepository repository, CentralClient.ResolvedVersion resolved, CentralDocs docs) { }
 
-    private static Result<LoadedPackage> build(
-            QualifiedName qualified, CentralClient.ResolvedVersion resolved, CentralDocs docs, String submodule) {
+    private static Result<LoadedPackage> build(QualifiedName qualified, Fetched fetched, LoadOptions options) {
+        String submodule = options.module();
+        CentralDocs docs = fetched.docs();
+        CentralClient.ResolvedVersion resolved = fetched.resolved();
         Result<CentralDocs.Module> module = FromCentral.selectModule(docs, qualified, submodule);
         if (!module.isOk()) {
             return module.cast();
         }
+        // The source is read only when it can change which service types bind to which listener — never for a
+        // package without listeners, and never when every service type is already some listener's attach target.
+        Optional<ObjectInclusions> inclusions = Bindings.needsSource(module.value())
+                ? SourceInclusions.load(fetched.repository(), qualified, resolved.version(), module.value().id(),
+                        options.http())
+                : Optional.empty();
 
         return Result.ok(new LoadedPackage(
                 qualified,
                 resolved.version(),
-                Pipeline.build(module.value()),
+                Pipeline.build(module.value(), inclusions),
                 Readmes.of(module.value()),
                 submodule,
                 submodulesOf(docs, qualified, submodule),

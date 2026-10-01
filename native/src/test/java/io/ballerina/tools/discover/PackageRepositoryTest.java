@@ -22,6 +22,7 @@ import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.PackageRepository;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
+import io.ballerina.tools.discover.model.Service;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -118,6 +119,50 @@ public class PackageRepositoryTest {
         Assert.assertEquals(loaded.value().version(), version);
         Assert.assertEquals(repository.resolveCalls, 1);
         Assert.assertEquals(repository.fetchCalls, 1);
+        Assert.assertEquals(repository.sourceCalls, 0, "kafka's one service type is its listener's target");
+    }
+
+    private static Result<LoadedPackage> loadHttp(FakeRepository repository) {
+        return Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository)));
+    }
+
+    private static FakeRepository http(Optional<Map<String, String>> sources) {
+        return new FakeRepository("fake",
+                Result.ok(new CentralClient.ResolvedVersion(Version.parse("2.16.6").value(), false)),
+                Result.ok(FixtureCorpus.loadFixture("ballerina__http")), sources);
+    }
+
+    /** Which service types bind is read from the source the SAME repository serves, when the docs cannot say. */
+    @Test
+    public void theSourceSettlesWhichServiceTypesBind() {
+        FakeRepository repository = http(FixtureCorpus.recordedSources("ballerina__http"));
+
+        Result<LoadedPackage> loaded = loadHttp(repository);
+
+        Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
+        Assert.assertEquals(repository.sourceCalls, 1);
+        List<Service> services = loaded.value().library().services();
+        Assert.assertEquals(services.stream().map(Service::name).toList(),
+                List.of("Service", "ServiceContract", "InterceptableService"));
+        Assert.assertTrue(services.stream().allMatch(Service::isAttachable));
+    }
+
+    /**
+     * No source is never a failure, and never the old cross product: the attach target is confirmed and every other
+     * service type is paired with the "not confirmed" hedge, rather than dropped.
+     */
+    @Test
+    public void withoutTheSourceTheOtherServiceTypesAreHedgedNotDropped() {
+        FakeRepository repository = http(Optional.empty());
+
+        Result<LoadedPackage> loaded = loadHttp(repository);
+
+        Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
+        List<Service> services = loaded.value().library().services();
+        Assert.assertEquals(services.size(), 7);
+        Assert.assertEquals(services.stream().filter(Service::isAttachable).map(Service::name).toList(),
+                List.of("Service"));
     }
 
     @Test

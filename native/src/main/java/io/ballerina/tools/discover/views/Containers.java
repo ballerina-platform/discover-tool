@@ -200,7 +200,8 @@ public final class Containers {
 
         List<String> selectors = options.selectors();
         if (selectors.isEmpty()) {
-            if (containers.size() == 1) {
+            // Another module's service type has nothing here to open; the roster is what carries its command.
+            if (containers.size() == 1 && foreignPairing(containers.get(0)).isEmpty()) {
                 return answer(loaded, scope, containers.get(0), List.of(), options, note);
             }
             return roster(loaded, scope, containers, options);
@@ -368,10 +369,18 @@ public final class Containers {
     }
 
     /** {@link #listenerNames} as a one-line fact, for the containers the ceiling has no room to list a fact row for. */
-    private static String listenerNote(Surface.Container container) {
+    private static String listenerNote(LoadedPackage loaded, Surface.Container container) {
+        if (Surface.isUnattachable(loaded.library(), container)) {
+            return "not attachable to any listener this package declares";
+        }
         String names = listenerNames(container);
         if (names == null) {
             return null;
+        }
+        Optional<Service> foreign = foreignPairing(container);
+        if (foreign.isPresent()) {
+            return "binds to " + names + "; declared in " + foreign.get().declaredIn().map(ModuleRef::coordinate)
+                    .orElse("") + " — " + foreignCommand(foreign.get());
         }
         boolean allConfirmed = container.pairings().stream().allMatch(Service::isAttachable);
         return allConfirmed
@@ -456,28 +465,62 @@ public final class Containers {
                     DiscoverResult.Documented.NONE, null, loaded.warning(), null));
         }
 
+        List<Surface.Container> bindable = selected.stream()
+                .filter(container -> !Surface.isUnattachable(loaded.library(), container))
+                .toList();
+        List<Surface.Container> unattachable = selected.stream()
+                .filter(container -> Surface.isUnattachable(loaded.library(), container))
+                .toList();
         String command = bucket + filterArgument(options);
-        Result<Page> page = Page.of(options.page(), selected.size(), command);
+        Result<Page> page = Page.of(options.page(), bindable.size() + unattachable.size(), command);
         if (!page.isOk()) {
             return page.cast();
         }
         Page window = page.value();
-        List<DiscoverResult.ContainerRoster.Container> items = selected.subList(window.from(), window.to()).stream()
+        List<DiscoverResult.ContainerRoster.Container> items = window.slice(bindable, 0).stream()
                 .map(container -> new DiscoverResult.ContainerRoster.Container(
                         container.name(),
                         (int) container.operations().stream().map(PathTree.Operation::segments).distinct().count(),
                         (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
                         (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
                         listenerNames(container),
-                        bucket + " " + container.name()
-                                + (namedByFilter(container, options) ? "" : filterArgument(options))))
+                        openCommand(loaded, scope, container, options)))
                 .toList();
-        return Result.ok(new DiscoverResult.ContainerRoster(
-                items, selected.size(), window.paging(), window.next(command), loaded.warning()));
+        List<DiscoverResult.ContainerRoster.NotAttachable> notAttachable =
+                window.slice(unattachable, bindable.size()).stream()
+                        .map(container -> new DiscoverResult.ContainerRoster.NotAttachable(
+                                container.name(), openCommand(loaded, scope, container, options)))
+                        .toList();
+        return Result.ok(new DiscoverResult.ContainerRoster(items, bindable.size(), window.paging(),
+                window.next(command), loaded.warning(), notAttachable, unattachable.size()));
     }
 
     private static boolean namedByFilter(Surface.Container container, Options options) {
         return options.filtered() && Filter.matches(options.filter(), container.name());
+    }
+
+    /**
+     * The command that opens one container — in ANOTHER package for a service type a listener here accepts but
+     * another module declares ({@code postgresql:CdcListener}'s {@code cdc:Service}), since that is where its
+     * contract is.
+     */
+    private static String openCommand(
+            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, Options options) {
+        Optional<Service> foreign = foreignPairing(container);
+        if (foreign.isPresent()) {
+            return foreignCommand(foreign.get());
+        }
+        return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + container.name()
+                + (namedByFilter(container, options) ? "" : filterArgument(options));
+    }
+
+    private static Optional<Service> foreignPairing(Surface.Container container) {
+        return container.pairings().stream().filter(service -> service.declaredIn().isPresent()).findFirst();
+    }
+
+    private static String foreignCommand(Service service) {
+        return "bal discover " + service.declaredIn().map(ModuleRef::coordinate).orElse("") + " service "
+                + service.name();
     }
 
     /**
@@ -751,7 +794,7 @@ public final class Containers {
     private static Result<DiscoverResult> answer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, String note) {
-        note = mergeNotes(note, listenerNote(container));
+        note = mergeNotes(note, listenerNote(loaded, container));
         List<Entry> selected = select(container, selectors);
         List<String> documented = List.of();
 

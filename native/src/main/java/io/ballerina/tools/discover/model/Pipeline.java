@@ -20,6 +20,7 @@ package io.ballerina.tools.discover.model;
 
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -44,8 +45,13 @@ public final class Pipeline {
     }
 
     public static Library build(CentralDocs.Module module) {
+        return build(module, Optional.empty());
+    }
+
+    /** @param inclusions the module's object inclusions, read from its published source, when it was read */
+    public static Library build(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
         return Defaults.markUnwritable(
-                Patches.applyPatches(FromCentral.fromCentral(module)), publishedButUnrendered(module));
+                Patches.applyPatches(FromCentral.fromCentral(module, inclusions)), publishedButUnrendered(module));
     }
 
     /**

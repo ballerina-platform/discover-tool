@@ -129,8 +129,18 @@ public final class TextRenderer {
         layout.top(counted(roster.total(), noun[0], noun[1]));
 
         List<DiscoverResult.ContainerRoster.Container> containers = roster.containers();
-        Drill drill = Drill.of(containers.stream().map(DiscoverResult.ContainerRoster.Container::name).toList(),
-                containers.stream().map(DiscoverResult.ContainerRoster.Container::command).toList(), "<name>");
+        List<DiscoverResult.ContainerRoster.NotAttachable> notAttachable = roster.notAttachable();
+        List<String> names = new ArrayList<>();
+        List<String> commands = new ArrayList<>();
+        containers.forEach(container -> {
+            names.add(container.name());
+            commands.add(container.command());
+        });
+        notAttachable.forEach(type -> {
+            names.add(type.name());
+            commands.add(type.command());
+        });
+        Drill drill = Drill.of(names, commands, "<name>");
         Map<String, List<Integer>> byListener = new LinkedHashMap<>();
         for (int i = 0; i < containers.size(); i++) {
             String listener = containers.get(i).listener();
@@ -155,6 +165,11 @@ public final class TextRenderer {
                 layout.block(table.lines(INDENT));
             }
         });
+        TextTable unattachable = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
+        for (int i = 0; i < notAttachable.size(); i++) {
+            unattachable.row(notAttachable.get(i).name(), drill.explicit(containers.size() + i));
+        }
+        layout.section("Not attachable to a listener", unattachable);
         layout.warning(roster.warning());
         layout.more(remaining(containers.size(), roster.total(), roster.paging()), roster.paging());
         layout.next(drill.pattern());

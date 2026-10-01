@@ -335,21 +335,21 @@ public class PatchesTest {
                 FixtureCorpus.libraryFor("ballerina__http").services().stream()
                         .map(Service::name)
                         .toList(),
-                List.of("Service", "ServiceContract", "RequestInterceptor", "ResponseInterceptor",
-                        "RequestErrorInterceptor", "ResponseErrorInterceptor", "InterceptableService"));
+                List.of("Service", "ServiceContract", "InterceptableService"));
         Assert.assertEquals(
                 FixtureCorpus.libraryFor("ballerina__graphql").services().stream()
                         .map(Service::name)
                         .toList(),
-                List.of("Service", "Interceptor"));
+                List.of("Service"));
         // Templates a service author can copy, rather than a comment naming a listener the caller's module
         // cannot resolve.
         String document = FixtureCorpus.readSnapshot("ballerina__http");
         Assert.assertFalse(document.contains("// --- Service (generic) ---"));
         Assert.assertTrue(document.contains("service http:Service on new http:Listener(port, config) {"));
-        // HTTP-14: the six service types the listener's `attach` does not name get no template, and their
-        // contract is not lost — it is the declaration in the Types section, which is where it always was.
-        Assert.assertFalse(document.contains("service http:InterceptableService on new"));
+        // The two that include `*Service;` are templates too; the four interceptors get none, and their contract
+        // is not lost — it is the declaration in the Types section, which is where it always was.
+        Assert.assertTrue(document.contains("service http:InterceptableService on new"));
+        Assert.assertFalse(document.contains("service http:RequestInterceptor on new"));
         Assert.assertTrue(document.contains(
                 "    function createInterceptors() returns Interceptor|Interceptor[];"));
         Assert.assertTrue(FixtureCorpus.readSnapshot("ballerina__graphql").contains(

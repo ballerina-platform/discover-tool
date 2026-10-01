@@ -20,6 +20,7 @@ package io.ballerina.tools.discover.symbols;
 
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.Library;
+import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.model.TypeDef;
 
@@ -105,8 +106,8 @@ public final class Surface {
      * @param scope which verb addresses it
      * @param description the declaration's own documentation, verbatim
      * @param functions everything callable on it, in the package's own order
-     * @param pairings the listener(s) this service type binds to, one entry per listener the module declares —
-     *     empty outside {@link Scope#SERVICE}
+     * @param pairings the listener(s) this service type binds to, one entry per listener — empty outside
+     *     {@link Scope#SERVICE}, and for a service type no listener accepts
      */
     public record Container(String name, Scope scope, String description, List<Fn> functions,
             List<Service> pairings) {
@@ -231,18 +232,27 @@ public final class Surface {
     }
 
     /**
-     * A service type, paired with every listener the module declares — {@link Library#services()} already holds
-     * the cross product, so this only has to group it back by service type name.
+     * Every service type, each with the listener(s) it binds to — {@link Library#services()} already holds the
+     * pairings, so this only has to group them back by service type name.
      *
      * <p>Sourced from {@link Library#typeDefs()} for the name, description and BARE-NAME methods (the same
      * declaration {@code type} and the code register quote), and from {@link Library#services()} only for the
      * listener pairing — {@code services()}' own methods are qualified for the CALLER's module instead, which is
      * a different rendering job ({@code Documents#renderService}), not a second copy of this one.
+     *
+     * <p>A listener whose {@code attach} takes another module's type adds that type too, under the name a caller
+     * writes it by ({@code cdc:Service}) and with no members of its own: its contract is the other module's.
+     * A type no listener accepts is still here, with no pairing — addressable by name; see
+     * {@link #isUnattachable}.
      */
     private static List<Container> serviceContainers(Library library) {
         Map<String, List<Service>> pairingsByName = new LinkedHashMap<>();
+        Map<String, List<Service>> foreignByName = new LinkedHashMap<>();
         for (Service service : library.services()) {
-            pairingsByName.computeIfAbsent(service.name(), key -> new ArrayList<>()).add(service);
+            String key = service.declaredIn().map(module -> module.prefix() + ":" + service.name())
+                    .orElse(service.name());
+            (service.declaredIn().isPresent() ? foreignByName : pairingsByName)
+                    .computeIfAbsent(key, ignored -> new ArrayList<>()).add(service);
         }
         List<Container> containers = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
@@ -254,7 +264,24 @@ public final class Surface {
             containers.add(new Container(object.name(), Scope.SERVICE, object.description(), object.methods(),
                     pairingsByName.getOrDefault(object.name(), List.of())));
         }
+        foreignByName.forEach((name, pairings) -> {
+            if (seen.add(name)) {
+                String declaredIn = pairings.get(0).declaredIn().map(ModuleRef::coordinate).orElse("");
+                containers.add(new Container(name, Scope.SERVICE, "Declared in " + declaredIn + ".", List.of(),
+                        List.copyOf(pairings)));
+            }
+        });
         return List.copyOf(containers);
+    }
+
+    /**
+     * A service type none of the package's listeners accepts — an interceptor, or a type a service returns rather
+     * than attaches ({@code websocket:Service}). Only meaningful when the package declares a listener: a package
+     * with none ({@code ballerinax/cdc}) pairs nothing, and its service types bind to listeners declared elsewhere.
+     */
+    public static boolean isUnattachable(Library library, Container container) {
+        return container.scope() == Scope.SERVICE && container.pairings().isEmpty()
+                && !library.listeners().isEmpty();
     }
 
     /**

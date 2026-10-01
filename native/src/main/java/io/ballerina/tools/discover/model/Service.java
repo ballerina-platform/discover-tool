@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover.model;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * How a package expects a service to be written against it: the exact {@code service X on new Y(...)} block,
@@ -35,23 +36,32 @@ import java.util.List;
  * callable in the document kept them, and what made a listener's parameter DECLARATIONS render inside a
  * {@code new} call, where the language expects arguments.
  *
- * <p>{@code isAttachable} is whether the listener's {@code attach} names THIS type. HTTP-14: a
- * {@code distinct service object} type reaches a listener only by including the type {@code attach} takes, and
- * Central publishes no inclusion for an object type — so this is the whole of what can be known, and a type it
- * is false for gets its contract stated rather than a template that does not compile.
+ * <p>{@code isAttachable} is whether the pairing is CONFIRMED — the service type is one of the listener's
+ * {@code attach} targets or includes one ({@link Bindings}). False is a pairing that could not be settled either
+ * way: the listener publishes no {@code attach} to read, or the package source that would show the type's
+ * inclusions could not be read. A type known NOT to bind is not paired at all.
+ *
+ * <p>{@code declaredIn} is set when the attach target is another module's type — {@code postgresql:CdcListener}
+ * takes a {@code cdc:Service} — and then {@code name} is that type's name in that module, and {@code methods}
+ * is empty: the contract is that module's to state.
  *
  * @param name the service type's name
  * @param isDeprecated whether Central flagged the type deprecated
  * @param listener the listener it binds to, and what its constructor takes
  * @param methods the remote contract the service block must implement
- * @param isAttachable whether the listener's {@code attach} names this type
+ * @param isAttachable whether the pairing is confirmed rather than merely possible
+ * @param declaredIn the module that declares the service type, when it is not this one
  * @since 0.1.0
  */
-public record Service(
-        String name, boolean isDeprecated, Listener listener, List<Fn> methods, boolean isAttachable) {
+public record Service(String name, boolean isDeprecated, Listener listener, List<Fn> methods,
+        boolean isAttachable, Optional<ModuleRef> declaredIn) {
 
     public Service(String name, boolean isDeprecated, Listener listener, List<Fn> methods) {
-        this(name, isDeprecated, listener, methods, true);
+        this(name, isDeprecated, listener, methods, true, Optional.empty());
+    }
+
+    public Service(String name, boolean isDeprecated, Listener listener, List<Fn> methods, boolean isAttachable) {
+        this(name, isDeprecated, listener, methods, isAttachable, Optional.empty());
     }
 
     /**

@@ -62,7 +62,11 @@ public class SurfaceTest {
         library.listeners().forEach(listener -> objects.remove(listener.name()));
 
         Set<String> clients = names(Surface.of(library, Surface.Scope.CLIENT));
-        Set<String> services = names(Surface.of(library, Surface.Scope.SERVICE));
+        // Another module's service type a listener here accepts (postgresql's `cdc:Service`) is addressable under
+        // `service` without being one of this package's own objects.
+        Set<String> services = names(Surface.of(library, Surface.Scope.SERVICE).stream()
+                .filter(container -> container.pairings().stream().allMatch(pair -> pair.declaredIn().isEmpty()))
+                .toList());
         Set<String> classes = names(Surface.of(library, Surface.Scope.CLASS));
 
         Set<String> pairwise = new HashSet<>(clients);
@@ -115,15 +119,54 @@ public class SurfaceTest {
 
     /**
      * {@code ballerina/http} is the RFC's own representative case: 80 plain classes against exactly one listener
-     * and seven real service types (its own {@code Service}, {@code ServiceContract} and five interceptor
-     * types) — every one of the seven is a {@code service}, none is a {@code class}.
+     * and seven real service types — every one of the seven is a {@code service}, none is a {@code class}. Only
+     * three bind to the listener: {@code Service}, its attach target, and {@code ServiceContract} and
+     * {@code InterceptableService}, which include it ({@code *Service;}, read from the recorded source). The four
+     * interceptors are still addressable under {@code service}, paired with nothing.
      */
     @Test
     public void httpsSevenServiceTypesAreAllUnderServiceNoneUnderClass() {
         Library library = FixtureCorpus.libraryFor("ballerina__http");
-        Assert.assertEquals(names(Surface.of(library, Surface.Scope.SERVICE)), Set.of(
+        List<Surface.Container> services = Surface.of(library, Surface.Scope.SERVICE);
+        Assert.assertEquals(names(services), Set.of(
                 "Service", "ServiceContract", "RequestInterceptor", "ResponseInterceptor",
                 "RequestErrorInterceptor", "ResponseErrorInterceptor", "InterceptableService"));
+        Assert.assertEquals(names(services.stream().filter(service -> !Surface.isUnattachable(library, service))
+                .toList()), Set.of("Service", "ServiceContract", "InterceptableService"));
+        Assert.assertEquals(names(services.stream().filter(service -> Surface.isUnattachable(library, service))
+                .toList()), Set.of("RequestInterceptor", "ResponseInterceptor", "RequestErrorInterceptor",
+                "ResponseErrorInterceptor"));
+        services.stream().flatMap(service -> service.pairings().stream()).forEach(pairing -> {
+            Assert.assertEquals(pairing.listener().name(), "http:Listener");
+            Assert.assertTrue(pairing.isAttachable(), pairing.name() + " is confirmed by the source");
+        });
+    }
+
+    /** {@code graphql:Interceptor} is configured through {@code GraphqlServiceConfig}, never attached. */
+    @Test
+    public void graphqlsInterceptorIsNotAttachable() {
+        Library library = FixtureCorpus.libraryFor("ballerina__graphql");
+        List<Surface.Container> services = Surface.of(library, Surface.Scope.SERVICE);
+        Assert.assertEquals(names(services.stream().filter(service -> !Surface.isUnattachable(library, service))
+                .toList()), Set.of("Service"));
+        Assert.assertEquals(names(services.stream().filter(service -> Surface.isUnattachable(library, service))
+                .toList()), Set.of("Interceptor"));
+    }
+
+    /**
+     * {@code postgresql:CdcListener.attach} takes {@code cdc:Service}, which {@code ballerinax/cdc} declares — so
+     * the bucket names that type, pointing at its own package, rather than reporting nothing.
+     */
+    @Test
+    public void aForeignAttachTargetIsAServiceOfItsOwnModule() {
+        Library library = FixtureCorpus.libraryFor("ballerinax__postgresql");
+        List<Surface.Container> services = Surface.of(library, Surface.Scope.SERVICE);
+        Assert.assertEquals(services.size(), 1);
+        Surface.Container service = services.get(0);
+        Assert.assertEquals(service.name(), "cdc:Service");
+        Assert.assertEquals(service.pairings().get(0).listener().name(), "postgresql:CdcListener");
+        Assert.assertEquals(service.pairings().get(0).declaredIn().orElseThrow().coordinate(), "ballerinax/cdc");
+        Assert.assertFalse(Surface.isUnattachable(library, service));
     }
 
     /**

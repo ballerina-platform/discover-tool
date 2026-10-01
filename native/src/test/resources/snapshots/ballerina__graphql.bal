@@ -649,14 +649,8 @@ service graphql:Service on new graphql:Listener(listenTo, configuration) {
     // readme` reproduces it.
 }
 
-// These service object types are declared above; this reader cannot confirm that graphql:Listener
-// accepts them, so it writes no attachment template for them:
+// Declared above, but no listener of this package accepts them, so no template is written:
 //   graphql:Interceptor
-// graphql:Listener.attach takes one specific type. A `distinct service object` type reaches it only
-// by INCLUDING that type, and Central publishes no inclusion for an object type — so some of these
-// do attach and some do not, and the payload cannot say which. An interceptor type, for one, reaches
-// the runtime as a `createInterceptors()` return rather than as an attachment. The package's own
-// guide is where the usage of each is written; `bal discover <org>/<name> readme` reproduces it.
 
 // --- Annotations ---
 

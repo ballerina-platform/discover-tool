@@ -989,9 +989,10 @@ public final class Constructs {
 
                 Construct.faithful(
                         "services/an-unattachable-service-type",
-                        "a service object type the listener's `attach` does not name gets NO template, "
-                                + "because a `distinct service object` reaches a listener only by including "
-                                + "the attached type and Central publishes no inclusion",
+                        "a service object type the listener's `attach` does not name gets NO template when the "
+                                + "package source is unread, because a `distinct service object` reaches a "
+                                + "listener only by including the attached type and Central publishes no "
+                                + "inclusion",
                         Payload.pkg()
                                 .with("listeners", Decl.listenerAttaching("Service", "Listener",
                                         Decl.param("config", Node.named("ListenerConfig", RECORDS))))
@@ -1011,15 +1012,10 @@ public final class Constructs {
                         // These service object types are declared above; this reader cannot confirm that pkg:Listener
                         // accepts them, so it writes no attachment template for them:
                         //   pkg:Interceptor
-                        // pkg:Listener.attach takes one specific type. A `distinct service object` type reaches it only
-                        // by INCLUDING that type, and Central publishes no inclusion for an object type —\s\
-                        so some of these
-                        // do attach and some do not, and the payload cannot say which.\s\
-                        An interceptor type, for one, reaches
-                        // the runtime as a `createInterceptors()` return rather than as an attachment.\s\
-                        The package's own
-                        // guide is where the usage of each is written; `bal discover <org>/<name> readme`\s\
-                        reproduces it.""")
+                        // A listener accepts the type its `attach` takes and any `distinct service object` type that
+                        // INCLUDES it; for these, that could not be read — the listener publishes no `attach`, or the
+                        // package source that shows inclusions was unavailable. The package's own guide is where the
+                        // usage of each is written; `bal discover <org>/<name> readme` reproduces it.""")
                         .inSection("Service"),
 
                 Construct.faithful(

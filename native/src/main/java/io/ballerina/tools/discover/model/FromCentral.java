@@ -655,13 +655,14 @@ public final class FromCentral {
     // -----------------------------------------------------------------------
 
     /**
-     * Pair every listener the module declares with every service type, producing the
+     * Pair each listener the module declares with the service types it accepts, producing the
      * {@code service X on new Y(...)} template plus the contract the service must implement.
      *
-     * <p>Every listener, not the first: {@code ballerina/email} publishes an IMAP listener and a POP one,
-     * the readme's examples all use the POP one, and taking {@code listeners().get(0)} named the other and
-     * discarded this one with no diagnostic. A module with service types but no listener (or the reverse)
-     * describes no service worth templating.
+     * <p>Every listener, not the first: {@code ballerina/email} publishes an IMAP listener and a POP one, and
+     * taking {@code listeners().get(0)} named one and discarded the other with no diagnostic. Which service types
+     * a listener accepts is {@link Bindings}' call; a listener whose {@code attach} takes another module's type
+     * ({@code postgresql:CdcListener}, a {@code cdc:Service}) gets that foreign type as its pairing rather than
+     * nothing.
      *
      * <p>Built under {@link #FOREIGN} rather than the module's own scope, which is the one place in this
      * reader where that is right. Every other section declares the package's API and so writes its own names
@@ -672,46 +673,22 @@ public final class FromCentral {
      * {@code Interceptor}, so the two halves of one line disagreed about whose module they were in and the
      * template did not resolve.
      */
-    /**
-     * The service type this listener's {@code attach} takes, or {@code null}.
-     *
-     * <p>HTTP-14. This is the only attachability signal the payload carries, and the reason it is only a
-     * partial one is worth stating: {@code attach} names {@code Service}, and a {@code distinct service object}
-     * type is a subtype of it only by INCLUDING it — {@code ballerina/http}'s {@code ServiceContract} and
-     * {@code InterceptableService} both write {@code *Service;} where its four interceptor types write nothing.
-     * Central publishes neither: measured on the recorded payload, {@code ServiceContract} arrives carrying
-     * {@code description}, {@code isDistinct} and {@code name} and no fields, no methods and no
-     * {@code inclusionType}, so it is byte-for-byte indistinguishable from {@code RequestInterceptor}.
-     *
-     * <p>So the equality test is deliberately narrow rather than a guess at the subtype relation. What it costs
-     * is two templates that WOULD have compiled; what it buys is that no template is printed which does not.
-     *
-     * <p>{@code null} when the payload publishes no {@code attach} at all, and the caller then treats every
-     * service type as attachable — the behaviour before this narrowing. Absent evidence is not evidence of
-     * absence, and suppressing every template for a package whose payload merely omits the lifecycle methods
-     * would lose the section wholesale. All three of the corpus's service packages publish it.
-     */
-    private static String attachedTypeName(CentralDocs.Listener listener) {
-        // `attach` is a LIFECYCLE method — Central files it apart from the listener's own methods — and its
-        // FIRST parameter is the service; the second is the optional attachment path.
-        return listener.lifeCycleMethodList().stream()
-                .filter(method -> "attach".equals(method.name()))
-                .flatMap(method -> method.params().stream().limit(1))
-                .map(param -> param.type().name().orElse(""))
-                .filter(name -> !name.isEmpty())
-                .findFirst()
-                .orElse(null);
-    }
-
-    private static boolean attachable(CentralDocs.ObjectDecl serviceType, CentralDocs.Listener listener) {
-        String attached = attachedTypeName(listener);
-        return attached == null || serviceType.name().equals(attached);
-    }
-
-    private static List<Service> buildServices(CentralDocs.Module module) {
-        if (module.listeners().isEmpty() || module.serviceTypes().isEmpty()) {
+    private static List<Service> buildServices(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
+        if (module.listeners().isEmpty()) {
             return List.of();
         }
+        Map<CentralDocs.Listener, Optional<Set<Bindings.Target>>> targets = new LinkedHashMap<>();
+        Set<String> targeted = new LinkedHashSet<>();
+        for (CentralDocs.Listener listener : module.listeners()) {
+            Optional<Set<Bindings.Target>> accepted = Bindings.attachTargets(listener, module);
+            targets.put(listener, accepted);
+            accepted.ifPresent(set -> set.forEach(target -> {
+                if (target instanceof Bindings.Target.Local local) {
+                    targeted.add(local.name());
+                }
+            }));
+        }
+
         List<Service> services = new ArrayList<>();
         for (CentralDocs.ObjectDecl serviceType : module.serviceTypes()) {
             // Every method, whatever its form. A service type's contract is usually remote methods, but
@@ -721,17 +698,26 @@ public final class FromCentral {
                     .map(method -> transformMethod(method, FOREIGN))
                     .toList();
             for (CentralDocs.Listener listener : module.listeners()) {
-                services.add(new Service(
-                        serviceType.name(),
-                        serviceType.isDeprecated(),
-                        new Service.Listener(
-                                module.id() + ":" + listener.name(),
-                                transformParams(listener.initParameterList(), FOREIGN)),
-                        methods,
-                        attachable(serviceType, listener)));
+                Bindings.Binding binding =
+                        Bindings.bind(serviceType.name(), targets.get(listener), targeted, inclusions);
+                if (binding != Bindings.Binding.NONE) {
+                    services.add(new Service(serviceType.name(), serviceType.isDeprecated(),
+                            serviceListener(module, listener), methods, binding == Bindings.Binding.CONFIRMED));
+                }
             }
         }
+        targets.forEach((listener, accepted) -> accepted.ifPresent(set -> set.forEach(target -> {
+            if (target instanceof Bindings.Target.Foreign foreign) {
+                services.add(new Service(foreign.name(), false, serviceListener(module, listener), List.of(),
+                        true, Optional.of(foreign.module())));
+            }
+        })));
         return List.copyOf(services);
+    }
+
+    private static Service.Listener serviceListener(CentralDocs.Module module, CentralDocs.Listener listener) {
+        return new Service.Listener(
+                module.id() + ":" + listener.name(), transformParams(listener.initParameterList(), FOREIGN));
     }
 
     /**
@@ -852,6 +838,14 @@ public final class FromCentral {
     }
 
     public static Library fromCentral(CentralDocs.Module module) {
+        return fromCentral(module, Optional.empty());
+    }
+
+    /**
+     * @param inclusions what the module's published source says each object type includes, or empty when it was
+     *     not read — the one fact about service bindings the docs payload cannot supply
+     */
+    public static Library fromCentral(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
         Scope scope = new Scope(module.id(), module.orgName());
         List<TypeDef> typeDefs = new ArrayList<>();
 
@@ -967,7 +961,7 @@ public final class FromCentral {
                 clients,
                 functions,
                 listeners,
-                buildServices(module),
+                buildServices(module, inclusions),
                 buildAnnotations(module, scope),
                 buildConfigurables(module, scope));
     }
