@@ -296,6 +296,11 @@ public final class JsonRenderer {
         if (!mixed.normal().isEmpty()) {
             json.add("normal", methods(mixed.normal()));
         }
+        JsonObject counts = new JsonObject();
+        addIfPositive(counts, "resources", mixed.counts().resources());
+        addIfPositive(counts, "remote", mixed.counts().remote());
+        addIfPositive(counts, "normal", mixed.counts().normal());
+        json.add("counts", counts);
         json.addProperty("shown", mixed.shown());
         json.addProperty("total", mixed.total());
         addPaging(json, mixed.paging());
@@ -373,6 +378,12 @@ public final class JsonRenderer {
 
     private static void addIfPresent(JsonObject json, String field, String value) {
         if (value != null) {
+            json.addProperty(field, value);
+        }
+    }
+
+    private static void addIfPositive(JsonObject json, String field, int value) {
+        if (value > 0) {
             json.addProperty(field, value);
         }
     }

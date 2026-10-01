@@ -280,6 +280,7 @@ public class SelectionCarryTest {
         Assert.assertEquals(parameters.code(), 0, parameters.err());
         Assert.assertFalse(parameters.json().has("groups"), "parameters counted toward depth: " + parameters.out());
     }
+
     // -----------------------------------------------------------------------
     // A mixed listing pages as one sequence, sections kept
     // -----------------------------------------------------------------------
@@ -288,8 +289,9 @@ public class SelectionCarryTest {
 
     /**
      * http's {@code Client} with 45 more remote and 26 more normal methods: 1 resource path, 60 remote and 30
-     * normal, 91 entries on three pages — page 1 spans resources into remote, page 2 remote into normal. No
-     * recorded container is a mixed one over the ceiling, which is the only reason this is an edited payload.
+     * normal, 91 entries on three pages — page 1 spans resources into remote, page 2 remote into normal. The
+     * recorded redis {@code Client} pages over the ceiling too, but has no resources and crosses into normal only
+     * on its last page; this edited payload crosses both boundaries, one of them on a middle page.
      */
     private static HttpOptions bulkyHttp() {
         JsonObject docs = FixtureCorpus.loadRawFixture("ballerina__http").deepCopy().getAsJsonObject();
@@ -355,6 +357,8 @@ public class SelectionCarryTest {
         Assert.assertEquals(middle.code(), 0, middle.err());
         JsonObject second = middle.json();
         Assert.assertFalse(second.has("resources"), second.toString());
+        Assert.assertEquals(second.getAsJsonObject("counts").toString(),
+                "{\"resources\":1,\"remote\":60,\"normal\":30}", "page 2 still names every form it does not hold");
         Assert.assertEquals(strings(second, "remote").size(), 21, second.toString());
         Assert.assertEquals(strings(second, "normal").size(), 19, second.toString());
         Assert.assertEquals(second.get("next").getAsString(), HTTP + " --page 3");
@@ -401,5 +405,36 @@ public class SelectionCarryTest {
         Assert.assertEquals(failure.get("kind").getAsString(), "validation");
         Assert.assertTrue(failure.get("message").getAsString().contains("3 pages"), outside.err());
         Assert.assertTrue(failure.get("suggestion").getAsString().contains(HTTP + " --page 3"), outside.err());
+    }
+
+    /** The recorded redis {@code Client}: 111 remote methods and {@code close}, 112 entries on pages of 40/40/32. */
+    @Test
+    public void theRecordedRedisClientPagesThroughBothFormsWithoutRepeatingOrSkipping() {
+        String command = "bal discover ballerinax/redis client Client";
+        List<String> remote = new ArrayList<>();
+        List<String> normal = new ArrayList<>();
+        JsonObject page = answer("ballerinax__redis", command);
+        int[] expected = {40, 40, 31};
+        for (int number = 1; number <= 3; number++) {
+            Assert.assertEquals(page.get("page").getAsInt(), number, page.toString());
+            Assert.assertEquals(page.get("total").getAsInt(), 112);
+            Assert.assertEquals(page.getAsJsonObject("counts").toString(), "{\"remote\":111,\"normal\":1}");
+            Assert.assertEquals(strings(page, "remote").size(), expected[number - 1], page.toString());
+            remote.addAll(strings(page, "remote"));
+            normal.addAll(strings(page, "normal"));
+            if (number < 3) {
+                Assert.assertFalse(page.has("normal"), page.toString());
+                Assert.assertEquals(page.get("next").getAsString(), command + " --page " + (number + 1));
+                page = answer("ballerinax__redis", page.get("next").getAsString());
+            } else {
+                Assert.assertFalse(page.has("next"), page.toString());
+            }
+        }
+        Assert.assertEquals(remote.stream().distinct().count(), 111L, "a page repeated or skipped an entry");
+        Assert.assertEquals(normal, List.of("close"));
+
+        Run text = run("ballerinax__redis", command + " --output text");
+        Assert.assertTrue(text.out().startsWith(
+                "ballerinax/redis · client · Client\n111 remote methods, 1 normal method\n"), text.out());
     }
 }

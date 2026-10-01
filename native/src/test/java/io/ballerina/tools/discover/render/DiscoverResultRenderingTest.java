@@ -517,8 +517,8 @@ public class DiscoverResultRenderingTest {
     public void aMixedListingIsSectionedByCallFormInTextAndThreeArraysInJson() {
         DiscoverResult result = new DiscoverResult.MixedListing("Client",
                 List.of(resource(":...path", HTTP + " :...path", "get", "post")),
-                methods(HTTP, "execute", "get"), methods(HTTP, "getCookieStore"), 4, 4, null, null, List.of(), null,
-                null);
+                methods(HTTP, "execute", "get"), methods(HTTP, "getCookieStore"),
+                new DiscoverResult.MixedListing.Counts(1, 2, 1), 4, 4, null, null, List.of(), null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "1 resource path, 2 remote methods, 1 normal method",
@@ -554,10 +554,10 @@ public class DiscoverResultRenderingTest {
         String next = "bal discover pkg client Client --page 2";
         DiscoverResult result = new DiscoverResult.MixedListing(null,
                 List.of(), methods("bal discover pkg client Client", "execute"),
-                methods("bal discover pkg client Client", "'close"), 2, 4, new DiscoverResult.Paging(1, 2, 2), next,
-                List.of("forward"), null, null);
+                methods("bal discover pkg client Client", "'close"), new DiscoverResult.MixedListing.Counts(0, 2, 2),
+                2, 4, new DiscoverResult.Paging(1, 2, 2), next, List.of("forward"), null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
-                "4 entries",
+                "2 remote methods, 2 normal methods",
                 "",
                 "Remote (->)",
                 "  execute",
@@ -578,6 +578,8 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.get("pages").getAsInt(), 2);
         Assert.assertEquals(json.getAsJsonArray("documented").get(0).getAsString(), "forward");
         Assert.assertFalse(json.has("resources"), "a section with nothing on this page is omitted");
+        Assert.assertEquals(json.getAsJsonObject("counts").toString(), "{\"remote\":2,\"normal\":2}",
+                "the whole listing's split, a form with none omitted");
         Assert.assertFalse(json.has("container"));
     }
 

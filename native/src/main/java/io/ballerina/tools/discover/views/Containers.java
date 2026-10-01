@@ -916,6 +916,7 @@ public final class Containers {
                 window.slice(resources, 0),
                 window.slice(remote, resources.size()),
                 window.slice(normal, resources.size() + remote.size()),
+                new DiscoverResult.MixedListing.Counts(resources.size(), remote.size(), normal.size()),
                 window.to() - window.from(), total, window.paging(), window.next(command), documented, warning,
                 mergeNotes(note, pathNote(container, selectors))));
     }
