@@ -155,10 +155,10 @@ them: an agent's tooling cuts output by line (`head`, `tail`), and any cut insid
 JSON that does not parse. `RegisterTest` holds every answer across the corpus, readmes included, to one line.
 
 **Every row carries its exact next command.** A method, a group, a container, a submodule and a readme section
-each open one thing and carry a `call` (a method row is `{"name", "call"}`, never a bare string). A resource row carries `calls` instead — an object keyed by accessor, in
-`accessors` order, one command per accessor — whether it has one accessor or several: a flat `call` on a
-multi-accessor path would have to guess which accessor, and one shape for every resource row means a caller
-never branches on the accessor count. A `call`, `calls` value or `next` re-types the selection it came from: a
+each open one thing and carry a `call` (a method row is `{"name", "call"}`, never a bare string). A resource row
+carries `calls` instead — an object keyed by accessor, in `accessors` order, one command per accessor — whether
+it has one accessor or several: a flat `call` on a multi-accessor path would have to guess which accessor, and
+one shape for every resource row means a caller never branches on the accessor count. A `call`, `calls` value or `next` re-types the selection it came from: a
 path selection canonically (path, then accessor), anything else exactly as given, one shell word per argument
 (`Texts.shellWord`), with any `--filter` kept. `PointersTest` runs every `call`, `calls` value and `next` that
 the first answers of every bucket and container print — bare, filtered, by name substring and by path plus accessor —
@@ -202,10 +202,11 @@ Over the ceiling:
   outside the listing is a `validation` failure naming the range, never an empty page.
 - **A mixed listing pages as one sequence** — any selection in more than one call form, remote beside normal
   methods included, since a flat list of names loses `->` against `.`: resource paths, then remote methods,
-  then normal ones, windowed
-  by the same `Containers.Page` (`Page.slice` cuts each section to the window), so a page can end partway
-  through one section and start the next. Each page keeps its section split and omits a section it holds
-  nothing of; `next` is the `--page N+1` command carrying the selector, `--filter` and `--module`.
+  then normal ones, windowed by the same `Containers.Page` (`Page.slice` cuts each section to the window), so a
+  page can end partway through one section and start the next. Each page keeps its section split and omits a
+  section it holds nothing of; `counts` gives every form's size across the whole listing (the text header too),
+  so redis's `close`, which only page 3 holds, is announced on page 1. `next` is the `--page N+1` command
+  carrying the selector, `--filter` and `--module`, and documentation-only matches come on page 1 only.
 - **A roster of containers is cut** at 40 and points at `--filter`.
 
 A cut answer always says so — `shown`/`total` and the `next` command in JSON (plus `page`/`pages` when
@@ -217,7 +218,8 @@ one.
 is never sent to Central. It is a case-insensitive substring of an entry's surface text (name, path, parameter
 and type names). An entry that matches only in its documentation is not listed but named in `documented`,
 because rendering both buries the first set and dropping the second loses the caller who knows the capability
-but not the vocabulary.
+but not the vocabulary. `documented` obeys the same 40-entry ceiling, with `documentedTotal` beside it: a
+common word (redis's `the`) matches over a hundred entries' docs.
 
 ---
 
@@ -379,7 +381,7 @@ ballerina-platform's GitHub Packages, so building needs a `read:packages` token 
 | `CorpusTest` | Thirteen recorded payloads render byte-for-byte to thirteen committed `.bal` API snapshots — the oracle every quoted declaration is checked against. |
 | `ViewsAgreeTest` | **What makes the drill-down safe.** Every exact member name and every exact path plus accessor resolves to one `Signature` (over a corpus-wide floor), and every line it quotes appears in the API snapshot verbatim; every path the tree offers is reachable and nothing unoffered is; closures terminate, do not repeat and stay bounded. |
 | `PointersTest` | Every `call`/`calls`/`next` command the first answers print (bare, filtered, per container, by name substring, by path plus accessor) is RUN through the real CLI against the recorded payload, then what those print is followed two levels further on a bounded sample; each must exit 0 with something other than "nothing matched", and none may point back at the command that printed it. Every resource row's `calls`, one per accessor, must open exactly that path and accessor's signature, every method row's `call` exactly that method's, and every answer the CLI prints must be one line. |
-| `SelectionCarryTest` | A page, a group and a canonical command re-select exactly what the listing was a window onto: the selector, the accessor and the `--filter` ride along, a substring never becomes a path, the depth cap counts literal segments, and an out-of-range `--page` fails. A mixed listing over the ceiling (an edited http payload, since no recorded container is one) pages across its section boundaries without repeating or skipping an entry. |
+| `SelectionCarryTest` | A page, a group and a canonical command re-select exactly what the listing was a window onto: the selector, the accessor and the `--filter` ride along, a substring never becomes a path, the depth cap counts literal segments, and an out-of-range `--page` fails. A mixed listing over the ceiling pages across its section boundaries without repeating or skipping an entry — the recorded redis `Client` (111 remote, then `close`) and an edited http payload that also crosses resources into remote and a boundary on a middle page — and documentation-only matches stay under the ceiling. |
 | `ViewsTest` | The `.buckets.txt`/`.buckets.json` snapshots, the entry ceiling over every fixture (listed sizes, `shown` against what is listed, a `next` on every cut listing, nested `NoMatch.available` listings included), and the resolution and tolerance rules. Also where path ordering is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
 | `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object on exactly one line (readmes included), no text rendering carries Markdown report furniture, no `note` carries a Markdown backtick, every text listing puts one entry per line with its columns lined up and every JSON `call`/`calls`/`next` reachable from the text, and quoted Ballerina carries no fences of the tool's own. |
 | `render/DiscoverResultRenderingTest` | Every result shape, in both renderers, driven directly. |
