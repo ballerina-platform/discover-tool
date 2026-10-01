@@ -1,323 +1,341 @@
 # Ballerina Discover Tool
 
-A Ballerina CLI tool that reads a package off **Ballerina Central** and answers eight addressed
-questions about it. It exists so an AI copilot can learn a package's real signatures instead of
-guessing them — and so a human can too.
+`bal discover` reads a Ballerina package off **Ballerina Central** and answers what its API actually is:
+the clients, services, classes and functions it declares, how each is called, and the exact signature of
+any one of them. It exists so an AI agent (or a human) can learn a package's real API instead of guessing it
+from a web search or memory. It is deterministic — no model runs inside it.
 
 ```bash
-bal discover --help          # what the tool is, what it can be asked, and how to walk it
-bal discover client --help   # one verb: its flags, and what its own reader needs to know
+bal discover --help
 ```
 
-**The tool documents itself, and there is one copy of each thing it says.** The lists inside `--help`
-are rendered from the picocli model rather than written twice; a flag is described on the
-verb that accepts it, and a rule about something a document prints is printed by that document, beside
-the thing it is about. The root text stops at the verb list: it answers _what can I ask,
-and how_, while the discipline a caller carries into a lookup — a `// Special Agent Note:` is the
-import, a `## Next` block is a pointer, a failure `kind` says whether to retry — belongs to the agent
-skill that is in context when it applies. This file deliberately
-does not restate the grammar — a second copy on a different release clock is exactly what that
-discipline removed.
+## Usage
 
-What follows is what `--help` has no room for: why the tool is shaped this way, and how to build,
-iterate on and verify it.
+```
+bal discover <org>/<package> [bucket] [selector ...] [flags]
+```
 
-## Why addressed rather than grepped
+The package comes first and every further positional drills one level down. With no bucket, the answer is
+the list of buckets the package has.
 
-`ballerinax/github`'s API document is 927KB and 22,829 lines. Reading it by hand costs an agent
-several turns and usually ends in a wrong extent. The addressed verbs answer by name or by path
-instead, and the numbers are why each one exists:
+| Bucket    | What it holds                                                                                            |
+| --------- | -------------------------------------------------------------------------------------------------------- |
+| `client`  | Objects reached with `->`: remote methods and resource functions (`client->path.accessor(...)`).         |
+| `service` | Service object types, each paired with the listener it attaches to.                                      |
+| `class`   | Plain objects reached with `.`.                                                                          |
+| `funcs`   | Module-level functions.                                                                                  |
+| `readme`  | The module's README, verbatim. `readme <n>` or `readme "<title>"` opens one code-carrying section.       |
 
-|                                         | measured                                                                                                                                                                                                                                                                                                                        |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `overview` is a bounded MAP             | it generates no signature at all, so its size is a property of the design rather than of the package — the eleven-package corpus is **732 lines**, against 2,426 when it carried signatures and 4,168 when it carried the readme too. A byte cap would still have let `ballerina/crypto` emit 20,000 bytes before degrading     |
-| the map is ordered to survive a pipe    | **80% of recorded lookups were piped**, so it leads with facts, quickstart and navigation — a `head -100` reaches `## Next` in 11 packages of 11, against 0 of 11 before                                                                                                                                                        |
-| `guide` is a verb, not a section        | the readme was **44% of the entry document and 29% of it was account setup**. A code-only extract was considered and rejected: `googleapis.sheets`' readme is 178 lines with 4 code blocks, so it would discard 85% of it — including the note that `deleteSpreadsheet` needs the Drive API enabled, which no signature implies |
-| `client` walks a path tree              | github's **903 operations reduce to 36 top-level segments in 445 bytes**, and each level names the next command                                                                                                                                                                                                                 |
-| `client` also addresses names           | a remote function has no path, so the same slot takes a name filter — twilio's **200 operations are an index of names, not 62,063 bytes of signatures**                                                                                                                                                                         |
-| three verbs, not one                    | `client`, `class` and `funcs` split the callable surface by how it is CALLED. Central publishes no `isClient` key, so the split is derived from the grammar: `ballerina/http` has ten clients, two of which Central files as ordinary declarations                                                                              |
-| `-r` stops at the package edge          | `http:ConnectionConfig` has a local closure of one and **fifteen** external edges; following them would hide a five-second fetch inside an answer the caller expects to be warm                                                                                                                                                 |
-| `-r` is bounded and names what it drops | `http:ClientConfiguration` was 38 declarations, 505 lines and 24,183 bytes handed back whole                                                                                                                                                                                                                                    |
-| `find` demotes unadopted packages       | measured, Central ranks a **one-pull** package fourth for `http client`                                                                                                                                                                                                                                                         |
-| the payload cache                       | **8.0s cold, 1.2s warm** on `ballerinax/github` — what makes four precise questions cheaper than one big answer                                                                                                                                                                                                                 |
+The first four are derived from how a symbol is called, not from Central's `isClient`-style flags:
+`ballerina/http` declares ten clients, two of which Central files as ordinary declarations.
 
-Five behaviours worth knowing because no signature shows them:
+Selectors after the bucket name a container, then a member: a method name, or a resource path followed by
+its accessor (`client "gists/'public" get`). With one container in the bucket, the container name can be
+left out.
 
-- **Line one states the document's own length**, in both registers. Piping was measured at 100% of
-  sessions and did not respond to being asked not to — and the reason turned out not to be about this
-  tool at all: every session that piped had piped a genuinely noisy command (`bal openapi`, `bal tool
-pull`) moments earlier, and the `| head` arrived on `bal discover --help` before a byte of any
-  document had been seen. A `| head -150` over one github operation's 535-line closure discards 72% and
-  ends mid-record; the length makes that arithmetic instead of a guess.
+| Flag                   | Meaning                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
+| `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
+| `--page <n>`           | Turn the page of a method listing longer than the entry ceiling.                                       |
+| `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`.                 |
+| `--refresh`            | Ignore the cached payload and fetch it again.                                                          |
 
-- **Paths match from the first segment.** An unanchored match for `repos/{owner}/{repo}` would return
-  nine operations rather than three, mixing in two unrelated subtrees about team access. The one
-  relaxation is a _trailing_ segment: `repos/owner/repo/caches` is answered at
-  `repos/{owner}/{repo}/actions/caches` when that is the only match, and listed rather than chosen
-  when it is not.
-- **A wrong guess costs a line, not a round trip.** A verb given another kind's symbol still answers,
-  prepending one line naming the canonical verb; a name that is a member rather than a container
-  resolves and names its owner. The same tolerance covers spelling: a path segment answers to
-  `{owner}`, `owner` and `[string owner]`, to its escaped form (`code\-scanning`, `chat\.postMessage`,
-  `'import`) as well as its readable one, and `new` addresses the constructor Ballerina spells `init` —
-  measured, that guess cost a round trip in two separate sweeps. These are **input** aliases only: the
-  document always prints what the package declares, so a genuinely declared `new` (github's
-  `codespaces/'new`) outranks the alias.
-- **Versions are never an argument.** The tool walks up from the process's directory for a
-  `Ballerina.toml` and reads the version its `Dependencies.toml` locks, so a lookup and a `bal build`
-  see the same one. No document discloses the resolution.
-- **An unusable cache directory is never a failure** — no byte on stderr, no non-zero exit. Cache
-  trouble is not the caller's problem, and failing there would send an agent into the argument-error
-  advice in a loop it can never escape.
+## Walkthrough
 
-## Installing It
+The output below is real, produced against the Central payloads recorded under
+`native/src/test/resources/fixtures/`; live Central may have moved on since they were recorded.
 
-The tool is **not on Ballerina Central** yet, so `bal tool pull discover` does not resolve it. CI
-builds and tests every PR (`.github/workflows/pull-request.yml`), and `:bal-tool` already produces a
-real `ballerina/tool_discover` bala the same way `bal openapi` is packaged — what's missing is Central
-credentials and a release process, not the packaging mechanism. See `internal-docs/distribution.md`
-for the exact status.
+What a package has:
 
-Until it's on Central, install it locally the same way a real Central publish would resolve it —
-there is deliberately one path, not a separate hand-rolled one for local use:
+```
+$ bal discover ballerinax/kafka
+client, service, class, readme
+
+$ bal discover ballerinax/kafka | cat
+{"buckets":[
+"client",
+"service",
+"class",
+"readme"
+]}
+```
+
+A bucket with too many resource paths to list is grouped by path segment:
+
+```
+$ bal discover ballerinax/github client
+Groups: repos (421), orgs (200), user (93), teams (34), users (34), gists (19), projects (19), app (13), repositories (11), notifications (7), search (7), marketplace_listing (6), applications (5), assignments (3), classrooms (3), advisories (2), codes_of_conduct (2), enterprises (2), gitignore (2), installation (2), licenses (2), markdown (2), . (1), app-manifests (1), apps (1), emojis (1), events (1), feeds (1), issues (1), meta (1), networks (1), octocat (1), organizations (1), rate_limit (1), versions (1), zen (1)
+```
+
+A group small enough to list shows one entry per path, with every accessor it answers to:
+
+```
+$ bal discover ballerinax/github client gists
+gists — get, post
+gists/:gistId — get, delete, patch
+gists/:gistId/comments — get, post
+gists/:gistId/comments/:commentId — get, delete, patch
+gists/:gistId/star — get, put, delete
+gists/:gistId/forks — get, post
+gists/:gistId/:sha — get
+gists/:gistId/commits — get
+gists/'public — get
+gists/starred — get
+```
+
+In JSON, an entry with exactly one accessor carries a `call` field: the ready-to-run command that opens its
+signature. A path with several accessors carries none, since it would have to guess which one:
+
+```
+$ bal discover ballerinax/github client gists --filter star | cat
+{"resources":[
+{"path":"gists/:gistId/star","accessors":[
+"get",
+"put",
+"delete"
+]},
+{"path":"gists/starred","accessors":[
+"get"
+],"call":"bal discover ballerinax/github client Client gists/starred get"}
+],"shown":2,"total":2}
+```
+
+One callable is the end of a drill-down: its declaration with its doc comment, then the declarations its
+signature names, one level deep:
+
+```
+$ bal discover ballerinax/kafka client Producer send
+# Produces records to the Kafka server.
+# ```ballerina
+# kafka:Error? result = producer->send({value: "Hello World".toBytes(), topic: "kafka-topic"});
+# ```
+# + producerRecord - Record to be produced
+# + return - A `kafka:Error` if send action fails to send data or else '()'
+isolated remote function send(AnydataProducerRecord producerRecord) returns Error?;
+
+Types it names (2):
+
+# Details related to the anydata producer record.
+public type AnydataProducerRecord record {|
+    # Topic to which the record will be appended
+    string topic;
+    # Key that is included in the record
+    anydata key?;
+    # Anydata record content
+    anydata value;
+    # Timestamp of the record, in milliseconds since epoch
+    int timestamp?;
+    # Partition to which the record should be sent
+    int partition?;
+    # Map of headers to be included with the record
+    map<byte[]|byte[][]|string|string[]> headers?;
+|};
+
+# Defines the common error type for the module.
+public type Error distinct error;
+```
+
+A listing over the ceiling says so, with the command that continues it:
+
+```
+$ bal discover ballerinax/twilio client
+Methods: createAccount, createAddress, createApplication, createCall, createCallFeedbackSummary, createCallRecording, createIncomingPhoneNumber, createIncomingPhoneNumberAssignedAddOn, createIncomingPhoneNumberLocal, createIncomingPhoneNumberMobile, createIncomingPhoneNumberTollFree, createMessage, createMessageFeedback, createNewKey, createNewSigningKey, createParticipant, createPayments, createQueue, createSipAuthCallsCredentialListMapping, createSipAuthCallsIpAccessControlListMapping, createSipAuthRegistrationsCredentialListMapping, createSipCredential, createSipCredentialList, createSipCredentialListMapping, createSipDomain, createSipIpAccessControlList, createSipIpAccessControlListMapping, createSipIpAddress, createSiprec, createStream, createToken, createUsageTrigger, createUserDefinedMessage, createUserDefinedMessageSubscription, createValidationRequest, deleteAddress, deleteApplication, deleteCall, deleteCallFeedbackSummary, deleteCallRecording
+... 159 more, narrow further: bal discover ballerinax/twilio client Client --page 2
+
+$ bal discover ballerinax/twilio client --filter message
+Methods: createMessage, createMessageFeedback, createUserDefinedMessage, createUserDefinedMessageSubscription, deleteMedia, deleteMessage, deleteUserDefinedMessageSubscription, fetchMedia, fetchMessage, listCallNotification, listMedia, listMessage, listNotification, updateMessage
+```
+
+A selector that matches nothing is still an answer (exit 0), naming the closest names and what is there:
+
+```
+$ bal discover ballerinax/kafka client Producer sendd
+Nothing on Producer matches 'sendd'.
+Did you mean: send, sendWithMetadata
+Available:
+Methods: 'flush, close, getTopicPartitions, send, sendWithMetadata
+```
+
+A member declared on several containers is never picked silently:
+
+```
+$ bal discover ballerinax/kafka client commit
+'commit' is declared on 2 containers — pick one:
+Caller (2 matches), Consumer (3 matches)
+```
+
+A large readme can be narrowed to the sections that mention a keyword:
+
+```
+$ bal discover ballerinax/kafka readme --filter producer
+1. Kafka producer (18 lines)
+4. Data serialization (26 lines)
+```
+
+## Output
+
+Every answer is one structured result, rendered either as text or as JSON. The JSON is compact — fields
+inline, one array element per line — and these are its shapes:
+
+| Answer                               | JSON fields                                                                                                      |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| bare package                         | `buckets`, `submodules` (`name`, `summary`, `call`)                                                              |
+| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `call`), `shown`, `total`, `next`             |
+| resource groups                      | `groups` (`name`, `count`, `call`), `shown`, `total`, `next`                                                      |
+| resource paths                       | `resources` (`path`, `accessors`, `call`), `shown`, `total`, `next`                                              |
+| methods                              | `methods`, `shown`, `total`, `next`                                                                              |
+| resources and methods together       | `resources`, `remote`, `normal`, `shown`, `total`, `next`, `documented`                                          |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form`, `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented` |
+| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `call`), `available`, `next`, `documented`              |
+| member on several containers         | `requested`, `owners` (`name`, `matches`, `call`), `shown`, `total`, `next`                                      |
+| empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `call`)                                                       |
+| readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
+| readme sections                      | `chunks` (`number`, `title`, `lines`, `call`), `shown`, `total`, `next`                                          |
+
+Any answer can also carry `warning` (the version could not be confirmed against the registry) and most can
+carry `note` (the symbol was found in a different bucket than the one asked, the path selector was relocated
+or a wildcard skipped a branch, or the service's listener). `documented` lists entries a `--filter` matched
+only in their documentation.
+
+### The entry ceiling
+
+No listing shows more than **40 entries**. Over that:
+
+- resource paths **group** by their next literal path segment, up to four levels below the top; path
+  parameters never form a group of their own;
+- remote and normal methods **page**, alphabetically, with `--page <n>` (a `--filter` carries over to every
+  page);
+- anything else — a roster of containers, a resource listing narrowed by `--filter`, a container mixing
+  resources with methods — is cut at 40 and points at `--filter`.
+
+A cut listing always says so: `shown`/`total` plus `next` (the command that continues it) in JSON, or a
+trailing `... N more, narrow further: <command>` line in text.
+
+### Paths
+
+Path parameters print as `:name` (`repos/:owner/:repo`), which is safe unquoted in bash, zsh, fish and
+PowerShell. A segment that is a Ballerina keyword keeps its escape (`gists/'public`), and every command the
+tool prints pre-quotes such a path for the shell. A selector also accepts `[string owner]`, `[owner]`,
+`{owner}` and plain `owner` for a parameter, and either spelling of an escaped segment (`code\-scanning` or
+`code-scanning`). Paths match from the first segment; the one relaxation is a trailing segment, which is
+looked for beneath the prefix that matched and listed rather than chosen when it occurs in several places.
+`new` addresses the constructor Ballerina spells `init`, unless the container really declares something
+called `new`.
+
+## The contract
+
+|        |                                                                       |
+| ------ | --------------------------------------------------------------------- |
+| stdout | the answer, and nothing else                                          |
+| stderr | on failure, exactly one JSON object, and nothing else                 |
+| exit 0 | success, and stdout is complete                                       |
+| exit 1 | every failure; the JSON's `kind` and `suggestion` say what to do next |
+
+```
+$ bal discover ballerinax/kafka client NoSuchContainer
+{"kind":"symbol-not-found","qualified":"ballerinax/kafka:4.6.5","requested":["NoSuchContainer"],"candidates":[],"suggestion":"Nothing in ballerinax/kafka:4.6.5 is named anything like that. List what is there: `bal discover ballerinax/kafka client`."}
+```
+
+`upstream` and `timeout` are worth re-running unchanged; `validation`, `package-not-found` and
+`symbol-not-found` need a different command; `schema-drift` means Central's payload changed shape and is for
+a maintainer.
+
+**Versions are never an argument.** Inside a Ballerina project the tool walks up to `Ballerina.toml` and uses
+the version `Dependencies.toml` locks, so a lookup sees what `bal build` compiles against. Outside one it uses
+Central's latest.
+
+## Caching
+
+The raw Central payload is cached, keyed by package coordinates, with atomic writes. Any problem with the
+cache — missing, unreadable, corrupt, an unwritable directory — falls back to a live fetch silently; it is
+never a failure. The location is the first usable of:
+
+1. `BAL_DISCOVER_CACHE=off` — caching disabled
+2. `BAL_DISCOVER_CACHE_DIR=<dir>`
+3. `$XDG_CACHE_HOME/bal-discover`
+4. `~/.cache/bal-discover`
+5. `<tmpdir>/bal-discover-<user>`
+
+and caching is off when none of them is usable.
+
+## Installing it
+
+The tool is not on Ballerina Central yet, so `bal tool pull discover` does not resolve it; see
+`internal-docs/distribution.md` for what is left. Until then, build and install it locally through the same
+packaging a Central publish uses:
 
 ```bash
-./gradlew :bal-tool:build                                            # packs and pushes to the local repository
-bal tool pull ballerina/tool_discover:<version> --repository=local   # registers it as an active tool
-bal discover --help                                                  # smoke test
+./gradlew :bal-tool:build -PpublishToLocalCentral=true          # pack the bala, push it to the local repository
+bal tool pull discover:<version> --repository=local              # register it as an active tool
+bal discover --help                                              # smoke test
 ```
 
-`<version>` is `gradle.properties`' `version` with any `-SNAPSHOT` suffix stripped — `0.1.0` today.
+`<version>` is `gradle.properties`' `version` without its `-SNAPSHOT` suffix.
 
-## Building from the Source
+## Building from the source
 
 ### Prerequisites
 
-OpenJDK 21 ([Adopt OpenJDK](https://adoptopenjdk.net/) or any other OpenJDK distribution). Set
-`JAVA_HOME` to the directory you installed it into.
-
-**And a GitHub token with `read:packages`, exported as `packagePAT`.** This is not optional and it is
-worth saying plainly, because this file used to claim the opposite. `org.ballerinalang:ballerina-cli`
-— the one dependency that is not on Maven Central — is published _only_ to ballerina-platform's GitHub
-Packages, which requires authentication even for a public read. Without it Gradle fails with
-`Username must not be null!`.
+- OpenJDK 21, with `JAVA_HOME` pointing at it.
+- A GitHub token with `read:packages`, exported as `packagePAT` (and your login as `packageUser`).
+  `org.ballerinalang:ballerina-cli`, which provides the `BLauncherCmd` interface `bal` discovers the tool
+  through, is published only to ballerina-platform's GitHub Packages, which needs authentication even for a
+  public read.
 
 ```bash
-gh auth refresh -h github.com -s read:packages   # if you use gh
+gh auth refresh -h github.com -s read:packages
 export packageUser="$(gh api /user -q .login)"
 export packagePAT="$(gh auth token)"
 ```
 
-In GitHub Actions no secret has to be provisioned: `packagePAT: ${{ secrets.GITHUB_TOKEN }}` is
-sufficient for that cross-org public read, and is the convention across WSO2 and ballerina-platform
-repos.
-
-The whole dependency is one interface, `io.ballerina.cli.BLauncherCmd`, which `DiscoverTool` implements
-and `bal` discovers through `META-INF/services`. Everything else — gson, picocli — is on Central.
-
-### Build
+### Build and test
 
 ```bash
-./gradlew build            # the complete project
-./gradlew :native:jar      # the tool jar (~370KB, our classes only)
-./gradlew :native:test     # the suite — 715 cases, offline
-./gradlew :bal-tool:build  # packages the jar into a ballerina/tool_discover bala
+./gradlew build                   # everything, including checkstyle, spotbugs and the tests
+./gradlew :native:test            # the test suite: offline, no network, no access to your real cache
+./gradlew :native:check           # tests plus the coverage floor (80% instructions, 70% branches)
+./gradlew :bal-tool:build         # package the tool jar into a ballerina/tool_discover bala
 ```
 
-`:bal-tool` is the `bala` packaging step: it wraps the `:native` jar into a `ballerina/tool_discover`
-package via `io.ballerina.plugin`, the same mechanism `ballerina-platform/openapi-tools` uses for
-`bal openapi`. `.github/workflows/pull-request.yml` runs this on every PR; it is not yet wired to an
-actual Central publish — see `internal-docs/distribution.md` for exactly what is and is not verified.
-
-## Development Iteration Flow
-
-The inner loop is: change the Java source, repackage, reinstall, run `bal discover`. There is one path
-for this — the same one "Installing It" above describes — not a faster hand-rolled shortcut.
-
-### Apply a change
+When a rendering change is intentional, regenerate the snapshots and review the diff before committing it:
 
 ```bash
-./gradlew build -P publishToLocalCentral=true
-bal tool pull discover:<version> --repository=local
-```
-
-The next `bal discover` invocation picks up the change.
-
-### Test
-
-```bash
-./gradlew test
-```
-
-The suite is offline and hermetic: no network, and no test can reach your real `~/.cache`. When a
-rendering change is intentional, regenerate the snapshots and review the diff:
-
-```bash
-UPDATE_SNAPSHOTS=1 ./gradlew :native:test              # the report snapshots + usage text
+UPDATE_SNAPSHOTS=1 ./gradlew :native:test               # answer snapshots and usage text
 BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :native:test   # after re-recording the fixtures
 ```
 
-The 13 `.bal` snapshots have no update switch on purpose. They are the oracle.
+The `.bal` API snapshots under `native/src/test/resources/snapshots/` have no update switch on purpose: they
+are the oracle every quoted declaration is checked against.
 
-It runs at two scales, and the difference matters when you change how something renders:
+## Verifying a build against live Central
 
-|                                                              | asks                                                 | answers                                       |
-| ------------------------------------------------------------ | ---------------------------------------------------- | --------------------------------------------- |
-| **the corpus** — `CorpusTest`, `ViewsTest`, `ViewsAgreeTest` | 13 recorded packages, whole documents                | _did anything move?_                          |
-| **the constructs** — `constructs/ConstructTest`              | one synthetic payload per Ballerina syntax dimension | _which construct moved, and is it now right?_ |
-
-A change to how closed records render fails one construct case by name; the corpus reports it as
-several thousand lines of snapshot diff across four packages. Both are wanted — the corpus is the
-only thing that covers a real package's whole surface, and the constructs are the only thing that
-covers a construct no recorded package happens to use. `constructs/Constructs.java` is the table;
-read it as a list of claims about the language.
-
-### Coverage
-
-```bash
-./gradlew :native:jacocoTestReport      # native/build/reports/jacoco/test/html/index.html
-./gradlew :native:check                 # tests + the coverage floor
-```
-
-The floor is 80% instruction / 70% branch, set below what the suite reaches so it fails on a
-regression and never on an untouched gap. Treat the report as a map of what nothing executes, not as
-a score: the suite reaches 93% of instructions, and the known fidelity defects are almost all on
-covered lines. `Schema.java`'s reading a class as a bare name runs for every fixture and is why
-class declarations come out empty. Coverage cannot see a wrong answer, only an unreached one — which
-is the job the construct table does.
-
-## Verification
-
-`./gradlew :native:test` proves the pipeline, and should run alongside the coverage floors on every
-pull request once this repository's own CI is set up (not yet present here). It does **not** prove
-the tool is installed, that `bal` routes to
-it, that arguments survive `bal`'s own launcher, that exit codes reach the shell, or that stdout is
-clean enough to redirect. Those are only observable through a real `bal discover` invocation, so run
-this after any change to the CLI.
-
-### Routing and help
-
-```bash
-bal discover --help                      # usage naming every verb, on stdout; exit 0
-bal discover                             # same as --help; exit 0
-bal discover overview --help             # overview's own flags; exit 0
-bal discover nonsense                    # names every verb; exit 1, one JSON object on stderr
-bal discover ballerinax/github           # exit 1, suggesting `bal discover overview ballerinax/github`
-```
-
-### Coordinates the document prints must run
-
-Every command a document hands back is part of the answer, so each of these is checked by RUNNING what
-the previous one printed:
-
-`PointersTest` does this offline over every fixture — it extracts every `bal discover` command from
-every document and re-runs it — so these are the cases it cannot reach: cross-package edges, and the
-launcher.
-
-```bash
-bal discover type ballerinax/sap TargetType -r               # footer names the edge with its version
-bal discover type ballerina/http Response -r                 # …and that command works verbatim
-bal discover type ballerinax/aws.s3 ConnectionConfig -r       # a module that is not its own package
-bal discover type ballerinax/aws.auth AuthConfig              # …readable on its own; the version is resolved
-                                                             #    through ballerinax/aws, which contains it
-bal discover client ballerinax/googleapis.gmail | grep -c 'resource function'   # 32, not 0
-bal discover client ballerinax/github Client 'repos/*/*' | head -12   # names the branch `*` did not take
-bal discover client ballerinax/github Client repos/owner/repo/caches  # located one level deeper
-bal discover type ballerinax/sap Client                       # the client resolves by name
-```
-
-### Each verb, live against Central
-
-```bash
-bal discover find     kafka messaging
-bal discover overview ballerinax/kafka
-bal discover overview ballerina/http -s cookie
-bal discover client   ballerinax/github Client repos
-bal discover client   ballerinax/twilio 'create*'
-bal discover client   ballerinax/github Client delete repos/{owner}/{repo}/actions/caches -r
-bal discover class    ballerina/http Cookie
-bal discover funcs    ballerina/uuid
-bal discover type     ballerina/http ClientRequestError -r
-bal discover guide    ballerinax/googleapis.sheets 2
-bal discover api      ballerinax/sap
-```
-
-Each must exit 0 and print its document to stdout. Two are worth reading rather than just checking:
-`type ... -r` must show the `Detail` record and the `distinct` chain — the lookup eight of nine
-recorded agent runs came for — and the `caches` line must print the `*ActionsDeleteActionsCacheByKeyQueries`
-parameter together with that record's own declaration, which is what makes the call writable in one
-call rather than two.
-
-### The stream contract
-
-```bash
-bal discover overview ballerinax/kafka > /tmp/doc.md 2>/tmp/err.txt
-test -s /tmp/doc.md && test ! -s /tmp/err.txt   # document on stdout, nothing on stderr
-
-bal discover type ballerina/http NoSuchType 2>/tmp/err.json 1>/tmp/out.txt
-test ! -s /tmp/out.txt                          # all-or-nothing: stdout empty on failure
-python3 -c 'import json; d=json.load(open("/tmp/err.json")); print(d["kind"], len(d["candidates"]))'
-```
-
-### Exit codes, asserted not eyeballed
+The test suite proves the pipeline against recorded payloads. It cannot prove that `bal` routes to the
+installed tool, that arguments survive `bal`'s launcher, or that exit codes reach the shell, so after a CLI
+change run a few real invocations:
 
 ```bash
 check() { local want="$1"; shift; bal discover "$@" >/dev/null 2>&1; local got=$?
   [ "$got" = "$want" ] && echo "ok   $* -> $got" || echo "FAIL $* -> $got want $want"; }
 
-check 0 overview ballerinax/kafka
-check 0 guide ballerinax/kafka
-check 0 client ballerina/http                # several clients is a roster, not a failure
-check 0 funcs ballerinax/kafka               # an empty scope is a fact, not a failure
-check 0 client ballerinax/github Client zzz  # a selector that matches nothing is answered
-check 1 overview no-such-org/no-such-pkg
-check 1 overview ballerina/http:2.16.6       # version suffix in the name
-check 1 overview ballerina/http -r           # -r belongs to the four verbs that print declarations
-check 1 client ballerina/http 2.16.6         # versions are not arguments
-check 1 type ballerina/http NoSuchType
-check 1 type ballerinax/kafka                # neither a name nor -s
-check 1 guide ballerinax/kafka --module nope
-check 1 nonsense
+check 0 --help
+check 0 ballerinax/kafka
+check 0 ballerina/http client                       # several clients: a roster
+check 0 ballerinax/kafka funcs                      # an empty bucket is an answer
+check 0 ballerinax/github client gists
+check 0 ballerinax/github client "gists/'public" get
+check 0 ballerinax/github client Client zzz         # a selector that matches nothing is an answer
+check 0 ballerina/sql client                        # clients Central files as plain declarations
+check 1 ballerina/http:2.16.6                       # no version suffix
+check 1 ballerina/http client 2.16.6                # no version argument
+check 1 ballerina/http nosuchbucket
+check 1 no-such-org/no-such-pkg
 ```
-
-### Packages outside the corpus
-
-`CorpusTest` covers the thirteen corpus packages offline and deterministically. What it cannot cover is
-a payload shape nothing has snapshotted, so a spot check against Central is worth a minute — a
-collation or a byte-length mistake moves bytes without breaking anything a unit test asserts.
-
-`ballerina/sql` is the one to keep in this list whatever else changes: its clients are declared
-`public type X client object`, so Central files them as ordinary declarations and a reader that trusted
-the `clients` array would report a database package as having none.
-
-```bash
-for pkg in ballerinax/rabbitmq ballerina/websocket ballerina/sql ballerinax/redis; do
-  for verb in overview client class funcs guide api; do
-    bal discover $verb "$pkg" >/dev/null 2>&1 && echo "ok   $verb $pkg" || echo "FAIL $verb $pkg"
-  done
-done
-```
-
-### The cache, and that it is silent
-
-The cache no longer speaks in `--help`, so its state is read from timings and from
-`DocsCache.describe()` rather than from a status line.
-
-```bash
-rm -rf ~/.cache/bal-discover
-time bal discover overview ballerinax/github     # cold
-time bal discover overview ballerinax/github     # warm — expect a large drop
-BAL_DISCOVER_CACHE=off bal discover overview ballerinax/kafka                  # still exit 0
-BAL_DISCOVER_CACHE_DIR=/dev/null/nope bal discover overview ballerinax/kafka   # still exit 0, silent
-```
-
-An unusable cache directory must never be a failure: failing there would send an agent into the
-argument-error advice in a loop it can never escape.
 
 ## Design notes
 
-`internal-docs/system-design.md` describes the architecture, what each module hides, and the two
-document registers.
+`internal-docs/system-design.md` describes the architecture and the reasoning behind it;
+`internal-docs/distribution.md` covers packaging and publishing.
 
 ## Contributing to Ballerina
 

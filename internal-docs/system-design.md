@@ -2,54 +2,51 @@
 
 ## Context
 
-`bal discover` reads a Ballerina package off **Ballerina Central's docs API** and answers eight addressed
-questions about it. It talks to Central over HTTPS and to nothing else: no language server, no bundled
-search index, no compiler invocation, no local package resolution.
+`bal discover` reads a Ballerina package off **Ballerina Central's docs API** and answers what its API is:
+which buckets it has, what each bucket holds, and the exact signature of any one callable. It talks to
+Central over HTTPS and to nothing else: no language server, no compiler invocation, no search index, and no
+model of any kind.
 
-The tool jar contains only our own classes — about 250KB. Everything it needs at run time (`gson`,
-`picocli`, the CLI launcher) is already on the Ballerina distribution's classpath, so the dependencies
-are `compileOnly` and no third-party code is redistributed.
+The tool jar contains only our own classes (~370KB). Everything it needs at run time (`gson`, `picocli`, the
+CLI launcher) is already on the Ballerina distribution's classpath, so those dependencies are `compileOnly`
+and no third-party code is redistributed.
 
 ---
 
-## Commands
+## Grammar
 
-```bash
-bal discover find     <keywords...>                              # Central registry search
-bal discover overview <org/name>                        [-s <q>]  # a map of the package
-bal discover client   <org/name> [<Name|selector>...]   [-s <q>] [-r]
-bal discover class    <org/name> [<Name|member>...]     [-s <q>] [-r]
-bal discover funcs    <org/name> [<name|prefix*>...]    [-s <q>] [-r]
-bal discover type     <org/name> <Name>...              [-s <q>] [-r]
-bal discover guide    <org/name> [<n|title>] [--module <name>] [-s <q>]
-bal discover api      <org/name>
-
-  --refresh · -h                          # every verb that reads a package
-  --all                                   # hidden: ignores the byte budget, offered only in `## Next`
+```
+bal discover <org>/<package> [bucket] [selector ...]
+             [--output json|text] [--filter <keyword>] [--page <n>] [-m|--module <name>] [--refresh]
 ```
 
-**Verb-first, and no implicit default.** A verb has no `/`, so a stale binary fails it against the
-qualified-name pattern as `validation`, which is loud and names the verbs it does know. A verb placed
-*after* the package used to land in the version slot and come back as `package-not-found` — which the
-skill teaches means "retry"; there is no version slot any more, so a trailing verb is now an
-unexpected positional.
+**Package first, then drill down.** There is one picocli command. The package is resolved, then the bucket,
+then the selectors — each positional narrows the one before it, so none of them is a mode switch. A package
+with no bucket answers with its bucket list (and its submodules, when it publishes any).
 
-**Three verbs for the callable surface, split by how a symbol is CALLED.** `client` addresses what is
-reached with `->`, `class` what is reached with `.`, `funcs` what needs no receiver. The split is
-DERIVED, not read off the payload: Central publishes no `isClient` key and its `clients` array is not
-the callable surface — `ballerina/http` declares ten clients, two of which (`ClientObject`,
-`StatusCodeClientObject`) it files as ordinary declarations, and for `ballerina/sql` the array is empty
-while both of its clients live there. `symbols/Surface` is the one place that partition is computed.
+**Five buckets.** `client`, `service`, `class` and `funcs` partition the callable surface by how a symbol is
+CALLED: `client` is what is reached with `->` (remote methods and resource functions), `service` is a
+service object type together with the listener it attaches to, `class` is a plain object reached with `.`,
+and `funcs` needs no receiver. The split is DERIVED, not read off the payload: Central publishes no
+`isClient` key and its `clients` array is not the callable surface — `ballerina/http` declares ten clients,
+two of which Central files as ordinary declarations, and for `ballerina/sql` the array is empty while both of
+its clients live there. `symbols/Surface` is the one place the partition is computed. A listener is never
+addressable on its own; it appears as the `listener` a service pairs with. `readme` is the fifth bucket and is
+not part of the callable surface at all.
 
-**A wrong verb costs a line, not a call.** Any of the three answers for a symbol of another kind,
-prepending one line that names the canonical verb; a name that is a member rather than a container
-resolves and names its owner. Without that, a kind-specific verb would make every guess a wasted round
-trip — which is what makes the split safe rather than merely tidier.
+**A wrong guess costs a line, not a call.** A bucket given a symbol of another kind still answers, with a
+`note` naming the canonical bucket; a name that is a member rather than a container resolves and names its
+owner; a member declared on several containers lists the owners rather than picking one. Without that, a
+kind-specific bucket would make every guess a wasted round trip.
 
-**Versions are internal.** There is no version syntax in the grammar and no document discloses the
-resolution. `DiscoverTool` walks up from the process's directory for a `Ballerina.toml`, and
-`Dependencies.toml` beside it pins the version — including transitively, so a cross-package pointer
-needs no version argument either.
+**Versions are internal.** There is no version syntax. `DiscoverTool` walks up from the process's directory
+for a `Ballerina.toml`, and the `Dependencies.toml` beside it pins the version; outside a project the tool
+reads Central's latest. A version-shaped argument is rejected with that rule as the suggestion.
+
+**`--module` is resolved once**, by `Loader`, against the payload Central already returned (it carries every
+module of the package), and every command the tool prints afterwards carries it forward through
+`LoadedPackage.pkgArgument()`. The `<org>/<package>` argument is always one literal package coordinate; a
+dotted name is never split into package and module by guessing.
 
 ---
 
@@ -59,48 +56,53 @@ needs no version argument either.
                        argv
                         │
         ┌───────────────▼────────────────┐
-        │  cli/DiscoverTool               │  BLauncherCmd. THE ONLY class that reads the
-        │  (the process wrapper)         │  environment or exits the process.
+        │  cli/DiscoverTool              │  BLauncherCmd. THE ONLY class that reads the
+        │  (the process wrapper)         │  environment, the TTY, or exits the process.
         └───────────────┬────────────────┘
-                        │  argv + streams + cache, all injected
+                        │  argv + streams + cache + interactive, all injected
         ┌───────────────▼────────────────┐
-        │  cli/Cli + cli/Commands        │  picocli grammar → one verb → one document.
-        │  cli/Usage                     │  Returns an exit code; never calls System.exit.
+        │  cli/Cli + cli/Commands        │  picocli grammar → one bucket → one DiscoverResult
+        │  cli/Usage                     │  → one renderer. Returns an exit code.
         └───────────────┬────────────────┘
                         │
         ┌───────────────▼────────────────┐
         │  Loader.loadPackage            │  resolve a version, then read it ONCE.
         └───────┬────────────────┬───────┘
                 │                │
+   ┌────────────▼──────────────┐ │
+   │ central/PackageRepository │ │   the provider seam; CentralRepository is the
+   │  └ CentralRepository      │ │   only implementation today
+   └────────────┬──────────────┘ │
    ┌────────────▼─────────┐   ┌──▼──────────────────────────┐
-   │ central/CentralClient│   │ cache/DiskCache             │
-   │ THE ADAPTER          │◄──┤ raw payload, keyed by        │
-   │ retry · Retry-After  │   │ coordinates. Never throws,   │
-   │ budget · 400-vs-404  │   │ never reports.               │
-   │ offline fallback     │   └─────────────────────────────┘
-   └────────────┬─────────┘
+   │ central/CentralClient│◄──┤ cache/DiskCache             │
+   │ retry · Retry-After  │   │ raw payload, keyed by       │
+   │ budget · 400-vs-404  │   │ coordinates. Never throws,  │
+   │ offline fallback     │   │ never reports.              │
+   └────────────┬─────────┘   └─────────────────────────────┘
                 │  untyped JSON
    ┌────────────▼─────────────────┐
-   │ central/schema/{CentralDocs,  │  the ONE description of what Central sends.
-   │                 Schema}       │  Read fields required; unknown keys stripped.
+   │ central/schema/{CentralDocs, │  the ONE description of what Central sends.
+   │                 Schema}      │  Read fields required; unknown keys stripped.
    └────────────┬─────────────────┘
                 │  typed
    ┌────────────▼──────────────────────────────┐
-   │ model/{FromCentral, Patches} → Library     │  the IR: sealed hierarchies, no flag bags.
+   │ model/{FromCentral, Patches} → Library    │  the IR: sealed hierarchies, no flag bags.
    └────────────┬──────────────────────────────┘
                 │
-   ┌────────────▼────────────┐   ┌────────────────────────┐
-   │ symbols/{Declarations,   │   │ render/{Signatures,     │
-   │  Names, PathTree,        │   │  TypeDefs, Documents,   │
-   │  Surface, Filter}        │   │  Report} the SHARED     │
-   │  indexes + the partition │   │  renderer               │
-   └────────────┬────────────┘   └───────────┬────────────┘
-                │                             │
-                └──────────┬──────────────────┘
+   ┌────────────▼────────────┐   ┌─────────────────────────┐
+   │ symbols/{Declarations,  │   │ render/{Signatures,     │
+   │  Names, PathTree,       │   │  TypeDefs} — the SHARED │
+   │  Surface, Filter}       │   │  declaration renderer   │
+   └────────────┬────────────┘   └───────────┬─────────────┘
+                └──────────┬─────────────────┘
    ┌───────────────────────▼──────────────────────────────┐
-   │ views/{Find, Overview, Containers, TypeView, Guide}  │
-   │ one function of a loaded package each                │
-   │ views/Closure — the type walk both `-r` paths share  │
+   │ views/Containers  client · service · class · funcs   │
+   │ views/Readme      readme                             │
+   │ views/Closure     the type walk under one signature  │
+   └───────────────────────┬──────────────────────────────┘
+                           │  render/DiscoverResult
+   ┌───────────────────────▼──────────────────────────────┐
+   │ render/JsonRenderer (via CompactJson) │ TextRenderer │
    └──────────────────────────────────────────────────────┘
 ```
 
@@ -108,40 +110,95 @@ Every arrow points one way and no stage mutates its input.
 
 ---
 
-## The two registers
+## One result, two renderers
 
-A document either **is** Ballerina or it **describes** a package. Blending the two produces things that
-look like declarations and are not, which invites an agent to transcribe from a summary.
+Every answer is a value of the sealed `render/DiscoverResult`, and `JsonRenderer` and `TextRenderer` are the
+only two things that turn one into bytes — so the two renderings cannot drift into describing different data.
+`--output json|text` picks one; without it, `DiscoverTool` passes whether stdout is an interactive terminal
+(`System.console() != null`) and `Cli` picks text for a terminal and JSON otherwise. Pre-JDK 22, that check
+also reports "not interactive" when only stdin is redirected; that errs toward JSON, which a person can
+override and a parser could not.
 
-| Register | Documents | Rules, enforced by `RegisterTest` |
-|---|---|---|
-| Code | `type`, `api`, **and any `-r` response** | No fences of our own, no report marker, no Markdown tables. A `//` comment annotates a real declaration. |
-| Report | `find`, `overview`, `client`, `class`, `funcs`, `guide` | Ballerina only inside ` ```ballerina ` fences. No bare `//`. Structure is headings. Opens with `<!-- bal discover <verb> v1 -->`. |
+| Shape             | Answers                                                                         |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `BucketList`      | a bare package: its buckets and its submodules                                  |
+| `ContainerRoster` | several containers in a bucket                                                  |
+| `PathGroups`      | resource paths grouped by segment, because there are too many to list           |
+| `ResourceList`    | resource paths, one entry per path with every accessor it answers to            |
+| `MethodList`      | remote or normal methods, alphabetical, paged over the ceiling                   |
+| `MixedListing`    | a container with both resource functions and named methods, split by call form |
+| `Signature`       | exactly one callable, with the declarations its signature names                 |
+| `NoMatch`         | a selector or `--filter` that matched nothing, with what is there instead       |
+| `Owners`          | one member declared on several containers                                       |
+| `EmptyBucket`     | a bucket the package declares nothing in, and the buckets that do               |
+| `Readme`          | the readme verbatim, or one section of it                                       |
+| `ReadmeChunks`    | the readme sections a selector or `--filter` matched                            |
 
-The register is a property of the **document**, not of the verb. A `-r` response is
-nothing but declarations, so it is pasteable whole even when a report verb reached it — which means the
-three container verbs each produce documents in both registers and each obeys the rules of the one it
-is in.
+JSON field names follow the RFC's worked examples where one exists (`buckets`, `groups`, `resources`,
+`path`, `accessors`, `methods`, `shown`, `total`, `next`, `call`). `CompactJson` writes object fields inline
+and one array element per line: valid JSON either way, and far fewer lines than indented JSON, which is the
+measure an agent's tooling truncates on.
 
-`Report` is the only way a report document is built, which is why those rules hold for documents nobody
-has written yet.
+**`call` is the exact next command, and only where it is unambiguous.** A group, a container, a submodule, a
+readme section and a single-accessor resource each carry one; a resource path with several accessors does not,
+because a flat field would have to guess which. Every `call` and `next` the tool can print is run by
+`PointersTest` against the recorded payloads and must answer with something other than a `NoMatch`.
 
-**Both registers state the document's own length on line one** — `<!-- bal discover overview v1 · 42
-lines -->` and `// ballerinax/github:6.0.0 · 535 lines`. Stamped by `Documents.withLength` at the single
-point in `Cli` that every document passes through on its way to stdout, so a view added later inherits it
-and the renderers stay untouched (which is why the committed `.bal` snapshots did not move when this
-landed). It is the only defence the tool has against a caller's filter: piping was measured at 100% of
-sessions and did not respond to prose, and a `| head -150` over a 535-line closure says nothing about the
-385 lines it dropped.
+**A `Signature` quotes; it never re-spells.** Its `declaration` and each of its `types` come from
+`Signatures`/`TypeDefs` byte for byte — the same functions that render the `.bal` API snapshots —
+so `ViewsAgreeTest` can require every quoted line to appear in the API snapshot verbatim. The structured
+`params` and `returns` beside it are derived from the same model, for a consumer that would rather not parse
+Ballerina. The types are a depth-1 closure under a 6,000-byte budget, with anything left out named in
+`omitted`: github's caches DELETE takes `*ActionsDeleteActionsCacheByKeyQueries`, whose fields ARE the call's
+named arguments, so including it is what makes the call writable in one lookup.
 
-**The split also decides what goes WHERE, not only how it is spelled.** A declaration in the code register is
-something to copy, so anything that does not compile stays out of it and the gap gets named instead:
-a service template is written only for a type the listener's `attach` names, and a `configurable` — which is
-module-private, so a caller cannot reference it — is NAMED by `api` in comments rather than declared by it. That
-last one moved: `overview` used to carry it as a `Config.toml` fragment and stopped, because that
-section addressed a deployer rather than the reader writing a `.bal` file. `type` cannot reach a configurable at
-all, so `api` is where the fact lives or nowhere does. A module-level `public final` variable goes the other way: it IS referenceable, so it is
-a declaration and prints with the initialiser its own source writes.
+---
+
+## Output size: an entry ceiling, not a byte budget
+
+No listing holds more than **40 entries** (`Containers.MAX_ENTRIES`). The earlier design bounded documents by
+bytes and degraded through tiers without ever paginating, with a hidden `--all` to escape it; that is gone.
+Over the ceiling:
+
+- **Resource paths group** by their next literal segment. Path parameters are transparent to grouping, and
+  a group subdivides only while it is still over the ceiling, to at most four levels below the top — surveyed
+  against real connectors, three were always enough (`ballerinax/jira` needed the most), and the fourth is
+  margin. Past that, the listing is shown flat and cut.
+- **Remote and normal methods page**, alphabetically, with `--page <n>` (`Containers.Page`, shared with the
+  readme's section listing). Grouping methods by a verb prefix was rejected: there is no fixed verb vocabulary
+  across connectors to split on reliably (`ballerinax/twilio` alone has 199 remote methods on one client).
+- **Everything else is cut** at 40 and points at `--filter`.
+
+A cut answer always says so — `shown`/`total` and the `next` command in JSON, a trailing
+`... N more, narrow further: <command>` line in text — so a partial list is never mistaken for a complete one.
+
+`--filter` narrows within the bucket already selected, client-side, over the payload already in memory; it
+is never sent to Central. It is a case-insensitive substring of an entry's surface text (name, path, parameter
+and type names). An entry that matches only in its documentation is not listed but named in `documented`,
+because rendering both buries the first set and dropping the second loses the caller who knows the capability
+but not the vocabulary.
+
+---
+
+## Paths
+
+Path parameters render `:name`, type-free (`repos/:owner/:repo`): the bracket form `[string owner]` breaks
+under zsh's globbing and `{owner}` was not confirmed safe outside bash and zsh. A segment that collides with a
+Ballerina keyword keeps its escape (`gists/'public`) — dropping it would describe a call that does not compile
+— and every command the tool prints double-quotes such a path for the shell, so the caller never has to.
+
+Selectors are tolerant on the way in: a parameter answers to `:owner`, `[string owner]`, `[owner]`, `{owner}`
+and `owner`; an escaped segment answers to `code\-scanning` and `code-scanning`; an accessor may come before
+the path (as its own argument or in the same one) or after it; and `new` addresses the constructor Ballerina spells `init`
+unless the container really declares something called `new`. These are input aliases only — output always
+prints what the package declares.
+
+A path and an accessor name one operation when the path itself declares that accessor; otherwise the
+accessor filters everything beneath the path. Paths match from the first segment — an unanchored match for
+`repos/{owner}/{repo}` on github would return nine operations rather than three. The one relaxation is a
+trailing segment, which is looked for beneath the prefix that matched: answered (with a `note`) when it occurs
+once, listed as `NoMatch.paths` when it occurs in several places. A wildcard `*` names every branch it also
+matched in the `note`, because it takes the busiest one.
 
 ---
 
@@ -150,22 +207,27 @@ a declaration and prints with the initialiser its own source writes.
 | Module | Depth |
 |---|---|
 | `central/CentralClient` | **The adapter.** The only module that can fail for reasons outside the process: retry policy, `Retry-After` in both legal forms, jittered backoff, a wall-clock budget, Central answering an unpublished package with 400 rather than 404, and the offline fallback. |
+| `central/PackageRepository` | The provider seam a second source (a local cache of Central, Artifactory) will implement. `Loader` holds an ordered list and tries each until one answers; `CentralRepository` is the only implementation so far. |
 | `central/HttpTransport` | The seam every retry test drives. Transport trouble is a value, not an exception, so "503 then 200" is two records and no socket. |
 | `central/schema/Schema` | The one place untyped JSON is touched. Collects EVERY mismatch before failing, because the person reading a drift failure is about to extend the schema. |
-| `cache/DocsCache` | **The interface is the test surface.** `DocsCache.NULL` is what keeps every other test hermetic — no test can reach a developer's real `$HOME`. Two implementations make it a real seam. Nothing here may throw or report. |
-| `model/FromCentral` | Deepest module in the tool: Central's flag-bag encoding is decided **once**, and nothing downstream ever sees `isResource`, `isAnonymousUnionType` or `inclusionType`. |
-| `model/Patches` | Three per-package corrections, for names Central OMITS. Was eight; the admission bar tightened and five did not clear it. |
-| `render/Report` | The report register, and the one place that decides how declarations are separated inside a fence — so `ballerinaBytes` is what a header sizes a block with, rather than a second derivation of the same number. |
-| `render/Signatures` | The **shared** renderer. Views and `api` agree structurally because both call `renderMemberFunction`; `ViewsAgreeTest` asserts it because the cheap way to break it is for a view to hand-roll a line. `Detail` is the one axis on which they differ — the registers print a declaration's `# +` parameter rows and the compact views do not. |
-| `model/ModuleRef` | A foreign reference's three derivations, which one formatted string kept conflating: the import path (keyword segments quoted), the CLI coordinate (which rejects the quote), and whether an import is needed at all. The pre-declared langlib set is measured with the compiler, not inferred from `lang.*`. |
-| `symbols/PathTree` | Anchored, tolerant path matching. Anchoring is the correctness property: an unanchored match for `repos/{owner}/{repo}` on github returns nine operations rather than three — and a wildcard names every branch it also matched, because `*` takes the busiest one and `--all` promises completeness. `locate` is the ONE relaxation: a *trailing* segment is looked for under the prefix that matched, answered when there is exactly one and listed when there are several, so `repos/owner/repo/caches` reaches `.../actions/caches` without reintroducing suffix matching. |
-| `symbols/Surface` | **The partition the three container verbs address**, by derived role rather than by Central's filing. Exhaustive and disjoint over every object a package declares, which `SurfaceTest` asserts in both directions — an object in neither verb is unreachable, one in both is a document that says two different things about one name. |
-| `symbols/Filter` | `-s`, as a linear scan over the package already in memory: no index, no second cache tier. Two tiers of RESULT, though, and that is the design — a surface match is rendered and a documentation-only match is named. Measured on github, `upload` is 7 against 12 and `pagination` is 0 against 14, so rendering both buries the first set and dropping the second loses the query shape a caller uses when they know the capability and not the vocabulary. |
-| `views/Closure` | `-r`, from a declaration OR a signature. Breadth-first and bounded at 20,000 bytes with an omission list, because a shallow field is likelier needed than a four-levels-deep one and `http:ClientConfiguration` was 24,183 bytes unbounded. Starting from a signature is what makes the common flow one call: github's caches DELETE names `*ActionsDeleteActionsCacheByKeyQueries`, whose fields ARE the call's named arguments. |
-| `views/Containers` | One implementation behind `client`, `class` and `funcs`. Holds the resolution order (exact container → exact member in scope → another scope → substring member), the byte budgets and the tier ladder. The parser cannot be decided per verb: a client IS a class, so the selector grammar is read off what the resolved CONTAINER declares. |
-| `Loader` | `loadPackage` is the only load, so no verb is cheap because it skipped work another verb does. |
-| `cli/Cli` | argv → exit code, with streams, transport and cache injected so tests drive the real command. |
+| `cache/DocsCache` | **The interface is the test surface.** `DocsCache.NULL` keeps every other test hermetic — no test can reach a developer's real `$HOME`. Nothing here may throw or report. |
+| `model/FromCentral` | Central's flag-bag encoding is decided **once**, and nothing downstream ever sees `isResource`, `isAnonymousUnionType` or `inclusionType`. Also where a module is selected: the default module by exact id, a submodule only when `--module` names it. |
+| `model/Patches` | A few per-package corrections, for names Central omits. |
+| `model/ModuleRef` | A foreign reference's three derivations: the import path (keyword segments quoted), the CLI coordinate, and whether an import is needed at all. The pre-declared langlib set is measured with the compiler, not inferred from `lang.*`. |
+| `render/Signatures`, `render/TypeDefs` | The **shared** declaration renderer. The views and the API snapshots agree because both call it; `ViewsAgreeTest` holds the line. |
+| `render/DiscoverResult` | The result IR — see "One result, two renderers". |
+| `symbols/PathTree` | Anchored, tolerant path matching, `locate`'s trailing-segment relaxation, and the per-node operations that grouping counts. |
+| `symbols/Surface` | **The partition the four callable buckets address**, by derived role. Exhaustive and disjoint over every object a package declares, which `SurfaceTest` asserts in both directions. |
+| `symbols/Filter` | `--filter`, as a linear scan over the package in memory, returning surface matches and documentation-only matches separately. |
+| `views/Containers` | One implementation behind `client`, `service`, `class` and `funcs`. Holds the resolution order (exact container → exact member or path in scope → another bucket → substring member), the entry ceiling, grouping and paging. The selector grammar is read off the resolved CONTAINER, not the bucket: a client IS a class, so `class ballerina/http Client get ...` has to parse an accessor too. |
+| `views/Closure` | The type walk under a signature: breadth-first, bounded, naming what it dropped. |
+| `views/Readme` | The readme bucket: the whole readme, a section by number or title, or the sections `--filter` matches. A section counts only if it carries a fenced code block. |
+| `Loader` | `loadPackage` is the only load, so no bucket is cheap because it skipped work another does. |
+| `cli/Cli` | argv → exit code, with streams, transport, cache, project directory and interactivity injected so tests drive the real command. |
 | `cli/DiscoverTool` | The process wrapper — the only place that reads the environment or exits. |
+
+`views/TypeView` is not reachable from the CLI; it remains only because a set of `Closure` tests still drive
+through it, and is due to be removed once they are ported.
 
 ---
 
@@ -173,18 +235,16 @@ a declaration and prints with the initialiser its own source writes.
 
 | | |
 |---|---|
-| stdout | the requested document, and nothing else — including the usage text, when `--help` is what was asked |
+| stdout | the requested answer, and nothing else — including the usage text, when `--help` is what was asked |
 | stderr | on failure, one JSON object matching `Failure`, and nothing else |
 | exit 0 | success, and stdout is **complete** |
 | exit 1 | every failure, whatever went wrong |
 
-**One failure code, and the `kind` is the branch.** `upstream` and `timeout` are the two
-worth re-running unchanged; `validation`, `package-not-found` and `symbol-not-found` need a different
-command, which the `suggestion` names; `schema-drift` is for a human. None of them is a licence to
-guess a signature.
-
-`type` is **all-or-nothing** across names: if any one fails, stdout gets nothing, because "exit 0 means
-stdout is complete" is what every redirecting caller relies on.
+**One failure code, and the `kind` is the branch.** `upstream` and `timeout` are worth re-running
+unchanged; `validation`, `package-not-found` and `symbol-not-found` need a different command, which the
+`suggestion` names; `schema-drift` is for a maintainer. A selector that matches nothing inside a container
+is not a failure: it is a `NoMatch` at exit 0, because an empty selection is a fact about the container and
+the next move is in the answer.
 
 ---
 
@@ -195,10 +255,8 @@ stdout is complete" is what every redirecting caller relies on.
 <root>/v1/latest/<org>/<name>.json              {"version":"6.0.0","atMs":…}
 ```
 
-What is cached is the **raw payload**, not the IR and not the rendered string — the payload is not
-derived from our code, so the coordinates are the whole key. Measured: `overview ballerinax/github`
-goes from **8.0s cold to 1.2s warm**, which is what makes four addressed questions cheaper than one
-big answer.
+What is cached is the **raw payload**, not the IR and not a rendered answer — the payload is not derived from
+our code, so the coordinates are the whole key, and `--filter`/`--page` cost nothing extra once it is warm.
 
 Location is a pure function of the environment (`cache/CacheLocation`), tried in order:
 
@@ -209,9 +267,9 @@ Location is a pure function of the environment (`cache/CacheLocation`), tried in
 5. `<tmpdir>/bal-discover-<user>`, mode 0700
 6. disabled
 
-**Any** problem with an entry is a miss, never a failure: missing, unreadable, truncated, not JSON,
-rejected by the schema, or coordinates that do not match its own path. Each of those drops the entry
-and uses the network, so a corrupt entry cannot produce a wrong document and heals on the next fetch.
+**Any** problem with an entry is a miss, never a failure: missing, unreadable, truncated, not JSON, rejected
+by the schema, or coordinates that do not match its own path. Each drops the entry and uses the network, so a
+corrupt entry cannot produce a wrong answer and heals on the next fetch.
 
 Writes go to a per-process temp file and are then moved atomically. No lock and no single-flight: two
 processes that miss the same package both fetch and both move, the content is equivalent, and no third
@@ -222,35 +280,33 @@ process can observe a partial file.
 ## Project structure
 
 ```
-bal-discover-tool/
-├── build.gradle              ← root: plugins + allprojects repos
-├── settings.gradle           ← includes ':native', and nothing else
-├── gradle.properties         ← all versions
-└── native/
-    ├── build.gradle          ← Java subproject; every dependency is compileOnly
+discover-tool/
+├── build.gradle, settings.gradle, gradle.properties   ← root build; all versions
+├── config/checkstyle/                                  ← :checkstyle
+├── config/resources/{ToolBallerina,BalTool}.toml       ← templates for the bala
+├── bal-tool/                                           ← :bal-tool, packs :native into ballerina/tool_discover
+└── native/                                             ← :native, the tool itself
     └── src/
         ├── main/java/io/ballerina/tools/discover/
-        │   ├── Result.java, Failure.java          ← sealed; failures are values
-        │   ├── QualifiedName.java, Version.java   ← parser-only construction
-        │   ├── Texts.java                         ← collation, byte length, counts
-        │   ├── Loader.java, LoadedPackage.java
-        │   ├── cache/{DocsCache,DiskCache,CacheLocation,Versions}.java
-        │   ├── central/{CentralClient,HttpTransport,JdkHttpTransport,HttpOptions,
-        │   │            Coordinates,DependenciesToml,SearchHit,Json}.java
-        │   ├── central/schema/{CentralDocs,Schema}.java
+        │   ├── Result, Failure, QualifiedName, Version, Texts, Loader, LoadedPackage
+        │   ├── cache/{DocsCache,DiskCache,CacheLocation,Versions}
+        │   ├── central/{PackageRepository,CentralRepository,CentralClient,HttpTransport,
+        │   │            JdkHttpTransport,HttpOptions,Coordinates,DependenciesToml,SearchHit,Json}
+        │   ├── central/schema/{CentralDocs,Schema}
         │   ├── model/{Library,TypeDef,Fn,Service,TypeRef,Param,ReturnDef,RecordField,
-        │   │          ClientClass,FromCentral,Patches,Defaults,Pipeline,ModuleRef}.java
-        │   ├── render/{Signatures,TypeDefs,Documents,Identifiers,Report}.java
-        │   ├── symbols/{Declarations,Names,PathTree,Surface,Filter}.java
-        │   ├── views/{Find,Overview,Containers,TypeView,Guide,Closure,
-        │   │            Snippets,Readmes}.java
-        │   └── cli/{DiscoverTool,Cli,Commands,Usage,UsageRenderer}.java
+        │   │          ClientClass,FromCentral,Patches,Defaults,Pipeline,ModuleRef}
+        │   ├── render/{DiscoverResult,JsonRenderer,TextRenderer,CompactJson,
+        │   │           Signatures,TypeDefs,Documents,Identifiers}
+        │   ├── symbols/{Declarations,Names,PathTree,Surface,Filter}
+        │   ├── views/{Containers,Readme,Readmes,Closure,TypeView}
+        │   └── cli/{DiscoverTool,Cli,Commands,Usage,UsageRenderer}
         └── test/
-            ├── java/io/ballerina/tools/discover/    ← 17 suites, 715 cases
+            ├── java/io/ballerina/tools/discover/   ← the suites below, plus constructs/ and render/
             └── resources/
-                ├── fixtures/*.json.gz        ← 13 recorded Central payloads
-                ├── snapshots/                ← 13 .bal + 50 .md + keyspace.txt
-                └── command-outputs/unix/     ← usage golden files
+                ├── fixtures/*.json.gz         ← 13 recorded Central payloads
+                ├── snapshots/                 ← per fixture: the .bal API document, and every bucket's
+                │                                 bare listing as .buckets.txt and .buckets.json
+                └── command-outputs/unix/      ← usage and failure golden files
 ```
 
 ---
@@ -262,58 +318,46 @@ Every dependency is `compileOnly` — all three are on the Ballerina distributio
 
 | Dependency | Purpose |
 |---|---|
-| `org.ballerinalang:ballerina-cli` | `BLauncherCmd` interface |
-| `info.picocli:picocli` | argument parsing and per-verb flag rejection |
+| `org.ballerinalang:ballerina-cli` | the `BLauncherCmd` interface `bal` discovers the tool through |
+| `info.picocli:picocli` | argument parsing |
 | `com.google.code.gson:gson` | JSON parsing and emission |
 
-HTTP is `java.net.http` from the JDK. No GitHub Packages credentials and no language server version
-are needed to build.
-
-The cost is version coupling to the distribution (`picocli 4.0.1` is from 2019), so nothing here may
-rely on a feature newer than the version in `bre/lib`. One place that bites: picocli only gained
-`setUnmatchedOptionsAllowedAsOptionParameters` in 4.4, so `Cli.rejectFlagShapedValues` does that check
-by hand rather than adding a bundled dependency.
+HTTP is `java.net.http` from the JDK. The cost is version coupling to the distribution (`picocli 4.0.1`), so
+nothing here may rely on a feature newer than the version in `bre/lib`. `ballerina-cli` is published only to
+ballerina-platform's GitHub Packages, so building needs a `read:packages` token (see `README.md`).
 
 ---
 
 ## Tests
 
-`./gradlew :native:test` — 715 cases, offline, no network and no `$HOME` access.
+`./gradlew :native:test` — offline, no network and no `$HOME` access.
 
 | Suite | What it holds the line on |
 |---|---|
-| `CorpusTest` | **The one that pins the rendering.** Thirteen recorded payloads render byte-for-byte to thirteen committed `.bal` snapshots. Those snapshots are also the interface redesign's own gate: they did not move by a byte, which is what proves the renderer was never touched. |
-| `ViewsAgreeTest` | **The one that makes the addressed verbs safe.** Every signature a container verb prints appears in the `api` snapshot verbatim, at every tier and under `--all`; `overview` generates none at all; every `type <Name>` body is `renderTypeDef` exactly; every offered path is reachable; every `-r` closure terminates, stays bounded and names what it dropped. |
-| `PointersTest` | **The general form of "a pointer that cannot answer is worse than no pointer".** Extracts every `bal discover` command from every document of every fixture and RUNS it through the real CLI, requiring exit 0. Three separate bugs of this shape had three separate assertions written after the fact; a new pointer cannot be added wrong. |
-| `SurfaceTest` | That the three-way split is exhaustive and disjoint, and that a `client object` type Central files as an ordinary declaration is still addressed by `client`. |
-| `ViewsTest` | The report snapshots, and the composition rules that decide their shape — what the quickstart quotes and in what order, where the tier ladder fires, that the errors the map names resolve through `type`. Also where path-tree ORDERING is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
-| `RegisterTest` | The two-registers rule, mechanically, over every fixture and every verb. |
-| `CliTest` | Parsing, streams and exit codes together, in-process against a recorded payload. |
+| `CorpusTest` | Thirteen recorded payloads render byte-for-byte to thirteen committed `.bal` API snapshots — the oracle every quoted declaration is checked against. |
+| `ViewsAgreeTest` | **What makes the drill-down safe.** Every line a `Signature` quotes appears in the API snapshot verbatim; every path the tree offers is reachable and nothing unoffered is; closures terminate, do not repeat and stay bounded. |
+| `PointersTest` | Every `call`/`next` command any answer prints is RUN through the real CLI against the recorded payload, and must exit 0 with something other than "nothing matched". |
+| `ViewsTest` | The `.buckets.txt`/`.buckets.json` snapshots, the entry ceiling over every fixture, and the resolution and tolerance rules. Also where path ordering is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
+| `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object, no text rendering carries Markdown report furniture, and quoted Ballerina carries no fences of the tool's own. |
+| `render/DiscoverResultRenderingTest` | Every result shape, in both renderers, driven directly. |
+| `CliTest` | Parsing, streams, exit codes and `--output` together, in-process against a recorded payload, including following resource `call` fields to the signatures they name. |
+| `SurfaceTest` | That the bucket partition is exhaustive and disjoint, and that a `client object` type Central files as an ordinary declaration is still a `client`. |
+| `ReadmeTest` | That the resolved module's readme is there and passed through untouched. |
+| `FromCentralTest`, `PackageRepositoryTest` | Module selection (`--module`, exact default-module match) and the provider seam. |
 | `CacheTest` | Every corruption mode falls through to the network silently; TTL boundaries; concurrency; the offline fallback. |
 | `ClientTest` | Which failures are worth retrying, which are answers, and what each costs the caller. |
-| `SymbolsTest` | Carries the **discovery corpus** — every lookup the nine recorded playground runs made, pinned with hit counts, so a zero-hit pin cannot masquerade as a working index. |
-| `KeySpaceTest` | The payload's whole key space per fixture: the live drift detector for fields the reader does not read yet. |
-| `PatchesTest` | Each correction pinned in BOTH directions — what it must change and what it must leave alone. |
-| `DiscoverToolTest` | The usage text as golden files, and that `bal` routes every verb. |
+| `SymbolsTest` | The discovery corpus — real lookups recorded from agent runs, pinned with hit counts. |
+| `KeySpaceTest` | The payload's whole key space per fixture: the drift detector for fields the reader does not read yet. |
+| `PatchesTest` | Each correction pinned in both directions — what it must change and what it must leave alone. |
+| `constructs/ConstructTest` | One synthetic payload per Ballerina syntax dimension, so a rendering change fails by construct name rather than as a corpus-wide diff. |
+| `DiscoverToolTest` | The usage text as a golden file, and that `bal` hands the whole argument list through unparsed. |
 
 Snapshot escape hatches, both narrow and deliberate:
 
 ```bash
-UPDATE_SNAPSHOTS=1 ./gradlew :native:test              # after an intentional rendering change
+UPDATE_SNAPSHOTS=1 ./gradlew :native:test              # after an intentional rendering change — review the diff
 BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :native:test   # after re-recording fixtures
 ```
 
-`./gradlew :native:test` does **not** prove the tool is installed, that `bal` routes to it, that
-arguments survive the launcher, or that exit codes reach the shell. Those are only observable through a
-real `bal discover` invocation — see **Verification** in `README.md`.
-
----
-
-## Build & install
-
-```bash
-./gradlew :native:test     # the suite
-./gradlew :native:jar      # just the jar
-./gradlew :bal-tool:build  # packages the jar into a ballerina/tool_discover bala
-bal tool pull ballerina/tool_discover:<version> --repository=local   # register it locally
-```
+The suite does **not** prove the tool is installed, that `bal` routes to it, that arguments survive the
+launcher, or that exit codes reach the shell — see "Verifying a build against live Central" in `README.md`.
