@@ -61,13 +61,11 @@ ballerinax/kafka
 Next: bal discover ballerinax/kafka <bucket>
 
 $ bal discover ballerinax/kafka | cat
-{"buckets":[
-"client",
-"service",
-"class",
-"readme"
-]}
+{"buckets":["client","service","class","readme"]}
 ```
+
+Every JSON answer is exactly one line, however long, so cutting the output with `head` or `tail` never
+leaves half an answer. The JSON samples below are that real output, unwrapped.
 
 At a terminal every answer opens with a header naming where it is — package, bucket, container, selector —
 and a count, lists one entry per line in aligned columns, and ends with a footer: notes, how much was left
@@ -212,20 +210,53 @@ rather than a guess at one:
 
 ```
 $ bal discover ballerinax/github client gists --filter star | cat
-{"container":"Client","resources":[
-{"path":"gists/:gistId/star","accessors":[
-"get",
-"put",
-"delete"
-],"calls":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},
-{"path":"gists/starred","accessors":[
-"get"
-],"calls":{"get":"bal discover ballerinax/github client Client gists/starred get"}}
-],"shown":2,"total":2}
+{"container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"calls":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},{"path":"gists/starred","accessors":["get"],"calls":{"get":"bal discover ballerinax/github client Client gists/starred get"}}],"shown":2,"total":2}
 ```
 
-Everything else that opens exactly one thing — a group, a container, a submodule, a readme section — carries a
-plain `call`.
+Everything else that opens exactly one thing — a method, a group, a container, a submodule, a readme section —
+carries a plain `call`. A method row is `name` plus that `call`, the name quoted as one shell word where it
+needs it (`'flush`):
+
+```
+$ bal discover ballerinax/kafka client Producer
+ballerinax/kafka · client · Producer
+5 methods
+
+  'flush              bal discover ballerinax/kafka client Producer "'flush"
+  close
+  getTopicPartitions
+  send
+  sendWithMetadata
+
+Next: bal discover ballerinax/kafka client Producer <name>
+
+$ bal discover ballerinax/kafka client Producer | cat
+{"container":"Producer","methods":[{"name":"'flush","call":"bal discover ballerinax/kafka client Producer \"'flush\""},{"name":"close","call":"bal discover ballerinax/kafka client Producer close"},{"name":"getTopicPartitions","call":"bal discover ballerinax/kafka client Producer getTopicPartitions"},{"name":"send","call":"bal discover ballerinax/kafka client Producer send"},{"name":"sendWithMetadata","call":"bal discover ballerinax/kafka client Producer sendWithMetadata"}],"shown":5,"total":5}
+```
+
+A container whose methods come in more than one call form is split by form, since `->` against `.` is what a
+caller has to get right:
+
+```
+$ bal discover ballerinax/postgresql client
+ballerinax/postgresql · client · Client
+5 remote methods, 1 normal method
+
+Remote (->)
+  batchExecute
+  call
+  execute
+  query
+  queryRow
+
+Normal (.)
+  close
+
+Next: bal discover ballerinax/postgresql client Client <name>
+
+$ bal discover ballerinax/postgresql client | cat
+{"container":"Client","remote":[{"name":"batchExecute","call":"bal discover ballerinax/postgresql client Client batchExecute"},{"name":"call","call":"bal discover ballerinax/postgresql client Client call"},{"name":"execute","call":"bal discover ballerinax/postgresql client Client execute"},{"name":"query","call":"bal discover ballerinax/postgresql client Client query"},{"name":"queryRow","call":"bal discover ballerinax/postgresql client Client queryRow"}],"normal":[{"name":"close","call":"bal discover ballerinax/postgresql client Client close"}],"shown":6,"total":6}
+```
 
 One callable is the end of a drill-down: its declaration with its doc comment, then the declarations its
 signature names, one level deep:
@@ -278,6 +309,7 @@ ballerinax/twilio · client · Client
   deleteCallRecording
 
 ... 159 more (page 1 of 5)
+Next: bal discover ballerinax/twilio client Client <name>
 Next: bal discover ballerinax/twilio client Client --page 2
 
 $ bal discover ballerinax/twilio client --filter message
@@ -298,6 +330,8 @@ ballerinax/twilio · client · Client · --filter message
   listMessage
   listNotification
   updateMessage
+
+Next: bal discover ballerinax/twilio client Client <name>
 ```
 
 A selector that matches nothing is still an answer (exit 0), naming the closest names and what is there:
@@ -314,11 +348,13 @@ Did you mean
 Available
   5 methods
 
-    'flush
+    'flush              bal discover ballerinax/kafka client Producer "'flush"
     close
     getTopicPartitions
     send
     sendWithMetadata
+
+  Next: bal discover ballerinax/kafka client Producer <name>
 ```
 
 A member declared on several containers is never picked silently:
@@ -347,8 +383,8 @@ Next: bal discover ballerinax/kafka readme <n>
 
 ## Output
 
-Every answer is one structured result, rendered either as text or as JSON. The JSON is compact — fields
-inline, one array element per line — and these are its shapes:
+Every answer is one structured result, rendered either as text or as JSON. The JSON is one line per answer —
+no line breaks inside it, so a `head`/`tail` cut never splits one — and these are its shapes:
 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
@@ -356,8 +392,8 @@ inline, one array element per line — and these are its shapes:
 | several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `call`), `shown`, `total`, `next`             |
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `calls`), `groups` (`name`, `count`, `call`), `shown`, `total`, `next` |
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `calls`), `shown`, `total`, `page`, `pages`, `next`              |
-| methods                              | `container`, `methods`, `shown`, `total`, `page`, `pages`, `next`                                               |
-| resources and methods together       | `container`, `resources` (`path`, `accessors`, `calls`), `remote`, `normal`, `shown`, `total`, `page`, `pages`, `next`, `documented` |
+| methods of one call form             | `container`, `methods` (`name`, `call`), `shown`, `total`, `page`, `pages`, `next`                              |
+| more than one call form              | `container`, `resources` (`path`, `accessors`, `calls`), `remote` (`name`, `call`), `normal` (`name`, `call`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
 | one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented` |
 | nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `call`), `available`, `next`, `documented`              |
 | member on several containers         | `requested`, `owners` (`name`, `matches`, `call`), `shown`, `total`, `next`                                      |
@@ -380,10 +416,10 @@ No listing shows more than **40 entries**. Over that:
 - remote and normal methods **page**, alphabetically, with `--page <n>`, and so do resource paths that cannot
   be grouped — selected by a name substring or `--filter`, or already four literal levels deep — and readme
   sections narrowed by `--filter`. Every page keeps the selector and the `--filter`;
-- a container mixing resources with methods pages the same way, as one sequence — resource paths, then remote
-  methods, then normal ones — so a page can end partway through one section and pick up the next; each page
-  keeps the section headings (`resources`, `remote`, `normal` in JSON) for whatever it holds and omits the
-  ones it holds nothing of;
+- a container mixing call forms (resources with methods, or remote methods with normal ones) pages the same
+  way, as one sequence — resource paths, then remote methods, then normal ones — so a page can end partway
+  through one section and pick up the next; each page keeps the section headings (`resources`, `remote`,
+  `normal` in JSON) for whatever it holds and omits the ones it holds nothing of;
 - a roster of containers is cut at 40 and points at `--filter`.
 
 A cut listing always says so: `shown`/`total` plus `next` (the command that continues it) in JSON, or a
