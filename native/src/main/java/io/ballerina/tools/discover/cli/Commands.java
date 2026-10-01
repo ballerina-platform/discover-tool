@@ -91,8 +91,8 @@ final class Commands {
 
         @CommandLine.Option(names = "--page", paramLabel = "<n>", defaultValue = "1",
                 description = "1-indexed. Turns the page of any listing that pages over the entry ceiling: "
-                        + "remote or normal methods, resource paths that cannot be grouped, a container's resources "
-                        + "and methods listed together, and readme sections narrowed by --filter. A page outside "
+                        + "methods, resource paths that cannot be grouped, a container listed by call form "
+                        + "(resources, remote, normal), and readme sections narrowed by --filter. A page outside "
                         + "the listing is an error.")
         int page;
 
