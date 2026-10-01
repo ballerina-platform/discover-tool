@@ -304,22 +304,24 @@ public sealed interface DiscoverResult {
 
     /**
      * A container answering to both {@code ->path.accessor()} and {@code ->name()}/{@code .name()} — the
-     * {@link ResourceList} and {@link MethodList} shapes side by side, split by call form.
+     * {@link ResourceList} and {@link MethodList} shapes side by side, split by call form, paginated with
+     * {@code --page} as one sequence (resources, then remote, then normal) once there are too many to show at once.
      *
      * @param container the container that declares them
-     * @param resources the resource paths shown
-     * @param remote the remote method names shown, alphabetical
-     * @param normal the plain method names shown, alphabetical
+     * @param resources the resource paths on this page
+     * @param remote the remote method names on this page, alphabetical
+     * @param normal the plain method names on this page, alphabetical
      * @param shown how many entries across all three are in this response
      * @param total how many exist across all three
-     * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
+     * @param paging which page this is, or {@code null} when the whole listing fit on one
+     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param documented entries a {@code --filter} matched only in their documentation
      * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the same joined advisory {@link ResourceList#note} carries, or {@code null}
      */
     record MixedListing(
             String container, List<ResourceList.Resource> resources, List<String> remote, List<String> normal,
-            int shown, int total, String next, List<String> documented, String warning, String note)
+            int shown, int total, Paging paging, String next, List<String> documented, String warning, String note)
             implements DiscoverResult { }
 
     /**

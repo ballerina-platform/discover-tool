@@ -70,9 +70,10 @@ import java.util.stream.Collectors;
  * <p><b>OUTPUT SIZE IS AN ENTRY/LINE CEILING NOW, NOT A BYTE BUDGET.</b> The RFC replaces this tool's earlier
  * byte-budget tier ladder (bytes of quoted Ballerina, degrading through four tiers) with a hard ceiling of
  * {@value #MAX_ENTRIES} entries per listing: under it, everything is shown; over it, resource paths selected by a
- * path GROUP by segment, and methods and any resource selection that cannot group PAGE with {@code --page}, all
- * honestly disclosing {@code shown}/{@code total} and the exact next command rather than silently degrading.
- * Every answer is a {@link DiscoverResult}, so {@code --output} renders all of them the same way.
+ * path GROUP by segment, and methods, mixed listings and any resource selection that cannot group PAGE with
+ * {@code --page}, all honestly disclosing {@code shown}/{@code total} and the exact next command rather than
+ * silently degrading. Every answer is a {@link DiscoverResult}, so {@code --output} renders all of them the same
+ * way.
  *
  * <p><b>THE VIEWS QUOTE, THEY NEVER RE-SPELL.</b> Every declaration printed here comes from
  * {@link Signatures} or {@link TypeDefs} byte-for-byte. That is what {@code ViewsAgreeTest} pins, and the reason
@@ -92,8 +93,9 @@ public final class Containers {
 
     /**
      * The {@code number}-th {@value #MAX_ENTRIES}-wide window into a {@code total}-sized list — the page-clamping
-     * arithmetic every paginated listing in this tool shares (a flat method listing here, a filtered readme-chunk
-     * listing in {@link Readme}), so a future fix to the page-boundary rule only has to be made once.
+     * arithmetic every paginated listing in this tool shares (a flat method or resource listing and a mixed one
+     * here, a filtered readme-chunk listing in {@link Readme}), so a future fix to the page-boundary rule only has
+     * to be made once.
      *
      * <p>A page outside the listing is a usage failure naming the valid range, never an empty answer: an empty
      * page with no {@code next} reads exactly like a listing that has nothing in it.
@@ -125,6 +127,17 @@ public final class Containers {
         /** What a response reports about this page — {@code null} when the whole listing fit on one. */
         public DiscoverResult.Paging paging() {
             return pages == 1 ? null : new DiscoverResult.Paging(number, pages, total - to);
+        }
+
+        /**
+         * The part of one section this page covers, when the listing is several sections laid end to end.
+         *
+         * @param offset where {@code section} starts in the whole listing
+         */
+        public <T> List<T> slice(List<T> section, int offset) {
+            int start = Math.clamp(from - offset, 0, section.size());
+            int end = Math.clamp(to - offset, 0, section.size());
+            return section.subList(start, end);
         }
 
         /** The command for the page after this one, or {@code null} on the last. */
@@ -759,8 +772,7 @@ public final class Containers {
         boolean hasResources = callable.stream().anyMatch(entry -> entry.fn() instanceof Fn.Resource);
         boolean hasNamed = callable.stream().anyMatch(entry -> !(entry.fn() instanceof Fn.Resource));
         if (hasResources && hasNamed) {
-            return Result.ok(
-                    mixedAnswer(loaded, scope, container, selectors, callable, options, documented, warning, note));
+            return mixedAnswer(loaded, scope, container, selectors, callable, options, documented, warning, note);
         }
         if (hasResources) {
             return resourceAnswer(loaded, scope, container, selectors, callable, options, warning, note);
@@ -880,33 +892,31 @@ public final class Containers {
     /**
      * A container answering to both {@code ->path.accessor()} and a named method — measured, only
      * {@code ballerina/http}'s {@code Client} and {@code ballerinax/sap}'s do this among the connectors surveyed.
-     * Under the ceiling every entry is shown; over it the listing is cut at {@value #MAX_ENTRIES}, resources
-     * first, and says so.
+     * The three sections are one sequence — resources, then remote, then normal — paged {@value #MAX_ENTRIES} at a
+     * time like every other flat listing, so a page can end partway through one section and start the next.
      */
-    private static DiscoverResult mixedAnswer(
+    private static Result<DiscoverResult> mixedAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> callable, Options options, List<String> documented, String warning, String note) {
         String base = baseCommand(loaded, scope, container);
+        String command = base + selectorArguments(container, selectors) + filterArgument(options);
         List<DiscoverResult.ResourceList.Resource> resources = mergedResources(
                 callable.stream().filter(entry -> entry.fn() instanceof Fn.Resource).toList(), base);
         List<String> remote = namesOf(callable, Fn.Remote.class);
         List<String> normal = namesOf(callable, Fn.Normal.class);
         int total = resources.size() + remote.size() + normal.size();
 
-        int room = MAX_ENTRIES;
-        List<DiscoverResult.ResourceList.Resource> shownResources =
-                resources.subList(0, Math.min(room, resources.size()));
-        room -= shownResources.size();
-        List<String> shownRemote = remote.subList(0, Math.min(room, remote.size()));
-        room -= shownRemote.size();
-        List<String> shownNormal = normal.subList(0, Math.min(room, normal.size()));
-        int shown = shownResources.size() + shownRemote.size() + shownNormal.size();
-
-        String next = shown < total
-                ? base + selectorArguments(container, selectors) + " --filter <keyword>"
-                : null;
-        return new DiscoverResult.MixedListing(containerName(container), shownResources, shownRemote, shownNormal,
-                shown, total, next, documented, warning, mergeNotes(note, pathNote(container, selectors)));
+        Result<Page> page = Page.of(options.page(), total, command);
+        if (!page.isOk()) {
+            return page.cast();
+        }
+        Page window = page.value();
+        return Result.ok(new DiscoverResult.MixedListing(containerName(container),
+                window.slice(resources, 0),
+                window.slice(remote, resources.size()),
+                window.slice(normal, resources.size() + remote.size()),
+                window.to() - window.from(), total, window.paging(), window.next(command), documented, warning,
+                mergeNotes(note, pathNote(container, selectors))));
     }
 
     private static List<String> namesOf(List<Entry> entries, Class<? extends Fn> form) {
