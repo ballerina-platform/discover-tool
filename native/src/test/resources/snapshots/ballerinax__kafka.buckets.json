@@ -3,7 +3,7 @@
 {"name":"Consumer","remote":24,"call":"bal discover ballerinax/kafka client Consumer"},
 {"name":"Producer","remote":5,"call":"bal discover ballerinax/kafka client Producer"}
 ],"shown":3,"total":3}
-{"methods":[],"shown":0,"total":0,"note":"binds to kafka:Listener"}
+{"container":"Service","methods":[],"shown":0,"total":0,"note":"binds to kafka:Listener"}
 {"containers":[
 {"name":"AvroDeserializer","normal":1,"call":"bal discover ballerinax/kafka class AvroDeserializer"},
 {"name":"AvroSerializer","normal":1,"call":"bal discover ballerinax/kafka class AvroSerializer"},

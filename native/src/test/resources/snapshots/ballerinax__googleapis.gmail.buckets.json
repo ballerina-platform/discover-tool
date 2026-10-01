@@ -1,4 +1,4 @@
-{"resources":[
+{"container":"Client","resources":[
 {"path":"users/:userId/drafts","accessors":[
 "get",
 "post"

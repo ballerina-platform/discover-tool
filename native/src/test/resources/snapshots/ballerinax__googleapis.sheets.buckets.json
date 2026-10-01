@@ -1,4 +1,4 @@
-{"methods":[
+{"container":"Client","methods":[
 "addColumnsAfter",
 "addColumnsAfterBySheetName",
 "addColumnsBefore",
@@ -39,7 +39,7 @@
 "renameSheet",
 "renameSpreadsheet",
 "setCell"
-],"shown":40,"total":43,"next":"bal discover ballerinax/googleapis.sheets client Client --page 2"}
+],"shown":40,"total":43,"page":1,"pages":2,"next":"bal discover ballerinax/googleapis.sheets client Client --page 2"}
 {"bucket":"service","total":0,"elsewhere":[
 {"bucket":"client","count":1,"call":"bal discover ballerinax/googleapis.sheets client"}
 ]}

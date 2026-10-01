@@ -1,12 +1,16 @@
 == client ==
+Container: Client
 Groups: admin.apps.approve (1), admin.apps.approved.list (1), admin.apps.requests.list (1), admin.apps.restrict (1), admin.apps.restricted.list (1), admin.conversations.archive (1), admin.conversations.convertToPrivate (1), admin.conversations.create (1), admin.conversations.delete (1), admin.conversations.disconnectShared (1), admin.conversations.ekm.listOriginalConnectedChannelInfo (1), admin.conversations.getConversationPrefs (1), admin.conversations.getTeams (1), admin.conversations.invite (1), admin.conversations.rename (1), admin.conversations.restrictAccess.addGroup (1), admin.conversations.restrictAccess.listGroups (1), admin.conversations.restrictAccess.removeGroup (1), admin.conversations.search (1), admin.conversations.setConversationPrefs (1), admin.conversations.setTeams (1), admin.conversations.unarchive (1), admin.emoji.add (1), admin.emoji.addAlias (1), admin.emoji.list (1), admin.emoji.remove (1), admin.emoji.rename (1), admin.inviteRequests.approve (1), admin.inviteRequests.approved.list (1), admin.inviteRequests.denied.list (1), admin.inviteRequests.deny (1), admin.inviteRequests.list (1), admin.teams.admins.list (1), admin.teams.create (1), admin.teams.list (1), admin.teams.owners.list (1), admin.teams.settings.info (1), admin.teams.settings.setDefaultChannels (1), admin.teams.settings.setDescription (1), admin.teams.settings.setDiscoverability (1)
 ... 134 more, narrow further: bal discover ballerinax/slack client Client --filter <keyword>
 == service ==
 service: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/slack client
 == class ==
 class: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/slack client
 == funcs ==
 funcs: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/slack client

@@ -25,10 +25,9 @@ import java.util.stream.Collectors;
 /**
  * {@link DiscoverResult} → the human-oriented text the RFC shows at an interactive terminal.
  *
- * <p>Deliberately terse — the RFC's own worked examples are one or two lines for every shape here, which is a
- * real departure from this tool's earlier Markdown-report convention (headings, a facts table, a
- * {@code ## Next} section), which is not carried forward: a shape with Ballerina to show prints it bare, as the
- * RFC's own single-signature example does.
+ * <p>Deliberately terse — the RFC's own worked examples are one or two lines for every shape here. A shape with
+ * Ballerina to show prints it bare, as the RFC's own single-signature example does; every command a caller can
+ * follow is printed, one per row, as the JSON rendering's {@code call} fields carry it.
  *
  * @since 0.1.0
  */
@@ -58,7 +57,9 @@ public final class TextRenderer {
         String list = bucketList.buckets().isEmpty() ? "none" : String.join(", ", bucketList.buckets());
         if (!bucketList.submodules().isEmpty()) {
             list += "\n\nSubmodules:\n" + bucketList.submodules().stream()
-                    .map(submodule -> "  " + submodule.name() + " — " + submodule.summary())
+                    .map(submodule -> "  " + submodule.name()
+                            + (submodule.summary().isEmpty() ? "" : " — " + submodule.summary())
+                            + ": " + submodule.call())
                     .collect(Collectors.joining("\n"));
         }
         return withWarning(list, bucketList.warning());
@@ -71,27 +72,36 @@ public final class TextRenderer {
                         : container.name() + " (binds to " + container.listener() + ")")
                 .collect(Collectors.joining(", "));
         return withWarning(
-                withNext(list, roster.containers().size(), roster.total(), roster.next()), roster.warning());
+                withNext(list, roster.total() - roster.containers().size(), null, roster.next()), roster.warning());
     }
 
     private static String renderPathGroups(DiscoverResult.PathGroups groups) {
-        String list = "Groups: " + groups.groups().stream()
-                .map(group -> group.name() + " (" + group.count() + ")")
-                .collect(Collectors.joining(", "));
-        return withNotices(withNext(list, groups.groups().size(), groups.total(), groups.next()),
-                groups.warning(), groups.note());
+        List<String> sections = new ArrayList<>();
+        if (!groups.resources().isEmpty()) {
+            sections.add("Here:\n" + resourceLines(groups.resources()));
+        }
+        if (!groups.groups().isEmpty()) {
+            sections.add("Groups: " + groups.groups().stream()
+                    .map(group -> group.name() + " (" + group.count() + ")")
+                    .collect(Collectors.joining(", ")));
+        }
+        int shown = groups.resources().size() + groups.groups().size();
+        String body = withNext(String.join("\n", sections), groups.total() - shown, null, groups.next());
+        return withNotices(withContainer(body, groups.container()), groups.warning(), groups.note());
     }
 
     private static String renderResourceList(DiscoverResult.ResourceList resources) {
         String list = resourceLines(resources.resources());
-        return withNotices(withNext(list, resources.shown(), resources.total(), resources.next()),
-                resources.warning(), resources.note());
+        String body = withNext(list, remaining(resources.shown(), resources.total(), resources.paging()),
+                resources.paging(), resources.next());
+        return withNotices(withContainer(body, resources.container()), resources.warning(), resources.note());
     }
 
     private static String renderMethodList(DiscoverResult.MethodList methods) {
         String list = "Methods: " + (methods.methods().isEmpty() ? "none" : String.join(", ", methods.methods()));
-        return withNotices(withNext(list, methods.shown(), methods.total(), methods.next()),
-                methods.warning(), methods.note());
+        String body = withNext(list, remaining(methods.shown(), methods.total(), methods.paging()),
+                methods.paging(), methods.next());
+        return withNotices(withContainer(body, methods.container()), methods.warning(), methods.note());
     }
 
     /** Verbatim, per the RFC's own words for this bucket — no heading, no wrapping, for the whole-readme case. */
@@ -113,7 +123,10 @@ public final class TextRenderer {
         String list = chunks.chunks().stream()
                 .map(chunk -> chunk.number() + ". " + chunk.title() + " (" + chunk.lines() + " lines)")
                 .collect(Collectors.joining("\n"));
-        return withWarning(withNext(list, chunks.chunks().size(), chunks.total(), chunks.next()), chunks.warning());
+        return withWarning(
+                withNext(list, remaining(chunks.chunks().size(), chunks.total(), chunks.paging()), chunks.paging(),
+                        chunks.next()),
+                chunks.warning());
     }
 
     private static String resourceLines(List<DiscoverResult.ResourceList.Resource> resources) {
@@ -150,8 +163,8 @@ public final class TextRenderer {
             sections.add("Normal (.): " + String.join(", ", mixed.normal()));
         }
         addDocumented(sections, mixed.documented());
-        String body = withNext(String.join("\n", sections), mixed.shown(), mixed.total(), mixed.next());
-        return withNotices(body, mixed.warning(), mixed.note());
+        String body = withNext(String.join("\n", sections), mixed.total() - mixed.shown(), null, mixed.next());
+        return withNotices(withContainer(body, mixed.container()), mixed.warning(), mixed.note());
     }
 
     private static String renderNoMatch(DiscoverResult.NoMatch noMatch) {
@@ -163,7 +176,7 @@ public final class TextRenderer {
         }
         if (!noMatch.paths().isEmpty()) {
             lines.add(noMatch.paths().size() + " paths carry that segment — pick one:");
-            noMatch.paths().forEach(alternative -> lines.add("  " + alternative.path()));
+            noMatch.paths().forEach(alternative -> lines.add("  " + alternative.path() + ": " + alternative.call()));
         }
         addDocumented(lines, noMatch.documented());
         if (noMatch.available() != null) {
@@ -178,19 +191,19 @@ public final class TextRenderer {
     private static String renderOwners(DiscoverResult.Owners owners) {
         String list = "'" + owners.requested() + "' is declared on " + owners.total() + " containers — pick one:\n"
                 + owners.owners().stream()
-                        .map(owner -> owner.name() + " (" + owner.matches()
-                                + (owner.matches() == 1 ? " match)" : " matches)"))
-                        .collect(Collectors.joining(", "));
-        return withWarning(withNext(list, owners.owners().size(), owners.total(), owners.next()),
+                        .map(owner -> "  " + owner.name() + " (" + owner.matches()
+                                + (owner.matches() == 1 ? " match): " : " matches): ") + owner.call())
+                        .collect(Collectors.joining("\n"));
+        return withWarning(withNext(list, owners.total() - owners.owners().size(), null, owners.next()),
                 owners.warning());
     }
 
     private static String renderEmptyBucket(DiscoverResult.EmptyBucket empty) {
         String body = empty.bucket() + ": none in this package";
         if (!empty.elsewhere().isEmpty()) {
-            body += "\nElsewhere: " + empty.elsewhere().stream()
-                    .map(other -> other.bucket() + " (" + other.count() + ")")
-                    .collect(Collectors.joining(", "));
+            body += "\nElsewhere:\n" + empty.elsewhere().stream()
+                    .map(other -> "  " + other.bucket() + " (" + other.count() + "): " + other.call())
+                    .collect(Collectors.joining("\n"));
         }
         return withWarning(body, empty.warning());
     }
@@ -211,11 +224,26 @@ public final class TextRenderer {
         return withWarning(withNote, warning);
     }
 
-    /** The RFC's truncation line: {@code ... N more, narrow further: <command>} — only when something was cut. */
-    private static String withNext(String body, int shown, int total, String next) {
-        if (next == null || shown >= total) {
-            return body;
+    /** The single container a listing belongs to, as its first line — none for module-level functions. */
+    private static String withContainer(String body, String container) {
+        return container == null ? body : "Container: " + container + "\n" + body;
+    }
+
+    /** How many entries a listing left out: everything after this page, or everything past what was shown. */
+    private static int remaining(int shown, int total, DiscoverResult.Paging paging) {
+        return paging == null ? total - shown : paging.remaining();
+    }
+
+    /**
+     * The RFC's truncation line: {@code ... N more, narrow further: <command>} — only when something was cut. A
+     * paged listing names its page instead, including the last one, which has nothing more to point at.
+     */
+    private static String withNext(String body, int remaining, DiscoverResult.Paging paging, String next) {
+        String position = paging == null ? "" : " (page " + paging.page() + " of " + paging.pages() + ")";
+        if (next == null || remaining <= 0) {
+            return position.isEmpty() ? body : body + "\nLast page" + position;
         }
-        return body + "\n... " + (total - shown) + " more, narrow further: " + next;
+        return body + "\n... " + remaining + " more" + position
+                + (paging == null ? ", narrow further: " : ", next page: ") + next;
     }
 }

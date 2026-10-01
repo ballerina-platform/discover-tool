@@ -1,9 +1,13 @@
 == client ==
 client: none in this package
-Elsewhere: class (3), funcs (11)
+Elsewhere:
+  class (3): bal discover ballerina/log class
+  funcs (11): bal discover ballerina/log funcs
 == service ==
 service: none in this package
-Elsewhere: class (3), funcs (11)
+Elsewhere:
+  class (3): bal discover ballerina/log class
+  funcs (11): bal discover ballerina/log funcs
 == class ==
 Logger, LoggerRegistry, PrintableRawTemplate
 == funcs ==

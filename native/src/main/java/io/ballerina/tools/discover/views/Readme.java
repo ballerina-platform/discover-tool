@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.views;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Names;
 
@@ -263,12 +264,14 @@ public final class Readme {
                         chunk.number(), chunk.title(), chunk.lines(),
                         "bal discover " + pkg + " readme " + chunk.number()))
                 .toList();
-        Containers.Page page = Containers.Page.of(options.page(), items.size());
-        List<DiscoverResult.ReadmeChunks.Chunk> shown = items.subList(page.from(), page.to());
-        String next = page.to() < items.size()
-                ? "bal discover " + pkg + " readme --filter \"" + options.filter() + "\" --page "
-                        + (page.number() + 1)
-                : null;
-        return Result.ok(new DiscoverResult.ReadmeChunks(shown, items.size(), next, loaded.warning()));
+        String command = "bal discover " + pkg + " readme --filter " + Texts.shellWord(options.filter());
+        Result<Containers.Page> page = Containers.Page.of(options.page(), items.size(), command);
+        if (!page.isOk()) {
+            return page.cast();
+        }
+        Containers.Page window = page.value();
+        List<DiscoverResult.ReadmeChunks.Chunk> shown = items.subList(window.from(), window.to());
+        return Result.ok(new DiscoverResult.ReadmeChunks(
+                shown, items.size(), window.paging(), window.next(command), loaded.warning()));
     }
 }

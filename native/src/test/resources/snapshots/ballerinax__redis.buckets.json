@@ -1,4 +1,4 @@
-{"methods":[
+{"container":"Client","methods":[
 "append",
 "auth",
 "bitCount",
@@ -39,7 +39,7 @@
 "incr",
 "incrBy",
 "incrByFloat"
-],"shown":40,"total":112,"next":"bal discover ballerinax/redis client Client --page 2"}
+],"shown":40,"total":112,"page":1,"pages":3,"next":"bal discover ballerinax/redis client Client --page 2"}
 {"bucket":"service","total":0,"elsewhere":[
 {"bucket":"client","count":1,"call":"bal discover ballerinax/redis client"}
 ]}

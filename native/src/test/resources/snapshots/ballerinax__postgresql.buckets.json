@@ -1,4 +1,4 @@
-{"methods":[
+{"container":"Client","methods":[
 "batchExecute",
 "call",
 "close",

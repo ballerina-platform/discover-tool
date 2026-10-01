@@ -1,4 +1,5 @@
 == client ==
+Container: Client
 users/:userId/drafts — get, post
 users/:userId/drafts/send — post
 users/:userId/drafts/:id — get, put, delete
@@ -23,10 +24,13 @@ users/:userId/threads/:id/trash — post
 users/:userId/threads/:id/untrash — post
 == service ==
 service: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/googleapis.gmail client
 == class ==
 class: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/googleapis.gmail client
 == funcs ==
 funcs: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/googleapis.gmail client

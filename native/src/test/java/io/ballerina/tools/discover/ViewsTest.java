@@ -138,33 +138,65 @@ public class ViewsTest {
     @Test(dataProvider = "fixtures")
     public void everyListingStaysInsideTheEntryCeiling(String slug) {
         LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
+        int checked = 0;
         for (Surface.Scope scope : Surface.Scope.values()) {
             List<DiscoverResult> answers = new java.util.ArrayList<>(List.of(render(loaded, scope, List.of())));
             for (Surface.Container container : Surface.of(loaded.library(), scope)) {
                 if (!container.isModule()) {
                     answers.add(render(loaded, scope, List.of(container.name())));
+                    answers.add(render(loaded, scope, List.of(container.name(), "zzznosuchmember")));
+                    // A one-letter substring is the widest selection a caller can make short of none at all.
+                    answers.add(render(loaded, scope, List.of(container.name(), "e")));
                 }
             }
             for (DiscoverResult answer : answers) {
-                int shown = switch (answer) {
-                    case DiscoverResult.ContainerRoster roster -> roster.containers().size();
-                    case DiscoverResult.PathGroups groups -> groups.groups().size();
-                    case DiscoverResult.ResourceList resources -> resources.shown();
-                    case DiscoverResult.MethodList methods -> methods.shown();
-                    case DiscoverResult.MixedListing mixed -> mixed.shown();
-                    case DiscoverResult.Owners owners -> owners.owners().size();
-                    case DiscoverResult.Signature ignored -> 1;
-                    case DiscoverResult.NoMatch ignored -> 0;
-                    case DiscoverResult.EmptyBucket ignored -> 0;
-                    // Neither reachable from Containers — readme is its own bucket, the bucket list is the CLI's.
-                    case DiscoverResult.BucketList ignored -> 0;
-                    case DiscoverResult.Readme ignored -> 0;
-                    case DiscoverResult.ReadmeChunks ignored -> 0;
-                };
-                Assert.assertTrue(shown <= Containers.MAX_ENTRIES,
-                        slug + " " + scope.verb() + ": " + shown + " entries shown, over the ceiling");
+                checked += assertInsideTheCeiling(slug + " " + scope.verb(), answer);
             }
         }
+        Assert.assertTrue(checked > 0, slug + ": no listing was checked");
+    }
+
+    /** One answer, and any listing nested inside it. Returns how many listings were checked. */
+    private static int assertInsideTheCeiling(String label, DiscoverResult answer) {
+        record Window(int listed, int shown, int total, String next) { }
+        Window window = switch (answer) {
+            case DiscoverResult.ContainerRoster roster -> new Window(roster.containers().size(),
+                    roster.containers().size(), roster.total(), roster.next());
+            case DiscoverResult.PathGroups groups -> new Window(groups.resources().size() + groups.groups().size(),
+                    groups.resources().size() + groups.groups().size(), groups.total(), groups.next());
+            case DiscoverResult.ResourceList resources -> new Window(resources.resources().size(),
+                    resources.shown(), resources.total() - pagesBefore(resources.paging(), resources.total(),
+                            resources.shown()), resources.next());
+            case DiscoverResult.MethodList methods -> new Window(methods.methods().size(), methods.shown(),
+                    methods.total() - pagesBefore(methods.paging(), methods.total(), methods.shown()),
+                    methods.next());
+            case DiscoverResult.MixedListing mixed -> new Window(
+                    mixed.resources().size() + mixed.remote().size() + mixed.normal().size(), mixed.shown(),
+                    mixed.total(), mixed.next());
+            case DiscoverResult.Owners owners -> new Window(owners.owners().size(), owners.owners().size(),
+                    owners.total(), owners.next());
+            case DiscoverResult.NoMatch noMatch -> noMatch.available() == null ? null
+                    : new Window(0, 0, 0, null);
+            default -> null;
+        };
+        if (window == null) {
+            return 0;
+        }
+        int nested = answer instanceof DiscoverResult.NoMatch noMatch
+                ? assertInsideTheCeiling(label + " (available)", noMatch.available())
+                : 0;
+        Assert.assertTrue(window.listed() <= Containers.MAX_ENTRIES,
+                label + ": " + window.listed() + " entries listed, over the ceiling");
+        Assert.assertEquals(window.listed(), window.shown(), label + ": shown disagrees with what is listed");
+        if (window.shown() < window.total()) {
+            Assert.assertNotNull(window.next(), label + ": cut off with no next command");
+        }
+        return nested + 1;
+    }
+
+    /** Entries on the pages before this one, so a later page's {@code shown < total} is read against what is left. */
+    private static int pagesBefore(DiscoverResult.Paging paging, int total, int shown) {
+        return paging == null ? 0 : total - shown - paging.remaining();
     }
 
     /** Every fixture's bare {@code client} listing answers with the shape surveyed — see {@link #CLIENT_SHAPE}. */
@@ -228,7 +260,7 @@ public class ViewsTest {
         // suggestion rebuilt the command WITHOUT it, so following the advice looped.
         DiscoverResult.Signature answer =
                 signature(FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLASS, "toStringValue");
-        Assert.assertTrue(answer.note().contains("`toStringValue` is declared on `Cookie`"), answer.note());
+        Assert.assertTrue(answer.note().contains("'toStringValue' is declared on Cookie"), answer.note());
         Assert.assertTrue(answer.note().contains("bal discover ballerina/http class Cookie toStringValue"),
                 answer.note());
     }
@@ -255,7 +287,7 @@ public class ViewsTest {
         DiscoverResult.MethodList cookie =
                 as(DiscoverResult.MethodList.class, render(http, Surface.Scope.CLIENT, List.of("Cookie")));
         Assert.assertNotNull(cookie.note(), cookie.toString());
-        Assert.assertTrue(cookie.note().contains("`Cookie` is addressed by `class`"), cookie.note());
+        Assert.assertTrue(cookie.note().contains("'Cookie' is addressed by class"), cookie.note());
         Assert.assertTrue(cookie.note().contains("bal discover ballerina/http class Cookie"), cookie.note());
 
         // A record, asked of `client`: not a callable at all, and no bucket answers for a bare declaration name.
@@ -271,7 +303,8 @@ public class ViewsTest {
         // Ballerina a client IS a class. `ballerina/http:Client` declares seven resource functions either way.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         DiscoverResult.Signature get = signature(http, Surface.Scope.CLASS, "Client", "get", "path");
-        Assert.assertTrue(get.note().contains("is addressed by `client`"), get.note());
+        Assert.assertTrue(get.note().contains("is addressed by client — showing it. "
+                + "Canonical: bal discover ballerina/http client Client get path"), get.note());
         // Quoted from what the tool prints, not re-spelled from memory: the rest-parameter form is
         // `[PathParamType ...path]`, with the ellipsis bound to the NAME.
         Assert.assertTrue(get.declaration().contains("resource function get [PathParamType ...path]"),
@@ -292,7 +325,7 @@ public class ViewsTest {
         DiscoverResult.Signature init = signature(
                 FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"), Surface.Scope.CLIENT, "Client", "init");
         Assert.assertEquals(init.kind(), "constructor");
-        Assert.assertEquals(init.form(), ".");
+        Assert.assertEquals(init.form(), "new");
         Assert.assertTrue(init.declaration().contains("function init("), init.declaration());
     }
 
@@ -452,7 +485,7 @@ public class ViewsTest {
         String note = clientNote(github, "repos/*/*");
         // Named by where it GOES, not where it forks: `repos/{templateOwner}` alone is not an address.
         Assert.assertNotNull(note, "repos/*/* should name the branch it did not take");
-        Assert.assertTrue(note.contains("also matched `repos/:templateOwner/:templateRepo/generate` (1), "
+        Assert.assertTrue(note.contains("also matched repos/:templateOwner/:templateRepo/generate (1), "
                 + "not included here"), note);
         // And only when a branch was actually dropped, or it is noise on every other lookup.
         Assert.assertNull(clientNote(github, "repos"), "no fork was walked into yet");
@@ -464,7 +497,7 @@ public class ViewsTest {
         // answer — "no `caches` under `repos/{owner}/{repo}`" — is correct and costs a round trip.
         DiscoverResult.ResourceList resources = as(DiscoverResult.ResourceList.class,
                 clientAnswer(FixtureCorpus.loadedFixture("ballerinax__github"), "repos/owner/repo/caches"));
-        Assert.assertEquals(resources.note(), "relocated to `repos/:owner/:repo/actions/caches` — the only "
+        Assert.assertEquals(resources.note(), "relocated to repos/:owner/:repo/actions/caches — the only "
                 + "match for that segment under the requested prefix");
         Assert.assertTrue(resources.resources().stream()
                         .anyMatch(resource -> resource.path().equals("repos/:owner/:repo/actions/caches")),

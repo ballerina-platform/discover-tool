@@ -355,7 +355,8 @@ public class CliTest {
         Assert.assertTrue(json.stdout().contains("\"call\":\"bal discover ballerinax/kafka client\""), json.stdout());
 
         Capture text = run(List.of("ballerinax/kafka", "funcs"), "ballerinax__kafka", "4.6.5", true);
-        Assert.assertTrue(text.stdout().startsWith("funcs: none in this package\nElsewhere: client ("),
+        Assert.assertTrue(text.stdout().startsWith("funcs: none in this package\nElsewhere:\n"
+                        + "  client (3): bal discover ballerinax/kafka client\n"),
                 text.stdout());
     }
 
@@ -459,7 +460,7 @@ public class CliTest {
         Assert.assertEquals(json.get("shown").getAsInt(), json.get("total").getAsInt());
 
         String text = run(argv, "ballerina__http", "2.16.6", true).stdout();
-        Assert.assertTrue(text.startsWith("Resources (->):\n"), text);
+        Assert.assertTrue(text.startsWith("Container: Client\nResources (->):\n"), text);
         Assert.assertTrue(text.contains("\nRemote (->): "), text);
         Assert.assertTrue(text.contains("\nNormal (.): "), text);
     }
@@ -477,7 +478,7 @@ public class CliTest {
 
         String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
         Assert.assertTrue(text.startsWith("Nothing on Producer matches 'sendd'.\nDid you mean: "), text);
-        Assert.assertTrue(text.contains("\nAvailable:\nMethods: "), text);
+        Assert.assertTrue(text.contains("\nAvailable:\nContainer: Producer\nMethods: "), text);
     }
 
     @Test
