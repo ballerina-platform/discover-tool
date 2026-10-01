@@ -57,6 +57,18 @@ public sealed interface DiscoverResult {
     record Method(String name, String call) { }
 
     /**
+     * Entries a {@code --filter} matched only in their documentation, not in any name, path, parameter or type —
+     * under the same entry ceiling as every listing, since a common word can match most of a package.
+     *
+     * @param names the names shown, up to the ceiling
+     * @param total how many matched that way
+     */
+    record Documented(List<String> names, int total) {
+
+        public static final Documented NONE = new Documented(List.of(), 0);
+    }
+
+    /**
      * A package's (or a targeted module's) own top-level buckets — the answer to a bare
      * {@code bal discover <org/name>} with no bucket and no selector.
      *
@@ -295,7 +307,7 @@ public sealed interface DiscoverResult {
     record Signature(
             String container, String kind, String name, String accessor, String path, String form,
             String declaration, List<Parameter> params, String returns, boolean deprecated,
-            List<Type> types, List<String> omitted, List<String> documented, String warning, String note)
+            List<Type> types, List<String> omitted, Documented documented, String warning, String note)
             implements DiscoverResult {
 
         /**
@@ -330,13 +342,14 @@ public sealed interface DiscoverResult {
      * @param total how many exist across all three
      * @param paging which page this is, or {@code null} when the whole listing fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
-     * @param documented entries a {@code --filter} matched only in their documentation
+     * @param documented entries a {@code --filter} matched only in their documentation — on the first page only,
+     *     since they are not part of the paged sequence
      * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the same joined advisory {@link ResourceList#note} carries, or {@code null}
      */
     record MixedListing(
             String container, List<ResourceList.Resource> resources, List<Method> remote, List<Method> normal,
-            Counts counts, int shown, int total, Paging paging, String next, List<String> documented,
+            Counts counts, int shown, int total, Paging paging, String next, Documented documented,
             String warning, String note) implements DiscoverResult {
 
         /**
@@ -363,7 +376,7 @@ public sealed interface DiscoverResult {
      */
     record NoMatch(
             String requested, String container, List<String> candidates, List<Alternative> paths,
-            DiscoverResult available, String next, List<String> documented, String warning, String note)
+            DiscoverResult available, String next, Documented documented, String warning, String note)
             implements DiscoverResult {
 
         /**

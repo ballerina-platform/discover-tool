@@ -451,7 +451,7 @@ public class DiscoverResultRenderingTest {
                 List.of(new DiscoverResult.Signature.Parameter("headers", "map<string|string[]>", "{}", null, ""),
                         new DiscoverResult.Signature.Parameter(
                                 "queries", "GistsListPublicQueries", null, "inclusion", "Queries to send")),
-                "BaseGist[]|error", false, types, omitted, List.of(), null, note);
+                "BaseGist[]|error", false, types, omitted, DiscoverResult.Documented.NONE, null, note);
     }
 
     @Test
@@ -518,7 +518,8 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MixedListing("Client",
                 List.of(resource(":...path", HTTP + " :...path", "get", "post")),
                 methods(HTTP, "execute", "get"), methods(HTTP, "getCookieStore"),
-                new DiscoverResult.MixedListing.Counts(1, 2, 1), 4, 4, null, null, List.of(), null, null);
+                new DiscoverResult.MixedListing.Counts(1, 2, 1), 4, 4, null, null, DiscoverResult.Documented.NONE, null,
+                null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "1 resource path, 2 remote methods, 1 normal method",
@@ -555,7 +556,8 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MixedListing(null,
                 List.of(), methods("bal discover pkg client Client", "execute"),
                 methods("bal discover pkg client Client", "'close"), new DiscoverResult.MixedListing.Counts(0, 2, 2),
-                2, 4, new DiscoverResult.Paging(1, 2, 2), next, List.of("forward"), null, null);
+                2, 4, new DiscoverResult.Paging(1, 2, 2), next, new DiscoverResult.Documented(List.of("forward"), 3),
+                null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 remote methods, 2 normal methods",
                 "",
@@ -565,7 +567,7 @@ public class DiscoverResultRenderingTest {
                 "Normal (.)",
                 "  'close  bal discover pkg client Client \"'close\"",
                 "",
-                "Matched by documentation only",
+                "Matched by documentation only (1 of 3)",
                 "  forward",
                 "",
                 "... 2 more (page 1 of 2)",
@@ -577,6 +579,7 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.get("page").getAsInt(), 1);
         Assert.assertEquals(json.get("pages").getAsInt(), 2);
         Assert.assertEquals(json.getAsJsonArray("documented").get(0).getAsString(), "forward");
+        Assert.assertEquals(json.get("documentedTotal").getAsInt(), 3);
         Assert.assertFalse(json.has("resources"), "a section with nothing on this page is omitted");
         Assert.assertEquals(json.getAsJsonObject("counts").toString(), "{\"remote\":2,\"normal\":2}",
                 "the whole listing's split, a form with none omitted");
@@ -592,7 +595,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.NoMatch("sendd", "Producer", List.of("send"), List.of(),
                 new DiscoverResult.MethodList(methods("bal discover ballerinax/kafka client Producer", "close", "send"),
                         2, 2, null),
-                "bal discover ballerinax/kafka client Producer", List.of(), null, null);
+                "bal discover ballerinax/kafka client Producer", DiscoverResult.Documented.NONE, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Producer",
                 "Nothing on Producer matches 'sendd'.",
@@ -624,7 +627,7 @@ public class DiscoverResultRenderingTest {
                                 "bal discover ballerinax/github client Client repos/:owner/:repo/actions/secrets"),
                         new DiscoverResult.NoMatch.Alternative("repos/:owner/:repo/dependabot/secrets",
                                 "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets")),
-                null, "bal discover ballerinax/github client Client", List.of(), null, null);
+                null, "bal discover ballerinax/github client Client", DiscoverResult.Documented.NONE, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "Nothing on Client matches 'repos/owner/repo/secrets'.",
