@@ -409,8 +409,9 @@ public class CliTest {
     }
 
     /**
-     * The RFC's own worked example: every single-accessor entry under github's {@code gists} carries a {@code call},
-     * and running it opens exactly that resource's signature — never the listing it came from again.
+     * The RFC's own worked example: every entry under github's {@code gists} carries a {@code calls} object, one
+     * command per accessor in {@code accessors} order and never a flat {@code call}, and running each opens exactly
+     * that resource and accessor's signature — never the listing it came from again.
      */
     @Test
     public void everyResourceCallOpensExactlyThatSignature() {
@@ -423,20 +424,26 @@ public class CliTest {
             JsonArray resources = JsonParser.parseString(run(argv, listing[1], "1.0.0", false).stdout())
                     .getAsJsonObject().getAsJsonArray("resources");
             int followed = 0;
+            boolean several = false;
             for (JsonElement element : resources) {
                 JsonObject resource = element.getAsJsonObject();
-                if (!resource.has("call")) {
-                    continue;
+                Assert.assertFalse(resource.has("call"), resource.toString());
+                JsonObject calls = resource.getAsJsonObject("calls");
+                List<String> accessors = new java.util.ArrayList<>();
+                resource.getAsJsonArray("accessors").forEach(accessor -> accessors.add(accessor.getAsString()));
+                Assert.assertEquals(List.copyOf(calls.keySet()), accessors, resource.toString());
+                several |= accessors.size() > 1;
+                for (String accessor : accessors) {
+                    List<String> call = argv(calls.get(accessor).getAsString());
+                    JsonObject signature = JsonParser.parseString(run(call, listing[1], "1.0.0", false).stdout())
+                            .getAsJsonObject();
+                    Assert.assertEquals(signature.get("path").getAsString(), resource.get("path").getAsString(),
+                            String.join(" ", call));
+                    Assert.assertEquals(signature.get("accessor").getAsString(), accessor, String.join(" ", call));
+                    followed++;
                 }
-                List<String> call = argv(resource.get("call").getAsString());
-                JsonObject signature = JsonParser.parseString(run(call, listing[1], "1.0.0", false).stdout())
-                        .getAsJsonObject();
-                Assert.assertEquals(signature.get("path").getAsString(), resource.get("path").getAsString(),
-                        String.join(" ", call));
-                Assert.assertEquals(signature.get("accessor").getAsString(),
-                        resource.getAsJsonArray("accessors").get(0).getAsString(), String.join(" ", call));
-                followed++;
             }
+            Assert.assertTrue(several, String.join(" ", argv) + " listed no multi-accessor path");
             Assert.assertTrue(followed > 0, String.join(" ", argv) + " printed no call");
         }
     }

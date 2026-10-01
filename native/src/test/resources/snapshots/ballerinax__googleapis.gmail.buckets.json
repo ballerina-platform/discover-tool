@@ -2,79 +2,79 @@
 {"path":"users/:userId/drafts","accessors":[
 "get",
 "post"
-]},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/drafts get","post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/drafts post"}},
 {"path":"users/:userId/drafts/send","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/drafts/send post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/drafts/send post"}},
 {"path":"users/:userId/drafts/:id","accessors":[
 "get",
 "put",
 "delete"
-]},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/drafts/:id get","put":"bal discover ballerinax/googleapis.gmail client Client users/:userId/drafts/:id put","delete":"bal discover ballerinax/googleapis.gmail client Client users/:userId/drafts/:id delete"}},
 {"path":"users/:userId/history","accessors":[
 "get"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/history get"},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/history get"}},
 {"path":"users/:userId/labels","accessors":[
 "get",
 "post"
-]},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/labels get","post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/labels post"}},
 {"path":"users/:userId/labels/:id","accessors":[
 "get",
 "put",
 "delete",
 "patch"
-]},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/labels/:id get","put":"bal discover ballerinax/googleapis.gmail client Client users/:userId/labels/:id put","delete":"bal discover ballerinax/googleapis.gmail client Client users/:userId/labels/:id delete","patch":"bal discover ballerinax/googleapis.gmail client Client users/:userId/labels/:id patch"}},
 {"path":"users/:userId/messages","accessors":[
 "get",
 "post"
-]},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages get","post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages post"}},
 {"path":"users/:userId/messages/batchDelete","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/batchDelete post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/batchDelete post"}},
 {"path":"users/:userId/messages/batchModify","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/batchModify post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/batchModify post"}},
 {"path":"users/:userId/messages/'import","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client \"users/:userId/messages/'import\" post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client \"users/:userId/messages/'import\" post"}},
 {"path":"users/:userId/messages/send","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/send post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/send post"}},
 {"path":"users/:userId/messages/:id","accessors":[
 "get",
 "delete"
-]},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:id get","delete":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:id delete"}},
 {"path":"users/:userId/messages/:id/modify","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:id/modify post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:id/modify post"}},
 {"path":"users/:userId/messages/:id/trash","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:id/trash post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:id/trash post"}},
 {"path":"users/:userId/messages/:id/untrash","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:id/untrash post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:id/untrash post"}},
 {"path":"users/:userId/messages/:messageId/attachments/:id","accessors":[
 "get"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:messageId/attachments/:id get"},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/messages/:messageId/attachments/:id get"}},
 {"path":"users/:userId/profile","accessors":[
 "get"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/profile get"},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/profile get"}},
 {"path":"users/:userId/threads","accessors":[
 "get"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads get"},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads get"}},
 {"path":"users/:userId/threads/:id","accessors":[
 "get",
 "delete"
-]},
+],"calls":{"get":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads/:id get","delete":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads/:id delete"}},
 {"path":"users/:userId/threads/:id/modify","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads/:id/modify post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads/:id/modify post"}},
 {"path":"users/:userId/threads/:id/trash","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads/:id/trash post"},
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads/:id/trash post"}},
 {"path":"users/:userId/threads/:id/untrash","accessors":[
 "post"
-],"call":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads/:id/untrash post"}
+],"calls":{"post":"bal discover ballerinax/googleapis.gmail client Client users/:userId/threads/:id/untrash post"}}
 ],"shown":22,"total":22}
 {"bucket":"service","total":0,"elsewhere":[
 {"bucket":"client","count":1,"call":"bal discover ballerinax/googleapis.gmail client"}

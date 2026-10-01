@@ -1039,10 +1039,9 @@ public final class Containers {
         }
         List<DiscoverResult.ResourceList.Resource> resources = new ArrayList<>();
         accessorsByPath.forEach((path, accessors) -> {
-            // A `call` field only where it is unambiguous — exactly one accessor. A flat field on a
-            // multi-accessor path would have to guess which one, which this design refuses to do.
-            String call = accessors.size() == 1 ? base + " " + shellWord(path) + " " + accessors.get(0) : null;
-            resources.add(new DiscoverResult.ResourceList.Resource(path, List.copyOf(accessors), call));
+            Map<String, String> calls = new LinkedHashMap<>();
+            accessors.forEach(accessor -> calls.put(accessor, base + " " + shellWord(path) + " " + accessor));
+            resources.add(new DiscoverResult.ResourceList.Resource(path, accessors, calls));
         });
         return List.copyOf(resources);
     }

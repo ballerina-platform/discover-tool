@@ -24,7 +24,9 @@ import com.google.gson.JsonParser;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The two renderers driven directly against {@link DiscoverResult}, independent of the CLI layer — one source,
@@ -246,8 +248,7 @@ public class DiscoverResultRenderingTest {
     public void operationsEndingAtTheGroupedPrefixAreListedBesideTheGroupsNotAsAGroupOfTheirOwn() {
         String client = "bal discover ballerinax/github client Client";
         DiscoverResult result = new DiscoverResult.PathGroups("Client",
-                List.of(new DiscoverResult.ResourceList.Resource(
-                        "repos/:owner/:repo", List.of("get", "patch", "delete"), null)),
+                List.of(resource("repos/:owner/:repo", client + " repos/:owner/:repo", "get", "patch", "delete")),
                 List.of(new DiscoverResult.PathGroups.Group("repos/actions", 38, client + " repos/actions get")),
                 2, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
@@ -260,6 +261,7 @@ public class DiscoverResultRenderingTest {
                 "Groups (operations under each)",
                 "  repos/actions  38",
                 "",
+                "Next: bal discover ballerinax/github client Client <path> <accessor>",
                 "Next: bal discover ballerinax/github client Client <group> get"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
@@ -275,13 +277,13 @@ public class DiscoverResultRenderingTest {
     // -----------------------------------------------------------------------
 
     @Test
-    public void resourceListOmitsCallOnlyOnMultiAccessorEntries() {
+    public void everyResourceRowCarriesOneCommandPerAccessorAndNeverAFlatCall() {
+        String client = "bal discover ballerinax/github client";
         DiscoverResult result = new DiscoverResult.ResourceList(
                 List.of(
-                        new DiscoverResult.ResourceList.Resource("gists", List.of("get", "post"), null),
-                        new DiscoverResult.ResourceList.Resource("gists/:gistId", List.of("get", "delete"), null),
-                        new DiscoverResult.ResourceList.Resource("gists/starred", List.of("get"),
-                                "bal discover ballerinax/github client gists/starred get")),
+                        resource("gists", client + " gists", "get", "post"),
+                        resource("gists/:gistId", client + " gists/:gistId", "get", "delete"),
+                        resource("gists/starred", client + " gists/starred", "get")),
                 3, 3, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "3 resource paths",
@@ -294,25 +296,31 @@ public class DiscoverResultRenderingTest {
 
         JsonArray resources = JsonParser.parseString(JsonRenderer.render(result))
                 .getAsJsonObject().getAsJsonArray("resources");
-        Assert.assertFalse(resources.get(0).getAsJsonObject().has("call"), "gists has two accessors");
-        Assert.assertFalse(resources.get(1).getAsJsonObject().has("call"), "gists/:gistId has two accessors");
-        Assert.assertTrue(resources.get(2).getAsJsonObject().has("call"), "gists/starred has exactly one");
+        Assert.assertEquals(resources.get(1).toString(),
+                "{\"path\":\"gists/:gistId\",\"accessors\":[\"get\",\"delete\"],\"calls\":{"
+                        + "\"get\":\"" + client + " gists/:gistId get\","
+                        + "\"delete\":\"" + client + " gists/:gistId delete\"}}");
+        Assert.assertEquals(resources.get(2).getAsJsonObject().getAsJsonObject("calls").toString(),
+                "{\"get\":\"" + client + " gists/starred get\"}");
+        for (int i = 0; i < resources.size(); i++) {
+            Assert.assertFalse(resources.get(i).getAsJsonObject().has("call"), resources.get(i).toString());
+        }
     }
 
     @Test
     public void aRowWhoseCommandTheSharedShapeCannotSpellCarriesItsOwn() {
         String client = "bal discover ballerinax/github client Client";
         DiscoverResult result = new DiscoverResult.ResourceList(
-                List.of(new DiscoverResult.ResourceList.Resource("gists/starred", List.of("get"),
-                                client + " gists/starred get"),
-                        new DiscoverResult.ResourceList.Resource("gists/'public", List.of("get"),
-                                client + " \"gists/'public\" get")),
-                2, 2, null);
+                List.of(resource("gists/starred", client + " gists/starred", "get"),
+                        resource("gists/'public", client + " \"gists/'public\"", "get"),
+                        resource("gists/'private", client + " \"gists/'private\"", "get", "post")),
+                3, 3, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
-                "2 resource paths",
+                "3 resource paths",
                 "",
-                "  gists/starred  get",
-                "  gists/'public  get  " + client + " \"gists/'public\" get",
+                "  gists/starred   get",
+                "  gists/'public   get        " + client + " \"gists/'public\" get",
+                "  gists/'private  get, post  " + client + " \"gists/'private\" <accessor>",
                 "",
                 "Next: " + client + " <path> <accessor>"));
     }
@@ -502,7 +510,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aMixedListingIsSectionedByCallFormInTextAndThreeArraysInJson() {
         DiscoverResult result = new DiscoverResult.MixedListing("Client",
-                List.of(new DiscoverResult.ResourceList.Resource(":...path", List.of("get", "post"), null)),
+                List.of(resource(":...path", null, "get", "post")),
                 List.of("execute", "get"), List.of("getCookieStore"), 4, 4, null, List.of(), null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
@@ -658,6 +666,17 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(client.get("bucket").getAsString(), "client");
         Assert.assertEquals(client.get("count").getAsInt(), 3);
         Assert.assertEquals(client.get("call").getAsString(), "bal discover ballerinax/kafka client");
+    }
+
+    /** A resource row whose command for each accessor is {@code prefix} and the accessor, or none when null. */
+    private static DiscoverResult.ResourceList.Resource resource(String path, String prefix, String... accessors) {
+        Map<String, String> calls = new LinkedHashMap<>();
+        if (prefix != null) {
+            for (String accessor : accessors) {
+                calls.put(accessor, prefix + " " + accessor);
+            }
+        }
+        return new DiscoverResult.ResourceList.Resource(path, List.of(accessors), calls);
     }
 
     private static String lines(String... lines) {

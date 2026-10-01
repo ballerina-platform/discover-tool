@@ -29,10 +29,10 @@ import java.util.Map;
  * <p>Every answer has the same frame: a header naming where the caller is ({@code ballerinax/github · client ·
  * Client}) and a count line, then the entries one per line in aligned columns, grouped under plain headings, then
  * a footer holding the notes, how much was left out and the {@code Next:} commands. Where the JSON rendering gives
- * every row its own {@code call}, a large listing prints the shared shape of those commands once in the footer
- * instead; a row whose command does not fit that shape (a name that needs shell quoting, a group opened without
- * the listing's accessor) carries its own. No colour and no wrapping, so the output stays as greppable as the
- * JSON.
+ * every row its own {@code call} (a resource row its {@code calls}, one per accessor), a large listing prints the
+ * shared shape of those commands once in the footer instead; a row whose command does not fit that shape (a name
+ * that needs shell quoting, a group opened without the listing's accessor) carries its own. No colour and no
+ * wrapping, so the output stays as greppable as the JSON.
  *
  * @since 0.1.0
  */
@@ -369,19 +369,38 @@ public final class TextRenderer {
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
         for (int i = 0; i < resources.size(); i++) {
             DiscoverResult.ResourceList.Resource resource = resources.get(i);
-            table.row(resource.path(), String.join(", ", resource.accessors()), drill.explicit(i));
+            table.row(resource.path(), String.join(", ", resource.accessors()), ownCommand(drill.unfit(i)));
         }
         return table;
     }
 
-    /** Only a single-accessor path carries a {@code call}, so only those rows teach the command's shape. */
+    /**
+     * Every accessor's command teaches the shape, a multi-accessor row's as much as a single one's — the
+     * {@code <path> <accessor>} pair is what a row's own name fills.
+     */
     private static Drill resourceDrill(List<DiscoverResult.ResourceList.Resource> resources) {
-        return Drill.of(
-                resources.stream()
-                        .map(resource -> resource.path() + " " + String.join(" ", resource.accessors()))
-                        .toList(),
-                resources.stream().map(DiscoverResult.ResourceList.Resource::call).toList(),
-                "<path> <accessor>");
+        List<List<String>> literals = new ArrayList<>();
+        List<List<String>> calls = new ArrayList<>();
+        for (DiscoverResult.ResourceList.Resource resource : resources) {
+            literals.add(resource.calls().keySet().stream().map(accessor -> resource.path() + " " + accessor)
+                    .toList());
+            calls.add(List.copyOf(resource.calls().values()));
+        }
+        return Drill.ofRows(literals, calls, "<path> <accessor>");
+    }
+
+    /**
+     * A resource row's commands the shared shape cannot spell (its path needs quoting): one is printed whole;
+     * several differ only in their accessor, which the row already lists, so they print once with that slot open.
+     */
+    private static String ownCommand(List<String> unfit) {
+        if (unfit.size() < 2) {
+            return unfit.isEmpty() ? null : unfit.get(0);
+        }
+        String prefix = unfit.get(0).substring(0, unfit.get(0).lastIndexOf(' '));
+        boolean shared = unfit.stream().allMatch(call -> call.lastIndexOf(' ') == prefix.length()
+                && call.startsWith(prefix));
+        return shared ? prefix + " <accessor>" : String.join("  ", unfit);
     }
 
     private static TextTable names(List<String> names) {
@@ -412,41 +431,51 @@ public final class TextRenderer {
 
     /**
      * The one command shape a listing's per-row {@code call}s share — the row's own name swapped for a
-     * placeholder — and, for each row, its command only where substituting its name into that shape would not
-     * reproduce it exactly.
+     * placeholder — and, for each row, its commands only where substituting its name into that shape would not
+     * reproduce them exactly.
      *
      * @param pattern the shared command shape, or {@code null} when no row carries a command
-     * @param explicit per row, its own command where the shape cannot spell it, else {@code null}
+     * @param unfit per row, the commands the shape cannot spell, in order
      */
-    private record Drill(String pattern, List<String> explicit) {
+    private record Drill(String pattern, List<List<String>> unfit) {
 
         static Drill of(List<String> literals, List<String> calls, String placeholder) {
+            return ofRows(literals.stream().map(List::of).toList(),
+                    calls.stream().map(call -> call == null ? List.<String>of() : List.of(call)).toList(),
+                    placeholder);
+        }
+
+        /** Each row with any number of commands, {@code literals} naming each one in the same order. */
+        static Drill ofRows(List<List<String>> literals, List<List<String>> calls, String placeholder) {
             Map<String, Integer> shapes = new LinkedHashMap<>();
-            for (int i = 0; i < calls.size(); i++) {
-                String shape = shapeOf(calls.get(i), literals.get(i), placeholder);
-                if (shape != null) {
-                    shapes.merge(shape, 1, Integer::sum);
+            for (int row = 0; row < calls.size(); row++) {
+                for (int i = 0; i < calls.get(row).size(); i++) {
+                    String shape = shapeOf(calls.get(row).get(i), literals.get(row).get(i), placeholder);
+                    if (shape != null) {
+                        shapes.merge(shape, 1, Integer::sum);
+                    }
                 }
             }
             String pattern = shapes.entrySet().stream()
                     .reduce((best, candidate) -> candidate.getValue() > best.getValue() ? candidate : best)
                     .map(Map.Entry::getKey)
                     .orElse(null);
-            List<String> explicit = new ArrayList<>();
-            for (int i = 0; i < calls.size(); i++) {
-                String call = calls.get(i);
-                boolean fits = pattern != null && call != null
-                        && call.equals(pattern.replace(placeholder, literals.get(i)));
-                explicit.add(call == null || fits ? null : call);
+            List<List<String>> unfit = new ArrayList<>();
+            for (int row = 0; row < calls.size(); row++) {
+                List<String> own = new ArrayList<>();
+                for (int i = 0; i < calls.get(row).size(); i++) {
+                    String call = calls.get(row).get(i);
+                    if (pattern == null || !call.equals(pattern.replace(placeholder, literals.get(row).get(i)))) {
+                        own.add(call);
+                    }
+                }
+                unfit.add(List.copyOf(own));
             }
-            return new Drill(pattern, explicit);
+            return new Drill(pattern, List.copyOf(unfit));
         }
 
         /** {@code call} with its last whole-word occurrence of {@code literal} replaced, or {@code null}. */
         private static String shapeOf(String call, String literal, String placeholder) {
-            if (call == null) {
-                return null;
-            }
             String needle = " " + literal;
             for (int at = call.lastIndexOf(needle); at >= 0; at = call.lastIndexOf(needle, at - 1)) {
                 int end = at + needle.length();
@@ -457,8 +486,13 @@ public final class TextRenderer {
             return null;
         }
 
+        List<String> unfit(int row) {
+            return unfit.get(row);
+        }
+
+        /** A single-command row's own command where the shape cannot spell it, else {@code null}. */
         String explicit(int row) {
-            return explicit.get(row);
+            return unfit.get(row).isEmpty() ? null : unfit.get(row).get(0);
         }
     }
 

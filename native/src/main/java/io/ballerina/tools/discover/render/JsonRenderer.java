@@ -226,7 +226,11 @@ public final class JsonRenderer {
             JsonObject entry = new JsonObject();
             entry.addProperty("path", resource.path());
             entry.add("accessors", strings(resource.accessors()));
-            addIfPresent(entry, "call", resource.call());
+            if (!resource.calls().isEmpty()) {
+                JsonObject calls = new JsonObject();
+                resource.calls().forEach(calls::addProperty);
+                entry.add("calls", calls);
+            }
             array.add(entry);
         }
         return array;

@@ -52,9 +52,9 @@ import java.util.regex.Pattern;
  * followed it ran the same wrong shape again.
  *
  * <p>All three are the same defect, and this is the general form of the test: extract every {@code bal discover}
- * command a bucket can print — read off every answer's own {@code call}/{@code next} fields — run it through the
- * real CLI against the recorded payload, and require exit 0 with something other than "nothing matched". A new
- * pointer cannot be added wrong.
+ * command a bucket can print — read off every answer's own {@code call}/{@code calls}/{@code next} fields — run
+ * it through the real CLI against the recorded payload, and require exit 0 with something other than "nothing
+ * matched". A new pointer cannot be added wrong.
  *
  * <p>Two exclusions, both principled. A command containing an angle-bracket slot is a TEMPLATE — {@code <Name>} or
  * {@code <keyword>} is the grammar, not an argument — and a command naming a DIFFERENT package is a cross-package
@@ -86,39 +86,42 @@ public class PointersTest {
     }
 
     /**
-     * Every command a fixture's buckets can print, from every shape a bucket query can produce, plus every shape
+     * Every answer a fixture's buckets give, from every shape a bucket query can produce, plus every shape
      * {@code readme} can answer with.
      *
      * <p>Deliberately the same breadth {@code RegisterTest} uses: a pointer printed only by the roster of a
      * package with 91 classes is exactly the one nobody checks by hand.
      */
-    private static List<String> commandsOf(LoadedPackage context) {
-        List<String> commands = new ArrayList<>();
+    private static List<DiscoverResult> answersOf(LoadedPackage context) {
+        List<DiscoverResult> answers = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
-            commands.addAll(commandsOf(expect(Containers.render(context, scope, Containers.Options.bare()))));
-            commands.addAll(commandsOf(expect(Containers.render(context, scope,
-                    new Containers.Options(List.of(), "config", 1)))));
+            answers.add(expect(Containers.render(context, scope, Containers.Options.bare())));
+            answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of(), "config", 1))));
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 if (container.isModule()) {
                     continue;
                 }
-                commands.addAll(commandsOf(expect(Containers.render(context, scope,
-                        new Containers.Options(List.of(container.name()))))));
-                commands.addAll(commandsOf(expect(Containers.render(context, scope,
-                        new Containers.Options(List.of(container.name(), "zzznosuchmember"))))));
+                answers.add(expect(Containers.render(context, scope,
+                        new Containers.Options(List.of(container.name())))));
+                answers.add(expect(Containers.render(context, scope,
+                        new Containers.Options(List.of(container.name(), "zzznosuchmember")))));
                 for (List<String> selector : narrowingSelectors(container)) {
-                    commands.addAll(commandsOf(expect(Containers.render(context, scope,
-                            new Containers.Options(selector)))));
+                    answers.add(expect(Containers.render(context, scope, new Containers.Options(selector))));
                 }
             }
         }
 
-        commands.addAll(commandsOf(expect(Readme.render(context, Readme.Options.BARE))));
-        commands.addAll(commandsOf(expect(Readme.render(context, new Readme.Options(null, "config", 1)))));
+        answers.add(expect(Readme.render(context, Readme.Options.BARE)));
+        answers.add(expect(Readme.render(context, new Readme.Options(null, "config", 1))));
         for (Readme.Chunk chunk : Readme.chunksOf(context)) {
-            commands.addAll(commandsOf(expect(
-                    Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1)))));
+            answers.add(expect(Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1))));
         }
+        return answers;
+    }
+
+    private static List<String> commandsOf(LoadedPackage context) {
+        List<String> commands = new ArrayList<>();
+        answersOf(context).forEach(answer -> commands.addAll(commandsOf(answer)));
         return commands;
     }
 
@@ -147,11 +150,12 @@ public class PointersTest {
                 addIfPresent(commands, roster.next());
             }
             case DiscoverResult.PathGroups groups -> {
+                groups.resources().forEach(resource -> commands.addAll(resource.calls().values()));
                 groups.groups().forEach(group -> commands.add(group.call()));
                 addIfPresent(commands, groups.next());
             }
             case DiscoverResult.ResourceList resources -> {
-                resources.resources().forEach(resource -> addIfPresent(commands, resource.call()));
+                resources.resources().forEach(resource -> commands.addAll(resource.calls().values()));
                 addIfPresent(commands, resources.next());
             }
             case DiscoverResult.MethodList methods -> addIfPresent(commands, methods.next());
@@ -166,7 +170,7 @@ public class PointersTest {
                 // The end of a drill-down: nothing further to open.
             }
             case DiscoverResult.MixedListing mixed -> {
-                mixed.resources().forEach(resource -> addIfPresent(commands, resource.call()));
+                mixed.resources().forEach(resource -> commands.addAll(resource.calls().values()));
                 addIfPresent(commands, mixed.next());
             }
             case DiscoverResult.NoMatch noMatch -> {
@@ -241,6 +245,45 @@ public class PointersTest {
     }
 
     /**
+     * Every resource row's {@code calls}, one per accessor, opens exactly that path and accessor's signature — the
+     * end of the drill-down, never another listing. A multi-accessor row is followed accessor by accessor, the
+     * same as a single-accessor one.
+     */
+    @Test(dataProvider = "fixtures")
+    public void everyResourceRowsCallsOpenTheirOwnSignatures(String slug) {
+        LoadedPackage context = FixtureCorpus.loadedFixture(slug);
+        HttpOptions http = centralFor(slug);
+        Set<String> seen = new LinkedHashSet<>();
+        for (DiscoverResult answer : answersOf(context)) {
+            for (DiscoverResult.ResourceList.Resource resource : resourcesOf(answer)) {
+                Assert.assertEquals(List.copyOf(resource.calls().keySet()), resource.accessors(),
+                        slug + ": " + resource);
+                resource.calls().forEach((accessor, call) -> {
+                    if (!seen.add(call)) {
+                        return;
+                    }
+                    JsonObject signature = run(slug, http, call);
+                    Assert.assertEquals(signature.has("declaration") ? signature.get("kind").getAsString() : null,
+                            "resource", slug + ": `" + call + "` is not a signature:\n" + signature);
+                    Assert.assertEquals(signature.get("path").getAsString(), resource.path(), call);
+                    Assert.assertEquals(signature.get("accessor").getAsString(), accessor, call);
+                });
+            }
+        }
+    }
+
+    private static List<DiscoverResult.ResourceList.Resource> resourcesOf(DiscoverResult answer) {
+        return switch (answer) {
+            case DiscoverResult.PathGroups groups -> groups.resources();
+            case DiscoverResult.ResourceList resources -> resources.resources();
+            case DiscoverResult.MixedListing mixed -> mixed.resources();
+            case DiscoverResult.NoMatch noMatch -> noMatch.available() == null ? List.of()
+                    : resourcesOf(noMatch.available());
+            default -> List.of();
+        };
+    }
+
+    /**
      * Whether a printed command can be run against this fixture — asserting the shape of the two kinds that
      * cannot, so an exclusion cannot become a hiding place.
      */
@@ -261,8 +304,8 @@ public class PointersTest {
         return true;
     }
 
-    /** Runs one printed command and returns every command its own answer prints. */
-    private static List<String> followed(String slug, HttpOptions http, String text) {
+    /** Runs one printed command, requiring an answer that is not "nothing matched". */
+    private static JsonObject run(String slug, HttpOptions http, String text) {
         StringBuilder out = new StringBuilder();
         StringBuilder err = new StringBuilder();
         int code = Cli.run(argv(text), new Cli.Streams(out::append, err::append), http);
@@ -272,6 +315,12 @@ public class PointersTest {
         // Exit 0 is not enough on its own: "nothing matched" is an exit-0 answer too, and a pointer that lands
         // on one is exactly the loop this test exists to catch.
         Assert.assertFalse(answer.has("candidates"), slug + ": `" + text + "` matched nothing:\n" + out);
+        return answer;
+    }
+
+    /** Runs one printed command and returns every command its own answer prints. */
+    private static List<String> followed(String slug, HttpOptions http, String text) {
+        JsonObject answer = run(slug, http, text);
         List<String> printed = new ArrayList<>();
         collectCommands(answer, printed);
         return printed;
@@ -285,6 +334,9 @@ public class PointersTest {
                 if ((field.getKey().equals("call") || field.getKey().equals("next"))
                         && field.getValue().isJsonPrimitive()) {
                     into.add(field.getValue().getAsString());
+                } else if (field.getKey().equals("calls") && field.getValue().isJsonObject()) {
+                    field.getValue().getAsJsonObject().entrySet()
+                            .forEach(call -> into.add(call.getValue().getAsString()));
                 } else {
                     collectCommands(field.getValue(), into);
                 }

@@ -243,7 +243,8 @@ public class RegisterTest {
                 String call = row[1];
                 boolean reachable = text.contains(call) || shapes.stream().anyMatch(shape -> shape.contains("<")
                         && call.equals(shape.substring(0, shape.indexOf('<')) + literal
-                                + shape.substring(shape.lastIndexOf('>') + 1)));
+                                + shape.substring(shape.lastIndexOf('>') + 1)))
+                        || row.length > 2 && accessorSlotOnItsRow(text, row[2], call);
                 Assert.assertTrue(reachable, label + "\nmissing: " + call);
             }
             String next = nextOf(answer.result());
@@ -251,6 +252,15 @@ public class RegisterTest {
                 Assert.assertTrue(shapes.contains(next), label + "\nmissing Next: " + next);
             }
         }
+    }
+
+    /**
+     * A resource row whose quoted path the footer's shape cannot spell prints its command once with the accessor
+     * left as a slot — lossless, because the same row lists every accessor that fills it.
+     */
+    private static boolean accessorSlotOnItsRow(String text, String path, String call) {
+        String slotted = call.substring(0, call.lastIndexOf(' ')) + " <accessor>";
+        return text.lines().anyMatch(line -> isRowFor(line, path) && line.endsWith(slotted));
     }
 
     private static boolean isRowFor(String line, String entry) {
@@ -317,18 +327,13 @@ public class RegisterTest {
             case DiscoverResult.ContainerRoster roster -> roster.containers()
                     .forEach(container -> calls.add(new String[] {container.name(), container.call()}));
             case DiscoverResult.PathGroups groups -> {
-                groups.resources().stream().filter(resource -> resource.call() != null).forEach(resource ->
-                        calls.add(new String[] {resource.path() + " " + resource.accessors().get(0), resource.call()}));
+                groups.resources().forEach(resource -> addResourceCalls(calls, resource));
                 groups.groups().forEach(group -> calls.add(new String[] {group.name(), group.call()}));
             }
-            case DiscoverResult.ResourceList resources -> resources.resources().stream()
-                    .filter(resource -> resource.call() != null).forEach(resource ->
-                            calls.add(new String[] {resource.path() + " " + resource.accessors().get(0),
-                                    resource.call()}));
-            case DiscoverResult.MixedListing mixed -> mixed.resources().stream()
-                    .filter(resource -> resource.call() != null).forEach(resource ->
-                            calls.add(new String[] {resource.path() + " " + resource.accessors().get(0),
-                                    resource.call()}));
+            case DiscoverResult.ResourceList resources ->
+                    resources.resources().forEach(resource -> addResourceCalls(calls, resource));
+            case DiscoverResult.MixedListing mixed ->
+                    mixed.resources().forEach(resource -> addResourceCalls(calls, resource));
             case DiscoverResult.NoMatch noMatch -> noMatch.paths()
                     .forEach(alternative -> calls.add(new String[] {alternative.path(), alternative.call()}));
             case DiscoverResult.Owners owners -> owners.owners()
@@ -338,6 +343,12 @@ public class RegisterTest {
             default -> { }
         }
         return calls;
+    }
+
+    /** One row per accessor, named by its path and that accessor, with the row's path as the line it sits on. */
+    private static void addResourceCalls(List<String[]> calls, DiscoverResult.ResourceList.Resource resource) {
+        resource.calls().forEach((accessor, call) ->
+                calls.add(new String[] {resource.path() + " " + accessor, call, resource.path()}));
     }
 
     private static String nextOf(DiscoverResult result) {
