@@ -115,9 +115,12 @@ Next: bal discover ballerina/http service <name>
 
 A service type binds to a listener when it is the type the listener's `attach` takes (resolved through unions
 and type aliases) or includes that type (`*Service;`). Central's docs payload does not publish a service
-type's inclusions, so when some service type is not an `attach` target, `discover` reads the package's own
-source from its published bala, once per version, and caches what it finds. If the source cannot be read, the
-types it would have settled stay listed under the listener, and opening one says the pairing is not confirmed.
+type's inclusions, so when some service type is not an `attach` target, the `service` bucket (and no other)
+reads the package's own source: from the exact version already in your Ballerina home
+(`~/.ballerina/repositories/central.ballerina.io/bala/...`, or under `BALLERINA_HOME_DIR`) when `bal pull` or
+`bal build` put it there, otherwise from the bala Central publishes — once per version, caching what it finds.
+If the source cannot be read, the types it would have settled stay listed under the listener, and opening one
+says the pairing is not confirmed.
 A listener whose `attach` takes another package's type points there:
 
 ```
