@@ -1,14 +1,32 @@
 == client ==
-Caller, Consumer, Producer
+ballerinax/kafka · client
+3 clients
+
+  Caller     3 remote
+  Consumer  24 remote
+  Producer   5 remote
+
+Next: bal discover ballerinax/kafka client <name>
 == service ==
+ballerinax/kafka · service · Service
+No methods.
+
 Note: binds to kafka:Listener
-Container: Service
-Methods: none
 == class ==
-AvroDeserializer, AvroSerializer, Deserializer, Serializer
+ballerinax/kafka · class
+4 classes
+
+  AvroDeserializer  1 normal
+  AvroSerializer    1 normal
+  Deserializer      1 normal
+  Serializer        1 normal
+
+Next: bal discover ballerinax/kafka class <name>
 == funcs ==
-funcs: none in this package
-Elsewhere:
-  client (3): bal discover ballerinax/kafka client
-  service (1): bal discover ballerinax/kafka service
-  class (4): bal discover ballerinax/kafka class
+ballerinax/kafka · funcs
+This package declares nothing in funcs.
+
+Elsewhere
+  client   3  bal discover ballerinax/kafka client
+  service  1  bal discover ballerinax/kafka service
+  class    4  bal discover ballerinax/kafka class

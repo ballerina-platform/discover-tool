@@ -1,16 +1,72 @@
 == client ==
-Container: Client
-Methods: batchExecute, call, close, execute, query, queryRow
+ballerinax/postgresql · client · Client
+6 methods
+
+  batchExecute
+  call
+  close
+  execute
+  query
+  queryRow
 == service ==
-service: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/postgresql client
-  class (125): bal discover ballerinax/postgresql class
+ballerinax/postgresql · service
+This package declares nothing in service.
+
+Elsewhere
+  client    1  bal discover ballerinax/postgresql client
+  class   125  bal discover ballerinax/postgresql class
 == class ==
-BitStringArrayValue, BitStringValue, BoxArrayValue, BoxOutParameter, BoxValue, ByteaOutParameter, CidrArrayValue, CidrOutParameter, CidrValue, CircleArrayValue, CircleOutParameter, CircleValue, CustomResultIterator, CustomTypeValue, DateRangeArrayValue, DateRangeOutParameter, DateRangeValue, EnumOutParameter, EnumValue, InetArrayValue, InetOutParameter, InetValue, InOutParameter, IntegerRangeArrayValue, IntegerRangeOutParameter, IntegerRangeValue, IntervalArrayValue, IntervalOutParameter, IntervalValue, JsonArrayValue, JsonBinaryArrayValue, JsonBinaryValue, JsonbOutParameter, JsonOutParameter, JsonPathArrayValue, JsonPathOutParameter, JsonPathValue, JsonValue, LineArrayValue, LineOutParameter
-... 85 more, narrow further: bal discover ballerinax/postgresql class --filter <keyword>
+ballerinax/postgresql · class
+125 classes
+
+  BitStringArrayValue
+  BitStringValue
+  BoxArrayValue
+  BoxOutParameter           1 normal
+  BoxValue
+  ByteaOutParameter         1 normal
+  CidrArrayValue
+  CidrOutParameter          1 normal
+  CidrValue
+  CircleArrayValue
+  CircleOutParameter        1 normal
+  CircleValue
+  CustomResultIterator      2 normal
+  CustomTypeValue
+  DateRangeArrayValue
+  DateRangeOutParameter     1 normal
+  DateRangeValue
+  EnumOutParameter          1 normal
+  EnumValue
+  InetArrayValue
+  InetOutParameter          1 normal
+  InetValue
+  InOutParameter            1 normal
+  IntegerRangeArrayValue
+  IntegerRangeOutParameter  1 normal
+  IntegerRangeValue
+  IntervalArrayValue
+  IntervalOutParameter      1 normal
+  IntervalValue
+  JsonArrayValue
+  JsonBinaryArrayValue
+  JsonBinaryValue
+  JsonbOutParameter         1 normal
+  JsonOutParameter          1 normal
+  JsonPathArrayValue
+  JsonPathOutParameter      1 normal
+  JsonPathValue
+  JsonValue
+  LineArrayValue
+  LineOutParameter          1 normal
+
+... 85 more, narrow further
+Next: bal discover ballerinax/postgresql class <name>
+Next: bal discover ballerinax/postgresql class --filter <keyword>
 == funcs ==
-funcs: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/postgresql client
-  class (125): bal discover ballerinax/postgresql class
+ballerinax/postgresql · funcs
+This package declares nothing in funcs.
+
+Elsewhere
+  client    1  bal discover ballerinax/postgresql client
+  class   125  bal discover ballerinax/postgresql class

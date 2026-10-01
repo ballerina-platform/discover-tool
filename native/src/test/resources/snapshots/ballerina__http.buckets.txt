@@ -1,9 +1,89 @@
 == client ==
-ClientObject, StatusCodeClientObject, Caller, Client, ClientOAuth2Handler, FailoverClient, ListenerLdapUserStoreBasicAuthHandler, ListenerOAuth2Handler, LoadBalanceClient, StatusCodeClient
+ballerina/http · client
+10 clients
+
+  ClientObject                           7 resources  15 remote
+  StatusCodeClientObject                 7 resources  15 remote
+  Caller                                               5 remote  1 normal
+  Client                                 7 resources  15 remote  4 normal
+  ClientOAuth2Handler                                  1 remote  2 normal
+  FailoverClient                         7 resources  15 remote  1 normal
+  ListenerLdapUserStoreBasicAuthHandler                2 remote
+  ListenerOAuth2Handler                                1 remote
+  LoadBalanceClient                      7 resources  15 remote
+  StatusCodeClient                       7 resources  15 remote  4 normal
+
+Next: bal discover ballerina/http client <name>
 == service ==
-Service (binds to http:Listener), ServiceContract (binds to http:Listener), RequestInterceptor (binds to http:Listener), ResponseInterceptor (binds to http:Listener), RequestErrorInterceptor (binds to http:Listener), ResponseErrorInterceptor (binds to http:Listener), InterceptableService (binds to http:Listener)
+ballerina/http · service
+7 service types
+
+http:Listener
+  Service
+  ServiceContract
+  RequestInterceptor
+  ResponseInterceptor
+  RequestErrorInterceptor
+  ResponseErrorInterceptor
+  InterceptableService      1 normal
+
+Next: bal discover ballerina/http service <name>
 == class ==
-ClientBasicAuthHandler, ClientBearerTokenAuthHandler, ClientSelfSignedJwtAuthHandler, Cookie, CookieStore, CsvPersistentCookieHandler, DefaultStatus, Headers, HttpCache, HttpFuture, ListenerFileUserStoreBasicAuthHandler, ListenerJwtAuthHandler, LoadBalancerRoundRobinRule, PushPromise, Request, RequestCacheControl, RequestContext, Response, ResponseCacheControl, StatusAccepted, StatusAlreadyReported, StatusBadGateway, StatusBadRequest, StatusConflict, StatusContinue, StatusCreated, StatusEarlyHints, StatusExpectationFailed, StatusFailedDependency, StatusForbidden, StatusFound, StatusGatewayTimeout, StatusGone, StatusHttpVersionNotSupported, StatusIMUsed, StatusInsufficientStorage, StatusInternalServerError, StatusLengthRequired, StatusLocked, StatusLoopDetected
-... 43 more, narrow further: bal discover ballerina/http class --filter <keyword>
+ballerina/http · class
+83 classes
+
+  ClientBasicAuthHandler                  3 normal
+  ClientBearerTokenAuthHandler            3 normal
+  ClientSelfSignedJwtAuthHandler          3 normal
+  Cookie                                  3 normal
+  CookieStore                            10 normal
+  CsvPersistentCookieHandler              4 normal
+  DefaultStatus
+  Headers                                 4 normal
+  HttpCache
+  HttpFuture
+  ListenerFileUserStoreBasicAuthHandler   2 normal
+  ListenerJwtAuthHandler                  2 normal
+  LoadBalancerRoundRobinRule              1 normal
+  PushPromise                             8 normal
+  Request                                34 normal
+  RequestCacheControl                     1 normal
+  RequestContext                          7 normal
+  Response                               35 normal
+  ResponseCacheControl                    2 normal
+  StatusAccepted
+  StatusAlreadyReported
+  StatusBadGateway
+  StatusBadRequest
+  StatusConflict
+  StatusContinue
+  StatusCreated
+  StatusEarlyHints
+  StatusExpectationFailed
+  StatusFailedDependency
+  StatusForbidden
+  StatusFound
+  StatusGatewayTimeout
+  StatusGone
+  StatusHttpVersionNotSupported
+  StatusIMUsed
+  StatusInsufficientStorage
+  StatusInternalServerError
+  StatusLengthRequired
+  StatusLocked
+  StatusLoopDetected
+
+... 43 more, narrow further
+Next: bal discover ballerina/http class <name>
+Next: bal discover ballerina/http class --filter <keyword>
 == funcs ==
-Methods: authenticateResource, createHttpCachingClient, createHttpSecureClient, getDefaultListener, getHeaderMap, getQueryMap, parseHeader
+ballerina/http · funcs
+7 functions
+
+  authenticateResource
+  createHttpCachingClient
+  createHttpSecureClient
+  getDefaultListener
+  getHeaderMap
+  getQueryMap
+  parseHeader

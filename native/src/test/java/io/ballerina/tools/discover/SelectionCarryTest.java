@@ -115,8 +115,8 @@ public class SelectionCarryTest {
     @Test
     public void aLaterPageCountsWhatIsLeftNotWhatWasShownInText() {
         Run text = run("ballerinax__twilio", "bal discover ballerinax/twilio client Client --page 2 --output text");
-        Assert.assertTrue(text.out().contains("\n... 119 more (page 2 of 5), next page: "
-                + "bal discover ballerinax/twilio client Client --page 3\n"), text.out());
+        Assert.assertTrue(text.out().contains("\n... 119 more (page 2 of 5)\n"
+                + "Next: bal discover ballerinax/twilio client Client --page 3\n"), text.out());
     }
 
     @Test
@@ -146,7 +146,7 @@ public class SelectionCarryTest {
         JsonObject service = answer("ballerinax__kafka", "bal discover ballerinax/kafka service");
         Assert.assertEquals(service.get("container").getAsString(), "Service", service.toString());
         Run text = run("ballerinax__kafka", "bal discover ballerinax/kafka service --output text");
-        Assert.assertTrue(text.out().contains("Container: Service\n"), text.out());
+        Assert.assertTrue(text.out().startsWith("ballerinax/kafka · service · Service\n"), text.out());
 
         JsonObject groups = answer("ballerinax__github", "bal discover ballerinax/github client");
         Assert.assertEquals(groups.get("container").getAsString(), "Client", groups.toString());

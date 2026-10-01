@@ -150,8 +150,10 @@ public final class Cli {
             return fail(loaded.failure(), streams);
         }
 
+        TextRenderer.Context where = new TextRenderer.Context(qualified.value().qualified(), root.module, rest,
+                root.filter);
         if (bucket == null) {
-            emit(bucketList(loaded.value()), streams, root.output, interactive);
+            emit(bucketList(loaded.value()), where, streams, root.output, interactive);
             return 0;
         }
 
@@ -165,7 +167,7 @@ public final class Cli {
             if (!readme.isOk()) {
                 return fail(readme.failure(), streams);
             }
-            emit(readme.value(), streams, root.output, interactive);
+            emit(readme.value(), where, streams, root.output, interactive);
             return 0;
         }
 
@@ -181,14 +183,15 @@ public final class Cli {
         if (!answer.isOk()) {
             return fail(answer.failure(), streams);
         }
-        emit(answer.value(), streams, root.output, interactive);
+        emit(answer.value(), where, streams, root.output, interactive);
         return 0;
     }
 
     /** Renders a result with whichever of the two renderers {@code --output} (or the TTY default) selects. */
-    private static void emit(DiscoverResult result, Streams streams, String output, boolean interactive) {
+    private static void emit(
+            DiscoverResult result, TextRenderer.Context where, Streams streams, String output, boolean interactive) {
         boolean json = jsonOutput(output, interactive);
-        streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result)) + "\n");
+        streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result, where)) + "\n");
     }
 
     // -----------------------------------------------------------------------

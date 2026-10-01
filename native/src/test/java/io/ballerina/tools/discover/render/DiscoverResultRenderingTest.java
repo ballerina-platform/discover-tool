@@ -35,9 +35,29 @@ import java.util.List;
 public class DiscoverResultRenderingTest {
 
     @Test
-    public void aBucketListRendersAsAPlainCommaListInText() {
+    public void aBucketListRendersOneBucketPerLineInText() {
         DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "service", "funcs", "readme"));
-        Assert.assertEquals(TextRenderer.render(result), "client, service, funcs, readme");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "4 buckets",
+                "",
+                "  client",
+                "  service",
+                "  funcs",
+                "  readme"));
+    }
+
+    @Test
+    public void aBucketListAtATerminalNamesThePackageAndTheCommandThatOpensABucket() {
+        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"));
+        TextRenderer.Context where = new TextRenderer.Context("ballerina/graphql", "subgraph", List.of(), null);
+        Assert.assertEquals(TextRenderer.render(result, where), lines(
+                "ballerina/graphql · module subgraph",
+                "2 buckets",
+                "",
+                "  client",
+                "  readme",
+                "",
+                "Next: bal discover ballerina/graphql --module subgraph <bucket>"));
     }
 
     @Test
@@ -52,7 +72,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void anEmptyBucketListRendersAsNoneInTextAndAnEmptyArrayInJson() {
         DiscoverResult result = new DiscoverResult.BucketList(List.of());
-        Assert.assertEquals(TextRenderer.render(result), "none");
+        Assert.assertEquals(TextRenderer.render(result), "No buckets.");
         Assert.assertEquals(JsonRenderer.render(result), "{\"buckets\":[]}");
     }
 
@@ -68,12 +88,19 @@ public class DiscoverResultRenderingTest {
                                 "create subgraphs for a federated GraphQL service",
                                 "bal discover ballerina/graphql --module subgraph")),
                 null);
-        Assert.assertEquals(TextRenderer.render(result),
-                "client, service, funcs, readme\n\nSubmodules:\n"
-                        + "  dataloader — load data from a source with batching and caching: "
-                        + "bal discover ballerina/graphql --module dataloader\n"
-                        + "  subgraph — create subgraphs for a federated GraphQL service: "
-                        + "bal discover ballerina/graphql --module subgraph");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "4 buckets",
+                "",
+                "  client",
+                "  service",
+                "  funcs",
+                "  readme",
+                "",
+                "Submodules",
+                "  dataloader  bal discover ballerina/graphql --module dataloader  "
+                        + "load data from a source with batching and caching",
+                "  subgraph    bal discover ballerina/graphql --module subgraph    "
+                        + "create subgraphs for a federated GraphQL service"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonArray submodules = json.getAsJsonArray("submodules");
@@ -94,7 +121,8 @@ public class DiscoverResultRenderingTest {
     public void anUnverifiedVersionsWarningAppearsInBothRenderings() {
         DiscoverResult result = new DiscoverResult.BucketList(
                 List.of("client"), "the registry was unreachable, so this version came off disk unchecked");
-        Assert.assertTrue(TextRenderer.render(result).startsWith("Warning: the registry was unreachable"));
+        Assert.assertTrue(TextRenderer.render(result).endsWith(
+                "\n\nWarning: the registry was unreachable, so this version came off disk unchecked"));
         String json = JsonRenderer.render(result);
         Assert.assertEquals(
                 JsonParser.parseString(json).getAsJsonObject().get("warning").getAsString(),
@@ -114,7 +142,13 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.ContainerRoster.Container(
                                 "Consumer", 0, 24, 0, "bal discover ballerinax/kafka client Consumer")),
                 2, null);
-        Assert.assertEquals(TextRenderer.render(result), "Caller, Consumer");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "2 containers",
+                "",
+                "  Caller     3 remote",
+                "  Consumer  24 remote",
+                "",
+                "Next: bal discover ballerinax/kafka client <name>"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonArray containers = json.getAsJsonArray("containers");
@@ -139,7 +173,16 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.ContainerRoster.Container(
                                 "Plain", 0, 1, 0, "bal discover ballerinax/kafka service Plain")),
                 2, null);
-        Assert.assertEquals(TextRenderer.render(result), "Service (binds to kafka:Listener), Plain");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "2 containers",
+                "",
+                "kafka:Listener",
+                "  Service  1 remote",
+                "",
+                "No listener",
+                "  Plain  1 remote",
+                "",
+                "Next: bal discover ballerinax/kafka service <name>"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonArray containers = json.getAsJsonArray("containers");
@@ -154,8 +197,14 @@ public class DiscoverResultRenderingTest {
                 List.of(new DiscoverResult.ContainerRoster.Container(
                         "A", 0, 1, 0, "bal discover pkg class A")),
                 91, "bal discover pkg class --page 2");
-        Assert.assertEquals(TextRenderer.render(result), "A\n... 90 more, narrow further: "
-                + "bal discover pkg class --page 2");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "91 containers",
+                "",
+                "  A  1 remote",
+                "",
+                "... 90 more, narrow further",
+                "Next: bal discover pkg class <name>",
+                "Next: bal discover pkg class --page 2"));
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("next").getAsString(), "bal discover pkg class --page 2");
     }
@@ -173,8 +222,16 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.PathGroups.Group(
                                 "orgs", 124, "bal discover ballerinax/github client orgs")),
                 36, "bal discover ballerinax/github client --filter <keyword>");
-        Assert.assertEquals(TextRenderer.render(result), "Groups: repos (421), orgs (124)\n"
-                + "... 34 more, narrow further: bal discover ballerinax/github client --filter <keyword>");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "36 path groups",
+                "",
+                "Groups (operations under each)",
+                "  repos  421",
+                "  orgs   124",
+                "",
+                "... 34 more, narrow further",
+                "Next: bal discover ballerinax/github client <group>",
+                "Next: bal discover ballerinax/github client --filter <keyword>"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonArray groups = json.getAsJsonArray("groups");
@@ -193,9 +250,17 @@ public class DiscoverResultRenderingTest {
                         "repos/:owner/:repo", List.of("get", "patch", "delete"), null)),
                 List.of(new DiscoverResult.PathGroups.Group("repos/actions", 38, client + " repos/actions get")),
                 2, null, null, null);
-        Assert.assertEquals(TextRenderer.render(result), "Container: Client\n"
-                + "Here:\nrepos/:owner/:repo — get, patch, delete\n"
-                + "Groups: repos/actions (38)");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "Client",
+                "1 resource path here, 1 path group",
+                "",
+                "Here",
+                "  repos/:owner/:repo  get, patch, delete",
+                "",
+                "Groups (operations under each)",
+                "  repos/actions  38",
+                "",
+                "Next: bal discover ballerinax/github client Client <group> get"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("container").getAsString(), "Client");
@@ -218,14 +283,38 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.ResourceList.Resource("gists/starred", List.of("get"),
                                 "bal discover ballerinax/github client gists/starred get")),
                 3, 3, null);
-        Assert.assertEquals(TextRenderer.render(result),
-                "gists — get, post\ngists/:gistId — get, delete\ngists/starred — get");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "3 resource paths",
+                "",
+                "  gists          get, post",
+                "  gists/:gistId  get, delete",
+                "  gists/starred  get",
+                "",
+                "Next: bal discover ballerinax/github client <path> <accessor>"));
 
         JsonArray resources = JsonParser.parseString(JsonRenderer.render(result))
                 .getAsJsonObject().getAsJsonArray("resources");
         Assert.assertFalse(resources.get(0).getAsJsonObject().has("call"), "gists has two accessors");
         Assert.assertFalse(resources.get(1).getAsJsonObject().has("call"), "gists/:gistId has two accessors");
         Assert.assertTrue(resources.get(2).getAsJsonObject().has("call"), "gists/starred has exactly one");
+    }
+
+    @Test
+    public void aRowWhoseCommandTheSharedShapeCannotSpellCarriesItsOwn() {
+        String client = "bal discover ballerinax/github client Client";
+        DiscoverResult result = new DiscoverResult.ResourceList(
+                List.of(new DiscoverResult.ResourceList.Resource("gists/starred", List.of("get"),
+                                client + " gists/starred get"),
+                        new DiscoverResult.ResourceList.Resource("gists/'public", List.of("get"),
+                                client + " \"gists/'public\" get")),
+                2, 2, null);
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "2 resource paths",
+                "",
+                "  gists/starred  get",
+                "  gists/'public  get  " + client + " \"gists/'public\" get",
+                "",
+                "Next: " + client + " <path> <accessor>"));
     }
 
     // -----------------------------------------------------------------------
@@ -237,9 +326,15 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
                 List.of("createAccount", "createAddress"), 40, 199, new DiscoverResult.Paging(1, 5, 159),
                 "bal discover ballerinax/twilio client Client --page 2", null, null);
-        Assert.assertEquals(TextRenderer.render(result),
-                "Container: Client\nMethods: createAccount, createAddress\n... 159 more (page 1 of 5), "
-                        + "next page: bal discover ballerinax/twilio client Client --page 2");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "Client",
+                "199 methods",
+                "",
+                "  createAccount",
+                "  createAddress",
+                "",
+                "... 159 more (page 1 of 5)",
+                "Next: bal discover ballerinax/twilio client Client --page 2"));
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("container").getAsString(), "Client");
         Assert.assertEquals(json.get("shown").getAsInt(), 40);
@@ -253,8 +348,9 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
                 List.of("deleteConferenceRecording"), 40, 199, new DiscoverResult.Paging(2, 5, 119),
                 "bal discover ballerinax/twilio client Client --page 3", null, null);
-        Assert.assertTrue(TextRenderer.render(result).endsWith(
-                "... 119 more (page 2 of 5), next page: bal discover ballerinax/twilio client Client --page 3"));
+        Assert.assertTrue(TextRenderer.render(result).endsWith(lines(
+                "... 119 more (page 2 of 5)",
+                "Next: bal discover ballerinax/twilio client Client --page 3")));
 
         DiscoverResult last = new DiscoverResult.MethodList("Client",
                 List.of("updateUsageTrigger"), 39, 199, new DiscoverResult.Paging(5, 5, 0), null, null, null);
@@ -280,7 +376,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aPackageWithNoReadmeIsNoneInTextAndAnEmptyStringInJson() {
         DiscoverResult result = new DiscoverResult.Readme("", 0, null);
-        Assert.assertEquals(TextRenderer.render(result), "none");
+        Assert.assertEquals(TextRenderer.render(result), "No readme in this module.");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("readme").getAsString(), "");
@@ -290,8 +386,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void oneChunkCarriesItsPositionInJsonAndAHeaderLineInText() {
         DiscoverResult result = new DiscoverResult.Readme("## Quickstart\n\ncode", 3, 2, 5, "Quickstart", null);
-        Assert.assertEquals(TextRenderer.render(result),
-                "Chunk 2 of 5 — Quickstart\n\n## Quickstart\n\ncode");
+        Assert.assertEquals(TextRenderer.render(result), "Chunk 2 of 5: Quickstart\n\n## Quickstart\n\ncode");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("chunk").getAsInt(), 2);
@@ -306,8 +401,13 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.ReadmeChunks.Chunk(1, "Overview", 10, "bal discover pkg readme 1"),
                         new DiscoverResult.ReadmeChunks.Chunk(3, "Quickstart", 25, "bal discover pkg readme 3")),
                 2, null);
-        Assert.assertEquals(TextRenderer.render(result),
-                "1. Overview (10 lines)\n3. Quickstart (25 lines)");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "2 matching chunks",
+                "",
+                "  1  Overview    10 lines",
+                "  3  Quickstart  25 lines",
+                "",
+                "Next: bal discover pkg readme <n>"));
 
         JsonArray chunks = JsonParser.parseString(JsonRenderer.render(result))
                 .getAsJsonObject().getAsJsonArray("chunks");
@@ -318,7 +418,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void noChunkMatchingTheFilterIsNoneInTextAndAnEmptyArrayInJson() {
         DiscoverResult result = new DiscoverResult.ReadmeChunks(List.of(), 0, null);
-        Assert.assertEquals(TextRenderer.render(result), "none");
+        Assert.assertEquals(TextRenderer.render(result), "No matching chunks.");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.getAsJsonArray("chunks").size(), 0);
@@ -343,9 +443,11 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aSignatureIsTheBareDeclarationInTextAndStructuredInJson() {
         DiscoverResult result = getPublicGists(List.of(), List.of(), null);
-        Assert.assertEquals(TextRenderer.render(result),
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "Client",
+                "",
                 "resource function get gists/'public(map<string|string[]> headers = {}, *GistsListPublicQueries "
-                        + "queries) returns BaseGist[]|error;");
+                        + "queries) returns BaseGist[]|error;"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("container").getAsString(), "Client");
@@ -370,12 +472,20 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = getPublicGists(
                 List.of(new DiscoverResult.Signature.Type("BaseGist", "public type BaseGist record {|\n|};")),
                 List.of("GistFile"), "relocated to gists/'public");
-        Assert.assertEquals(TextRenderer.render(result), "Note: relocated to gists/'public\n"
-                + "resource function get gists/'public(map<string|string[]> headers = {}, *GistsListPublicQueries "
-                + "queries) returns BaseGist[]|error;\n\n"
-                + "Types it names (1):\n\n"
-                + "public type BaseGist record {|\n|};\n\n"
-                + "1 more past the closure budget, not shown: GistFile");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "Client",
+                "",
+                "resource function get gists/'public(map<string|string[]> headers = {}, *GistsListPublicQueries "
+                        + "queries) returns BaseGist[]|error;",
+                "",
+                "Types it names (1)",
+                "  public type BaseGist record {|",
+                "  |};",
+                "",
+                "1 more past the closure budget, not shown",
+                "  GistFile",
+                "",
+                "Note: relocated to gists/'public"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonObject type = json.getAsJsonArray("types").get(0).getAsJsonObject();
@@ -394,9 +504,19 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MixedListing("Client",
                 List.of(new DiscoverResult.ResourceList.Resource(":...path", List.of("get", "post"), null)),
                 List.of("execute", "get"), List.of("getCookieStore"), 4, 4, null, List.of(), null, null);
-        Assert.assertEquals(TextRenderer.render(result), "Container: Client\nResources (->):\n:...path — get, post\n"
-                + "Remote (->): execute, get\n"
-                + "Normal (.): getCookieStore");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "Client",
+                "1 resource path, 2 remote methods, 1 normal method",
+                "",
+                "Resources (->)",
+                "  :...path  get, post",
+                "",
+                "Remote (->)",
+                "  execute",
+                "  get",
+                "",
+                "Normal (.)",
+                "  getCookieStore"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("container").getAsString(), "Client");
@@ -414,9 +534,17 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MixedListing(null,
                 List.of(), List.of("execute"), List.of(), 1, 45, "bal discover pkg client Client --filter <keyword>",
                 List.of("forward"), null, null);
-        Assert.assertEquals(TextRenderer.render(result), "Remote (->): execute\n"
-                + "Matched by documentation only: forward\n"
-                + "... 44 more, narrow further: bal discover pkg client Client --filter <keyword>");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "45 entries",
+                "",
+                "Remote (->)",
+                "  execute",
+                "",
+                "Matched by documentation only",
+                "  forward",
+                "",
+                "... 44 more, narrow further",
+                "Next: bal discover pkg client Client --filter <keyword>"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("next").getAsString(), "bal discover pkg client Client --filter <keyword>");
@@ -434,10 +562,18 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.NoMatch("sendd", "Producer", List.of("send"), List.of(),
                 new DiscoverResult.MethodList(List.of("close", "send"), 2, 2, null),
                 "bal discover ballerinax/kafka client Producer", List.of(), null, null);
-        Assert.assertEquals(TextRenderer.render(result), "Nothing on Producer matches 'sendd'.\n"
-                + "Did you mean: send\n"
-                + "Available:\n"
-                + "Methods: close, send");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "Producer",
+                "Nothing on Producer matches 'sendd'.",
+                "",
+                "Did you mean",
+                "  send",
+                "",
+                "Available",
+                "  2 functions",
+                "",
+                "    close",
+                "    send"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("requested").getAsString(), "sendd");
@@ -456,13 +592,17 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.NoMatch.Alternative("repos/:owner/:repo/dependabot/secrets",
                                 "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets")),
                 null, "bal discover ballerinax/github client Client", List.of(), null, null);
-        Assert.assertEquals(TextRenderer.render(result), "Nothing on Client matches 'repos/owner/repo/secrets'.\n"
-                + "2 paths carry that segment — pick one:\n"
-                + "  repos/:owner/:repo/actions/secrets: "
-                + "bal discover ballerinax/github client Client repos/:owner/:repo/actions/secrets\n"
-                + "  repos/:owner/:repo/dependabot/secrets: "
-                + "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets\n"
-                + "List everything: bal discover ballerinax/github client Client");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "Client",
+                "Nothing on Client matches 'repos/owner/repo/secrets'.",
+                "",
+                "2 paths carry that segment; pick one",
+                "  repos/:owner/:repo/actions/secrets     "
+                        + "bal discover ballerinax/github client Client repos/:owner/:repo/actions/secrets",
+                "  repos/:owner/:repo/dependabot/secrets  "
+                        + "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets",
+                "",
+                "Next: bal discover ballerinax/github client Client"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonArray paths = json.getAsJsonArray("paths");
@@ -483,10 +623,11 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.Owners.Owner(
                                 "Consumer", 3, "bal discover ballerinax/kafka client Consumer commit")),
                 2, null, null);
-        Assert.assertEquals(TextRenderer.render(result),
-                "'commit' is declared on 2 containers — pick one:\n"
-                        + "  Caller (1 match): bal discover ballerinax/kafka client Caller commit\n"
-                        + "  Consumer (3 matches): bal discover ballerinax/kafka client Consumer commit");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "'commit' is declared on 2 containers; pick one.",
+                "",
+                "  Caller    1 match    bal discover ballerinax/kafka client Caller commit",
+                "  Consumer  3 matches  bal discover ballerinax/kafka client Consumer commit"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("requested").getAsString(), "commit");
@@ -503,10 +644,12 @@ public class DiscoverResultRenderingTest {
                 List.of(new DiscoverResult.EmptyBucket.Elsewhere("client", 3, "bal discover ballerinax/kafka client"),
                         new DiscoverResult.EmptyBucket.Elsewhere("class", 4, "bal discover ballerinax/kafka class")),
                 null);
-        Assert.assertEquals(TextRenderer.render(result),
-                "funcs: none in this package\nElsewhere:\n"
-                        + "  client (3): bal discover ballerinax/kafka client\n"
-                        + "  class (4): bal discover ballerinax/kafka class");
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "This package declares nothing in funcs.",
+                "",
+                "Elsewhere",
+                "  client  3  bal discover ballerinax/kafka client",
+                "  class   4  bal discover ballerinax/kafka class"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("bucket").getAsString(), "funcs");
@@ -515,5 +658,9 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(client.get("bucket").getAsString(), "client");
         Assert.assertEquals(client.get("count").getAsInt(), 3);
         Assert.assertEquals(client.get("call").getAsString(), "bal discover ballerinax/kafka client");
+    }
+
+    private static String lines(String... lines) {
+        return String.join("\n", lines);
     }
 }

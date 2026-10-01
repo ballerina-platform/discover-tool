@@ -19,214 +19,390 @@
 package io.ballerina.tools.discover.render;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 /**
- * {@link DiscoverResult} → the human-oriented text the RFC shows at an interactive terminal.
+ * {@link DiscoverResult} → the human-oriented text {@code --output text} prints at an interactive terminal.
  *
- * <p>Deliberately terse — the RFC's own worked examples are one or two lines for every shape here. A shape with
- * Ballerina to show prints it bare, as the RFC's own single-signature example does; every command a caller can
- * follow is printed, one per row, as the JSON rendering's {@code call} fields carry it.
+ * <p>Every answer has the same frame: a header naming where the caller is ({@code ballerinax/github · client ·
+ * Client}) and a count line, then the entries one per line in aligned columns, grouped under plain headings, then
+ * a footer holding the notes, how much was left out and the {@code Next:} commands. Where the JSON rendering gives
+ * every row its own {@code call}, a large listing prints the shared shape of those commands once in the footer
+ * instead; a row whose command does not fit that shape (a name that needs shell quoting, a group opened without
+ * the listing's accessor) carries its own. No colour and no wrapping, so the output stays as greppable as the
+ * JSON.
  *
  * @since 0.1.0
  */
 public final class TextRenderer {
 
+    private static final String INDENT = "  ";
+    private static final String SEPARATOR = " · ";
+
     private TextRenderer() {
     }
 
+    /**
+     * Where an answer was asked from — the header line. None of it is in a {@link DiscoverResult}, because the
+     * JSON rendering answers a caller who already holds the command it ran.
+     *
+     * @param pkg the package, {@code org/name}, or {@code null} when unknown
+     * @param module the {@code --module} submodule, or {@code null}
+     * @param trail the bucket and selectors, as typed
+     * @param filter the {@code --filter} keyword, or {@code null}
+     */
+    public record Context(String pkg, String module, List<String> trail, String filter) {
+
+        public static final Context NONE = new Context(null, null, List.of(), null);
+
+        public Context {
+            trail = trail == null ? List.of() : List.copyOf(trail);
+        }
+
+        private String bucket() {
+            return trail.isEmpty() ? null : trail.get(0);
+        }
+    }
+
     public static String render(DiscoverResult result) {
+        return render(result, Context.NONE);
+    }
+
+    public static String render(DiscoverResult result, Context where) {
+        if (result instanceof DiscoverResult.Readme readme && readme.chunk() == null && !readme.markdown().isEmpty()) {
+            return verbatimReadme(readme);
+        }
+        Layout layout = new Layout();
+        layout.top(header(where, containerOf(result)));
+        fill(layout, result, where);
+        return layout.render();
+    }
+
+    private static void fill(Layout layout, DiscoverResult result, Context where) {
+        switch (result) {
+            case DiscoverResult.BucketList bucketList -> bucketList(layout, bucketList, where);
+            case DiscoverResult.ContainerRoster roster -> containerRoster(layout, roster, where);
+            case DiscoverResult.PathGroups groups -> pathGroups(layout, groups);
+            case DiscoverResult.ResourceList resources -> resourceList(layout, resources);
+            case DiscoverResult.MethodList methods -> methodList(layout, methods);
+            case DiscoverResult.Readme readme -> readmeChunk(layout, readme);
+            case DiscoverResult.ReadmeChunks chunks -> readmeChunks(layout, chunks);
+            case DiscoverResult.Signature signature -> signature(layout, signature);
+            case DiscoverResult.MixedListing mixed -> mixedListing(layout, mixed);
+            case DiscoverResult.NoMatch noMatch -> noMatch(layout, noMatch, where);
+            case DiscoverResult.Owners owners -> owners(layout, owners);
+            case DiscoverResult.EmptyBucket empty -> emptyBucket(layout, empty);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Shapes
+    // -----------------------------------------------------------------------
+
+    private static void bucketList(Layout layout, DiscoverResult.BucketList bucketList, Context where) {
+        layout.top(counted(bucketList.buckets().size(), "bucket", "buckets"));
+        TextTable buckets = new TextTable(TextTable.Column.LEFT);
+        bucketList.buckets().forEach(buckets::row);
+        layout.block(buckets.lines(INDENT));
+        if (!bucketList.submodules().isEmpty()) {
+            TextTable submodules = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+            bucketList.submodules().forEach(submodule ->
+                    submodules.row(submodule.name(), submodule.call(), submodule.summary()));
+            layout.section("Submodules", submodules);
+        }
+        layout.warning(bucketList.warning());
+        if (where.pkg() != null && !bucketList.buckets().isEmpty()) {
+            layout.next("bal discover " + where.pkg()
+                    + (where.module() == null ? "" : " --module " + where.module()) + " <bucket>");
+        }
+    }
+
+    private static void containerRoster(Layout layout, DiscoverResult.ContainerRoster roster, Context where) {
+        String[] noun = switch (where.bucket() == null ? "" : where.bucket()) {
+            case "client" -> new String[] {"client", "clients"};
+            case "class" -> new String[] {"class", "classes"};
+            case "service" -> new String[] {"service type", "service types"};
+            default -> new String[] {"container", "containers"};
+        };
+        layout.top(counted(roster.total(), noun[0], noun[1]));
+
+        List<DiscoverResult.ContainerRoster.Container> containers = roster.containers();
+        Drill drill = Drill.of(containers.stream().map(DiscoverResult.ContainerRoster.Container::name).toList(),
+                containers.stream().map(DiscoverResult.ContainerRoster.Container::call).toList(), "<name>");
+        Map<String, List<Integer>> byListener = new LinkedHashMap<>();
+        for (int i = 0; i < containers.size(); i++) {
+            String listener = containers.get(i).listener();
+            byListener.computeIfAbsent(listener, key -> new ArrayList<>()).add(i);
+        }
+        boolean paired = !byListener.containsKey(null) || byListener.size() > 1;
+        byListener.forEach((listener, rows) -> {
+            TextTable table = new TextTable(TextTable.Column.LEFT,
+                    TextTable.Column.count("resource", "resources"),
+                    TextTable.Column.count("remote", "remote"),
+                    TextTable.Column.count("normal", "normal"),
+                    TextTable.Column.LEFT);
+            for (int row : rows) {
+                DiscoverResult.ContainerRoster.Container container = containers.get(row);
+                table.row(container.name(), String.valueOf(container.resources()),
+                        String.valueOf(container.remote()), String.valueOf(container.normal()),
+                        drill.explicit(row));
+            }
+            if (paired) {
+                layout.section(listener == null ? "No listener" : listener, table);
+            } else {
+                layout.block(table.lines(INDENT));
+            }
+        });
+        layout.warning(roster.warning());
+        layout.more(roster.total() - containers.size(), null);
+        layout.next(drill.pattern());
+        layout.next(roster.next());
+    }
+
+    private static void pathGroups(Layout layout, DiscoverResult.PathGroups groups) {
+        List<DiscoverResult.ResourceList.Resource> here = groups.resources();
+        if (groups.groups().isEmpty()) {
+            layout.top(counted(groups.total(), "resource path", "resource paths"));
+        } else if (here.isEmpty()) {
+            layout.top(counted(groups.total(), "path group", "path groups"));
+        } else {
+            layout.top(counted(here.size(), "resource path", "resource paths") + " here, "
+                    + counted(groups.total() - here.size(), "path group", "path groups"));
+        }
+
+        Drill hereDrill = resourceDrill(here);
+        layout.section("Here", resourceTable(here, hereDrill));
+        Drill groupDrill = Drill.of(groups.groups().stream().map(DiscoverResult.PathGroups.Group::name).toList(),
+                groups.groups().stream().map(DiscoverResult.PathGroups.Group::call).toList(), "<group>");
+        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
+        for (int i = 0; i < groups.groups().size(); i++) {
+            DiscoverResult.PathGroups.Group group = groups.groups().get(i);
+            table.row(group.name(), String.valueOf(group.count()), groupDrill.explicit(i));
+        }
+        layout.section("Groups (operations under each)", table);
+
+        layout.notices(groups.note(), groups.warning());
+        layout.more(groups.total() - here.size() - groups.groups().size(), null);
+        layout.next(hereDrill.pattern());
+        layout.next(groupDrill.pattern());
+        layout.next(groups.next());
+    }
+
+    private static void resourceList(Layout layout, DiscoverResult.ResourceList resources) {
+        layout.top(counted(resources.total(), "resource path", "resource paths"));
+        Drill drill = resourceDrill(resources.resources());
+        layout.block(resourceTable(resources.resources(), drill).lines(INDENT));
+        layout.notices(resources.note(), resources.warning());
+        layout.more(remaining(resources.shown(), resources.total(), resources.paging()), resources.paging());
+        layout.next(drill.pattern());
+        layout.next(resources.next());
+    }
+
+    private static void methodList(Layout layout, DiscoverResult.MethodList methods) {
+        layout.top(methods.container() == null
+                ? counted(methods.total(), "function", "functions")
+                : counted(methods.total(), "method", "methods"));
+        layout.block(names(methods.methods()).lines(INDENT));
+        layout.notices(methods.note(), methods.warning());
+        layout.more(remaining(methods.shown(), methods.total(), methods.paging()), methods.paging());
+        layout.next(methods.next());
+    }
+
+    /** Verbatim, per the RFC's own words for this bucket — no header, no wrapping, for the whole-readme case. */
+    private static String verbatimReadme(DiscoverResult.Readme readme) {
+        return readme.warning() == null ? readme.markdown() : readme.markdown() + "\n\nWarning: " + readme.warning();
+    }
+
+    private static void readmeChunk(Layout layout, DiscoverResult.Readme readme) {
+        if (readme.markdown().isEmpty()) {
+            layout.top("No readme in this module.");
+        } else {
+            layout.top("Chunk " + readme.chunk() + " of " + readme.of() + ": " + readme.title());
+            layout.block(List.of(readme.markdown()));
+        }
+        layout.warning(readme.warning());
+    }
+
+    private static void readmeChunks(Layout layout, DiscoverResult.ReadmeChunks chunks) {
+        layout.top(counted(chunks.total(), "matching chunk", "matching chunks"));
+        List<DiscoverResult.ReadmeChunks.Chunk> rows = chunks.chunks();
+        Drill drill = Drill.of(rows.stream().map(chunk -> String.valueOf(chunk.number())).toList(),
+                rows.stream().map(DiscoverResult.ReadmeChunks.Chunk::call).toList(), "<n>");
+        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT,
+                TextTable.Column.count("line", "lines"), TextTable.Column.LEFT);
+        for (int i = 0; i < rows.size(); i++) {
+            DiscoverResult.ReadmeChunks.Chunk chunk = rows.get(i);
+            table.row(String.valueOf(chunk.number()), chunk.title(), String.valueOf(chunk.lines()),
+                    drill.explicit(i));
+        }
+        layout.block(table.lines(INDENT));
+        layout.warning(chunks.warning());
+        layout.more(remaining(rows.size(), chunks.total(), chunks.paging()), chunks.paging());
+        layout.next(drill.pattern());
+        layout.next(chunks.next());
+    }
+
+    /** The declaration verbatim — it is Ballerina to copy — then each type it names, indented, one block apiece. */
+    private static void signature(Layout layout, DiscoverResult.Signature signature) {
+        layout.block(List.of(signature.declaration()));
+        List<DiscoverResult.Signature.Type> types = signature.types();
+        for (int i = 0; i < types.size(); i++) {
+            List<String> block = new ArrayList<>();
+            if (i == 0) {
+                block.add("Types it names (" + types.size() + ")");
+            }
+            block.addAll(indented(types.get(i).declaration().lines().toList()));
+            layout.block(block);
+        }
+        layout.section(signature.omitted().size() + " more past the closure budget, not shown",
+                names(signature.omitted()));
+        documented(layout, signature.documented());
+        layout.notices(signature.note(), signature.warning());
+    }
+
+    private static void mixedListing(Layout layout, DiscoverResult.MixedListing mixed) {
+        if (mixed.shown() < mixed.total()) {
+            layout.top(counted(mixed.total(), "entry", "entries"));
+        } else {
+            List<String> parts = new ArrayList<>();
+            if (!mixed.resources().isEmpty()) {
+                parts.add(counted(mixed.resources().size(), "resource path", "resource paths"));
+            }
+            if (!mixed.remote().isEmpty()) {
+                parts.add(counted(mixed.remote().size(), "remote method", "remote methods"));
+            }
+            if (!mixed.normal().isEmpty()) {
+                parts.add(counted(mixed.normal().size(), "normal method", "normal methods"));
+            }
+            layout.top(String.join(", ", parts));
+        }
+        Drill drill = resourceDrill(mixed.resources());
+        layout.section("Resources (->)", resourceTable(mixed.resources(), drill));
+        layout.section("Remote (->)", names(mixed.remote()));
+        layout.section("Normal (.)", names(mixed.normal()));
+        documented(layout, mixed.documented());
+        layout.notices(mixed.note(), mixed.warning());
+        layout.more(mixed.total() - mixed.shown(), null);
+        layout.next(drill.pattern());
+        layout.next(mixed.next());
+    }
+
+    private static void noMatch(Layout layout, DiscoverResult.NoMatch noMatch, Context where) {
+        layout.top("Nothing" + (noMatch.container() == null ? "" : " on " + noMatch.container())
+                + " matches '" + noMatch.requested() + "'.");
+        layout.section("Did you mean", names(noMatch.candidates()));
+        TextTable paths = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
+        noMatch.paths().forEach(alternative -> paths.row(alternative.path(), alternative.call()));
+        layout.section(noMatch.paths().size() + " paths carry that segment; pick one", paths);
+        documented(layout, noMatch.documented());
+        if (noMatch.available() != null) {
+            Layout available = new Layout();
+            fill(available, noMatch.available(), where);
+            List<String> block = new ArrayList<>();
+            block.add("Available");
+            block.addAll(indented(available.render().lines().toList()));
+            layout.block(block);
+        } else {
+            layout.next(noMatch.next());
+        }
+        layout.notices(noMatch.note(), noMatch.warning());
+    }
+
+    private static void owners(Layout layout, DiscoverResult.Owners owners) {
+        layout.top("'" + owners.requested() + "' is declared on " + owners.total() + " containers; pick one.");
+        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.count("match", "matches"),
+                TextTable.Column.LEFT);
+        owners.owners().forEach(owner -> table.row(owner.name(), String.valueOf(owner.matches()), owner.call()));
+        layout.block(table.lines(INDENT));
+        layout.warning(owners.warning());
+        layout.more(owners.total() - owners.owners().size(), null);
+        layout.next(owners.next());
+    }
+
+    private static void emptyBucket(Layout layout, DiscoverResult.EmptyBucket empty) {
+        layout.top("This package declares nothing in " + empty.bucket() + ".");
+        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
+        empty.elsewhere().forEach(other -> table.row(other.bucket(), String.valueOf(other.count()), other.call()));
+        layout.section("Elsewhere", table);
+        layout.warning(empty.warning());
+    }
+
+    // -----------------------------------------------------------------------
+    // Shared pieces
+    // -----------------------------------------------------------------------
+
+    /** {@code org/name · module m · bucket · Container · selectors · --filter k}, from what was asked. */
+    private static String header(Context where, String container) {
+        List<String> parts = new ArrayList<>();
+        if (where.pkg() != null) {
+            parts.add(where.pkg());
+        }
+        if (where.module() != null) {
+            parts.add("module " + where.module());
+        }
+        List<String> trail = new ArrayList<>(where.trail());
+        if (container != null && !trail.contains(container)) {
+            trail.add(Math.min(1, trail.size()), container);
+        }
+        parts.addAll(trail);
+        if (where.filter() != null) {
+            parts.add("--filter " + where.filter());
+        }
+        return parts.isEmpty() ? null : String.join(SEPARATOR, parts);
+    }
+
+    private static String containerOf(DiscoverResult result) {
         return switch (result) {
-            case DiscoverResult.BucketList bucketList -> renderBucketList(bucketList);
-            case DiscoverResult.ContainerRoster roster -> renderContainerRoster(roster);
-            case DiscoverResult.PathGroups groups -> renderPathGroups(groups);
-            case DiscoverResult.ResourceList resources -> renderResourceList(resources);
-            case DiscoverResult.MethodList methods -> renderMethodList(methods);
-            case DiscoverResult.Readme readme -> renderReadme(readme);
-            case DiscoverResult.ReadmeChunks chunks -> renderReadmeChunks(chunks);
-            case DiscoverResult.Signature signature -> renderSignature(signature);
-            case DiscoverResult.MixedListing mixed -> renderMixedListing(mixed);
-            case DiscoverResult.NoMatch noMatch -> renderNoMatch(noMatch);
-            case DiscoverResult.Owners owners -> renderOwners(owners);
-            case DiscoverResult.EmptyBucket empty -> renderEmptyBucket(empty);
+            case DiscoverResult.PathGroups groups -> groups.container();
+            case DiscoverResult.ResourceList resources -> resources.container();
+            case DiscoverResult.MethodList methods -> methods.container();
+            case DiscoverResult.MixedListing mixed -> mixed.container();
+            case DiscoverResult.Signature signature -> signature.container();
+            case DiscoverResult.NoMatch noMatch -> noMatch.container();
+            default -> null;
         };
     }
 
-    private static String renderBucketList(DiscoverResult.BucketList bucketList) {
-        String list = bucketList.buckets().isEmpty() ? "none" : String.join(", ", bucketList.buckets());
-        if (!bucketList.submodules().isEmpty()) {
-            list += "\n\nSubmodules:\n" + bucketList.submodules().stream()
-                    .map(submodule -> "  " + submodule.name()
-                            + (submodule.summary().isEmpty() ? "" : " — " + submodule.summary())
-                            + ": " + submodule.call())
-                    .collect(Collectors.joining("\n"));
+    private static TextTable resourceTable(List<DiscoverResult.ResourceList.Resource> resources, Drill drill) {
+        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        for (int i = 0; i < resources.size(); i++) {
+            DiscoverResult.ResourceList.Resource resource = resources.get(i);
+            table.row(resource.path(), String.join(", ", resource.accessors()), drill.explicit(i));
         }
-        return withWarning(list, bucketList.warning());
+        return table;
     }
 
-    private static String renderContainerRoster(DiscoverResult.ContainerRoster roster) {
-        String list = roster.containers().stream()
-                .map(container -> container.listener() == null
-                        ? container.name()
-                        : container.name() + " (binds to " + container.listener() + ")")
-                .collect(Collectors.joining(", "));
-        return withWarning(
-                withNext(list, roster.total() - roster.containers().size(), null, roster.next()), roster.warning());
+    /** Only a single-accessor path carries a {@code call}, so only those rows teach the command's shape. */
+    private static Drill resourceDrill(List<DiscoverResult.ResourceList.Resource> resources) {
+        return Drill.of(
+                resources.stream()
+                        .map(resource -> resource.path() + " " + String.join(" ", resource.accessors()))
+                        .toList(),
+                resources.stream().map(DiscoverResult.ResourceList.Resource::call).toList(),
+                "<path> <accessor>");
     }
 
-    private static String renderPathGroups(DiscoverResult.PathGroups groups) {
-        List<String> sections = new ArrayList<>();
-        if (!groups.resources().isEmpty()) {
-            sections.add("Here:\n" + resourceLines(groups.resources()));
+    private static TextTable names(List<String> names) {
+        TextTable table = new TextTable(TextTable.Column.LEFT);
+        names.forEach(table::row);
+        return table;
+    }
+
+    private static void documented(Layout layout, List<String> documented) {
+        layout.section("Matched by documentation only", names(documented));
+    }
+
+    private static List<String> indented(List<String> lines) {
+        return lines.stream().map(line -> line.isEmpty() ? line : INDENT + line).toList();
+    }
+
+    private static String counted(int count, String singular, String plural) {
+        if (count == 0) {
+            return "No " + plural + ".";
         }
-        if (!groups.groups().isEmpty()) {
-            sections.add("Groups: " + groups.groups().stream()
-                    .map(group -> group.name() + " (" + group.count() + ")")
-                    .collect(Collectors.joining(", ")));
-        }
-        int shown = groups.resources().size() + groups.groups().size();
-        String body = withNext(String.join("\n", sections), groups.total() - shown, null, groups.next());
-        return withNotices(withContainer(body, groups.container()), groups.warning(), groups.note());
-    }
-
-    private static String renderResourceList(DiscoverResult.ResourceList resources) {
-        String list = resourceLines(resources.resources());
-        String body = withNext(list, remaining(resources.shown(), resources.total(), resources.paging()),
-                resources.paging(), resources.next());
-        return withNotices(withContainer(body, resources.container()), resources.warning(), resources.note());
-    }
-
-    private static String renderMethodList(DiscoverResult.MethodList methods) {
-        String list = "Methods: " + (methods.methods().isEmpty() ? "none" : String.join(", ", methods.methods()));
-        String body = withNext(list, remaining(methods.shown(), methods.total(), methods.paging()),
-                methods.paging(), methods.next());
-        return withNotices(withContainer(body, methods.container()), methods.warning(), methods.note());
-    }
-
-    /** Verbatim, per the RFC's own words for this bucket — no heading, no wrapping, for the whole-readme case. */
-    private static String renderReadme(DiscoverResult.Readme readme) {
-        if (readme.markdown().isEmpty()) {
-            return withWarning("none", readme.warning());
-        }
-        String body = readme.chunk() == null
-                ? readme.markdown()
-                : "Chunk " + readme.chunk() + " of " + readme.of() + " — " + readme.title()
-                        + "\n\n" + readme.markdown();
-        return withWarning(body, readme.warning());
-    }
-
-    private static String renderReadmeChunks(DiscoverResult.ReadmeChunks chunks) {
-        if (chunks.chunks().isEmpty()) {
-            return withWarning("none", chunks.warning());
-        }
-        String list = chunks.chunks().stream()
-                .map(chunk -> chunk.number() + ". " + chunk.title() + " (" + chunk.lines() + " lines)")
-                .collect(Collectors.joining("\n"));
-        return withWarning(
-                withNext(list, remaining(chunks.chunks().size(), chunks.total(), chunks.paging()), chunks.paging(),
-                        chunks.next()),
-                chunks.warning());
-    }
-
-    private static String resourceLines(List<DiscoverResult.ResourceList.Resource> resources) {
-        return resources.stream()
-                .map(resource -> resource.path() + " — " + String.join(", ", resource.accessors()))
-                .collect(Collectors.joining("\n"));
-    }
-
-    /** The declaration first, bare — the RFC's own example is that line and nothing else — then what it names. */
-    private static String renderSignature(DiscoverResult.Signature signature) {
-        List<String> blocks = new ArrayList<>();
-        blocks.add(signature.declaration());
-        if (!signature.types().isEmpty()) {
-            blocks.add("Types it names (" + signature.types().size() + "):");
-            signature.types().forEach(type -> blocks.add(type.declaration()));
-        }
-        if (!signature.omitted().isEmpty()) {
-            blocks.add(signature.omitted().size() + " more past the closure budget, not shown: "
-                    + String.join(", ", signature.omitted()));
-        }
-        addDocumented(blocks, signature.documented());
-        return withNotices(String.join("\n\n", blocks), signature.warning(), signature.note());
-    }
-
-    private static String renderMixedListing(DiscoverResult.MixedListing mixed) {
-        List<String> sections = new ArrayList<>();
-        if (!mixed.resources().isEmpty()) {
-            sections.add("Resources (->):\n" + resourceLines(mixed.resources()));
-        }
-        if (!mixed.remote().isEmpty()) {
-            sections.add("Remote (->): " + String.join(", ", mixed.remote()));
-        }
-        if (!mixed.normal().isEmpty()) {
-            sections.add("Normal (.): " + String.join(", ", mixed.normal()));
-        }
-        addDocumented(sections, mixed.documented());
-        String body = withNext(String.join("\n", sections), mixed.total() - mixed.shown(), null, mixed.next());
-        return withNotices(withContainer(body, mixed.container()), mixed.warning(), mixed.note());
-    }
-
-    private static String renderNoMatch(DiscoverResult.NoMatch noMatch) {
-        List<String> lines = new ArrayList<>();
-        lines.add("Nothing" + (noMatch.container() == null ? "" : " on " + noMatch.container())
-                + " matches '" + noMatch.requested() + "'.");
-        if (!noMatch.candidates().isEmpty()) {
-            lines.add("Did you mean: " + String.join(", ", noMatch.candidates()));
-        }
-        if (!noMatch.paths().isEmpty()) {
-            lines.add(noMatch.paths().size() + " paths carry that segment — pick one:");
-            noMatch.paths().forEach(alternative -> lines.add("  " + alternative.path() + ": " + alternative.call()));
-        }
-        addDocumented(lines, noMatch.documented());
-        if (noMatch.available() != null) {
-            lines.add("Available:");
-            lines.add(render(noMatch.available()));
-        } else {
-            lines.add("List everything: " + noMatch.next());
-        }
-        return withNotices(String.join("\n", lines), noMatch.warning(), noMatch.note());
-    }
-
-    private static String renderOwners(DiscoverResult.Owners owners) {
-        String list = "'" + owners.requested() + "' is declared on " + owners.total() + " containers — pick one:\n"
-                + owners.owners().stream()
-                        .map(owner -> "  " + owner.name() + " (" + owner.matches()
-                                + (owner.matches() == 1 ? " match): " : " matches): ") + owner.call())
-                        .collect(Collectors.joining("\n"));
-        return withWarning(withNext(list, owners.total() - owners.owners().size(), null, owners.next()),
-                owners.warning());
-    }
-
-    private static String renderEmptyBucket(DiscoverResult.EmptyBucket empty) {
-        String body = empty.bucket() + ": none in this package";
-        if (!empty.elsewhere().isEmpty()) {
-            body += "\nElsewhere:\n" + empty.elsewhere().stream()
-                    .map(other -> "  " + other.bucket() + " (" + other.count() + "): " + other.call())
-                    .collect(Collectors.joining("\n"));
-        }
-        return withWarning(body, empty.warning());
-    }
-
-    private static void addDocumented(List<String> blocks, List<String> documented) {
-        if (!documented.isEmpty()) {
-            blocks.add("Matched by documentation only: " + String.join(", ", documented));
-        }
-    }
-
-    private static String withWarning(String body, String warning) {
-        return warning == null ? body : "Warning: " + warning + "\n" + body;
-    }
-
-    /** {@code note} first — it explains what bucket this answer actually came from — then {@code warning}. */
-    private static String withNotices(String body, String warning, String note) {
-        String withNote = note == null ? body : "Note: " + note + "\n" + body;
-        return withWarning(withNote, warning);
-    }
-
-    /** The single container a listing belongs to, as its first line — none for module-level functions. */
-    private static String withContainer(String body, String container) {
-        return container == null ? body : "Container: " + container + "\n" + body;
+        return count + " " + (count == 1 ? singular : plural);
     }
 
     /** How many entries a listing left out: everything after this page, or everything past what was shown. */
@@ -235,15 +411,141 @@ public final class TextRenderer {
     }
 
     /**
-     * The RFC's truncation line: {@code ... N more, narrow further: <command>} — only when something was cut. A
-     * paged listing names its page instead, including the last one, which has nothing more to point at.
+     * The one command shape a listing's per-row {@code call}s share — the row's own name swapped for a
+     * placeholder — and, for each row, its command only where substituting its name into that shape would not
+     * reproduce it exactly.
+     *
+     * @param pattern the shared command shape, or {@code null} when no row carries a command
+     * @param explicit per row, its own command where the shape cannot spell it, else {@code null}
      */
-    private static String withNext(String body, int remaining, DiscoverResult.Paging paging, String next) {
-        String position = paging == null ? "" : " (page " + paging.page() + " of " + paging.pages() + ")";
-        if (next == null || remaining <= 0) {
-            return position.isEmpty() ? body : body + "\nLast page" + position;
+    private record Drill(String pattern, List<String> explicit) {
+
+        static Drill of(List<String> literals, List<String> calls, String placeholder) {
+            Map<String, Integer> shapes = new LinkedHashMap<>();
+            for (int i = 0; i < calls.size(); i++) {
+                String shape = shapeOf(calls.get(i), literals.get(i), placeholder);
+                if (shape != null) {
+                    shapes.merge(shape, 1, Integer::sum);
+                }
+            }
+            String pattern = shapes.entrySet().stream()
+                    .reduce((best, candidate) -> candidate.getValue() > best.getValue() ? candidate : best)
+                    .map(Map.Entry::getKey)
+                    .orElse(null);
+            List<String> explicit = new ArrayList<>();
+            for (int i = 0; i < calls.size(); i++) {
+                String call = calls.get(i);
+                boolean fits = pattern != null && call != null
+                        && call.equals(pattern.replace(placeholder, literals.get(i)));
+                explicit.add(call == null || fits ? null : call);
+            }
+            return new Drill(pattern, explicit);
         }
-        return body + "\n... " + remaining + " more" + position
-                + (paging == null ? ", narrow further: " : ", next page: ") + next;
+
+        /** {@code call} with its last whole-word occurrence of {@code literal} replaced, or {@code null}. */
+        private static String shapeOf(String call, String literal, String placeholder) {
+            if (call == null) {
+                return null;
+            }
+            String needle = " " + literal;
+            for (int at = call.lastIndexOf(needle); at >= 0; at = call.lastIndexOf(needle, at - 1)) {
+                int end = at + needle.length();
+                if (end == call.length() || call.charAt(end) == ' ') {
+                    return call.substring(0, at + 1) + placeholder + call.substring(end);
+                }
+            }
+            return null;
+        }
+
+        String explicit(int row) {
+            return explicit.get(row);
+        }
+    }
+
+    /**
+     * The frame every answer shares: the header and count lines, the blocks, then the footer — notices, then
+     * what was left out, then the {@code Next:} commands. One blank line between parts, none inside one.
+     */
+    private static final class Layout {
+
+        private final List<String> top = new ArrayList<>();
+        private final List<List<String>> blocks = new ArrayList<>();
+        private final List<String> notices = new ArrayList<>();
+        private final List<String> more = new ArrayList<>();
+        private final List<String> next = new ArrayList<>();
+
+        void top(String line) {
+            if (line != null) {
+                top.add(line);
+            }
+        }
+
+        void block(List<String> lines) {
+            if (!lines.isEmpty()) {
+                blocks.add(lines);
+            }
+        }
+
+        void section(String heading, TextTable table) {
+            if (!table.isEmpty()) {
+                List<String> lines = new ArrayList<>();
+                lines.add(heading);
+                lines.addAll(table.lines(INDENT));
+                blocks.add(lines);
+            }
+        }
+
+        /** {@code note} first — it explains what bucket this answer actually came from — then {@code warning}. */
+        void notices(String note, String warning) {
+            if (note != null) {
+                notices.add("Note: " + note);
+            }
+            warning(warning);
+        }
+
+        void warning(String warning) {
+            if (warning != null) {
+                notices.add("Warning: " + warning);
+            }
+        }
+
+        /**
+         * The RFC's truncation line, {@code ... N more, narrow further} — only when something was cut. A paged
+         * listing names its page instead, including the last one, which has nothing more to point at.
+         */
+        void more(int remaining, DiscoverResult.Paging paging) {
+            if (paging == null) {
+                if (remaining > 0) {
+                    more.add("... " + remaining + " more, narrow further");
+                }
+            } else if (remaining > 0) {
+                more.add("... " + remaining + " more (page " + paging.page() + " of " + paging.pages() + ")");
+            } else if (paging.pages() > 1) {
+                more.add("Last page (page " + paging.page() + " of " + paging.pages() + ")");
+            }
+        }
+
+        void next(String command) {
+            if (command != null) {
+                next.add("Next: " + command);
+            }
+        }
+
+        String render() {
+            List<String> parts = new ArrayList<>();
+            addPart(parts, top);
+            blocks.forEach(block -> addPart(parts, block));
+            List<String> footer = new ArrayList<>(notices);
+            footer.addAll(more);
+            footer.addAll(next);
+            addPart(parts, footer);
+            return String.join("\n\n", parts);
+        }
+
+        private static void addPart(List<String> parts, List<String> lines) {
+            if (!lines.isEmpty()) {
+                parts.add(String.join("\n", lines));
+            }
+        }
     }
 }

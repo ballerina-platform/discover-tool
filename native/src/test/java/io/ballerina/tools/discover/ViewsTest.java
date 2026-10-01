@@ -118,7 +118,10 @@ public class ViewsTest {
         StringBuilder json = new StringBuilder();
         for (Surface.Scope scope : Surface.Scope.values()) {
             DiscoverResult listing = render(loaded, scope, List.of());
-            text.append("== ").append(scope.verb()).append(" ==\n").append(TextRenderer.render(listing)).append("\n");
+            TextRenderer.Context where = new TextRenderer.Context(
+                    loaded.qualified().qualified(), null, List.of(scope.verb()), null);
+            text.append("== ").append(scope.verb()).append(" ==\n").append(TextRenderer.render(listing, where))
+                    .append("\n");
             json.append(JsonRenderer.render(listing)).append("\n");
         }
         FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + ".buckets.txt"),
@@ -343,9 +346,9 @@ public class ViewsTest {
         Assert.assertEquals(mixed.total(), mixed.resources().size() + mixed.remote().size() + mixed.normal().size());
         // The call form is printed on every section, because `->` versus `.` is the fact a caller came for.
         String text = TextRenderer.render(mixed);
-        Assert.assertTrue(text.contains("Resources (->):"), text);
-        Assert.assertTrue(text.contains("Remote (->): "), text);
-        Assert.assertTrue(text.contains("Normal (.): "), text);
+        Assert.assertTrue(text.contains("\n\nResources (->)\n  "), text);
+        Assert.assertTrue(text.contains("\n\nRemote (->)\n  "), text);
+        Assert.assertTrue(text.contains("\n\nNormal (.)\n  "), text);
     }
 
     @Test
@@ -470,7 +473,7 @@ public class ViewsTest {
         DiscoverResult.NoMatch miss = as(DiscoverResult.NoMatch.class, render(
                 FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, List.of("Producer", "sendd")));
         Assert.assertTrue(miss.candidates().contains("send"), miss.candidates().toString());
-        Assert.assertTrue(TextRenderer.render(miss).contains("Did you mean: "), TextRenderer.render(miss));
+        Assert.assertTrue(TextRenderer.render(miss).contains("\n\nDid you mean\n  send\n"), TextRenderer.render(miss));
     }
 
     // -----------------------------------------------------------------------

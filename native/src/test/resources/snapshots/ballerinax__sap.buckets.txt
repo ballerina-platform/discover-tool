@@ -1,17 +1,33 @@
 == client ==
-Container: Client
-Resources (->):
-:...path — post, put, patch, delete, head, get, options
-Remote (->): delete, get, head, options, patch, post, put
+ballerinax/sap · client · Client
+1 resource path, 7 remote methods
+
+Resources (->)
+  :...path  post, put, patch, delete, head, get, options
+
+Remote (->)
+  delete
+  get
+  head
+  options
+  patch
+  post
+  put
 == service ==
-service: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/sap client
+ballerinax/sap · service
+This package declares nothing in service.
+
+Elsewhere
+  client  1  bal discover ballerinax/sap client
 == class ==
-class: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/sap client
+ballerinax/sap · class
+This package declares nothing in class.
+
+Elsewhere
+  client  1  bal discover ballerinax/sap client
 == funcs ==
-funcs: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/sap client
+ballerinax/sap · funcs
+This package declares nothing in funcs.
+
+Elsewhere
+  client  1  bal discover ballerinax/sap client

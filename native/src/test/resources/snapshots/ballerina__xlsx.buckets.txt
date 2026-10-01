@@ -1,14 +1,33 @@
 == client ==
-client: none in this package
-Elsewhere:
-  class (3): bal discover ballerina/xlsx class
-  funcs (6): bal discover ballerina/xlsx funcs
+ballerina/xlsx · client
+This package declares nothing in client.
+
+Elsewhere
+  class  3  bal discover ballerina/xlsx class
+  funcs  6  bal discover ballerina/xlsx funcs
 == service ==
-service: none in this package
-Elsewhere:
-  class (3): bal discover ballerina/xlsx class
-  funcs (6): bal discover ballerina/xlsx funcs
+ballerina/xlsx · service
+This package declares nothing in service.
+
+Elsewhere
+  class  3  bal discover ballerina/xlsx class
+  funcs  6  bal discover ballerina/xlsx funcs
 == class ==
-Workbook, Sheet, Table
+ballerina/xlsx · class
+3 classes
+
+  Workbook  12 normal
+  Sheet     21 normal
+  Table     18 normal
+
+Next: bal discover ballerina/xlsx class <name>
 == funcs ==
-Methods: fromBytes, fromFile, parseSheet, parseTable, writeSheet, writeTable
+ballerina/xlsx · funcs
+6 functions
+
+  fromBytes
+  fromFile
+  parseSheet
+  parseTable
+  writeSheet
+  writeTable

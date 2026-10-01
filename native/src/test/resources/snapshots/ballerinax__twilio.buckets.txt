@@ -1,16 +1,65 @@
 == client ==
-Container: Client
-Methods: createAccount, createAddress, createApplication, createCall, createCallFeedbackSummary, createCallRecording, createIncomingPhoneNumber, createIncomingPhoneNumberAssignedAddOn, createIncomingPhoneNumberLocal, createIncomingPhoneNumberMobile, createIncomingPhoneNumberTollFree, createMessage, createMessageFeedback, createNewKey, createNewSigningKey, createParticipant, createPayments, createQueue, createSipAuthCallsCredentialListMapping, createSipAuthCallsIpAccessControlListMapping, createSipAuthRegistrationsCredentialListMapping, createSipCredential, createSipCredentialList, createSipCredentialListMapping, createSipDomain, createSipIpAccessControlList, createSipIpAccessControlListMapping, createSipIpAddress, createSiprec, createStream, createToken, createUsageTrigger, createUserDefinedMessage, createUserDefinedMessageSubscription, createValidationRequest, deleteAddress, deleteApplication, deleteCall, deleteCallFeedbackSummary, deleteCallRecording
-... 159 more (page 1 of 5), next page: bal discover ballerinax/twilio client Client --page 2
+ballerinax/twilio · client · Client
+199 methods
+
+  createAccount
+  createAddress
+  createApplication
+  createCall
+  createCallFeedbackSummary
+  createCallRecording
+  createIncomingPhoneNumber
+  createIncomingPhoneNumberAssignedAddOn
+  createIncomingPhoneNumberLocal
+  createIncomingPhoneNumberMobile
+  createIncomingPhoneNumberTollFree
+  createMessage
+  createMessageFeedback
+  createNewKey
+  createNewSigningKey
+  createParticipant
+  createPayments
+  createQueue
+  createSipAuthCallsCredentialListMapping
+  createSipAuthCallsIpAccessControlListMapping
+  createSipAuthRegistrationsCredentialListMapping
+  createSipCredential
+  createSipCredentialList
+  createSipCredentialListMapping
+  createSipDomain
+  createSipIpAccessControlList
+  createSipIpAccessControlListMapping
+  createSipIpAddress
+  createSiprec
+  createStream
+  createToken
+  createUsageTrigger
+  createUserDefinedMessage
+  createUserDefinedMessageSubscription
+  createValidationRequest
+  deleteAddress
+  deleteApplication
+  deleteCall
+  deleteCallFeedbackSummary
+  deleteCallRecording
+
+... 159 more (page 1 of 5)
+Next: bal discover ballerinax/twilio client Client --page 2
 == service ==
-service: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/twilio client
+ballerinax/twilio · service
+This package declares nothing in service.
+
+Elsewhere
+  client  1  bal discover ballerinax/twilio client
 == class ==
-class: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/twilio client
+ballerinax/twilio · class
+This package declares nothing in class.
+
+Elsewhere
+  client  1  bal discover ballerinax/twilio client
 == funcs ==
-funcs: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/twilio client
+ballerinax/twilio · funcs
+This package declares nothing in funcs.
+
+Elsewhere
+  client  1  bal discover ballerinax/twilio client
