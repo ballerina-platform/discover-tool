@@ -20,7 +20,6 @@ package io.ballerina.tools.discover.central;
 
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
-import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 
 import java.util.Map;
@@ -55,7 +54,7 @@ public interface PackageRepository {
      * @param moduleId the module's full id as Central names it — {@code http}, or {@code http.httpscerr}
      */
     Optional<Map<String, String>> fetchModuleSources(
-            QualifiedName qualified, Version version, String moduleId, HttpOptions options);
+            QualifiedName qualified, CentralClient.ResolvedVersion resolved, String moduleId, HttpOptions options);
 
     /**
      * This repository's own stable, filesystem-safe identity — the cache key's repository dimension (see

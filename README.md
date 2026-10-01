@@ -97,7 +97,7 @@ Next: bal discover ballerina/http client <name>
 
 $ bal discover ballerina/http service
 ballerina/http · service
-3 service types
+7 service types
 
 http:Listener
   Service
@@ -115,12 +115,34 @@ Next: bal discover ballerina/http service <name>
 
 A service type binds to a listener when it is the type the listener's `attach` takes (resolved through unions
 and type aliases) or includes that type (`*Service;`). Central's docs payload does not publish a service
-type's inclusions, so when some service type is not an `attach` target, the `service` bucket (and no other)
-reads the package's own source: from the exact version already in your Ballerina home
-(`~/.ballerina/repositories/central.ballerina.io/bala/...`, or under `BALLERINA_HOME_DIR`) when `bal pull` or
-`bal build` put it there, otherwise from the bala Central publishes — once per version, caching what it finds.
-If the source cannot be read, the types it would have settled stay listed under the listener, and opening one
-says the pairing is not confirmed.
+type's inclusions, so when some service type is not an `attach` target, an answer that shows a service type —
+the `service` bucket, or a service type reached through any other bucket — reads the package's own source,
+once per version, caching what it finds. It looks for the exact version first in your Ballerina home
+(`~/.ballerina/repositories/central.ballerina.io/bala/...`, or under `BALLERINA_HOME_DIR`), where `bal pull` and
+`bal build` put packages, then in the running distribution's own repository (`<ballerina.home>/repo/bala/...`,
+the standard library it ships), and only then downloads the bala Central publishes. If the source cannot be
+read, a type it would have settled is listed under the listener marked as not confirmed — `"confirmed":false`
+in JSON — and opening one says why. With http's source unavailable:
+
+```
+$ bal discover ballerina/http service
+ballerina/http · service
+7 service types
+
+http:Listener
+  Service
+
+http:Listener — not confirmed (package source unavailable)
+  ServiceContract
+  RequestInterceptor
+  ResponseInterceptor
+  RequestErrorInterceptor
+  ResponseErrorInterceptor
+  InterceptableService      1 normal
+
+Next: bal discover ballerina/http service <name>
+```
+
 A listener whose `attach` takes another package's type points there:
 
 ```
@@ -424,7 +446,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | bare package                         | `buckets`, `submodules` (`name`, `summary`, `command`)                                                              |
-| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `command`), `shown`, `total`, `page`, `pages`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page |
+| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `confirmed`, `command`), `shown`, `total`, `page`, `pages`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `next` |
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `next`, `documented`                 |

@@ -64,15 +64,6 @@ public final class FromCentral {
      */
     private record Scope(String moduleId, String orgName) { }
 
-    /**
-     * A scope no module can equal, so every name it qualifies comes out prefixed.
-     *
-     * <p>For the one section written from the caller's side rather than the package's: a service template is
-     * code someone writes in their OWN module, where the package's own names are all foreign. Central never
-     * publishes an empty {@code orgName}/{@code moduleName} pair for a reference, so this matches nothing.
-     */
-    private static final Scope FOREIGN = new Scope("", "");
-
     /** Which of Central's three type encodings a node uses. */
     private enum Encoding {
         EXTERNAL,
@@ -655,23 +646,13 @@ public final class FromCentral {
     // -----------------------------------------------------------------------
 
     /**
-     * Pair each listener the module declares with the service types it accepts, producing the
-     * {@code service X on new Y(...)} template plus the contract the service must implement.
+     * Pair each listener the module declares with the service types it accepts.
      *
      * <p>Every listener, not the first: {@code ballerina/email} publishes an IMAP listener and a POP one, and
      * taking {@code listeners().get(0)} named one and discarded the other with no diagnostic. Which service types
      * a listener accepts is {@link Bindings}' call; a listener whose {@code attach} takes another module's type
      * ({@code postgresql:CdcListener}, a {@code cdc:Service}) gets that foreign type as its pairing rather than
      * nothing.
-     *
-     * <p>Built under {@link #FOREIGN} rather than the module's own scope, which is the one place in this
-     * reader where that is right. Every other section declares the package's API and so writes its own names
-     * bare; a service template is code the CALLER writes, in the caller's module, where every one of the
-     * package's names — the service type, the listener AND the contract's parameter and return types — is
-     * foreign. Under the module's own scope the block came out as
-     * {@code service http:Service on new http:Listener(…)} whose method returned an unqualified
-     * {@code Interceptor}, so the two halves of one line disagreed about whose module they were in and the
-     * template did not resolve.
      */
     private static List<Service> buildServices(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
         if (module.listeners().isEmpty()) {
@@ -689,35 +670,25 @@ public final class FromCentral {
             }));
         }
 
+        String prefix = new ModuleRef(module.orgName(), module.id()).prefix();
         List<Service> services = new ArrayList<>();
         for (CentralDocs.ObjectDecl serviceType : module.serviceTypes()) {
-            // Every method, whatever its form. A service type's contract is usually remote methods, but
-            // graphql's is resource functions, and dropping the ones that were not `remote function <name>`
-            // dropped those.
-            List<Fn> methods = serviceType.methodList().stream()
-                    .map(method -> transformMethod(method, FOREIGN))
-                    .toList();
             for (CentralDocs.Listener listener : module.listeners()) {
                 Bindings.Binding binding =
                         Bindings.bind(serviceType.name(), targets.get(listener), targeted, inclusions);
                 if (binding != Bindings.Binding.NONE) {
-                    services.add(new Service(serviceType.name(), serviceType.isDeprecated(),
-                            serviceListener(module, listener), methods, binding == Bindings.Binding.CONFIRMED));
+                    services.add(new Service(serviceType.name(), prefix + ":" + listener.name(), binding,
+                            Optional.empty()));
                 }
             }
         }
         targets.forEach((listener, accepted) -> accepted.ifPresent(set -> set.forEach(target -> {
             if (target instanceof Bindings.Target.Foreign foreign) {
-                services.add(new Service(foreign.name(), false, serviceListener(module, listener), List.of(),
-                        true, Optional.of(foreign.module())));
+                services.add(new Service(foreign.name(), prefix + ":" + listener.name(),
+                        Bindings.Binding.CONFIRMED, Optional.of(foreign.module())));
             }
         })));
         return List.copyOf(services);
-    }
-
-    private static Service.Listener serviceListener(CentralDocs.Module module, CentralDocs.Listener listener) {
-        return new Service.Listener(
-                module.id() + ":" + listener.name(), transformParams(listener.initParameterList(), FOREIGN));
     }
 
     /**

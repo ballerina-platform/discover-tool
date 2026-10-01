@@ -341,15 +341,9 @@ public class PatchesTest {
                         .map(Service::name)
                         .toList(),
                 List.of("Service"));
-        // Templates a service author can copy, rather than a comment naming a listener the caller's module
-        // cannot resolve.
+        // Their contracts are the declarations in the Types section, which is where they always were.
         String document = FixtureCorpus.readSnapshot("ballerina__http");
         Assert.assertFalse(document.contains("// --- Service (generic) ---"));
-        Assert.assertTrue(document.contains("service http:Service on new http:Listener(port, config) {"));
-        // The two that include `*Service;` are templates too; the four interceptors get none, and their contract
-        // is not lost — it is the declaration in the Types section, which is where it always was.
-        Assert.assertTrue(document.contains("service http:InterceptableService on new"));
-        Assert.assertFalse(document.contains("service http:RequestInterceptor on new"));
         Assert.assertTrue(document.contains(
                 "    function createInterceptors() returns Interceptor|Interceptor[];"));
         Assert.assertTrue(FixtureCorpus.readSnapshot("ballerina__graphql").contains(

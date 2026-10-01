@@ -165,8 +165,9 @@ public class ViewsTest {
     private static int assertInsideTheCeiling(String label, DiscoverResult answer) {
         record Window(int listed, int shown, int total, String next) { }
         Window window = switch (answer) {
-            case DiscoverResult.ContainerRoster roster -> new Window(roster.containers().size(),
-                    roster.containers().size(), roster.total(), roster.next());
+            case DiscoverResult.ContainerRoster roster -> new Window(
+                    roster.containers().size() + roster.notAttachable().size(),
+                    roster.containers().size() + roster.notAttachable().size(), roster.total(), roster.next());
             case DiscoverResult.PathGroups groups -> new Window(groups.resources().size() + groups.groups().size(),
                     groups.resources().size() + groups.groups().size(), groups.total(), groups.next());
             case DiscoverResult.ResourceList resources -> new Window(resources.resources().size(),

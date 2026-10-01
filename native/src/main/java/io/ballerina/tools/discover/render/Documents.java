@@ -20,16 +20,9 @@ package io.ballerina.tools.discover.render;
 
 import io.ballerina.tools.discover.model.ClientClass;
 import io.ballerina.tools.discover.model.Library;
-import io.ballerina.tools.discover.model.ModuleRef;
-import io.ballerina.tools.discover.model.Param;
-import io.ballerina.tools.discover.model.Service;
-import io.ballerina.tools.discover.model.TypeDef;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * {@link Library} → the whole-package Ballerina document the {@code api} verb prints.
@@ -64,7 +57,7 @@ public final class Documents {
     }
 
     /**
-     * Section order is the output's contract with the caller: types, clients, functions, services,
+     * Section order is the output's contract with the caller: types, clients, functions, listeners,
      * annotations. Reordering it was proposed and rejected — it moves every declaration in all nine
      * snapshots and does not solve the motivating case, since {@code ballerinax/github}'s client section is
      * 2,715 lines on its own. The addressed verbs are the answer to "the client is at the bottom".
@@ -84,12 +77,8 @@ public final class Documents {
                 library.clients().stream().map(ClientClass::asObjectDef).map(TypeDefs::renderTypeDef).toList());
         section(output, "// --- Functions ---",
                 library.functions().stream().map(Signatures::renderStandaloneFunction).toList());
-        // Listeners immediately before the services written against them: a listener declaration and the
-        // `service … on new Listener(…)` template are one story, and the template names the arguments whose
-        // types only the declaration gives.
         section(output, "// --- Listeners ---",
                 library.listeners().stream().map(TypeDefs::renderTypeDef).toList());
-        section(output, "// --- Service ---", serviceSection(library));
         section(output, "// --- Annotations ---",
                 library.annotations().stream().map(Documents::renderAnnotation).toList());
         section(output, "// --- Configurables ---", configurableSection(library));
@@ -143,136 +132,8 @@ public final class Documents {
     }
 
     // -----------------------------------------------------------------------
-    // Services and annotations
+    // Annotations
     // -----------------------------------------------------------------------
-
-    /**
-     * The listener's constructor as ARGUMENTS, which is what a {@code new} call takes.
-     *
-     * <p>The parameter NAMES, because that is the only part of a declaration that belongs in a call. Emitting
-     * the whole declaration produced six compiler errors on one line for kafka, the first of which was
-     * {@code too many arguments in call to 'new()'} and the rest of which came from
-     * {@code string|string[] bootstrapServers} being parsed as member access on {@code string}. A template a
-     * caller is meant to copy has to parse.
-     */
-    private static String listenerArguments(Service.Listener listener) {
-        return listener.initParams().stream()
-                .map(Param::name)
-                .collect(Collectors.joining(", "));
-    }
-
-    /** {@code kafka:Listener} → {@code kafka}, the alias the service type needs too. */
-    private static String deriveListenerAlias(String listenerName) {
-        int index = listenerName.indexOf(':');
-        return index > 0 ? listenerName.substring(0, index) : null;
-    }
-
-    /**
-     * How a service is written against this package: a template per service type a listener accepts, then a note
-     * naming the types whose attachment could not be settled, then one naming the types no listener accepts.
-     *
-     * <p>HTTP-14. Every service object type used to get {@code service X on new Listener(…)}, and 5 of the 10
-     * the corpus produced do not compile: {@code ballerina/http}'s four interceptor types and
-     * {@code ballerina/graphql}'s {@code Interceptor} are service objects a listener does not accept — an
-     * interceptor reaches the runtime through {@code createInterceptors()}, not through an attachment. Which
-     * types a listener accepts is {@code Bindings}' call; a pairing it could not confirm gets no template,
-     * because printing a declaration that does not compile is the failure this document exists to prevent, and
-     * the note is what keeps the gap from being a silent one. Each of these types is declared in full in the
-     * Types section either way, so no contract is lost.
-     */
-    private static List<String> serviceSection(Library library) {
-        List<String> rendered = new ArrayList<>();
-        List<Service> unconfirmed = new ArrayList<>();
-        Set<String> paired = new HashSet<>();
-        for (Service service : library.services()) {
-            if (service.declaredIn().isEmpty()) {
-                paired.add(service.name());
-            }
-            if (service.isAttachable()) {
-                rendered.add(renderService(service));
-            } else {
-                unconfirmed.add(service);
-            }
-        }
-        if (!unconfirmed.isEmpty()) {
-            rendered.add(unconfirmedAttachments(unconfirmed));
-        }
-        List<String> unattachable = library.typeDefs().stream()
-                .filter(TypeDef.ObjectDef.class::isInstance)
-                .map(TypeDef.ObjectDef.class::cast)
-                .filter(object -> object.role() == TypeDef.ObjectDef.Role.SERVICE && !paired.contains(object.name()))
-                .map(TypeDef::name)
-                .distinct()
-                .toList();
-        if (!library.listeners().isEmpty() && !unattachable.isEmpty()) {
-            rendered.add(unattachableTypes(library, unattachable));
-        }
-        return List.copyOf(rendered);
-    }
-
-    private static String unconfirmedAttachments(List<Service> unconfirmed) {
-        String listener = unconfirmed.get(0).listener().name();
-        String alias = deriveListenerAlias(listener);
-        List<String> lines = new ArrayList<>();
-        lines.add("// These service object types are declared above; this reader cannot confirm that "
-                + listener);
-        lines.add("// accepts them, so it writes no attachment template for them:");
-        for (Service service : unconfirmed) {
-            lines.add("//   " + (alias == null ? "" : alias + ":") + service.name());
-        }
-        lines.add("// A listener accepts the type its `attach` takes and any `distinct service object` type that");
-        lines.add("// INCLUDES it; for these, that could not be read — the listener publishes no `attach`, or the");
-        lines.add("// package source that shows inclusions was unavailable. The package's own guide is where the");
-        lines.add("// usage of each is written; `bal discover <org>/<name> readme` reproduces it.");
-        return String.join("\n", lines);
-    }
-
-    /** The service types no listener of the package accepts — named, so their absence above is not a gap. */
-    private static String unattachableTypes(Library library, List<String> names) {
-        String moduleId = library.name().substring(library.name().indexOf('/') + 1);
-        String alias = moduleId.substring(moduleId.lastIndexOf('.') + 1);
-        List<String> lines = new ArrayList<>();
-        lines.add("// Declared above, but no listener of this package accepts them, so no template is written:");
-        for (String name : names) {
-            lines.add("//   " + alias + ":" + name);
-        }
-        return String.join("\n", lines);
-    }
-
-    private static String renderService(Service service) {
-        List<String> lines = new ArrayList<>();
-        if (service.isDeprecated()) {
-            lines.add("@deprecated");
-        }
-        String alias = service.declaredIn().map(ModuleRef::prefix)
-                .orElseGet(() -> deriveListenerAlias(service.listener().name()));
-        String prefix = !service.name().isEmpty() && alias != null ? alias + ":" + service.name() + " " : "";
-        lines.add("service " + prefix + "on new " + service.listener().name()
-                + "(" + listenerArguments(service.listener()) + ") {");
-        if (service.declaredIn().isPresent()) {
-            String coordinate = service.declaredIn().get().coordinate();
-            lines.add("    // " + coordinate + " declares this service type's contract: `bal discover " + coordinate
-                    + " service " + service.name() + "`.");
-        } else if (service.methods().isEmpty()) {
-            // A SKELETON with a named hole, rather than a block that silently does not compile. Central
-            // publishes no methods for `graphql:Service` or `kafka:Service`, and both listeners require one —
-            // measured: `a GraphQL service must include at least one resource method with the accessor 'get'`
-            // and `Service must have remote method onConsumerRecord`. `http:Service` is the case where an empty
-            // body genuinely compiles, so the difference is real and only the package's guide states which
-            // applies.
-            lines.add("    // Central publishes no method contract for this service type. The listener may "
-                    + "still require");
-            lines.add("    // one — add the resource or remote methods the package's guide shows; "
-                    + "`bal discover <org>/<name>");
-            lines.add("    // readme` reproduces it.");
-        }
-        // The same renderer every other callable uses, so a service method keeps its parameter defaults, its
-        // optionality, its doc comment and its import note. The hand-rolled copy this replaces kept none of
-        // them.
-        lines.addAll(TypeDefs.renderMembers(List.of(), service.methods()));
-        lines.add("}");
-        return String.join("\n", lines);
-    }
 
     /**
      * An annotation declaration: its config record, its name, and every point it attaches to.

@@ -5132,32 +5132,6 @@ public isolated class Listener {
     isolated function getConfig() returns readonly & InferredListenerConfiguration;
 }
 
-// --- Service ---
-
-service http:Service on new http:Listener(port, config) {
-    // Central publishes no method contract for this service type. The listener may still require
-    // one — add the resource or remote methods the package's guide shows; `bal discover <org>/<name>
-    // readme` reproduces it.
-}
-
-service http:ServiceContract on new http:Listener(port, config) {
-    // Central publishes no method contract for this service type. The listener may still require
-    // one — add the resource or remote methods the package's guide shows; `bal discover <org>/<name>
-    // readme` reproduces it.
-}
-
-service http:InterceptableService on new http:Listener(port, config) {
-    # Function to define interceptor pipeline
-    # + return - The `http:Interceptor|http:Interceptor[]`
-    function createInterceptors() returns http:Interceptor|http:Interceptor[]; // Special Agent Note: Interceptor FROM ballerina/http module
-}
-
-// Declared above, but no listener of this package accepts them, so no template is written:
-//   http:RequestInterceptor
-//   http:ResponseInterceptor
-//   http:RequestErrorInterceptor
-//   http:ResponseErrorInterceptor
-
 // --- Annotations ---
 
 # The annotation which is used to define the response cache configuration. This annotation only supports `anydata` and

@@ -25,7 +25,6 @@ import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Param;
 import io.ballerina.tools.discover.model.RecordField;
 import io.ballerina.tools.discover.model.ReturnDef;
-import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.render.Documents;
@@ -351,47 +350,6 @@ public class RenderTest {
                         new ReturnDef(new TypeRef("json"))))))));
         Assert.assertTrue(rendered.contains(
                 "resource function get repos/[string owner](int page = 1) returns json;"), rendered);
-    }
-
-    @Test
-    public void aServiceTemplateNamesTheListenerAndTheContractItImplies() {
-        String rendered = Documents.toSyntaxString(EMPTY.withServices(List.of(new Service(
-                "ConsumerService",
-                false,
-                new Service.Listener("kafka:Listener", List.of(
-                        new Param("config", "", new TypeRef("ConsumerConfiguration")))),
-                List.of(new Fn.Remote(
-                        "onConsumerRecord",
-                        "",
-                        List.of(new Param("records", "", new TypeRef("BytesConsumerRecord[]"))),
-                        new ReturnDef(new TypeRef("error?"))))))));
-        // ARGUMENTS, not a parameter declaration list: `new kafka:Listener(ConsumerConfiguration config)` was
-        // six compiler errors on one line, of which the first was "too many arguments in call to 'new()'".
-        Assert.assertTrue(rendered.contains(
-                "service kafka:ConsumerService on new kafka:Listener(config) {"), rendered);
-        Assert.assertTrue(rendered.contains(
-                "remote function onConsumerRecord(BytesConsumerRecord[] records) returns error?;"), rendered);
-    }
-
-    @Test
-    public void aServiceMethodIsRenderedByTheSameCodeAsEveryOtherCallable() {
-        // KAFKA-10: the hand-rolled service-method renderer dropped defaults and optionality, which every
-        // other callable in the document keeps. Sharing one renderer is what makes that structural.
-        String rendered = Documents.toSyntaxString(EMPTY.withServices(List.of(new Service(
-                "Service",
-                false,
-                new Service.Listener("pkg:Listener", List.of()),
-                List.of(new Fn.Remote(
-                        "onMessage",
-                        "Called per message.",
-                        List.of(new Param("retries", "", new TypeRef("int"), "3"),
-                                new Param("tag", "", new TypeRef("string?"))),
-                        new ReturnDef(new TypeRef("error?"))))))));
-        Assert.assertTrue(rendered.contains("""
-                service pkg:Service on new pkg:Listener() {
-                    # Called per message.
-                    remote function onMessage(int retries = 3, string? tag) returns error?;
-                }"""), rendered);
     }
 
     @Test

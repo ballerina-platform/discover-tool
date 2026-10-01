@@ -114,7 +114,7 @@ public class SurfaceTest {
         Surface.Container service = services.get(0);
         Assert.assertEquals(service.name(), "Service");
         Assert.assertEquals(service.pairings().size(), 1);
-        Assert.assertEquals(service.pairings().get(0).listener().name(), "kafka:Listener");
+        Assert.assertEquals(service.pairings().get(0).listener(), "kafka:Listener");
     }
 
     /**
@@ -137,8 +137,8 @@ public class SurfaceTest {
                 .toList()), Set.of("RequestInterceptor", "ResponseInterceptor", "RequestErrorInterceptor",
                 "ResponseErrorInterceptor"));
         services.stream().flatMap(service -> service.pairings().stream()).forEach(pairing -> {
-            Assert.assertEquals(pairing.listener().name(), "http:Listener");
-            Assert.assertTrue(pairing.isAttachable(), pairing.name() + " is confirmed by the source");
+            Assert.assertEquals(pairing.listener(), "http:Listener");
+            Assert.assertTrue(pairing.isConfirmed(), pairing.name() + " is confirmed by the source");
         });
     }
 
@@ -164,7 +164,7 @@ public class SurfaceTest {
         Assert.assertEquals(services.size(), 1);
         Surface.Container service = services.get(0);
         Assert.assertEquals(service.name(), "cdc:Service");
-        Assert.assertEquals(service.pairings().get(0).listener().name(), "postgresql:CdcListener");
+        Assert.assertEquals(service.pairings().get(0).listener(), "postgresql:CdcListener");
         Assert.assertEquals(service.pairings().get(0).declaredIn().orElseThrow().coordinate(), "ballerinax/cdc");
         Assert.assertFalse(Surface.isUnattachable(library, service));
     }

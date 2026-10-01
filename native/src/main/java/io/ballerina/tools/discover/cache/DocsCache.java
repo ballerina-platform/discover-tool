@@ -91,16 +91,17 @@ public interface DocsCache {
     /** Best-effort. Used to make a corrupt entry self-healing and by {@code --refresh}. */
     void removeDocs(DocsKey key);
 
-    /** The cached versions answer, or {@code null}. */
     /**
      * What one module's published source says about its object types' inclusions — a few hundred bytes derived
      * from an archive that can run to tens of megabytes, so it is the derived fact that is kept, never the
      * archive. Immutable for a version, like a docs payload.
      */
-    JsonElement readInclusions(DocsKey key, String module);
+    JsonElement readInclusions(DocsKey key, String module, String derivation);
 
-    void writeInclusions(DocsKey key, String module, JsonElement inclusions);
+    /** @param derivation which version of the reader derived it — a new one never reads an older one's entry */
+    void writeInclusions(DocsKey key, String module, String derivation, JsonElement inclusions);
 
+    /** The cached versions answer, or {@code null}. */
     LatestEntry readLatest(PackageKey key);
 
     void writeLatest(PackageKey key, LatestEntry entry);
@@ -135,12 +136,12 @@ public interface DocsCache {
         }
 
         @Override
-        public JsonElement readInclusions(DocsKey key, String module) {
+        public JsonElement readInclusions(DocsKey key, String module, String derivation) {
             return null;
         }
 
         @Override
-        public void writeInclusions(DocsKey key, String module, JsonElement inclusions) {
+        public void writeInclusions(DocsKey key, String module, String derivation, JsonElement inclusions) {
         }
 
         @Override

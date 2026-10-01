@@ -129,8 +129,8 @@ public class BindingsTest {
         Assert.assertEquals(library.services().size(), 1);
         Service foreign = library.services().get(0);
         Assert.assertEquals(foreign.name(), "Service");
-        Assert.assertEquals(foreign.listener().name(), "pkg:CdcListener");
-        Assert.assertTrue(foreign.isAttachable());
+        Assert.assertEquals(foreign.listener(), "pkg:CdcListener");
+        Assert.assertTrue(foreign.isConfirmed());
         Assert.assertEquals(foreign.declaredIn().map(ModuleRef::coordinate), Optional.of("ballerinax/cdc"));
     }
 
@@ -149,7 +149,8 @@ public class BindingsTest {
         Assert.assertFalse(Bindings.needsSource(module), "nothing to settle against");
         List<Service> services = Pipeline.build(module).services();
         Assert.assertEquals(services.stream().map(Service::name).toList(), List.of("Service", "Interceptor"));
-        Assert.assertTrue(services.stream().noneMatch(Service::isAttachable));
+        Assert.assertTrue(services.stream().allMatch(service -> service.binding()
+                == Bindings.Binding.NO_ATTACH_EVIDENCE));
     }
 
     @Test
@@ -187,7 +188,7 @@ public class BindingsTest {
     public void anInclusionOfAForeignTargetBindsToo() {
         Set<Bindings.Target> targets =
                 Set.of(new Bindings.Target.Foreign(new ModuleRef("ballerinax", "cdc"), "Service"));
-        ObjectInclusions inclusions = new ObjectInclusions(Map.of("Audit", List.of("cdc:Service")));
+        ObjectInclusions inclusions = new ObjectInclusions(Map.of("Audit", List.of("ballerinax/cdc:Service")));
         Assert.assertEquals(Bindings.bind("Audit", Optional.of(targets), Set.of(), Optional.of(inclusions)),
                 Bindings.Binding.CONFIRMED);
     }
@@ -196,7 +197,7 @@ public class BindingsTest {
     public void withoutTheSourceANonTargetIsUnconfirmedUnlessAnotherListenerTakesIt() {
         Optional<Set<Bindings.Target>> jetStream = Optional.of(locals("JetStreamService"));
         Assert.assertEquals(Bindings.bind("Interceptor", jetStream, Set.of("JetStreamService", "Service"),
-                Optional.empty()), Bindings.Binding.UNCONFIRMED);
+                Optional.empty()), Bindings.Binding.SOURCE_UNAVAILABLE);
         Assert.assertEquals(Bindings.bind("Service", jetStream, Set.of("JetStreamService", "Service"),
                 Optional.empty()), Bindings.Binding.NONE);
     }
@@ -216,8 +217,20 @@ public class BindingsTest {
                 .with("serviceTypes", Decl.serviceType("Service"), Decl.serviceType("JetStreamService"))
                 .module();
         List<Service> services = Pipeline.build(module).services();
-        Assert.assertEquals(services.stream().map(service -> service.name() + "->" + service.listener().name())
+        Assert.assertEquals(services.stream().map(service -> service.name() + "->" + service.listener())
                 .toList(), List.of("Service->pkg:Listener", "JetStreamService->pkg:JetStreamListener"));
-        Assert.assertTrue(services.stream().allMatch(Service::isAttachable));
+        Assert.assertTrue(services.stream().allMatch(Service::isConfirmed));
+    }
+
+    /** Targets keep the order the attach parameter lists them in, so a roster is the same on every run. */
+    @Test
+    public void foreignTargetsKeepTheirDeclaredOrder() {
+        List<String> names = List.of("Zeta", "Alpha", "Mid", "Beta", "Omega");
+        Node[] members = names.stream().map(name -> Node.external("ballerinax", "cdc", name)).toArray(Node[]::new);
+        CentralDocs.Module module = Payload.pkg().with("listeners", Decl.listenerAttaching(
+                Node.structural().on("isAnonymousUnionType").members(members), "Listener")).module();
+        Assert.assertEquals(targetsOf(module).orElseThrow().stream()
+                .map(target -> ((Bindings.Target.Foreign) target).name()).toList(), names);
+        Assert.assertEquals(Pipeline.build(module).services().stream().map(Service::name).toList(), names);
     }
 }

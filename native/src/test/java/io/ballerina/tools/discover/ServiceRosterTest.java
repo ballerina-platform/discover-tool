@@ -73,7 +73,8 @@ public class ServiceRosterTest {
     public void bindableAndNotAttachableShareOnePagedListing() {
         DiscoverResult.ContainerRoster first = page(1);
         Assert.assertEquals(first.containers().size(), Containers.MAX_ENTRIES);
-        Assert.assertEquals(first.total(), BOUND);
+        Assert.assertEquals(first.total(), BOUND + INTERCEPTORS, "the not-attachable types are counted too");
+        Assert.assertEquals(first.paging().pages(), 2);
         Assert.assertTrue(first.notAttachable().isEmpty());
         Assert.assertEquals(first.notAttachableTotal(), INTERCEPTORS);
         Assert.assertEquals(first.next(), "bal discover test/pkg service --page 2");

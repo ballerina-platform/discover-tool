@@ -20,6 +20,7 @@ package io.ballerina.tools.discover.model;
 
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -64,18 +65,30 @@ public final class Bindings {
          */
         record Foreign(ModuleRef module, String name) implements Target {
 
-            /** {@code cdc:Service} — how a source file in another module writes it. */
-            public String prefixed() {
-                return module.prefix() + ":" + name;
+            /**
+             * {@code ballerinax/cdc:Service} — what an inclusion of it is recorded as, whatever prefix the
+             * including file imported the module under.
+             */
+            public String qualified() {
+                return module.coordinate() + ":" + name;
             }
         }
     }
 
     /** Whether a service type binds to a listener, and how sure that answer is. */
     public enum Binding {
+        /** It is the listener's attach target, or includes one. */
         CONFIRMED,
-        UNCONFIRMED,
-        NONE
+        /** Unsettled: the listener publishes no {@code attach()} to read the target from. */
+        NO_ATTACH_EVIDENCE,
+        /** Unsettled: the package source, which shows the type's inclusions, was unavailable. */
+        SOURCE_UNAVAILABLE,
+        /** It does not bind. */
+        NONE;
+
+        public boolean isConfirmed() {
+            return this == CONFIRMED;
+        }
     }
 
     /**
@@ -98,7 +111,7 @@ public final class Bindings {
         }
         Set<Target> targets = new LinkedHashSet<>();
         collect(parameter.get(), module, aliases(module), new HashSet<>(), targets);
-        return targets.isEmpty() ? Optional.empty() : Optional.of(Set.copyOf(targets));
+        return targets.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableSet(targets));
     }
 
     private static Map<String, CentralDocs.AliasDecl> aliases(CentralDocs.Module module) {
@@ -177,7 +190,7 @@ public final class Bindings {
     public static Binding bind(String serviceType, Optional<Set<Target>> targets, Set<String> targetedElsewhere,
             Optional<ObjectInclusions> inclusions) {
         if (targets.isEmpty()) {
-            return Binding.UNCONFIRMED;
+            return Binding.NO_ATTACH_EVIDENCE;
         }
         if (targets.get().contains(new Target.Local(serviceType))) {
             return Binding.CONFIRMED;
@@ -186,10 +199,10 @@ public final class Bindings {
             Set<String> included = inclusions.get().closure(serviceType);
             boolean reaches = targets.get().stream().anyMatch(target -> switch (target) {
                 case Target.Local local -> included.contains(local.name());
-                case Target.Foreign foreign -> included.contains(foreign.prefixed());
+                case Target.Foreign foreign -> included.contains(foreign.qualified());
             });
             return reaches ? Binding.CONFIRMED : Binding.NONE;
         }
-        return targetedElsewhere.contains(serviceType) ? Binding.NONE : Binding.UNCONFIRMED;
+        return targetedElsewhere.contains(serviceType) ? Binding.NONE : Binding.SOURCE_UNAVAILABLE;
     }
 }

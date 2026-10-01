@@ -22,6 +22,7 @@ import io.ballerina.tools.discover.model.Library;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * One package, read once: its coordinates, its API as the IR, and its readme.
@@ -36,6 +37,8 @@ import java.util.Optional;
  *     shown as {@code Submodules:}, regardless of which module {@code module} itself addresses
  * @param warning why this version cannot be trusted, or {@code null} when it was confirmed against the
  *     registry — see {@link Loader#unverifiedWarning}
+ * @param bound {@code library} with its service bindings read from the package source — deferred, since only an
+ *     answer that shows a service type needs it, and reading it can mean a download
  * @since 0.1.0
  */
 public record LoadedPackage(
@@ -45,7 +48,14 @@ public record LoadedPackage(
         Optional<String> readme,
         String module,
         List<Submodule> submodules,
-        String warning) {
+        String warning,
+        Supplier<Library> bound) {
+
+    /** A package whose {@code library} already shows every service binding it can. */
+    public LoadedPackage(QualifiedName qualified, Version version, Library library, Optional<String> readme,
+            String module, List<Submodule> submodules, String warning) {
+        this(qualified, version, library, readme, module, submodules, warning, () -> library);
+    }
 
     /**
      * @param name the bare name {@code --module} itself takes, e.g. {@code dataloader}
@@ -69,5 +79,14 @@ public record LoadedPackage(
     /** The same package with a different IR, which is what a test that removes every client needs. */
     public LoadedPackage withLibrary(Library replacement) {
         return new LoadedPackage(qualified, version, replacement, readme, module, submodules, warning);
+    }
+
+    /**
+     * The same package with its service bindings settled from the package source where the docs payload cannot
+     * settle them — read on first call, and only by an answer that shows a service type.
+     */
+    public LoadedPackage withBindings() {
+        Library settled = bound.get();
+        return settled == library ? this : withLibrary(settled);
     }
 }

@@ -98,11 +98,14 @@ public final class JsonRenderer {
             if (container.listener() != null) {
                 entry.addProperty("listener", container.listener());
             }
+            if (container.unconfirmed() != null) {
+                entry.addProperty("confirmed", false);
+            }
             entry.addProperty("command", container.command());
             containers.add(entry);
         }
         json.add("containers", containers);
-        json.addProperty("shown", roster.containers().size());
+        json.addProperty("shown", roster.containers().size() + roster.notAttachable().size());
         json.addProperty("total", roster.total());
         addPaging(json, roster.paging());
         if (roster.next() != null) {
