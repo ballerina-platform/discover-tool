@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.Collator;
 import java.util.Comparator;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Text conventions the whole reader shares, gathered here because getting one of them wrong moves
@@ -48,6 +49,10 @@ public final class Texts {
 
     public static final Comparator<String> LOCALE_ORDER = Texts::compareLocale;
 
+    private static final Pattern SAFE_WORD = Pattern.compile("[A-Za-z0-9_./:@%+=,-]+");
+
+    private static final Pattern DOUBLE_QUOTE_UNSAFE = Pattern.compile("[\"$`\\\\!]");
+
     private Texts() {
     }
 
@@ -59,8 +64,8 @@ public final class Texts {
     /**
      * How many bytes a string occupies as UTF-8.
      *
-     * <p>The overview's 20,000-byte inline limit and every {@code bytes of signatures} figure depend
-     * on this being bytes rather than {@code length()}, which counts UTF-16 units.
+     * <p>The closure budget a single signature inlines its types under depends on this being bytes rather
+     * than {@code length()}, which counts UTF-16 units.
      */
     public static int byteLength(String text) {
         return text.getBytes(StandardCharsets.UTF_8).length;
@@ -71,8 +76,19 @@ public final class Texts {
         return String.format(Locale.US, "%,d", value);
     }
 
-    /** Inline code, for a name inside prose. */
-    public static String code(String text) {
-        return "`" + text + "`";
+    /**
+     * One argument as a POSIX shell reads it back unchanged. A word made only of characters no shell treats
+     * specially is left bare; anything else is double-quoted, which keeps the keyword-escaping apostrophe
+     * ({@code gists/'public}) readable, unless it holds a character double quotes do not neutralise, in which
+     * case it is single-quoted.
+     */
+    public static String shellWord(String token) {
+        if (SAFE_WORD.matcher(token).matches()) {
+            return token;
+        }
+        if (!DOUBLE_QUOTE_UNSAFE.matcher(token).find()) {
+            return "\"" + token + "\"";
+        }
+        return "'" + token.replace("'", "'\\''") + "'";
     }
 }

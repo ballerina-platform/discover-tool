@@ -37,6 +37,15 @@ import java.util.List;
 public sealed interface DiscoverResult {
 
     /**
+     * Which page of a paginated listing this response is.
+     *
+     * @param page the page served, 1-indexed
+     * @param pages how many pages the whole listing spans
+     * @param remaining how many entries come after this page
+     */
+    record Paging(int page, int pages, int remaining) { }
+
+    /**
      * A package's (or a targeted module's) own top-level buckets — the answer to a bare
      * {@code bal discover <org/name>} with no bucket and no selector.
      *
@@ -102,8 +111,11 @@ public sealed interface DiscoverResult {
      * Resource paths grouped by their next segment, because there are too many to list flat — the RFC's
      * {@code repos (275), orgs (124), ...} shape.
      *
-     * @param groups the groups shown, up to the ceiling, busiest first
-     * @param total how many groups exist at this level
+     * @param container the container these paths belong to
+     * @param resources the operations that end at this level rather than under a further group, one entry per
+     *     path — listed beside the groups because no group name could reach them without looping back here
+     * @param groups the groups shown, busiest first; {@code resources} and {@code groups} share the ceiling
+     * @param total how many entries (resources plus groups) exist at this level
      * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
@@ -112,29 +124,33 @@ public sealed interface DiscoverResult {
      *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
      *     {@code null} when neither applies
      */
-    record PathGroups(List<Group> groups, int total, String next, String warning, String note)
-            implements DiscoverResult {
+    record PathGroups(
+            String container, List<ResourceList.Resource> resources, List<Group> groups, int total, String next,
+            String warning, String note) implements DiscoverResult {
 
         public PathGroups(List<Group> groups, int total, String next) {
-            this(groups, total, next, null, null);
+            this(null, List.of(), groups, total, next, null, null);
         }
 
         /**
          * @param name the group's path prefix, {@code /}-joined from the top of the bucket
-         * @param count operations at or under this group
-         * @param call the command that opens it — a group is never ambiguous, so this is never {@code null}
+         * @param count selected operations under this group
+         * @param call the command that opens it, carrying the accessor the listing was narrowed by — a group is
+         *     never ambiguous, so this is never {@code null}
          */
         public record Group(String name, int count, String call) { }
     }
 
     /**
      * Resource paths, flat: one entry per path with the accessors it answers to — the terminal answer once a
-     * group (or the whole bucket) fits under the ceiling.
+     * group (or the whole bucket) fits under the ceiling, or once a selection cannot be grouped and pages instead.
      *
+     * @param container the container these paths belong to
      * @param resources the paths shown, up to the ceiling
      * @param shown how many are in this response
      * @param total how many exist at this level
-     * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
+     * @param paging which page this is, or {@code null} when the whole listing fit on one
+     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
@@ -142,15 +158,16 @@ public sealed interface DiscoverResult {
      *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
      *     {@code null} when neither applies
      */
-    record ResourceList(List<Resource> resources, int shown, int total, String next, String warning, String note)
-            implements DiscoverResult {
+    record ResourceList(
+            String container, List<Resource> resources, int shown, int total, Paging paging, String next,
+            String warning, String note) implements DiscoverResult {
 
         public ResourceList(List<Resource> resources, int shown, int total, String next) {
-            this(resources, shown, total, next, null, null);
+            this(null, resources, shown, total, null, next, null, null);
         }
 
         /**
-         * @param path the resource's path, {@code :name}-spelled for parameters
+         * @param path the resource's path, {@code :name}-spelled for parameters, {@code .} for the root
          * @param accessors every accessor this path answers to
          * @param call the exact next-step command, or {@code null} on a multi-accessor entry — a flat field
          *     would have to guess which accessor
@@ -162,9 +179,11 @@ public sealed interface DiscoverResult {
      * Remote or normal method names, flat — the RFC's {@code Methods: get, post, ...} shape, paginated with
      * {@code --page} once a container has too many to show at once.
      *
+     * @param container the container that declares them, or {@code null} for module-level functions
      * @param methods the names shown, alphabetical, up to the ceiling
      * @param shown how many are in this response
      * @param total how many the container declares
+     * @param paging which page this is, or {@code null} when the whole listing fit on one
      * @param next the ready-to-run command that narrows further or turns the page, or {@code null} when nothing
      *     was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
@@ -174,11 +193,12 @@ public sealed interface DiscoverResult {
      *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
      *     {@code null} when neither applies
      */
-    record MethodList(List<String> methods, int shown, int total, String next, String warning, String note)
-            implements DiscoverResult {
+    record MethodList(
+            String container, List<String> methods, int shown, int total, Paging paging, String next,
+            String warning, String note) implements DiscoverResult {
 
         public MethodList(List<String> methods, int shown, int total, String next) {
-            this(methods, shown, total, next, null, null);
+            this(null, methods, shown, total, null, next, null, null);
         }
     }
 
@@ -210,14 +230,16 @@ public sealed interface DiscoverResult {
      *
      * @param chunks the chunks shown, up to the ceiling
      * @param total how many chunks actually match
+     * @param paging which page this is, or {@code null} when every match fit on one
      * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      */
-    record ReadmeChunks(List<Chunk> chunks, int total, String next, String warning) implements DiscoverResult {
+    record ReadmeChunks(List<Chunk> chunks, int total, Paging paging, String next, String warning)
+            implements DiscoverResult {
 
         public ReadmeChunks(List<Chunk> chunks, int total, String next) {
-            this(chunks, total, next, null);
+            this(chunks, total, null, next, null);
         }
 
         /**
@@ -238,7 +260,7 @@ public sealed interface DiscoverResult {
      * @param name the method's name ({@code init} for a constructor), or {@code null} for a resource
      * @param accessor a resource's accessor, or {@code null} otherwise
      * @param path a resource's path, {@code :name}-spelled for parameters, or {@code null} otherwise
-     * @param form how it is called: {@code ->} or {@code .}
+     * @param form how it is called: {@code ->}, {@code .}, or {@code new} for a constructor
      * @param declaration the Ballerina declaration with its doc comment, quoted verbatim from the shared renderer
      * @param params its parameters, in declaration order — a resource's path parameters live in {@code path}
      * @param returns its return type, or {@code null} when it returns nothing
@@ -275,6 +297,7 @@ public sealed interface DiscoverResult {
      * A container answering to both {@code ->path.accessor()} and {@code ->name()}/{@code .name()} — the
      * {@link ResourceList} and {@link MethodList} shapes side by side, split by call form.
      *
+     * @param container the container that declares them
      * @param resources the resource paths shown
      * @param remote the remote method names shown, alphabetical
      * @param normal the plain method names shown, alphabetical
@@ -286,8 +309,8 @@ public sealed interface DiscoverResult {
      * @param note the same joined advisory {@link ResourceList#note} carries, or {@code null}
      */
     record MixedListing(
-            List<ResourceList.Resource> resources, List<String> remote, List<String> normal, int shown,
-            int total, String next, List<String> documented, String warning, String note)
+            String container, List<ResourceList.Resource> resources, List<String> remote, List<String> normal,
+            int shown, int total, String next, List<String> documented, String warning, String note)
             implements DiscoverResult { }
 
     /**

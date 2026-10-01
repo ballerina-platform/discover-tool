@@ -1,13 +1,17 @@
 == client ==
+Container: Client
 Resources (->):
 :...path — post, put, patch, delete, head, get, options
 Remote (->): delete, get, head, options, patch, post, put
 == service ==
 service: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/sap client
 == class ==
 class: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/sap client
 == funcs ==
 funcs: none in this package
-Elsewhere: client (1)
+Elsewhere:
+  client (1): bal discover ballerinax/sap client

@@ -1,4 +1,4 @@
-{"groups":[
+{"container":"Client","groups":[
 {"name":"admin.apps.approve","count":1,"call":"bal discover ballerinax/slack client Client admin.apps.approve"},
 {"name":"admin.apps.approved.list","count":1,"call":"bal discover ballerinax/slack client Client admin.apps.approved.list"},
 {"name":"admin.apps.requests.list","count":1,"call":"bal discover ballerinax/slack client Client admin.apps.requests.list"},

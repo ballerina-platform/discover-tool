@@ -2,9 +2,13 @@
 Caller, Consumer, Producer
 == service ==
 Note: binds to kafka:Listener
+Container: Service
 Methods: none
 == class ==
 AvroDeserializer, AvroSerializer, Deserializer, Serializer
 == funcs ==
 funcs: none in this package
-Elsewhere: client (3), service (1), class (4)
+Elsewhere:
+  client (3): bal discover ballerinax/kafka client
+  service (1): bal discover ballerinax/kafka service
+  class (4): bal discover ballerinax/kafka class

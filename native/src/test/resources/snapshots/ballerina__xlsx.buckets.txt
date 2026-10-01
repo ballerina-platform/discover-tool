@@ -1,9 +1,13 @@
 == client ==
 client: none in this package
-Elsewhere: class (3), funcs (6)
+Elsewhere:
+  class (3): bal discover ballerina/xlsx class
+  funcs (6): bal discover ballerina/xlsx funcs
 == service ==
 service: none in this package
-Elsewhere: class (3), funcs (6)
+Elsewhere:
+  class (3): bal discover ballerina/xlsx class
+  funcs (6): bal discover ballerina/xlsx funcs
 == class ==
 Workbook, Sheet, Table
 == funcs ==

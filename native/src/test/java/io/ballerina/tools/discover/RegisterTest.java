@@ -83,9 +83,32 @@ public class RegisterTest {
                     add(answers, verb + " " + String.join(" ", one),
                             Containers.render(context, scope, new Containers.Options(one)));
                 }
+                // The three answers that carry a note: a member named without its owner, a wildcard path that
+                // skips sibling branches, and a container asked of a bucket that does not hold it.
+                container.memberNames().stream().findFirst().ifPresent(member -> addIfOk(answers, verb + " " + member,
+                        Containers.render(context, scope, new Containers.Options(List.of(member)))));
+                if (container.hasPaths()) {
+                    List<String> wildcard = new ArrayList<>(selector);
+                    wildcard.add("*/*");
+                    add(answers, verb + " " + String.join(" ", wildcard),
+                            Containers.render(context, scope, new Containers.Options(wildcard)));
+                }
+                for (Surface.Scope other : Surface.Scope.values()) {
+                    if (other != scope && !container.isModule()) {
+                        add(answers, other.verb() + " " + container.name(),
+                                Containers.render(context, other, new Containers.Options(selector)));
+                    }
+                }
             }
         }
         return answers;
+    }
+
+    /** A member named bare can be ambiguous across buckets in ways this walk does not control. */
+    private static void addIfOk(List<Answer> answers, String label, Result<DiscoverResult> view) {
+        if (view.isOk()) {
+            answers.add(new Answer(label, view.value()));
+        }
     }
 
     private static void add(List<Answer> answers, String label, Result<DiscoverResult> view) {
@@ -123,6 +146,33 @@ public class RegisterTest {
                     label + ": a Markdown heading");
             Assert.assertFalse(text.contains("\n\n\n"), label + ": a block was emitted empty");
             Assert.assertFalse(text.endsWith("\n"), label + ": the CLI adds the one trailing newline");
+        }
+    }
+
+    /**
+     * A note is plain prose in both renderings: a Markdown backtick in it is a leftover of the report register,
+     * and in JSON it is two characters a caller has to strip before the command inside can run.
+     */
+    @Test(dataProvider = "fixtures")
+    public void noNoteCarriesMarkdown(String slug) {
+        int notes = 0;
+        for (Answer answer : answers(slug)) {
+            String note = switch (answer.result()) {
+                case DiscoverResult.PathGroups groups -> groups.note();
+                case DiscoverResult.ResourceList resources -> resources.note();
+                case DiscoverResult.MethodList methods -> methods.note();
+                case DiscoverResult.MixedListing mixed -> mixed.note();
+                case DiscoverResult.Signature signature -> signature.note();
+                case DiscoverResult.NoMatch noMatch -> noMatch.note();
+                default -> null;
+            };
+            if (note != null) {
+                Assert.assertFalse(note.contains("`"), slug + " " + answer.label() + ": " + note);
+                notes++;
+            }
+        }
+        if (slug.equals("ballerina__http") || slug.equals("ballerinax__github")) {
+            Assert.assertTrue(notes > 0, slug + ": no answer carried a note, so this checked nothing");
         }
     }
 

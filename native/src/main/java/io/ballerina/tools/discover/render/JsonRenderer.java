@@ -114,6 +114,10 @@ public final class JsonRenderer {
 
     private static JsonObject pathGroups(DiscoverResult.PathGroups groups) {
         JsonObject json = new JsonObject();
+        addIfPresent(json, "container", groups.container());
+        if (!groups.resources().isEmpty()) {
+            json.add("resources", resources(groups.resources()));
+        }
         JsonArray array = new JsonArray();
         for (DiscoverResult.PathGroups.Group group : groups.groups()) {
             JsonObject entry = new JsonObject();
@@ -123,7 +127,7 @@ public final class JsonRenderer {
             array.add(entry);
         }
         json.add("groups", array);
-        json.addProperty("shown", groups.groups().size());
+        json.addProperty("shown", groups.resources().size() + groups.groups().size());
         json.addProperty("total", groups.total());
         if (groups.next() != null) {
             json.addProperty("next", groups.next());
@@ -139,9 +143,11 @@ public final class JsonRenderer {
 
     private static JsonObject resourceList(DiscoverResult.ResourceList resources) {
         JsonObject json = new JsonObject();
+        addIfPresent(json, "container", resources.container());
         json.add("resources", resources(resources.resources()));
         json.addProperty("shown", resources.shown());
         json.addProperty("total", resources.total());
+        addPaging(json, resources.paging());
         if (resources.next() != null) {
             json.addProperty("next", resources.next());
         }
@@ -156,11 +162,13 @@ public final class JsonRenderer {
 
     private static JsonObject methodList(DiscoverResult.MethodList methods) {
         JsonObject json = new JsonObject();
+        addIfPresent(json, "container", methods.container());
         JsonArray array = new JsonArray();
         methods.methods().forEach(array::add);
         json.add("methods", array);
         json.addProperty("shown", methods.shown());
         json.addProperty("total", methods.total());
+        addPaging(json, methods.paging());
         if (methods.next() != null) {
             json.addProperty("next", methods.next());
         }
@@ -202,6 +210,7 @@ public final class JsonRenderer {
         json.add("chunks", array);
         json.addProperty("shown", chunks.chunks().size());
         json.addProperty("total", chunks.total());
+        addPaging(json, chunks.paging());
         if (chunks.next() != null) {
             json.addProperty("next", chunks.next());
         }
@@ -217,11 +226,7 @@ public final class JsonRenderer {
             JsonObject entry = new JsonObject();
             entry.addProperty("path", resource.path());
             entry.add("accessors", strings(resource.accessors()));
-            // Deliberately omitted on a multi-accessor entry: a flat `call` field would have to guess which
-            // accessor, which is exactly the "don't guess, be explicit or say nothing" the RFC states for this.
-            if (resource.call() != null) {
-                entry.addProperty("call", resource.call());
-            }
+            addIfPresent(entry, "call", resource.call());
             array.add(entry);
         }
         return array;
@@ -269,9 +274,10 @@ public final class JsonRenderer {
 
     private static JsonObject mixedListing(DiscoverResult.MixedListing mixed) {
         JsonObject json = new JsonObject();
+        addIfPresent(json, "container", mixed.container());
         json.add("resources", resources(mixed.resources()));
-        json.add("remote", strings(mixed.remote()));
-        json.add("normal", strings(mixed.normal()));
+        addIfNotEmpty(json, "remote", mixed.remote());
+        addIfNotEmpty(json, "normal", mixed.normal());
         json.addProperty("shown", mixed.shown());
         json.addProperty("total", mixed.total());
         addIfPresent(json, "next", mixed.next());
@@ -355,6 +361,13 @@ public final class JsonRenderer {
     private static void addIfNotEmpty(JsonObject json, String field, List<String> values) {
         if (!values.isEmpty()) {
             json.add(field, strings(values));
+        }
+    }
+
+    private static void addPaging(JsonObject json, DiscoverResult.Paging paging) {
+        if (paging != null) {
+            json.addProperty("page", paging.page());
+            json.addProperty("pages", paging.pages());
         }
     }
 

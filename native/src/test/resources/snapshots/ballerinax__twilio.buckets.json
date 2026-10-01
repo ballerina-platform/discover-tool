@@ -1,4 +1,4 @@
-{"methods":[
+{"container":"Client","methods":[
 "createAccount",
 "createAddress",
 "createApplication",
@@ -39,7 +39,7 @@
 "deleteCall",
 "deleteCallFeedbackSummary",
 "deleteCallRecording"
-],"shown":40,"total":199,"next":"bal discover ballerinax/twilio client Client --page 2"}
+],"shown":40,"total":199,"page":1,"pages":5,"next":"bal discover ballerinax/twilio client Client --page 2"}
 {"bucket":"service","total":0,"elsewhere":[
 {"bucket":"client","count":1,"call":"bal discover ballerinax/twilio client"}
 ]}

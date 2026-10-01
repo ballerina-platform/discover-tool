@@ -1,4 +1,4 @@
-{"groups":[
+{"container":"Client","groups":[
 {"name":"repos","count":421,"call":"bal discover ballerinax/github client Client repos"},
 {"name":"orgs","count":200,"call":"bal discover ballerinax/github client Client orgs"},
 {"name":"user","count":93,"call":"bal discover ballerinax/github client Client user"},
