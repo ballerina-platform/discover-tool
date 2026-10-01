@@ -13,7 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Ballerina Central without a web search
 - Add the `client`, `service`, `class`, `funcs` and `readme` buckets, classified by call-site grammar rather than
   Ballerina Central's metadata
-- Pair each service type with the listener it binds to in the `service` bucket
+- Pair each service type with the listener it binds to in the `service` bucket — the listener's `attach` target,
+  or a type that includes it, read from the package's source when Central's docs cannot say — and list the
+  service types no listener accepts apart
 - Address resource functions by path and accessor, with path parameters spelled `:name` and keyword-escaped segments
   quoted in every printed command
 - Group large resource listings by path segment, up to four levels below the top level
