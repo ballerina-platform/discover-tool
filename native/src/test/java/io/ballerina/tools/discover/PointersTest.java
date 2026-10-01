@@ -277,37 +277,60 @@ public class PointersTest {
         }
     }
 
-    /** Every method row's {@code call} opens exactly that method's signature, never another listing. */
+    /**
+     * Every method row's {@code call} opens exactly that method's signature, never another listing: the same name,
+     * on the same container, and — under a mixed listing's section — the call form that section names.
+     */
     @Test(dataProvider = "fixtures")
     public void everyMethodRowsCallOpensItsOwnSignature(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         HttpOptions http = centralFor(slug);
         Set<String> seen = new LinkedHashSet<>();
         for (DiscoverResult answer : answersOf(context)) {
-            for (DiscoverResult.Method method : methodsOf(answer)) {
-                if (!seen.add(method.call())) {
+            for (Row row : methodRowsOf(answer)) {
+                String call = row.method().call();
+                if (!seen.add(call)) {
                     continue;
                 }
-                JsonObject signature = run(slug, http, method.call());
-                Assert.assertTrue(signature.has("declaration"),
-                        slug + ": `" + method.call() + "` is not a signature:\n" + signature);
-                Assert.assertEquals(signature.get("name").getAsString(), method.name(), method.call());
+                JsonObject signature = run(slug, http, call);
+                Assert.assertTrue(signature.has("declaration"), slug + ": `" + call + "` is not a signature:\n"
+                        + signature);
+                Assert.assertEquals(signature.get("name").getAsString(), row.method().name(), call);
+                Assert.assertEquals(signature.has("container") ? signature.get("container").getAsString() : null,
+                        row.container(), call);
+                if (row.form() != null) {
+                    Assert.assertEquals(signature.get("form").getAsString(), row.form(), call);
+                }
             }
         }
     }
 
-    private static List<DiscoverResult.Method> methodsOf(DiscoverResult answer) {
-        return switch (answer) {
-            case DiscoverResult.MethodList methods -> methods.methods();
+    /**
+     * One method row and where it was listed.
+     *
+     * @param method the row
+     * @param container the listing's container, {@code null} for module-level functions
+     * @param form the call form its section names, or {@code null} for a single-form listing
+     */
+    private record Row(DiscoverResult.Method method, String container, String form) { }
+
+    private static List<Row> methodRowsOf(DiscoverResult answer) {
+        List<Row> rows = new ArrayList<>();
+        switch (answer) {
+            case DiscoverResult.MethodList methods ->
+                    methods.methods().forEach(method -> rows.add(new Row(method, methods.container(), null)));
             case DiscoverResult.MixedListing mixed -> {
-                List<DiscoverResult.Method> methods = new ArrayList<>(mixed.remote());
-                methods.addAll(mixed.normal());
-                yield methods;
+                mixed.remote().forEach(method -> rows.add(new Row(method, mixed.container(), "->")));
+                mixed.normal().forEach(method -> rows.add(new Row(method, mixed.container(), ".")));
             }
-            case DiscoverResult.NoMatch noMatch -> noMatch.available() == null ? List.of()
-                    : methodsOf(noMatch.available());
-            default -> List.of();
-        };
+            case DiscoverResult.NoMatch noMatch -> {
+                if (noMatch.available() != null) {
+                    rows.addAll(methodRowsOf(noMatch.available()));
+                }
+            }
+            default -> { }
+        }
+        return rows;
     }
 
     private static List<DiscoverResult.ResourceList.Resource> resourcesOf(DiscoverResult answer) {
