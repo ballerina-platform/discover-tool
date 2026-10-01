@@ -123,8 +123,8 @@ override and a parser could not.
 | ----------------- | ------------------------------------------------------------------------------- |
 | `BucketList`      | a bare package: its buckets and its submodules                                  |
 | `ContainerRoster` | several containers in a bucket                                                  |
-| `PathGroups`      | resource paths grouped by segment, because there are too many to list           |
-| `ResourceList`    | resource paths, one entry per path with every accessor it answers to            |
+| `PathGroups`      | resource paths grouped by segment, plus those ending at the grouped prefix      |
+| `ResourceList`    | resource paths, one entry per path with every accessor it answers to, paged     |
 | `MethodList`      | remote or normal methods, alphabetical, paged over the ceiling                   |
 | `MixedListing`    | a container with both resource functions and named methods, split by call form |
 | `Signature`       | exactly one callable, with the declarations its signature names                 |
@@ -141,8 +141,16 @@ measure an agent's tooling truncates on.
 
 **`call` is the exact next command, and only where it is unambiguous.** A group, a container, a submodule, a
 readme section and a single-accessor resource each carry one; a resource path with several accessors does not,
-because a flat field would have to guess which. Every `call` and `next` the tool can print is run by
-`PointersTest` against the recorded payloads and must answer with something other than a `NoMatch`.
+because a flat field would have to guess which. A `call` or `next` re-types the selection it came from: a
+path selection canonically (path, then accessor), anything else exactly as given, one shell word per argument
+(`Texts.shellWord`), with any `--filter` kept. `PointersTest` runs every `call` and `next` that the first
+answers of every bucket and container print — bare, filtered, by name substring and by path plus accessor —
+against the recorded payloads, then follows what those answers print two levels further on a bounded sample;
+each must exit 0 with something other than a `NoMatch`, and none may print the command that produced it.
+Commands with a `<slot>` are templates and are checked for shape, not run.
+
+Every answer about one container names it in `container` (a `Container:` line in text). A `Signature`'s `form`
+is `->`, `.` or, for a constructor, `new`.
 
 **A `Signature` quotes; it never re-spells.** Its `declaration` and each of its `types` come from
 `Signatures`/`TypeDefs` byte for byte — the same functions that render the `.bal` API snapshots —
@@ -160,17 +168,26 @@ No listing holds more than **40 entries** (`Containers.MAX_ENTRIES`). The earlie
 bytes and degraded through tiers without ever paginating, with a hidden `--all` to escape it; that is gone.
 Over the ceiling:
 
-- **Resource paths group** by their next literal segment. Path parameters are transparent to grouping, and
-  a group subdivides only while it is still over the ceiling, to at most four levels below the top — surveyed
-  against real connectors, three were always enough (`ballerinax/jira` needed the most), and the fourth is
-  margin. Past that, the listing is shown flat and cut.
+- **Resource paths group** by their next literal segment — only when the selection is anchored at a path (or
+  is the bare container), and counting the SELECTED operations, so an accessor narrows each `count` and rides
+  into each group's `call`. Path parameters are transparent to grouping but spelled out in a group's name
+  (`repos/:owner/:repo/actions`), since the literal segments alone can name two places. Operations that end
+  exactly at the grouped prefix are listed beside the groups as resources, never as a group whose `call` would
+  be the command that produced it. A group subdivides only while it is still over the ceiling, to at most four
+  LITERAL levels below the top — surveyed against real connectors, three were always enough
+  (`ballerinax/jira` needed the most), and the fourth is margin.
 - **Remote and normal methods page**, alphabetically, with `--page <n>` (`Containers.Page`, shared with the
-  readme's section listing). Grouping methods by a verb prefix was rejected: there is no fixed verb vocabulary
-  across connectors to split on reliably (`ballerinax/twilio` alone has 199 remote methods on one client).
-- **Everything else is cut** at 40 and points at `--filter`.
+  readme's section listing). So do resource paths that cannot be grouped: a name-substring or `--filter`
+  selection (there is no path prefix a group name could extend without inventing one) and one already past
+  the depth cap. Grouping methods by a verb prefix was rejected: there is no fixed verb vocabulary across
+  connectors to split on reliably (`ballerinax/twilio` alone has 199 remote methods on one client). A page
+  outside the listing is a `validation` failure naming the range, never an empty page.
+- **Everything else is cut** at 40 and points at `--filter`: a roster of containers and a mixed listing.
 
-A cut answer always says so — `shown`/`total` and the `next` command in JSON, a trailing
-`... N more, narrow further: <command>` line in text — so a partial list is never mistaken for a complete one.
+A cut answer always says so — `shown`/`total` and the `next` command in JSON (plus `page`/`pages` when
+paged), a trailing `... N more, narrow further: <command>` line in text (`... N more (page P of Q), next page:
+<command>` when paged, `N` counting what follows this page) — so a partial list is never mistaken for a
+complete one.
 
 `--filter` narrows within the bucket already selected, client-side, over the payload already in memory; it
 is never sent to Central. It is a case-insensitive substring of an entry's surface text (name, path, parameter
@@ -190,7 +207,8 @@ Ballerina keyword keeps its escape (`gists/'public`) — dropping it would descr
 Selectors are tolerant on the way in: a parameter answers to `:owner`, `[string owner]`, `[owner]`, `{owner}`
 and `owner`; an escaped segment answers to `code\-scanning` and `code-scanning`; an accessor may come before
 the path (as its own argument or in the same one) or after it; and `new` addresses the constructor Ballerina spells `init`
-unless the container really declares something called `new`. These are input aliases only — output always
+— except on a container with resource paths, where a path selector is tried first, so a segment called `new`
+(github's `codespaces/'new`) wins. These are input aliases only — output always
 prints what the package declares.
 
 A path and an accessor name one operation when the path itself declares that accessor; otherwise the
@@ -251,8 +269,8 @@ the next move is in the answer.
 ## The cache
 
 ```
-<root>/v1/docs/<org>/<name>/<version>.json      mode 0600, no TTL
-<root>/v1/latest/<org>/<name>.json              {"version":"6.0.0","atMs":…}
+<root>/v2/docs/<repository>/<org>/<name>/<version>.json    mode 0600, no TTL
+<root>/v2/latest/<repository>/<org>/<name>.json            {"version":"6.0.0","atMs":…}
 ```
 
 What is cached is the **raw payload**, not the IR and not a rendered answer — the payload is not derived from
@@ -291,7 +309,7 @@ discover-tool/
         │   ├── Result, Failure, QualifiedName, Version, Texts, Loader, LoadedPackage
         │   ├── cache/{DocsCache,DiskCache,CacheLocation,Versions}
         │   ├── central/{PackageRepository,CentralRepository,CentralClient,HttpTransport,
-        │   │            JdkHttpTransport,HttpOptions,Coordinates,DependenciesToml,SearchHit,Json}
+        │   │            JdkHttpTransport,HttpOptions,Coordinates,DependenciesToml,Json}
         │   ├── central/schema/{CentralDocs,Schema}
         │   ├── model/{Library,TypeDef,Fn,Service,TypeRef,Param,ReturnDef,RecordField,
         │   │          ClientClass,FromCentral,Patches,Defaults,Pipeline,ModuleRef}
@@ -335,10 +353,11 @@ ballerina-platform's GitHub Packages, so building needs a `read:packages` token 
 | Suite | What it holds the line on |
 |---|---|
 | `CorpusTest` | Thirteen recorded payloads render byte-for-byte to thirteen committed `.bal` API snapshots — the oracle every quoted declaration is checked against. |
-| `ViewsAgreeTest` | **What makes the drill-down safe.** Every line a `Signature` quotes appears in the API snapshot verbatim; every path the tree offers is reachable and nothing unoffered is; closures terminate, do not repeat and stay bounded. |
-| `PointersTest` | Every `call`/`next` command any answer prints is RUN through the real CLI against the recorded payload, and must exit 0 with something other than "nothing matched". |
-| `ViewsTest` | The `.buckets.txt`/`.buckets.json` snapshots, the entry ceiling over every fixture, and the resolution and tolerance rules. Also where path ordering is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
-| `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object, no text rendering carries Markdown report furniture, and quoted Ballerina carries no fences of the tool's own. |
+| `ViewsAgreeTest` | **What makes the drill-down safe.** Every exact member name and every exact path plus accessor resolves to one `Signature` (over a corpus-wide floor), and every line it quotes appears in the API snapshot verbatim; every path the tree offers is reachable and nothing unoffered is; closures terminate, do not repeat and stay bounded. |
+| `PointersTest` | Every `call`/`next` command the first answers print (bare, filtered, per container, by name substring, by path plus accessor) is RUN through the real CLI against the recorded payload, then what those print is followed two levels further on a bounded sample; each must exit 0 with something other than "nothing matched", and none may point back at the command that printed it. |
+| `SelectionCarryTest` | A page, a group and a canonical command re-select exactly what the listing was a window onto: the selector, the accessor and the `--filter` ride along, a substring never becomes a path, the depth cap counts literal segments, and an out-of-range `--page` fails. |
+| `ViewsTest` | The `.buckets.txt`/`.buckets.json` snapshots, the entry ceiling over every fixture (listed sizes, `shown` against what is listed, a `next` on every cut listing, nested `NoMatch.available` listings included), and the resolution and tolerance rules. Also where path ordering is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
+| `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object, no text rendering carries Markdown report furniture, no `note` carries a Markdown backtick, and quoted Ballerina carries no fences of the tool's own. |
 | `render/DiscoverResultRenderingTest` | Every result shape, in both renderers, driven directly. |
 | `CliTest` | Parsing, streams, exit codes and `--output` together, in-process against a recorded payload, including following resource `call` fields to the signatures they name. |
 | `SurfaceTest` | That the bucket partition is exhaustive and disjoint, and that a `client object` type Central files as an ordinary declaration is still a `client`. |

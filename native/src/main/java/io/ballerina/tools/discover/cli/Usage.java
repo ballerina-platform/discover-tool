@@ -62,9 +62,9 @@ final class Usage {
     private static final String SESSION = """
             Typical session:
 
-              1. What can I ask?             bal discover ballerinax/github
+              1. What can I ask?              bal discover ballerinax/github
               2. A bucket, listed or one:     bal discover ballerinax/github client
-                                               bal discover ballerinax/github client Client
+                                              bal discover ballerinax/github client Client
               3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
             """;
 

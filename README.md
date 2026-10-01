@@ -37,7 +37,7 @@ left out.
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
-| `--page <n>`           | Turn the page of a method listing longer than the entry ceiling.                                       |
+| `--page <n>`           | Turn the page of a listing that pages over the entry ceiling: methods, resource paths that cannot be grouped, and readme sections narrowed by `--filter`. A page outside the listing is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`.                 |
 | `--refresh`            | Ignore the cached payload and fetch it again.                                                          |
 
@@ -61,10 +61,12 @@ $ bal discover ballerinax/kafka | cat
 ]}
 ```
 
-A bucket with too many resource paths to list is grouped by path segment:
+A bucket with too many resource paths to list is grouped by path segment. Every listing about one container
+names it first:
 
 ```
 $ bal discover ballerinax/github client
+Container: Client
 Groups: repos (421), orgs (200), user (93), teams (34), users (34), gists (19), projects (19), app (13), repositories (11), notifications (7), search (7), marketplace_listing (6), applications (5), assignments (3), classrooms (3), advisories (2), codes_of_conduct (2), enterprises (2), gitignore (2), installation (2), licenses (2), markdown (2), . (1), app-manifests (1), apps (1), emojis (1), events (1), feeds (1), issues (1), meta (1), networks (1), octocat (1), organizations (1), rate_limit (1), versions (1), zen (1)
 ```
 
@@ -72,6 +74,7 @@ A group small enough to list shows one entry per path, with every accessor it an
 
 ```
 $ bal discover ballerinax/github client gists
+Container: Client
 gists — get, post
 gists/:gistId — get, delete, patch
 gists/:gistId/comments — get, post
@@ -84,12 +87,24 @@ gists/'public — get
 gists/starred — get
 ```
 
+Operations that end exactly at a grouped prefix are listed beside its groups rather than as a group of their
+own, and a group deeper than the top is named by its full path:
+
+```
+$ bal discover ballerinax/github client repos
+Container: Client
+Here:
+repos/:owner/:repo — get, delete, patch
+Groups: repos/:owner/:repo/actions (72), repos/:owner/:repo/branches (36), repos/:owner/:repo/pulls (31), ...
+... 25 more, narrow further: bal discover ballerinax/github client Client repos --filter <keyword>
+```
+
 In JSON, an entry with exactly one accessor carries a `call` field: the ready-to-run command that opens its
 signature. A path with several accessors carries none, since it would have to guess which one:
 
 ```
 $ bal discover ballerinax/github client gists --filter star | cat
-{"resources":[
+{"container":"Client","resources":[
 {"path":"gists/:gistId/star","accessors":[
 "get",
 "put",
@@ -140,10 +155,12 @@ A listing over the ceiling says so, with the command that continues it:
 
 ```
 $ bal discover ballerinax/twilio client
+Container: Client
 Methods: createAccount, createAddress, createApplication, createCall, createCallFeedbackSummary, createCallRecording, createIncomingPhoneNumber, createIncomingPhoneNumberAssignedAddOn, createIncomingPhoneNumberLocal, createIncomingPhoneNumberMobile, createIncomingPhoneNumberTollFree, createMessage, createMessageFeedback, createNewKey, createNewSigningKey, createParticipant, createPayments, createQueue, createSipAuthCallsCredentialListMapping, createSipAuthCallsIpAccessControlListMapping, createSipAuthRegistrationsCredentialListMapping, createSipCredential, createSipCredentialList, createSipCredentialListMapping, createSipDomain, createSipIpAccessControlList, createSipIpAccessControlListMapping, createSipIpAddress, createSiprec, createStream, createToken, createUsageTrigger, createUserDefinedMessage, createUserDefinedMessageSubscription, createValidationRequest, deleteAddress, deleteApplication, deleteCall, deleteCallFeedbackSummary, deleteCallRecording
-... 159 more, narrow further: bal discover ballerinax/twilio client Client --page 2
+... 159 more (page 1 of 5), next page: bal discover ballerinax/twilio client Client --page 2
 
 $ bal discover ballerinax/twilio client --filter message
+Container: Client
 Methods: createMessage, createMessageFeedback, createUserDefinedMessage, createUserDefinedMessageSubscription, deleteMedia, deleteMessage, deleteUserDefinedMessageSubscription, fetchMedia, fetchMessage, listCallNotification, listMedia, listMessage, listNotification, updateMessage
 ```
 
@@ -154,6 +171,7 @@ $ bal discover ballerinax/kafka client Producer sendd
 Nothing on Producer matches 'sendd'.
 Did you mean: send, sendWithMetadata
 Available:
+Container: Producer
 Methods: 'flush, close, getTopicPartitions, send, sendWithMetadata
 ```
 
@@ -162,7 +180,8 @@ A member declared on several containers is never picked silently:
 ```
 $ bal discover ballerinax/kafka client commit
 'commit' is declared on 2 containers — pick one:
-Caller (2 matches), Consumer (3 matches)
+  Caller (2 matches): bal discover ballerinax/kafka client Caller commit
+  Consumer (3 matches): bal discover ballerinax/kafka client Consumer commit
 ```
 
 A large readme can be narrowed to the sections that mention a keyword:
@@ -182,16 +201,16 @@ inline, one array element per line — and these are its shapes:
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | bare package                         | `buckets`, `submodules` (`name`, `summary`, `call`)                                                              |
 | several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `call`), `shown`, `total`, `next`             |
-| resource groups                      | `groups` (`name`, `count`, `call`), `shown`, `total`, `next`                                                      |
-| resource paths                       | `resources` (`path`, `accessors`, `call`), `shown`, `total`, `next`                                              |
-| methods                              | `methods`, `shown`, `total`, `next`                                                                              |
-| resources and methods together       | `resources`, `remote`, `normal`, `shown`, `total`, `next`, `documented`                                          |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form`, `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented` |
+| resource groups                      | `container`, `resources` (ending at this prefix), `groups` (`name`, `count`, `call`), `shown`, `total`, `next`    |
+| resource paths                       | `container`, `resources` (`path`, `accessors`, `call`), `shown`, `total`, `page`, `pages`, `next`               |
+| methods                              | `container`, `methods`, `shown`, `total`, `page`, `pages`, `next`                                               |
+| resources and methods together       | `container`, `resources`, `remote`, `normal`, `shown`, `total`, `next`, `documented`                            |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented` |
 | nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `call`), `available`, `next`, `documented`              |
 | member on several containers         | `requested`, `owners` (`name`, `matches`, `call`), `shown`, `total`, `next`                                      |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `call`)                                                       |
 | readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
-| readme sections                      | `chunks` (`number`, `title`, `lines`, `call`), `shown`, `total`, `next`                                          |
+| readme sections                      | `chunks` (`number`, `title`, `lines`, `call`), `shown`, `total`, `page`, `pages`, `next`                       |
 
 Any answer can also carry `warning` (the version could not be confirmed against the registry) and most can
 carry `note` (the symbol was found in a different bucket than the one asked, the path selector was relocated
@@ -202,15 +221,18 @@ only in their documentation.
 
 No listing shows more than **40 entries**. Over that:
 
-- resource paths **group** by their next literal path segment, up to four levels below the top; path
-  parameters never form a group of their own;
-- remote and normal methods **page**, alphabetically, with `--page <n>` (a `--filter` carries over to every
-  page);
-- anything else — a roster of containers, a resource listing narrowed by `--filter`, a container mixing
-  resources with methods — is cut at 40 and points at `--filter`.
+- resource paths selected by a path (or by nothing) **group** by their next literal path segment, up to four
+  literal levels below the top; path parameters never form a group of their own, and a group carries the
+  accessor the listing was narrowed by into its `call`;
+- remote and normal methods **page**, alphabetically, with `--page <n>`, and so do resource paths that cannot
+  be grouped — selected by a name substring or `--filter`, or already four literal levels deep — and readme
+  sections narrowed by `--filter`. Every page keeps the selector and the `--filter`;
+- anything else — a roster of containers, a container mixing resources with methods — is cut at 40 and
+  points at `--filter`.
 
 A cut listing always says so: `shown`/`total` plus `next` (the command that continues it) in JSON, or a
-trailing `... N more, narrow further: <command>` line in text.
+trailing `... N more, narrow further: <command>` line in text — `... N more (page P of Q), next page:
+<command>` for a paged one, where `N` counts what comes after this page and JSON adds `page`/`pages`.
 
 ### Paths
 
@@ -220,8 +242,8 @@ tool prints pre-quotes such a path for the shell. A selector also accepts `[stri
 `{owner}` and plain `owner` for a parameter, and either spelling of an escaped segment (`code\-scanning` or
 `code-scanning`). Paths match from the first segment; the one relaxation is a trailing segment, which is
 looked for beneath the prefix that matched and listed rather than chosen when it occurs in several places.
-`new` addresses the constructor Ballerina spells `init`, unless the container really declares something
-called `new`.
+`new` addresses the constructor Ballerina spells `init` — except on a container with resource paths, where a
+path selector is tried first, so a path segment called `new` (github's `codespaces/'new`) wins over it.
 
 ## The contract
 
