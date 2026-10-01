@@ -702,13 +702,11 @@ public class DiscoverResultRenderingTest {
                 .toList();
     }
 
-    /** A resource row whose command for each accessor is {@code prefix} and the accessor, or none when null. */
+    /** A resource row whose command for each accessor is {@code prefix} and the accessor. */
     private static DiscoverResult.ResourceList.Resource resource(String path, String prefix, String... accessors) {
         Map<String, String> calls = new LinkedHashMap<>();
-        if (prefix != null) {
-            for (String accessor : accessors) {
-                calls.put(accessor, prefix + " " + accessor);
-            }
+        for (String accessor : accessors) {
+            calls.put(accessor, prefix + " " + accessor);
         }
         return new DiscoverResult.ResourceList.Resource(path, List.of(accessors), calls);
     }
