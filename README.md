@@ -37,7 +37,7 @@ left out.
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
-| `--page <n>`           | Turn the page of a listing that pages over the entry ceiling: methods, resource paths that cannot be grouped, and readme sections narrowed by `--filter`. A page outside the listing is a `validation` failure. |
+| `--page <n>`           | Turn the page of a listing that pages over the entry ceiling: methods, resource paths that cannot be grouped, a container's resources and methods listed together, and readme sections narrowed by `--filter`. A page outside the listing is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`.                 |
 | `--refresh`            | Ignore the cached payload and fetch it again.                                                          |
 
@@ -71,9 +71,9 @@ $ bal discover ballerinax/kafka | cat
 
 At a terminal every answer opens with a header naming where it is — package, bucket, container, selector —
 and a count, lists one entry per line in aligned columns, and ends with a footer: notes, how much was left
-out, and the `Next:` commands. A listing whose JSON gives every row its own `call` prints the shape those
-commands share once, as a `Next:` line with a placeholder; a row whose command does not fit that shape (a path
-that needs shell quoting, say) carries its own beside it.
+out, and the `Next:` commands. A listing whose JSON gives every row its own command (`call`, or `calls` on a
+resource row) prints the shape those commands share once, as a `Next:` line with a placeholder; a row whose
+command does not fit that shape (a path that needs shell quoting, say) carries its own beside it.
 
 Several containers in one bucket are a roster with their member counts; service types are listed under the
 listener they bind to:
@@ -200,12 +200,15 @@ Groups (operations under each)
   repos/:owner/:repo/notifications              2
 
 ... 25 more, narrow further
+Next: bal discover ballerinax/github client Client <path> <accessor>
 Next: bal discover ballerinax/github client Client <group>
 Next: bal discover ballerinax/github client Client repos --filter <keyword>
 ```
 
-In JSON, an entry with exactly one accessor carries a `call` field: the ready-to-run command that opens its
-signature. A path with several accessors carries none, since it would have to guess which one:
+In JSON, every resource entry carries a `calls` object keyed by accessor, in `accessors` order: for each
+accessor, the ready-to-run command that opens that signature. A path with one accessor has the same shape with
+one key, so a caller reads every resource row the same way, and a path with several gets a command for each
+rather than a guess at one:
 
 ```
 $ bal discover ballerinax/github client gists --filter star | cat
@@ -214,12 +217,15 @@ $ bal discover ballerinax/github client gists --filter star | cat
 "get",
 "put",
 "delete"
-]},
+],"calls":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},
 {"path":"gists/starred","accessors":[
 "get"
-],"call":"bal discover ballerinax/github client Client gists/starred get"}
+],"calls":{"get":"bal discover ballerinax/github client Client gists/starred get"}}
 ],"shown":2,"total":2}
 ```
+
+Everything else that opens exactly one thing — a group, a container, a submodule, a readme section — carries a
+plain `call`.
 
 One callable is the end of a drill-down: its declaration with its doc comment, then the declarations its
 signature names, one level deep:
@@ -348,10 +354,10 @@ inline, one array element per line — and these are its shapes:
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | bare package                         | `buckets`, `submodules` (`name`, `summary`, `call`)                                                              |
 | several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `call`), `shown`, `total`, `next`             |
-| resource groups                      | `container`, `resources` (ending at this prefix), `groups` (`name`, `count`, `call`), `shown`, `total`, `next`    |
-| resource paths                       | `container`, `resources` (`path`, `accessors`, `call`), `shown`, `total`, `page`, `pages`, `next`               |
+| resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `calls`), `groups` (`name`, `count`, `call`), `shown`, `total`, `next` |
+| resource paths                       | `container`, `resources` (`path`, `accessors`, `calls`), `shown`, `total`, `page`, `pages`, `next`              |
 | methods                              | `container`, `methods`, `shown`, `total`, `page`, `pages`, `next`                                               |
-| resources and methods together       | `container`, `resources`, `remote`, `normal`, `shown`, `total`, `next`, `documented`                            |
+| resources and methods together       | `container`, `resources` (`path`, `accessors`, `calls`), `remote`, `normal`, `shown`, `total`, `page`, `pages`, `next`, `documented` |
 | one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented` |
 | nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `call`), `available`, `next`, `documented`              |
 | member on several containers         | `requested`, `owners` (`name`, `matches`, `call`), `shown`, `total`, `next`                                      |
@@ -374,8 +380,11 @@ No listing shows more than **40 entries**. Over that:
 - remote and normal methods **page**, alphabetically, with `--page <n>`, and so do resource paths that cannot
   be grouped — selected by a name substring or `--filter`, or already four literal levels deep — and readme
   sections narrowed by `--filter`. Every page keeps the selector and the `--filter`;
-- anything else — a roster of containers, a container mixing resources with methods — is cut at 40 and
-  points at `--filter`.
+- a container mixing resources with methods pages the same way, as one sequence — resource paths, then remote
+  methods, then normal ones — so a page can end partway through one section and pick up the next; each page
+  keeps the section headings (`resources`, `remote`, `normal` in JSON) for whatever it holds and omits the
+  ones it holds nothing of;
+- a roster of containers is cut at 40 and points at `--filter`.
 
 A cut listing always says so: `shown`/`total` plus `next` (the command that continues it) in JSON, or a
 `... N more, narrow further` line followed by `Next: <command>` in text — `... N more (page P of Q)` for a
