@@ -4,6 +4,8 @@ ballerina/graphql · client · Client
 
   execute
   executeWithType
+
+Next: bal discover ballerina/graphql client Client <name>
 == service ==
 ballerina/graphql · service
 2 service types
@@ -27,3 +29,5 @@ ballerina/graphql · funcs
 
   __addError
   getSdlString
+
+Next: bal discover ballerina/graphql funcs <name>

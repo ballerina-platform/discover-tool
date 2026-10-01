@@ -12,10 +12,10 @@
 {"name":"Table","normal":18,"call":"bal discover ballerina/xlsx class Table"}
 ],"shown":3,"total":3}
 {"methods":[
-"fromBytes",
-"fromFile",
-"parseSheet",
-"parseTable",
-"writeSheet",
-"writeTable"
+{"name":"fromBytes","call":"bal discover ballerina/xlsx funcs fromBytes"},
+{"name":"fromFile","call":"bal discover ballerina/xlsx funcs fromFile"},
+{"name":"parseSheet","call":"bal discover ballerina/xlsx funcs parseSheet"},
+{"name":"parseTable","call":"bal discover ballerina/xlsx funcs parseTable"},
+{"name":"writeSheet","call":"bal discover ballerina/xlsx funcs writeSheet"},
+{"name":"writeTable","call":"bal discover ballerina/xlsx funcs writeTable"}
 ],"shown":6,"total":6}

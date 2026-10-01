@@ -49,6 +49,14 @@ public sealed interface DiscoverResult {
     record Paging(int page, int pages, int remaining) { }
 
     /**
+     * One method or module-level function in a listing.
+     *
+     * @param name its name, as declared
+     * @param call the command that opens its signature
+     */
+    record Method(String name, String call) { }
+
+    /**
      * A package's (or a targeted module's) own top-level buckets — the answer to a bare
      * {@code bal discover <org/name>} with no bucket and no selector.
      *
@@ -189,7 +197,7 @@ public sealed interface DiscoverResult {
      * {@code --page} once a container has too many to show at once.
      *
      * @param container the container that declares them, or {@code null} for module-level functions
-     * @param methods the names shown, alphabetical, up to the ceiling
+     * @param methods the methods shown, alphabetical, up to the ceiling
      * @param shown how many are in this response
      * @param total how many the container declares
      * @param paging which page this is, or {@code null} when the whole listing fit on one
@@ -203,10 +211,10 @@ public sealed interface DiscoverResult {
      *     {@code null} when neither applies
      */
     record MethodList(
-            String container, List<String> methods, int shown, int total, Paging paging, String next,
+            String container, List<Method> methods, int shown, int total, Paging paging, String next,
             String warning, String note) implements DiscoverResult {
 
-        public MethodList(List<String> methods, int shown, int total, String next) {
+        public MethodList(List<Method> methods, int shown, int total, String next) {
             this(null, methods, shown, total, null, next, null, null);
         }
     }
@@ -309,8 +317,8 @@ public sealed interface DiscoverResult {
      *
      * @param container the container that declares them
      * @param resources the resource paths on this page
-     * @param remote the remote method names on this page, alphabetical
-     * @param normal the plain method names on this page, alphabetical
+     * @param remote the remote methods on this page, alphabetical
+     * @param normal the plain methods on this page, alphabetical
      * @param shown how many entries across all three are in this response
      * @param total how many exist across all three
      * @param paging which page this is, or {@code null} when the whole listing fit on one
@@ -320,7 +328,7 @@ public sealed interface DiscoverResult {
      * @param note the same joined advisory {@link ResourceList#note} carries, or {@code null}
      */
     record MixedListing(
-            String container, List<ResourceList.Resource> resources, List<String> remote, List<String> normal,
+            String container, List<ResourceList.Resource> resources, List<Method> remote, List<Method> normal,
             int shown, int total, Paging paging, String next, List<String> documented, String warning, String note)
             implements DiscoverResult { }
 

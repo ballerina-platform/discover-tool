@@ -1,10 +1,10 @@
 {"container":"Client","methods":[
-"batchExecute",
-"call",
-"close",
-"execute",
-"query",
-"queryRow"
+{"name":"batchExecute","call":"bal discover ballerinax/postgresql client Client batchExecute"},
+{"name":"call","call":"bal discover ballerinax/postgresql client Client call"},
+{"name":"close","call":"bal discover ballerinax/postgresql client Client close"},
+{"name":"execute","call":"bal discover ballerinax/postgresql client Client execute"},
+{"name":"query","call":"bal discover ballerinax/postgresql client Client query"},
+{"name":"queryRow","call":"bal discover ballerinax/postgresql client Client queryRow"}
 ],"shown":6,"total":6}
 {"bucket":"service","total":0,"elsewhere":[
 {"bucket":"client","count":1,"call":"bal discover ballerinax/postgresql client"},

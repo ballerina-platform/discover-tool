@@ -12,15 +12,15 @@
 {"name":"PrintableRawTemplate","call":"bal discover ballerina/log class PrintableRawTemplate"}
 ],"shown":3,"total":3}
 {"methods":[
-"evaluateTemplate",
-"fromConfig",
-"getLoggerRegistry",
-"printDebug",
-"printError",
-"printInfo",
-"printWarn",
-"processTemplate",
-"root",
-"setOutputFile",
-"toMaskedString"
+{"name":"evaluateTemplate","call":"bal discover ballerina/log funcs evaluateTemplate"},
+{"name":"fromConfig","call":"bal discover ballerina/log funcs fromConfig"},
+{"name":"getLoggerRegistry","call":"bal discover ballerina/log funcs getLoggerRegistry"},
+{"name":"printDebug","call":"bal discover ballerina/log funcs printDebug"},
+{"name":"printError","call":"bal discover ballerina/log funcs printError"},
+{"name":"printInfo","call":"bal discover ballerina/log funcs printInfo"},
+{"name":"printWarn","call":"bal discover ballerina/log funcs printWarn"},
+{"name":"processTemplate","call":"bal discover ballerina/log funcs processTemplate"},
+{"name":"root","call":"bal discover ballerina/log funcs root"},
+{"name":"setOutputFile","call":"bal discover ballerina/log funcs setOutputFile"},
+{"name":"toMaskedString","call":"bal discover ballerina/log funcs toMaskedString"}
 ],"shown":11,"total":11}

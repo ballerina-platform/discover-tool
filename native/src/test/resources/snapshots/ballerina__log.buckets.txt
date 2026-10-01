@@ -36,3 +36,5 @@ ballerina/log · funcs
   root
   setOutputFile
   toMaskedString
+
+Next: bal discover ballerina/log funcs <name>

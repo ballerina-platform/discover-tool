@@ -21,9 +21,11 @@ package io.ballerina.tools.discover.render;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.ballerina.tools.discover.Texts;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -332,8 +334,8 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aPaginatedMethodListNamesTheNextPageInBothRenderings() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
-                List.of("createAccount", "createAddress"), 40, 199, new DiscoverResult.Paging(1, 5, 159),
-                "bal discover ballerinax/twilio client Client --page 2", null, null);
+                methods(TWILIO, "createAccount", "createAddress"), 40, 199, new DiscoverResult.Paging(1, 5, 159),
+                TWILIO + " --page 2", null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "199 methods",
@@ -342,8 +344,11 @@ public class DiscoverResultRenderingTest {
                 "  createAddress",
                 "",
                 "... 159 more (page 1 of 5)",
-                "Next: bal discover ballerinax/twilio client Client --page 2"));
+                "Next: " + TWILIO + " <name>",
+                "Next: " + TWILIO + " --page 2"));
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.getAsJsonArray("methods").get(0).toString(),
+                "{\"name\":\"createAccount\",\"call\":\"" + TWILIO + " createAccount\"}");
         Assert.assertEquals(json.get("container").getAsString(), "Client");
         Assert.assertEquals(json.get("shown").getAsInt(), 40);
         Assert.assertEquals(json.get("total").getAsInt(), 199);
@@ -354,15 +359,16 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aLaterPageCountsOnlyWhatComesAfterIt() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
-                List.of("deleteConferenceRecording"), 40, 199, new DiscoverResult.Paging(2, 5, 119),
+                methods(TWILIO, "deleteConferenceRecording"), 40, 199, new DiscoverResult.Paging(2, 5, 119),
                 "bal discover ballerinax/twilio client Client --page 3", null, null);
         Assert.assertTrue(TextRenderer.render(result).endsWith(lines(
                 "... 119 more (page 2 of 5)",
-                "Next: bal discover ballerinax/twilio client Client --page 3")));
+                "Next: " + TWILIO + " <name>",
+                "Next: " + TWILIO + " --page 3")));
 
         DiscoverResult last = new DiscoverResult.MethodList("Client",
-                List.of("updateUsageTrigger"), 39, 199, new DiscoverResult.Paging(5, 5, 0), null, null, null);
-        Assert.assertTrue(TextRenderer.render(last).endsWith("Last page (page 5 of 5)"));
+                methods(TWILIO, "updateUsageTrigger"), 39, 199, new DiscoverResult.Paging(5, 5, 0), null, null, null);
+        Assert.assertTrue(TextRenderer.render(last).endsWith("Last page (page 5 of 5)\nNext: " + TWILIO + " <name>"));
         Assert.assertFalse(JsonParser.parseString(JsonRenderer.render(last)).getAsJsonObject().has("next"));
     }
 
@@ -510,8 +516,9 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aMixedListingIsSectionedByCallFormInTextAndThreeArraysInJson() {
         DiscoverResult result = new DiscoverResult.MixedListing("Client",
-                List.of(resource(":...path", null, "get", "post")),
-                List.of("execute", "get"), List.of("getCookieStore"), 4, 4, null, null, List.of(), null, null);
+                List.of(resource(":...path", HTTP + " :...path", "get", "post")),
+                methods(HTTP, "execute", "get"), methods(HTTP, "getCookieStore"), 4, 4, null, null, List.of(), null,
+                null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "1 resource path, 2 remote methods, 1 normal method",
@@ -524,14 +531,19 @@ public class DiscoverResultRenderingTest {
                 "  get",
                 "",
                 "Normal (.)",
-                "  getCookieStore"));
+                "  getCookieStore",
+                "",
+                "Next: " + HTTP + " <path> <accessor>",
+                "Next: " + HTTP + " <name>"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("container").getAsString(), "Client");
         Assert.assertEquals(json.getAsJsonArray("resources").get(0).getAsJsonObject().get("path").getAsString(),
                 ":...path");
-        Assert.assertEquals(json.getAsJsonArray("remote").toString(), "[\"execute\",\"get\"]");
-        Assert.assertEquals(json.getAsJsonArray("normal").toString(), "[\"getCookieStore\"]");
+        Assert.assertEquals(json.getAsJsonArray("remote").get(1).toString(),
+                "{\"name\":\"get\",\"call\":\"" + HTTP + " get\"}");
+        Assert.assertEquals(json.getAsJsonArray("normal").get(0).getAsJsonObject().get("name").getAsString(),
+                "getCookieStore");
         Assert.assertEquals(json.get("shown").getAsInt(), 4);
         Assert.assertEquals(json.get("total").getAsInt(), 4);
         Assert.assertFalse(json.has("documented"));
@@ -541,7 +553,8 @@ public class DiscoverResultRenderingTest {
     public void aPagedMixedListingNamesItsPageAndDocumentationOnlyMatches() {
         String next = "bal discover pkg client Client --page 2";
         DiscoverResult result = new DiscoverResult.MixedListing(null,
-                List.of(), List.of("execute"), List.of("close"), 2, 4, new DiscoverResult.Paging(1, 2, 2), next,
+                List.of(), methods("bal discover pkg client Client", "execute"),
+                methods("bal discover pkg client Client", "'close"), 2, 4, new DiscoverResult.Paging(1, 2, 2), next,
                 List.of("forward"), null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "4 entries",
@@ -550,12 +563,13 @@ public class DiscoverResultRenderingTest {
                 "  execute",
                 "",
                 "Normal (.)",
-                "  close",
+                "  'close  bal discover pkg client Client \"'close\"",
                 "",
                 "Matched by documentation only",
                 "  forward",
                 "",
                 "... 2 more (page 1 of 2)",
+                "Next: bal discover pkg client Client <name>",
                 "Next: " + next));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
@@ -574,7 +588,8 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aMissNamesTheClosestNamesAndWhatIsThereInBothRenderings() {
         DiscoverResult result = new DiscoverResult.NoMatch("sendd", "Producer", List.of("send"), List.of(),
-                new DiscoverResult.MethodList(List.of("close", "send"), 2, 2, null),
+                new DiscoverResult.MethodList(methods("bal discover ballerinax/kafka client Producer", "close", "send"),
+                        2, 2, null),
                 "bal discover ballerinax/kafka client Producer", List.of(), null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Producer",
@@ -587,7 +602,9 @@ public class DiscoverResultRenderingTest {
                 "  2 functions",
                 "",
                 "    close",
-                "    send"));
+                "    send",
+                "",
+                "  Next: bal discover ballerinax/kafka client Producer <name>"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("requested").getAsString(), "sendd");
@@ -672,6 +689,17 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(client.get("bucket").getAsString(), "client");
         Assert.assertEquals(client.get("count").getAsInt(), 3);
         Assert.assertEquals(client.get("call").getAsString(), "bal discover ballerinax/kafka client");
+    }
+
+    private static final String TWILIO = "bal discover ballerinax/twilio client Client";
+
+    private static final String HTTP = "bal discover ballerina/http client Client";
+
+    /** Each name with its command, {@code prefix} and the name as one shell word. */
+    private static List<DiscoverResult.Method> methods(String prefix, String... names) {
+        return Arrays.stream(names)
+                .map(name -> new DiscoverResult.Method(name, prefix + " " + Texts.shellWord(name)))
+                .toList();
     }
 
     /** A resource row whose command for each accessor is {@code prefix} and the accessor, or none when null. */

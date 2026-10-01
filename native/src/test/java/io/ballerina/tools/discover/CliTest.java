@@ -490,7 +490,8 @@ public class CliTest {
         String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
         Assert.assertTrue(text.startsWith("ballerinax/kafka · client · Producer · sendd\n"
                 + "Nothing on Producer matches 'sendd'.\n\nDid you mean\n  send\n"), text);
-        Assert.assertTrue(text.contains("\n\nAvailable\n  5 methods\n\n    'flush\n    close\n"), text);
+        Assert.assertTrue(text.contains("\n\nAvailable\n  5 methods\n\n    'flush              "
+                + "bal discover ballerinax/kafka client Producer \"'flush\"\n    close\n"), text);
     }
 
     @Test

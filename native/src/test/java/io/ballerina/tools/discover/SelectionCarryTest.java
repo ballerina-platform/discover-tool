@@ -116,6 +116,7 @@ public class SelectionCarryTest {
     public void aLaterPageCountsWhatIsLeftNotWhatWasShownInText() {
         Run text = run("ballerinax__twilio", "bal discover ballerinax/twilio client Client --page 2 --output text");
         Assert.assertTrue(text.out().contains("\n... 119 more (page 2 of 5)\n"
+                + "Next: bal discover ballerinax/twilio client Client <name>\n"
                 + "Next: bal discover ballerinax/twilio client Client --page 3\n"), text.out());
     }
 
@@ -329,7 +330,8 @@ public class SelectionCarryTest {
     private static List<String> strings(JsonObject json, String field) {
         List<String> values = new ArrayList<>();
         if (json.has(field)) {
-            json.getAsJsonArray(field).forEach(value -> values.add(value.getAsString()));
+            json.getAsJsonArray(field).forEach(value ->
+                    values.add(value.getAsJsonObject().get("name").getAsString()));
         }
         return values;
     }
@@ -375,8 +377,8 @@ public class SelectionCarryTest {
         Run text = run(http, HTTP + " --page 2 --output text");
         Assert.assertTrue(text.out().contains("\n\nRemote (->)\n  "), text.out());
         Assert.assertTrue(text.out().contains("\n\nNormal (.)\n  "), text.out());
-        Assert.assertTrue(text.out().contains("\n... 11 more (page 2 of 3)\nNext: " + HTTP + " --page 3"),
-                text.out());
+        Assert.assertTrue(text.out().contains("\n... 11 more (page 2 of 3)\nNext: " + HTTP + " <name>\nNext: " + HTTP
+                + " --page 3"), text.out());
     }
 
     @Test

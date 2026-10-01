@@ -44,6 +44,7 @@ ballerinax/redis · client · Client
   incrByFloat
 
 ... 72 more (page 1 of 3)
+Next: bal discover ballerinax/redis client Client <name>
 Next: bal discover ballerinax/redis client Client --page 2
 == service ==
 ballerinax/redis · service

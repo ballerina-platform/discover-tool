@@ -340,8 +340,10 @@ public class ViewsTest {
         DiscoverResult.MixedListing mixed = as(DiscoverResult.MixedListing.class,
                 render(FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLIENT, List.of("Client")));
         Assert.assertFalse(mixed.resources().isEmpty(), mixed.toString());
-        Assert.assertTrue(mixed.remote().contains("execute"), mixed.remote().toString());
-        Assert.assertTrue(mixed.normal().contains("getCookieStore"), mixed.normal().toString());
+        Assert.assertTrue(mixed.remote().stream().anyMatch(method -> method.name().equals("execute")),
+                mixed.remote().toString());
+        Assert.assertTrue(mixed.normal().stream().anyMatch(method -> method.name().equals("getCookieStore")),
+                mixed.normal().toString());
         Assert.assertEquals(mixed.shown(), mixed.total());
         Assert.assertEquals(mixed.total(), mixed.resources().size() + mixed.remote().size() + mixed.normal().size());
         // The call form is printed on every section, because `->` versus `.` is the fact a caller came for.
