@@ -40,9 +40,14 @@ public class TextsTest {
     @Test
     public void globAndShellMetacharactersAreQuoted() {
         for (String word : List.of("repos/*", "a?", "[x]", "a;b", "a|b", "a&b", "a<b", "a>b", "(a)", "{a}",
-                "#a", "~a", "a b", "gists/'public")) {
+                "#a", "~a", "a b", "gists/'public", "=ls", "a@b", "@a", "a,b")) {
             Assert.assertEquals(Texts.shellWord(word), "\"" + word + "\"", word);
         }
+    }
+
+    @Test
+    public void anEqualsSignPastTheFirstCharacterIsLeftBare() {
+        Assert.assertEquals(Texts.shellWord("a=b"), "a=b");
     }
 
     @Test
