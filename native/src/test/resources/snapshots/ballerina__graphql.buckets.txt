@@ -1,0 +1,8 @@
+== client ==
+Methods: execute, executeWithType
+== service ==
+Service (binds to graphql:Listener), Interceptor (binds to graphql:Listener)
+== class ==
+Context, Field
+== funcs ==
+Methods: __addError, getSdlString

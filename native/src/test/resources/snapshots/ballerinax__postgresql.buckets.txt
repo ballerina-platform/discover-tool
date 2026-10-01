@@ -1,0 +1,11 @@
+== client ==
+Methods: batchExecute, call, close, execute, query, queryRow
+== service ==
+service: none in this package
+Elsewhere: client (1), class (125)
+== class ==
+BitStringArrayValue, BitStringValue, BoxArrayValue, BoxOutParameter, BoxValue, ByteaOutParameter, CidrArrayValue, CidrOutParameter, CidrValue, CircleArrayValue, CircleOutParameter, CircleValue, CustomResultIterator, CustomTypeValue, DateRangeArrayValue, DateRangeOutParameter, DateRangeValue, EnumOutParameter, EnumValue, InetArrayValue, InetOutParameter, InetValue, InOutParameter, IntegerRangeArrayValue, IntegerRangeOutParameter, IntegerRangeValue, IntervalArrayValue, IntervalOutParameter, IntervalValue, JsonArrayValue, JsonBinaryArrayValue, JsonBinaryValue, JsonbOutParameter, JsonOutParameter, JsonPathArrayValue, JsonPathOutParameter, JsonPathValue, JsonValue, LineArrayValue, LineOutParameter
+... 85 more, narrow further: bal discover ballerinax/postgresql class --filter <keyword>
+== funcs ==
+funcs: none in this package
+Elsewhere: client (1), class (125)

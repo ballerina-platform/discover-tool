@@ -1,0 +1,12 @@
+== client ==
+Methods: append, auth, bitCount, bitOpAnd, bitOpNot, bitOpOr, bitOpXor, bLPop, bRPop, close, clusterInfo, decr, decrBy, del, echo, exists, expire, flushAll, flushDb, get, getBit, getRange, getSet, hDel, hExists, hGet, hGetAll, hIncrBy, hIncrByFloat, hKeys, hLen, hMGet, hMSet, hSet, hSetNx, hStrLen, hVals, incr, incrBy, incrByFloat
+... 72 more, narrow further: bal discover ballerinax/redis client Client --page 2
+== service ==
+service: none in this package
+Elsewhere: client (1)
+== class ==
+class: none in this package
+Elsewhere: client (1)
+== funcs ==
+funcs: none in this package
+Elsewhere: client (1)

@@ -1,0 +1,10 @@
+== client ==
+client: none in this package
+Elsewhere: class (3), funcs (11)
+== service ==
+service: none in this package
+Elsewhere: class (3), funcs (11)
+== class ==
+Logger, LoggerRegistry, PrintableRawTemplate
+== funcs ==
+Methods: evaluateTemplate, fromConfig, getLoggerRegistry, printDebug, printError, printInfo, printWarn, processTemplate, root, setOutputFile, toMaskedString

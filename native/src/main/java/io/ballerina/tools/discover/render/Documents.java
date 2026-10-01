@@ -48,48 +48,10 @@ public final class Documents {
     }
 
     /**
-     * Stamp a document's own length onto its first line — the tool's only defence against a filter.
-     *
-     * <p>Piping is not a habit this tool can argue a caller out of. It was measured at 19 of 19 calls before the
-     * skill said "never pipe it" and 19 of 19 after, and the reflex turns out not to be about {@code bal discover}
-     * at all: in every session that showed it, a genuinely noisy command ({@code bal openapi}, {@code bal tool
-     * pull}) had been piped moments earlier, and the {@code | head} came along with it — applied to
-     * {@code bal discover --help} before a single byte of a document had been seen. The one session with no such
-     * command ahead of it piped nothing.
-     *
-     * <p>What that costs is silent. A {@code | head -150} over one github operation's type closure keeps 150 of
-     * 535 lines and says nothing; one measured cut landed eight lines inside {@code public type Repository
-     * record &#123;|}, so the model was handed a record whose last field had no closing brace. Bounded documents
-     * do not help, because the bound is per document and the window is per call.
-     *
-     * <p>A length on line one converts that silence into arithmetic: 150 arrived, the document says 535. It is
-     * the one line every window keeps, which is exactly why it goes there and not in a footer.
-     *
-     * <p>Applied at the single point every document passes through on its way to stdout, so a view written later
-     * inherits it without knowing about it. A first line that is neither register's marker is left untouched.
-     */
-    public static String withLength(String document) {
-        long lines = document.lines().count();
-        int end = document.indexOf('\n');
-        String first = end < 0 ? document : document.substring(0, end);
-        String rest = end < 0 ? "" : document.substring(end);
-        if (first.startsWith("<!-- bal discover ") && first.endsWith(" -->")) {
-            return first.substring(0, first.length() - " -->".length()) + " · " + lines + " lines -->" + rest;
-        }
-        // Every code-register document opens on a single-line identity comment — `// ballerinax/github:6.0.0`,
-        // or `// Resolved: …` from `api`. Neither is a divider, so the count reads as part of the sentence.
-        if (first.startsWith("// ")) {
-            return first + " · " + lines + " lines" + rest;
-        }
-        return document;
-    }
-
-    /**
      * The opening comment of a code-register document: what was resolved, then what is wrong with it.
      *
-     * <p>The counterpart of {@link Report#warning} for documents that ARE Ballerina, where a comment is the
-     * only thing a file can carry. Both registers take the warning from the same loaded package, so a version
-     * nobody verified says so whether the caller asked for Markdown or for source.
+     * <p>A version nobody verified says so in the document itself, where a comment is the only thing a
+     * Ballerina file can carry.
      *
      * @param warning {@code null} when there is nothing to warn about, and then no second line is written
      */

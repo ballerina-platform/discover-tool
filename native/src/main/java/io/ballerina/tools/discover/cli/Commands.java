@@ -34,11 +34,8 @@ import java.util.List;
  * <p>{@code --module}/{@code -m} applies uniformly across every bucket including {@code readme} — it is read once,
  * by {@link Cli} itself before any bucket is dispatched, since which module a coordinate resolves to is a fact
  * about the PACKAGE lookup, not about any one bucket. {@code --filter} and {@code --page} are here now that
- * {@code Containers} and {@code Readme} both read them. {@code --output} only changes the bare-package bucket
- * listing, {@code readme}, and the {@code client}/{@code service}/{@code class}/{@code funcs} buckets' own
- * over-the-ceiling responses — the still-Markdown answers those four buckets can also produce (exactly one result,
- * or a container mixing resource paths with named methods) keep their Markdown shape regardless of {@code --output}
- * until they are rewritten onto {@link DiscoverResult} too. {@code -s/--search}, {@code -r/--resolve-types} and
+ * {@code Containers} and {@code Readme} both read them. {@code --output} applies to every response, since every
+ * one is a {@link DiscoverResult}. {@code -s/--search}, {@code -r/--resolve-types} and
  * {@code --all} are gone for good: the RFC has no equivalent for any of them (see the RFC-alignment plan's
  * "Decisions locked in").
  *

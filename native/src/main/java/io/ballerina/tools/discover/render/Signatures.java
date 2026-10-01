@@ -226,8 +226,7 @@ public final class Signatures {
      * {@code *T x = {}} is not a form the language has; a rest parameter's default is "none passed".
      */
     private static String renderParam(Param param) {
-        List<ExternalLink> links = collectExternalLinks(param.type());
-        String type = applyPrefixToTypeName(param.type().name(), links);
+        String type = paramType(param);
         String name = Identifiers.write(param.name());
         return switch (param.form()) {
             case INCLUSION -> "*" + type + " " + name;
@@ -235,6 +234,19 @@ public final class Signatures {
             case NORMAL -> type + " " + name
                     + (param.hasDefault() ? " = " + param.defaultValue() : "");
         };
+    }
+
+    /** A parameter's type as its declaration spells it, foreign names qualified. */
+    public static String paramType(Param param) {
+        return applyPrefixToTypeName(param.type().name(), collectExternalLinks(param.type()));
+    }
+
+    /** A callable's return type as its declaration spells it, or {@code null} when it returns nothing. */
+    public static String returnType(Fn fn) {
+        return fn.returns().hasType()
+                ? applyPrefixToTypeName(fn.returns().type().name(),
+                        collectSignatureLinks(fn.params(), fn.returns().type()))
+                : null;
     }
 
     /**

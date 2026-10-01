@@ -75,15 +75,4 @@ public final class Texts {
     public static String code(String text) {
         return "`" + text + "`";
     }
-
-    /**
-     * The same sentence with its Markdown stripped, for the code register.
-     *
-     * <p>One note, two homes: a kind-mismatch line reads as a facts row in a report and as a {@code //} comment
-     * in a Ballerina document, and a backtick inside a comment is noise rather than emphasis. Writing the
-     * sentence once and stripping here is what keeps the two from drifting into different wordings.
-     */
-    public static String plain(String text) {
-        return text.replace("`", "");
-    }
 }

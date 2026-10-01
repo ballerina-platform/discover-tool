@@ -1,0 +1,26 @@
+{"bucket":"client","total":0,"elsewhere":[
+{"bucket":"class","count":3,"call":"bal discover ballerina/log class"},
+{"bucket":"funcs","count":11,"call":"bal discover ballerina/log funcs"}
+]}
+{"bucket":"service","total":0,"elsewhere":[
+{"bucket":"class","count":3,"call":"bal discover ballerina/log class"},
+{"bucket":"funcs","count":11,"call":"bal discover ballerina/log funcs"}
+]}
+{"containers":[
+{"name":"Logger","normal":7,"call":"bal discover ballerina/log class Logger"},
+{"name":"LoggerRegistry","normal":2,"call":"bal discover ballerina/log class LoggerRegistry"},
+{"name":"PrintableRawTemplate","call":"bal discover ballerina/log class PrintableRawTemplate"}
+],"shown":3,"total":3}
+{"methods":[
+"evaluateTemplate",
+"fromConfig",
+"getLoggerRegistry",
+"printDebug",
+"printError",
+"printInfo",
+"printWarn",
+"processTemplate",
+"root",
+"setOutputFile",
+"toMaskedString"
+],"shown":11,"total":11}

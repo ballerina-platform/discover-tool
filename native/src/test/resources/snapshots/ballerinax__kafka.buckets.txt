@@ -1,0 +1,10 @@
+== client ==
+Caller, Consumer, Producer
+== service ==
+Note: binds to kafka:Listener
+Methods: none
+== class ==
+AvroDeserializer, AvroSerializer, Deserializer, Serializer
+== funcs ==
+funcs: none in this package
+Elsewhere: client (3), service (1), class (4)
