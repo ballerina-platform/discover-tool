@@ -39,7 +39,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -83,6 +85,19 @@ public final class FixtureCorpus {
     public static final Path FIXTURES_DIR = RESOURCES.resolve("fixtures");
 
     public static final Path SNAPSHOTS_DIR = RESOURCES.resolve("snapshots");
+
+    /**
+     * Recorded package SOURCE, for the fixtures whose service bindings depend on it — the docs payload publishes
+     * no inclusion for a service type, so which ones bind to a listener is read from the {@code .bal} files.
+     *
+     * <p>Captured from the same versions as the payloads (http 2.16.6, graphql 1.17.0): the bala named by
+     * {@code GET https://api.central.ballerina.io/2.0/registry/packages/<org>/<name>/<version>}'s
+     * {@code balaURL}, unzipped, and only the files under {@code modules/<name>/} that declare the service object
+     * types kept, verbatim — http's {@code http_types.bal} and {@code http_interceptors.bal}, graphql's
+     * {@code types.bal}. Every other file of those modules declares no service type, so dropping them changes no
+     * answer.
+     */
+    public static final Path SOURCES_DIR = RESOURCES.resolve("sources");
 
     public static final Path KEYSPACE_SNAPSHOT = SNAPSHOTS_DIR.resolve("keyspace.txt");
 
@@ -165,6 +180,23 @@ public final class FixtureCorpus {
             }
             return Pipeline.build(module.value());
         });
+    }
+
+    /** The recorded {@code .bal} files for one fixture, by file name, or empty when none were recorded. */
+    public static Optional<Map<String, String>> recordedSources(String slug) {
+        Path directory = SOURCES_DIR.resolve(slug);
+        if (!Files.isDirectory(directory)) {
+            return Optional.empty();
+        }
+        try (Stream<Path> files = Files.list(directory)) {
+            Map<String, String> sources = new TreeMap<>();
+            for (Path file : files.filter(path -> path.toString().endsWith(".bal")).toList()) {
+                sources.put(file.getFileName().toString(), Files.readString(file, StandardCharsets.UTF_8));
+            }
+            return Optional.of(sources);
+        } catch (IOException cause) {
+            throw new UncheckedIOException("recorded sources for " + slug + " are unreadable", cause);
+        }
     }
 
     /** A fixture as the views receive it, under a FIXED version and a verified load. */

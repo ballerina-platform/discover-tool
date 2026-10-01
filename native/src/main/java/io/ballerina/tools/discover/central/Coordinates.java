@@ -113,4 +113,13 @@ public final class Coordinates {
         }
         return java.util.List.copyOf(versions);
     }
+
+    /** The registry's per-version entry's {@code balaURL}, when it names one. */
+    static java.util.Optional<String> balaUrl(JsonElement raw) {
+        if (raw == null || !raw.isJsonObject()) {
+            return java.util.Optional.empty();
+        }
+        String url = Json.string(raw.getAsJsonObject(), "balaURL");
+        return url == null || url.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(url);
+    }
 }

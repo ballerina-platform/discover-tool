@@ -18,6 +18,8 @@
 
 package io.ballerina.tools.discover.central;
 
+import java.util.Optional;
+
 /**
  * One HTTP GET, as a value.
  *
@@ -32,6 +34,14 @@ public interface HttpTransport {
 
     /** One attempt. Never throws; every outcome is a {@link Reply}. */
     Reply get(String url, long timeoutMs);
+
+    /**
+     * One binary GET — a package archive rather than a JSON document — with no retries: every caller of this
+     * treats a missing answer as "fall back to what the docs payload says", so the reason is not worth carrying.
+     */
+    default Optional<byte[]> download(String url, long timeoutMs) {
+        return Optional.empty();
+    }
 
     /** What one attempt produced. */
     sealed interface Reply {

@@ -20,7 +20,11 @@ package io.ballerina.tools.discover.central;
 
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
+
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Ballerina Central, as a {@link PackageRepository}.
@@ -48,6 +52,12 @@ public final class CentralRepository implements PackageRepository {
     public Result<CentralDocs> fetchDocs(
             QualifiedName qualified, CentralClient.ResolvedVersion resolved, HttpOptions options) {
         return CentralClient.fetchDocs(qualified, resolved, options);
+    }
+
+    @Override
+    public Optional<Map<String, String>> fetchModuleSources(
+            QualifiedName qualified, Version version, String moduleId, HttpOptions options) {
+        return CentralClient.fetchModuleSources(qualified, version, moduleId, options);
     }
 
     @Override

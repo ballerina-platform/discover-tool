@@ -36,6 +36,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Everything that talks to Ballerina Central.
@@ -512,6 +514,31 @@ public final class CentralClient {
         }
         List<String> versions = Coordinates.publishedVersions(response.value());
         return versions.isEmpty() ? null : String.join(", ", versions);
+    }
+
+    // -----------------------------------------------------------------------
+    // The package archive
+    // -----------------------------------------------------------------------
+
+    /**
+     * One module's {@code .bal} files, read out of the version's published bala.
+     *
+     * <p>The registry's per-version entry names a signed {@code balaURL}; the archive behind it is the package
+     * exactly as {@code bal pull} would fetch it. Not cached here: what is worth keeping is the small fact a
+     * caller derives from the source, not the archive, which runs to tens of megabytes once a package bundles
+     * its native jars.
+     */
+    public static Optional<Map<String, String>> fetchModuleSources(
+            QualifiedName qualified, Version version, String moduleId, HttpOptions options) {
+        String url = CENTRAL_BASE_URL + "registry/packages/" + encode(qualified.org())
+                + "/" + encode(qualified.name()) + "/" + encode(version.text());
+        Result<JsonElement> response = fetchJson(url, options);
+        if (!response.isOk()) {
+            return Optional.empty();
+        }
+        return Coordinates.balaUrl(response.value())
+                .flatMap(balaUrl -> options.transport().download(balaUrl, options.timeoutMs()))
+                .flatMap(archive -> Bala.moduleSources(archive, moduleId));
     }
 
     private static String encode(String segment) {

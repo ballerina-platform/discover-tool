@@ -35,6 +35,8 @@ dependencies {
     checkstyle "com.puppycrawl.tools:checkstyle:${checkstylePluginVersion}"
 
     compileOnly "org.ballerinalang:ballerina-cli:${ballerinaLangVersion}"
+    compileOnly "org.ballerinalang:ballerina-parser:${ballerinaLangVersion}"
+    compileOnly "org.ballerinalang:ballerina-tools-api:${ballerinaLangVersion}"
     compileOnly "info.picocli:picocli:${picocliVersion}"
     compileOnly "com.google.code.gson:gson:${gsonVersion}"
 

@@ -26,6 +26,8 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Proof that {@link Loader} reaches a package only through the {@link PackageRepository} list it is handed, never
@@ -45,17 +47,32 @@ public class PackageRepositoryTest {
         private final String id;
         private final Result<CentralClient.ResolvedVersion> version;
         private final Result<CentralDocs> docs;
+        private final Optional<Map<String, String>> sources;
         private int resolveCalls;
         private int fetchCalls;
+        private int sourceCalls;
 
         private FakeRepository(Result<CentralClient.ResolvedVersion> version, Result<CentralDocs> docs) {
             this("fake", version, docs);
         }
 
         private FakeRepository(String id, Result<CentralClient.ResolvedVersion> version, Result<CentralDocs> docs) {
+            this(id, version, docs, Optional.empty());
+        }
+
+        private FakeRepository(String id, Result<CentralClient.ResolvedVersion> version, Result<CentralDocs> docs,
+                Optional<Map<String, String>> sources) {
             this.id = id;
             this.version = version;
             this.docs = docs;
+            this.sources = sources;
+        }
+
+        @Override
+        public Optional<Map<String, String>> fetchModuleSources(
+                QualifiedName qualified, Version version, String moduleId, HttpOptions options) {
+            sourceCalls++;
+            return sources;
         }
 
         @Override

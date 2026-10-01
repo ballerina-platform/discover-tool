@@ -25,6 +25,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.time.Duration;
+import java.util.Optional;
 
 /**
  * The real transport, on the JDK's own client.
@@ -70,6 +71,24 @@ public final class JdkHttpTransport implements HttpTransport {
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return new Reply.Failed("network error: interrupted");
+        }
+    }
+
+    @Override
+    public Optional<byte[]> download(String url, long timeoutMs) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .GET()
+                    .timeout(Duration.ofMillis(timeoutMs))
+                    .build();
+            HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            int status = response.statusCode();
+            return status >= 200 && status < 300 ? Optional.ofNullable(response.body()) : Optional.empty();
+        } catch (IOException | IllegalArgumentException failed) {
+            return Optional.empty();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
         }
     }
 
