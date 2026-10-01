@@ -112,8 +112,7 @@ public record Library(
      * <p>Listeners are held apart from {@link #typeDefs()} because they print in their own section — a
      * listener is the entry point to a package's service half, and burying it among postgresql's 125 value
      * classes is how it went unnoticed that it printed nowhere at all. They are declarations for every other
-     * purpose, though: {@code type} resolves them, {@code --deps} walks them, and {@code overview} counts
-     * them.
+     * purpose, though: a signature's type closure resolves them like any other declaration.
      */
     public List<TypeDef> declarations() {
         List<TypeDef> all = new java.util.ArrayList<>(typeDefs);
@@ -125,10 +124,9 @@ public record Library(
      * Every declaration a caller can address by name, clients included.
      *
      * <p>Separate from {@link #declarations()} because the two answer different questions and one list cannot.
-     * {@code overview} counts declarations to describe the type surface, and it names clients on their own row;
-     * folding them in would double-count them there. {@code type} resolves a name, and a client is the name
-     * asked for first — {@code type ballerinax/sap Client} asserted the package had no such declaration, in a
-     * package where the client is 1 of 4 things published.
+     * The API document prints clients in their own section, so folding them into {@link #declarations()} would
+     * print them twice; resolving a name by declaration, though, has to find a client — it is the name asked for
+     * first, and {@code ballerinax/sap}'s client is 1 of the 4 things that package publishes.
      */
     public List<TypeDef> addressable() {
         List<TypeDef> all = new java.util.ArrayList<>(declarations());

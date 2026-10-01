@@ -172,12 +172,9 @@ public final class Filter {
             case TypeDef.Constant constant -> text.append(constant.varType().name());
             case TypeDef.Variable variable -> text.append(variable.varType().name());
             case TypeDef.ErrorDef error -> error.base().ifPresent(base -> text.append(base.name()));
-            // FIELDS ONLY, and no methods at all. A class's methods are the container verbs' business, and this
-            // function is what `type -s` searches: folding them in makes that verb useless, because
-            // `ballerinax/kafka`'s 5KB `Consumer` matches `TopicPartition` on the strength of one method called
-            // `getTopicPartitions` — so a query that should return four records returned 14,603 bytes and was
-            // refused by the budget. The callables are searched directly, by their own signatures, in the scope
-            // that addresses them.
+            // FIELDS ONLY, and no methods at all. A class's methods are the container buckets' business, searched
+            // by their own signatures in the scope that addresses them; folded in here, `ballerinax/kafka`'s
+            // `Consumer` would match `TopicPartition` on the strength of one method called `getTopicPartitions`.
             case TypeDef.ObjectDef object -> appendFields(text, object.fields());
         }
         return text.toString();

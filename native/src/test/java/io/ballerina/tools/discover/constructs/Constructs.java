@@ -1018,7 +1018,8 @@ public final class Constructs {
                         An interceptor type, for one, reaches
                         // the runtime as a `createInterceptors()` return rather than as an attachment.\s\
                         The package's own
-                        // guide is where the usage of each is written; `bal discover overview` reproduces it.""")
+                        // guide is where the usage of each is written; `bal discover <org>/<name> readme`\s\
+                        reproduces it.""")
                         .inSection("Service"),
 
                 Construct.faithful(

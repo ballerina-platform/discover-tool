@@ -39,8 +39,8 @@ import java.util.stream.Collectors;
  * How one callable is written, and how a foreign name inside it is qualified.
  *
  * <p>This is the module the views share with the API document, and sharing it is what makes their
- * agreement structural rather than tested: {@code overview} and {@code ops --sigs} quote
- * {@link #renderMemberFunction}, so a signature they show cannot differ from the one {@code api} shows.
+ * agreement structural rather than tested: the container buckets quote {@link #renderMemberFunction}, so a
+ * signature they show cannot differ from the one the API document shows.
  * {@code ViewsAgreeTest} still asserts it, because the cheap way to break the guarantee is for a view to
  * hand-roll a line rather than call this.
  *
@@ -76,12 +76,8 @@ public final class Signatures {
      *
      * <p>The declaration itself is identical either way — the same bytes, from the same code path — and that is
      * what {@code ViewsAgreeTest} pins. What differs is the documentation around it, and the split follows what
-     * each caller is for: {@code api} and {@code type} are declaration registers, where a parameter's description
-     * is the point; {@code overview} and {@code ops} answer a question inside a byte budget, and already abbreviate
-     * prose for that reason — {@code overview} prints a client's description as its first line only. Wiring the
-     * {@code # +} rows into the quoted form instead would have pushed {@code googleapis.gmail} past
-     * {@code overview}'s 20,000-byte signature budget, replacing 32 real signatures with a path summary: a change
-     * that takes information away from the view it was meant to enrich.
+     * each caller is for: the API document and a single-callable answer are declaration registers, where a
+     * parameter's description is the point; a compact view quotes the description and the declaration only.
      */
     public enum Detail {
 

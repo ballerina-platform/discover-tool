@@ -158,8 +158,8 @@ public final class Surface {
         /**
          * The constructor, which is part of the container and used to be reachable from no verb at all.
          *
-         * <p>T14. {@code overview --client <Name>} was the only document that carried one, so an agent that had
-         * navigated to the operation it wanted could not then ask how to build the thing it calls.
+         * <p>Addressable as {@code init} or {@code new}, so an agent that has navigated to the operation it wants
+         * can then ask how to build the thing it calls.
          */
         public Optional<Fn.Constructor> constructor() {
             return functions.stream()
