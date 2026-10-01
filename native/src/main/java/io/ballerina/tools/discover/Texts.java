@@ -49,7 +49,7 @@ public final class Texts {
 
     public static final Comparator<String> LOCALE_ORDER = Texts::compareLocale;
 
-    private static final Pattern SAFE_WORD = Pattern.compile("[A-Za-z0-9_./:@%+=,-]+");
+    private static final Pattern SAFE_WORD = Pattern.compile("[A-Za-z0-9_./:%+-][A-Za-z0-9_./:%+=-]*");
 
     private static final Pattern DOUBLE_QUOTE_UNSAFE = Pattern.compile("[\"$`\\\\!]");
 
@@ -78,7 +78,8 @@ public final class Texts {
 
     /**
      * One argument as a POSIX shell reads it back unchanged. A word made only of characters no shell treats
-     * specially is left bare; anything else is double-quoted, which keeps the keyword-escaping apostrophe
+     * specially is left bare — {@code =} only past the first character, since zsh expands a leading one to a
+     * command's path; anything else is double-quoted, which keeps the keyword-escaping apostrophe
      * ({@code gists/'public}) readable, unless it holds a character double quotes do not neutralise, in which
      * case it is single-quoted.
      */
