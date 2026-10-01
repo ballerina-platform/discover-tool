@@ -758,7 +758,7 @@ public final class Containers {
     }
 
     /**
-     * Several entries: resource paths, named methods, or both side by side.
+     * Several entries: resource paths, methods of one call form, or several forms side by side.
      *
      * <p>The constructor is never part of the ceiling problem — it is one signature, always shown once, on request
      * ({@code init}/{@code new}) rather than folded into a "many entries" listing.
@@ -769,9 +769,9 @@ public final class Containers {
         List<Entry> callable = selected.stream()
                 .filter(entry -> !(entry.fn() instanceof Fn.Constructor))
                 .toList();
+        long forms = callable.stream().map(entry -> entry.fn().getClass()).distinct().count();
         boolean hasResources = callable.stream().anyMatch(entry -> entry.fn() instanceof Fn.Resource);
-        boolean hasNamed = callable.stream().anyMatch(entry -> !(entry.fn() instanceof Fn.Resource));
-        if (hasResources && hasNamed) {
+        if (forms > 1) {
             return mixedAnswer(loaded, scope, container, selectors, callable, options, documented, warning, note);
         }
         if (hasResources) {
@@ -890,10 +890,11 @@ public final class Containers {
     }
 
     /**
-     * A container answering to both {@code ->path.accessor()} and a named method — measured, only
-     * {@code ballerina/http}'s {@code Client} and {@code ballerinax/sap}'s do this among the connectors surveyed.
-     * The three sections are one sequence — resources, then remote, then normal — paged {@value #MAX_ENTRIES} at a
-     * time like every other flat listing, so a page can end partway through one section and start the next.
+     * A selection in more than one call form — resources beside named methods ({@code ballerina/http}'s and
+     * {@code ballerinax/sap}'s {@code Client}), or remote methods beside normal ones — split by form, because a
+     * flat list of names loses whether each is called with {@code ->} or {@code .}. The three sections are one
+     * sequence — resources, then remote, then normal — paged {@value #MAX_ENTRIES} at a time like every other flat
+     * listing, so a page can end partway through one section and start the next.
      */
     private static Result<DiscoverResult> mixedAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,

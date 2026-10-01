@@ -193,8 +193,9 @@ public sealed interface DiscoverResult {
     }
 
     /**
-     * Remote or normal method names, flat — the RFC's {@code Methods: get, post, ...} shape, paginated with
-     * {@code --page} once a container has too many to show at once.
+     * Methods of one call form, flat — the RFC's {@code Methods: get, post, ...} shape, paginated with
+     * {@code --page} once a container has too many to show at once. A container declaring both remote and normal
+     * methods is a {@link MixedListing} instead, so the call form is never lost.
      *
      * @param container the container that declares them, or {@code null} for module-level functions
      * @param methods the methods shown, alphabetical, up to the ceiling
@@ -311,9 +312,10 @@ public sealed interface DiscoverResult {
     }
 
     /**
-     * A container answering to both {@code ->path.accessor()} and {@code ->name()}/{@code .name()} — the
-     * {@link ResourceList} and {@link MethodList} shapes side by side, split by call form, paginated with
-     * {@code --page} as one sequence (resources, then remote, then normal) once there are too many to show at once.
+     * A container answering in more than one call form — {@code ->path.accessor()}, {@code ->name()},
+     * {@code .name()} — the {@link ResourceList} and {@link MethodList} shapes side by side, split by call form,
+     * paginated with {@code --page} as one sequence (resources, then remote, then normal) once there are too many
+     * to show at once.
      *
      * @param container the container that declares them
      * @param resources the resource paths on this page

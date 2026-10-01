@@ -1,13 +1,16 @@
 == client ==
 ballerinax/postgresql · client · Client
-6 methods
+5 remote methods, 1 normal method
 
+Remote (->)
   batchExecute
   call
-  close
   execute
   query
   queryRow
+
+Normal (.)
+  close
 
 Next: bal discover ballerinax/postgresql client Client <name>
 == service ==

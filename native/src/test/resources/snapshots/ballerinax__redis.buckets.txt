@@ -1,7 +1,8 @@
 == client ==
 ballerinax/redis · client · Client
-112 methods
+112 entries
 
+Remote (->)
   append
   auth
   bitCount
@@ -11,7 +12,6 @@ ballerinax/redis · client · Client
   bitOpXor
   bLPop
   bRPop
-  close
   clusterInfo
   decr
   decrBy
@@ -42,6 +42,7 @@ ballerinax/redis · client · Client
   incr
   incrBy
   incrByFloat
+  keys
 
 ... 72 more (page 1 of 3)
 Next: bal discover ballerinax/redis client Client <name>

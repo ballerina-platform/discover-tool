@@ -56,20 +56,22 @@ public class ViewsTest {
      *
      * <p>Grouping ({@link Shape#PATH_GROUPS}) and pagination ({@link Shape#METHOD_LIST} with a {@code next}) are
      * what engage once a listing is actually over {@value Containers#MAX_ENTRIES}; under it, the same shapes still
-     * appear, just flat. {@code ballerinax__sap}'s one client mixes resources with named methods, and
-     * {@code ballerina__log}/{@code ballerina__xlsx} declare no client at all.
+     * appear, just flat. {@code ballerinax__sap}'s one client mixes resources with named methods, redis's and
+     * postgresql's mix remote methods with normal ones, and {@code ballerina__log}/{@code ballerina__xlsx} declare
+     * no client at all.
      */
     private static final Map<String, Shape> CLIENT_SHAPE = Map.ofEntries(
             // Resource-only: grouped by path segment once over the ceiling (github, slack), flat under it (gmail).
             Map.entry("ballerinax__github", Shape.PATH_GROUPS),
             Map.entry("ballerinax__slack", Shape.PATH_GROUPS),
             Map.entry("ballerinax__googleapis.gmail", Shape.RESOURCE_LIST),
-            // Remote/normal-method-only: paginated once over the ceiling, flat under it.
+            // Methods of one call form only: paginated once over the ceiling, flat under it.
             Map.entry("ballerinax__twilio", Shape.METHOD_LIST),
-            Map.entry("ballerinax__redis", Shape.METHOD_LIST),
             Map.entry("ballerinax__googleapis.sheets", Shape.METHOD_LIST),
             Map.entry("ballerina__graphql", Shape.METHOD_LIST),
-            Map.entry("ballerinax__postgresql", Shape.METHOD_LIST),
+            // Remote methods beside normal ones: split by call form, paged as one sequence over the ceiling.
+            Map.entry("ballerinax__redis", Shape.MIXED_LISTING),
+            Map.entry("ballerinax__postgresql", Shape.MIXED_LISTING),
             // Several client containers in one bucket — a roster regardless of any one container's own size.
             Map.entry("ballerina__http", Shape.CONTAINER_ROSTER),
             Map.entry("ballerinax__kafka", Shape.CONTAINER_ROSTER),
