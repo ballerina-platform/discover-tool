@@ -107,6 +107,7 @@ public class DiscoverToolTest {
         Assert.assertEquals(run.stdout(), "");
         Assert.assertTrue(run.stderr().contains("\"kind\":\"validation\""), run.stderr());
         Assert.assertTrue(run.stderr().endsWith("}\n"));
+        Assert.assertEquals(run.stderr().lines().count(), 1L, run.stderr());
     }
 
     @Test

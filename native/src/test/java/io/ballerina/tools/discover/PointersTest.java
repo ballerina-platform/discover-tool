@@ -349,6 +349,7 @@ public class PointersTest {
         int code = Cli.run(argv(text), new Cli.Streams(out::append, err::append), http);
         Assert.assertEquals(code, 0, slug + ": `" + text + "` failed with " + err);
         Assert.assertFalse(out.toString().isBlank(), slug + ": `" + text + "` answered with nothing");
+        Assert.assertEquals(out.toString().strip().lines().count(), 1L, slug + ": `" + text + "` spans lines");
         JsonObject answer = JsonParser.parseString(out.toString()).getAsJsonObject();
         // Exit 0 is not enough on its own: "nothing matched" is an exit-0 answer too, and a pointer that lands
         // on one is exactly the loop this test exists to catch.

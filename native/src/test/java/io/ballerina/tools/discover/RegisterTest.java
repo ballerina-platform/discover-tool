@@ -26,6 +26,7 @@ import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
+import io.ballerina.tools.discover.views.Readme;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -125,6 +126,25 @@ public class RegisterTest {
         for (Answer answer : answers(slug)) {
             JsonElement parsed = JsonParser.parseString(JsonRenderer.render(answer.result()));
             Assert.assertTrue(parsed.isJsonObject(), slug + " " + answer.label());
+        }
+    }
+
+    /**
+     * Every JSON answer is exactly one line: an agent's tooling cuts output by line, and a cut anywhere inside a
+     * multi-line answer leaves JSON that does not parse. The readme is included here, because its markdown is the
+     * one value certain to carry newlines of its own.
+     */
+    @Test(dataProvider = "fixtures")
+    public void everyJsonAnswerIsOneLine(String slug) {
+        List<Answer> all = new ArrayList<>(answers(slug));
+        LoadedPackage context = FixtureCorpus.loadedFixture(slug);
+        add(all, "readme", Readme.render(context, Readme.Options.BARE));
+        Readme.chunksOf(context).forEach(chunk -> add(all, "readme " + chunk.number(),
+                Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1))));
+        for (Answer answer : all) {
+            String json = JsonRenderer.render(answer.result());
+            Assert.assertFalse(json.contains("\n") || json.contains("\r"), slug + " " + answer.label() + ":\n" + json);
+            Assert.assertTrue(JsonParser.parseString(json).isJsonObject(), slug + " " + answer.label());
         }
     }
 
