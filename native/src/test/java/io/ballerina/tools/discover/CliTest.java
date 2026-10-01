@@ -34,6 +34,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -612,13 +613,140 @@ public class CliTest {
         docs.getAsJsonObject("docsData").getAsJsonArray("modules")
                 .get(1).getAsJsonObject().addProperty("description", "   ");
 
+        for (List<String> narrowed : List.of(List.<String>of(), List.of("--filter", "kafka"), List.of("1"))) {
+            List<String> argv = new ArrayList<>(List.of("ballerina/graphql", "--module", "dataloader", "readme"));
+            argv.addAll(narrowed);
+            Capture capture = new Capture();
+            int exitCode = Cli.run(argv, capture.streams(), centralForDocs(docs, "1.0.0"));
+            Assert.assertEquals(exitCode, 1, argv + " -> " + capture.stdout());
+            Assert.assertEquals(capture.stdout(), "");
+            Assert.assertEquals(capture.field("kind"), "validation");
+            Assert.assertTrue(capture.field("message").contains("publishes no readme for module dataloader"),
+                    argv + " -> " + capture.stderr());
+        }
+    }
+
+    @Test
+    public void aReadmeFilterMatchingNoSectionIsANoMatchPointingAtTheWholeReadme() {
+        Capture json = new Capture();
+        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "zzzz"), json.streams(),
+                centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
+        Assert.assertEquals(exitCode, 0, json.stderr());
+        JsonObject answer = JsonParser.parseString(json.stdout()).getAsJsonObject();
+        Assert.assertEquals(answer.get("requested").getAsString(), "zzzz");
+        Assert.assertEquals(answer.get("next").getAsString(), "bal discover ballerinax/kafka readme");
+        Assert.assertFalse(answer.has("chunks"), answer.toString());
+
+        Capture text = new Capture();
+        Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "zzzz"), text.streams(),
+                centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()), null, true);
+        Assert.assertTrue(text.stdout().contains("Nothing matches 'zzzz'."), text.stdout());
+        Assert.assertTrue(text.stdout().endsWith("Next: bal discover ballerinax/kafka readme\n"), text.stdout());
+    }
+
+    @Test
+    public void aReadmeSuggestionQuotesTheSelectorItRepeats() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader", "readme"), capture.streams(),
-                centralForDocs(docs, "1.0.0"));
-        Assert.assertEquals(exitCode, 1);
-        Assert.assertEquals(capture.stdout(), "");
-        Assert.assertEquals(capture.field("kind"), "validation");
-        Assert.assertTrue(capture.field("message").contains("no readme"), capture.stderr());
+        Cli.run(List.of("ballerinax/kafka", "readme", "1", "--filter", "zzzz"), capture.streams(),
+                centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
+        Assert.assertTrue(capture.field("suggestion").endsWith("`bal discover ballerinax/kafka readme 1`."),
+                capture.stderr());
+
+        Capture chunks = new Capture();
+        Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "kafka"), chunks.streams(),
+                centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
+        String title = null;
+        for (JsonElement chunk : JsonParser.parseString(chunks.stdout()).getAsJsonObject().getAsJsonArray("chunks")) {
+            String candidate = chunk.getAsJsonObject().get("title").getAsString();
+            if (candidate.contains(" ")) {
+                title = candidate;
+                break;
+            }
+        }
+        Assert.assertNotNull(title, chunks.stdout());
+        Capture titled = new Capture();
+        Cli.run(List.of("ballerinax/kafka", "readme", title, "--filter", "zzzz"), titled.streams(),
+                centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
+        Assert.assertTrue(titled.field("suggestion").endsWith(" readme " + Texts.shellWord(title) + "`."),
+                titled.stderr());
+    }
+
+    // -----------------------------------------------------------------------
+    // --page against what does and does not page
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void aPageBelowOneIsRejectedBeforeAnythingIsFetched() {
+        for (String page : List.of("0", "-1")) {
+            Capture capture = new Capture();
+            int exitCode = Cli.run(List.of("ballerinax/github", "client", "--page", page), capture.streams(), never());
+            Assert.assertEquals(exitCode, 1);
+            Assert.assertEquals(capture.field("kind"), "validation");
+            Assert.assertTrue(capture.field("message").contains("numbered from 1"), capture.stderr());
+        }
+    }
+
+    @Test
+    public void aPageAgainstAnAnswerThatDoesNotPageIsRejectedRatherThanServedAsPageOne() {
+        String github = "ballerinax__github";
+        List<List<String>> unpaged = List.of(
+                List.of("ballerinax/github", "--page", "5"),
+                List.of("ballerinax/github", "readme", "--page", "5"),
+                List.of("ballerinax/github", "client", "Client", "gists/'public", "get", "--page", "2"),
+                List.of("ballerinax/github", "client", "Client", "--filter", "zzzq", "--page", "2"));
+        for (List<String> argv : unpaged) {
+            Capture capture = new Capture();
+            int exitCode = Cli.run(argv, capture.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
+            Assert.assertEquals(exitCode, 1, argv + " -> " + capture.stdout());
+            Assert.assertEquals(capture.stdout(), "");
+            Assert.assertEquals(capture.field("kind"), "validation");
+            Assert.assertTrue(capture.field("message").contains("not paged"), argv + " -> " + capture.stderr());
+            String suggestion = capture.field("suggestion");
+            Assert.assertFalse(suggestion.substring(suggestion.indexOf('`')).contains("--page"), suggestion);
+        }
+        Capture quoted = new Capture();
+        Cli.run(unpaged.get(2), quoted.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
+        Assert.assertEquals(quoted.field("suggestion"),
+                "Drop --page: `bal discover ballerinax/github client Client \"gists/'public\" get`.");
+
+        Capture oneGroupedPage = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "--page", "2"),
+                oneGroupedPage.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
+        Assert.assertTrue(oneGroupedPage.field("message").contains("on 1 page"), oneGroupedPage.stderr());
+    }
+
+    // -----------------------------------------------------------------------
+    // --filter
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void aBlankFilterIsNoFilterInEitherRendering() {
+        HttpOptions http = centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text());
+        Capture plain = new Capture();
+        Cli.run(List.of("ballerinax/kafka", "client"), plain.streams(), http, null, true);
+        for (String blank : List.of("", " ")) {
+            Capture text = new Capture();
+            Cli.run(List.of("ballerinax/kafka", "client", "--filter", blank), text.streams(), http, null, true);
+            Assert.assertEquals(text.stdout(), plain.stdout(), "'" + blank + "'");
+            Assert.assertFalse(text.stdout().contains("--filter"), text.stdout());
+        }
+    }
+
+    /** A member found in another bucket on several containers keeps the note saying so. */
+    @Test
+    public void ownersReachedByKindToleranceCarryTheNoteInBothRenderings() {
+        HttpOptions http = centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text());
+        Capture json = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "class", "commit"), json.streams(), http), 0,
+                json.stderr());
+        JsonObject owners = JsonParser.parseString(json.stdout()).getAsJsonObject();
+        Assert.assertTrue(owners.has("owners"), owners.toString());
+        Assert.assertTrue(owners.get("note").getAsString().startsWith("'commit' is addressed by client"),
+                owners.toString());
+
+        Capture text = new Capture();
+        Cli.run(List.of("ballerinax/kafka", "class", "commit"), text.streams(), http, null, true);
+        Assert.assertTrue(text.stdout().contains("\nNote: 'commit' is addressed by client"), text.stdout());
     }
 
     @Test

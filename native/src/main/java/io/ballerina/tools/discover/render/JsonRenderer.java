@@ -104,6 +104,7 @@ public final class JsonRenderer {
         json.add("containers", containers);
         json.addProperty("shown", roster.containers().size());
         json.addProperty("total", roster.total());
+        addPaging(json, roster.paging());
         if (roster.next() != null) {
             json.addProperty("next", roster.next());
         }
@@ -128,8 +129,13 @@ public final class JsonRenderer {
             array.add(entry);
         }
         json.add("groups", array);
+        JsonObject counts = new JsonObject();
+        addIfPositive(counts, "resources", groups.counts().resources());
+        addIfPositive(counts, "groups", groups.counts().groups());
+        json.add("counts", counts);
         json.addProperty("shown", groups.resources().size() + groups.groups().size());
         json.addProperty("total", groups.total());
+        addPaging(json, groups.paging());
         if (groups.next() != null) {
             json.addProperty("next", groups.next());
         }
@@ -152,6 +158,7 @@ public final class JsonRenderer {
         if (resources.next() != null) {
             json.addProperty("next", resources.next());
         }
+        addDocumented(json, resources.documented());
         if (resources.warning() != null) {
             json.addProperty("warning", resources.warning());
         }
@@ -171,6 +178,7 @@ public final class JsonRenderer {
         if (methods.next() != null) {
             json.addProperty("next", methods.next());
         }
+        addDocumented(json, methods.documented());
         if (methods.warning() != null) {
             json.addProperty("warning", methods.warning());
         }
@@ -280,6 +288,8 @@ public final class JsonRenderer {
         json.add("types", types);
         addIfNotEmpty(json, "omitted", signature.omitted());
         addDocumented(json, signature.documented());
+        addPaging(json, signature.paging());
+        addIfPresent(json, "next", signature.next());
         addNotices(json, signature.warning(), signature.note());
         return json;
     }
@@ -328,8 +338,9 @@ public final class JsonRenderer {
         if (noMatch.available() != null) {
             json.add("available", toJson(noMatch.available()));
         }
-        json.addProperty("next", noMatch.next());
+        addIfPresent(json, "next", noMatch.next());
         addDocumented(json, noMatch.documented());
+        addPaging(json, noMatch.paging());
         addNotices(json, noMatch.warning(), noMatch.note());
         return json;
     }
@@ -348,8 +359,9 @@ public final class JsonRenderer {
         json.add("owners", array);
         json.addProperty("shown", owners.owners().size());
         json.addProperty("total", owners.total());
+        addPaging(json, owners.paging());
         addIfPresent(json, "next", owners.next());
-        addIfPresent(json, "warning", owners.warning());
+        addNotices(json, owners.warning(), owners.note());
         return json;
     }
 
