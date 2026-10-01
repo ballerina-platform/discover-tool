@@ -69,7 +69,7 @@ public final class JsonRenderer {
                 JsonObject entry = new JsonObject();
                 entry.addProperty("name", submodule.name());
                 entry.addProperty("summary", submodule.summary());
-                entry.addProperty("call", submodule.call());
+                entry.addProperty("command", submodule.command());
                 submodules.add(entry);
             }
             json.add("submodules", submodules);
@@ -98,7 +98,7 @@ public final class JsonRenderer {
             if (container.listener() != null) {
                 entry.addProperty("listener", container.listener());
             }
-            entry.addProperty("call", container.call());
+            entry.addProperty("command", container.command());
             containers.add(entry);
         }
         json.add("containers", containers);
@@ -124,7 +124,7 @@ public final class JsonRenderer {
             JsonObject entry = new JsonObject();
             entry.addProperty("name", group.name());
             entry.addProperty("count", group.count());
-            entry.addProperty("call", group.call());
+            entry.addProperty("command", group.command());
             array.add(entry);
         }
         json.add("groups", array);
@@ -203,7 +203,7 @@ public final class JsonRenderer {
             entry.addProperty("number", chunk.number());
             entry.addProperty("title", chunk.title());
             entry.addProperty("lines", chunk.lines());
-            entry.addProperty("call", chunk.call());
+            entry.addProperty("command", chunk.command());
             array.add(entry);
         }
         json.add("chunks", array);
@@ -225,9 +225,9 @@ public final class JsonRenderer {
             JsonObject entry = new JsonObject();
             entry.addProperty("path", resource.path());
             entry.add("accessors", strings(resource.accessors()));
-            JsonObject calls = new JsonObject();
-            resource.calls().forEach(calls::addProperty);
-            entry.add("calls", calls);
+            JsonObject commands = new JsonObject();
+            resource.commands().forEach(commands::addProperty);
+            entry.add("commands", commands);
             array.add(entry);
         }
         return array;
@@ -238,7 +238,7 @@ public final class JsonRenderer {
         for (DiscoverResult.Method method : methods) {
             JsonObject entry = new JsonObject();
             entry.addProperty("name", method.name());
-            entry.addProperty("call", method.call());
+            entry.addProperty("command", method.command());
             array.add(entry);
         }
         return array;
@@ -320,7 +320,7 @@ public final class JsonRenderer {
             for (DiscoverResult.NoMatch.Alternative alternative : noMatch.paths()) {
                 JsonObject entry = new JsonObject();
                 entry.addProperty("path", alternative.path());
-                entry.addProperty("call", alternative.call());
+                entry.addProperty("command", alternative.command());
                 paths.add(entry);
             }
             json.add("paths", paths);
@@ -342,7 +342,7 @@ public final class JsonRenderer {
             JsonObject entry = new JsonObject();
             entry.addProperty("name", owner.name());
             entry.addProperty("matches", owner.matches());
-            entry.addProperty("call", owner.call());
+            entry.addProperty("command", owner.command());
             array.add(entry);
         }
         json.add("owners", array);
@@ -362,7 +362,7 @@ public final class JsonRenderer {
             JsonObject entry = new JsonObject();
             entry.addProperty("bucket", other.bucket());
             entry.addProperty("count", other.count());
-            entry.addProperty("call", other.call());
+            entry.addProperty("command", other.command());
             elsewhere.add(entry);
         }
         json.add("elsewhere", elsewhere);

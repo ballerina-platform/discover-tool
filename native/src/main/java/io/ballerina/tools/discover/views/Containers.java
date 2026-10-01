@@ -600,7 +600,7 @@ public final class Containers {
         if (selectors.size() >= 2 && isAccessor(container, selectors.get(0))) {
             return Optional.of(new PathRequest(selectors.get(0), PathTree.splitPath(selectors.get(1))));
         }
-        // The RFC's own order, and the one every `call` field prints: the path, then the accessor.
+        // The RFC's own order, and the one every `command` field prints: the path, then the accessor.
         if (selectors.size() == 2 && isAccessor(container, selectors.get(1))) {
             return Optional.of(new PathRequest(selectors.get(1), PathTree.splitPath(selectors.get(0))));
         }
@@ -642,8 +642,8 @@ public final class Containers {
                     .toList();
         }
         // A path AND an accessor name one operation when the path declares that accessor itself — the RFC's
-        // signature drill-down, and what every resource `call` field prints. Only when it does not is the accessor
-        // a filter over everything beneath the path.
+        // signature drill-down, and what every resource `commands` value prints. Only when it does not is the
+        // accessor a filter over everything beneath the path.
         List<Entry> exact = accessorsOf(found.node().operations(), accessor);
         return exact.isEmpty() ? accessorsOf(PathTree.operationsUnder(found.node()), accessor) : exact;
     }
@@ -967,9 +967,9 @@ public final class Containers {
      * Resource paths: flat under the ceiling, grouped by their next literal segment over it.
      *
      * <p>Only a selection anchored at a path GROUPS, and it groups the SELECTED operations, never the whole tree
-     * under the node — an accessor narrows the counts and rides along into every group's {@code call}. A selection
-     * that is not a path (a name substring such as {@code action}, or a {@code --filter}) has no prefix a group
-     * name could extend without inventing one, so it pages flat instead, every entry carrying its own call.
+     * under the node — an accessor narrows the counts and rides along into every group's {@code command}. A
+     * selection that is not a path (a name substring such as {@code action}, or a {@code --filter}) has no prefix a
+     * group name could extend without inventing one, so it pages flat instead, every entry carrying its own command.
      */
     private static Result<DiscoverResult> resourceAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
@@ -1059,9 +1059,9 @@ public final class Containers {
         }
         List<DiscoverResult.ResourceList.Resource> resources = new ArrayList<>();
         accessorsByPath.forEach((path, accessors) -> {
-            Map<String, String> calls = new LinkedHashMap<>();
-            accessors.forEach(accessor -> calls.put(accessor, base + " " + shellWord(path) + " " + accessor));
-            resources.add(new DiscoverResult.ResourceList.Resource(path, accessors, calls));
+            Map<String, String> commands = new LinkedHashMap<>();
+            accessors.forEach(accessor -> commands.put(accessor, base + " " + shellWord(path) + " " + accessor));
+            resources.add(new DiscoverResult.ResourceList.Resource(path, accessors, commands));
         });
         return List.copyOf(resources);
     }

@@ -29,8 +29,8 @@ import java.util.Map;
  * it into bytes, so the two renderers can never drift into describing different data.
  *
  * <p>Field names follow the RFC's own worked examples wherever one exists ({@code buckets}, {@code groups}/
- * {@code name}/{@code count}, {@code resources}/{@code path}/{@code accessors}/{@code calls}, {@code methods},
- * {@code shown}/{@code total}/{@code next}/{@code call}). {@link ContainerRoster} has no RFC example to match —
+ * {@code name}/{@code count}, {@code resources}/{@code path}/{@code accessors}/{@code commands}, {@code methods},
+ * {@code shown}/{@code total}/{@code next}/{@code command}). {@link ContainerRoster} has no RFC example to match —
  * several containers in one bucket is existing, pre-RFC behaviour — so its field names are this rewrite's own
  * choice, as are those of every other shape the RFC shows no example for ({@link Signature}, {@link MixedListing},
  * {@link NoMatch}, {@link Owners}, {@link EmptyBucket}).
@@ -52,9 +52,9 @@ public sealed interface DiscoverResult {
      * One method or module-level function in a listing.
      *
      * @param name its name, as declared
-     * @param call the command that opens its signature
+     * @param command the command that opens its signature
      */
-    record Method(String name, String call) { }
+    record Method(String name, String command) { }
 
     /**
      * Entries a {@code --filter} matched only in their documentation, not in any name, path, parameter or type —
@@ -91,9 +91,9 @@ public sealed interface DiscoverResult {
         /**
          * @param name the bare name {@code --module} itself takes
          * @param summary the submodule's own one-line summary, or empty when it publishes none
-         * @param call the command that opens it
+         * @param command the command that opens it
          */
-        public record Submodule(String name, String summary, String call) { }
+        public record Submodule(String name, String summary, String command) { }
     }
 
     /**
@@ -120,12 +120,12 @@ public sealed interface DiscoverResult {
          * @param normal how many plain (non-remote) methods it declares
          * @param listener the listener(s) this service type binds to, joined, or {@code null} outside the
          *     {@code service} bucket
-         * @param call the command that opens it
+         * @param command the command that opens it
          */
-        public record Container(String name, int resources, int remote, int normal, String listener, String call) {
+        public record Container(String name, int resources, int remote, int normal, String listener, String command) {
 
-            public Container(String name, int resources, int remote, int normal, String call) {
-                this(name, resources, remote, normal, null, call);
+            public Container(String name, int resources, int remote, int normal, String command) {
+                this(name, resources, remote, normal, null, command);
             }
         }
     }
@@ -158,10 +158,10 @@ public sealed interface DiscoverResult {
         /**
          * @param name the group's path prefix, {@code /}-joined from the top of the bucket
          * @param count selected operations under this group
-         * @param call the command that opens it, carrying the accessor the listing was narrowed by — a group is
+         * @param command the command that opens it, carrying the accessor the listing was narrowed by — a group is
          *     never ambiguous, so this is never {@code null}
          */
-        public record Group(String name, int count, String call) { }
+        public record Group(String name, int count, String command) { }
     }
 
     /**
@@ -192,15 +192,15 @@ public sealed interface DiscoverResult {
         /**
          * @param path the resource's path, {@code :name}-spelled for parameters, {@code .} for the root
          * @param accessors every accessor this path answers to
-         * @param calls the exact next-step command per accessor, in {@code accessors} order — one shape whether a
+         * @param commands the exact next-step command per accessor, in {@code accessors} order — one shape whether a
          *     path answers to one accessor or several, and every accessor gets its own, so none is preferred
          */
-        public record Resource(String path, List<String> accessors, Map<String, String> calls) {
+        public record Resource(String path, List<String> accessors, Map<String, String> commands) {
 
             public Resource {
                 accessors = List.copyOf(accessors);
-                calls = Collections.unmodifiableMap(new LinkedHashMap<>(calls));
-                if (accessors.isEmpty() || !List.copyOf(calls.keySet()).equals(accessors)) {
+                commands = Collections.unmodifiableMap(new LinkedHashMap<>(commands));
+                if (accessors.isEmpty() || !List.copyOf(commands.keySet()).equals(accessors)) {
                     throw new IllegalArgumentException("one command per accessor, in order: " + path);
                 }
             }
@@ -279,9 +279,9 @@ public sealed interface DiscoverResult {
          * @param number the 1-based address a caller types
          * @param title the heading it sits under
          * @param lines how many lines the chunk holds
-         * @param call the command that opens it
+         * @param command the command that opens it
          */
-        public record Chunk(int number, String title, int lines, String call) { }
+        public record Chunk(int number, String title, int lines, String command) { }
     }
 
     /**
@@ -381,9 +381,9 @@ public sealed interface DiscoverResult {
 
         /**
          * @param path one full path carrying the requested segment
-         * @param call the command that opens it
+         * @param command the command that opens it
          */
-        public record Alternative(String path, String call) { }
+        public record Alternative(String path, String command) { }
     }
 
     /**
@@ -401,9 +401,9 @@ public sealed interface DiscoverResult {
         /**
          * @param name the container's name
          * @param matches how many of its entries the selector matched
-         * @param call the command that opens the member on that container
+         * @param command the command that opens the member on that container
          */
-        public record Owner(String name, int matches, String call) { }
+        public record Owner(String name, int matches, String command) { }
     }
 
     /**
@@ -418,8 +418,8 @@ public sealed interface DiscoverResult {
         /**
          * @param bucket the bucket's name
          * @param count containers in it — functions, for {@code funcs}
-         * @param call the command that opens it
+         * @param command the command that opens it
          */
-        public record Elsewhere(String bucket, int count, String call) { }
+        public record Elsewhere(String bucket, int count, String command) { }
     }
 }

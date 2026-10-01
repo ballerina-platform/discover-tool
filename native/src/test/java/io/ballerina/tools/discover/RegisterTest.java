@@ -258,14 +258,14 @@ public class RegisterTest {
             List<String> shapes = text.lines().filter(line -> line.startsWith("Next: "))
                     .map(line -> line.substring("Next: ".length()))
                     .toList();
-            for (String[] row : callsOf(answer.result())) {
+            for (String[] row : rowCommandsOf(answer.result())) {
                 String literal = row[0];
-                String call = row[1];
-                boolean reachable = text.contains(call) || shapes.stream().anyMatch(shape -> shape.contains("<")
-                        && call.equals(shape.substring(0, shape.indexOf('<')) + literal
+                String command = row[1];
+                boolean reachable = text.contains(command) || shapes.stream().anyMatch(shape -> shape.contains("<")
+                        && command.equals(shape.substring(0, shape.indexOf('<')) + literal
                                 + shape.substring(shape.lastIndexOf('>') + 1)))
-                        || row.length > 2 && accessorSlotOnItsRow(text, row[2], call);
-                Assert.assertTrue(reachable, label + "\nmissing: " + call);
+                        || row.length > 2 && accessorSlotOnItsRow(text, row[2], command);
+                Assert.assertTrue(reachable, label + "\nmissing: " + command);
             }
             String next = nextOf(answer.result());
             if (next != null) {
@@ -278,8 +278,8 @@ public class RegisterTest {
      * A resource row whose quoted path the footer's shape cannot spell prints its command once with the accessor
      * left as a slot — lossless, because the same row lists every accessor that fills it.
      */
-    private static boolean accessorSlotOnItsRow(String text, String path, String call) {
-        String slotted = call.substring(0, call.lastIndexOf(' ')) + " <accessor>";
+    private static boolean accessorSlotOnItsRow(String text, String path, String command) {
+        String slotted = command.substring(0, command.lastIndexOf(' ')) + " <accessor>";
         return text.lines().anyMatch(line -> isRowFor(line, path) && line.endsWith(slotted));
     }
 
@@ -342,39 +342,39 @@ public class RegisterTest {
     }
 
     /** Each row's own name and the command the JSON rendering gives it. */
-    private static List<String[]> callsOf(DiscoverResult result) {
-        List<String[]> calls = new ArrayList<>();
+    private static List<String[]> rowCommandsOf(DiscoverResult result) {
+        List<String[]> commands = new ArrayList<>();
         switch (result) {
             case DiscoverResult.ContainerRoster roster -> roster.containers()
-                    .forEach(container -> calls.add(new String[] {container.name(), container.call()}));
+                    .forEach(container -> commands.add(new String[] {container.name(), container.command()}));
             case DiscoverResult.PathGroups groups -> {
-                groups.resources().forEach(resource -> addResourceCalls(calls, resource));
-                groups.groups().forEach(group -> calls.add(new String[] {group.name(), group.call()}));
+                groups.resources().forEach(resource -> addResourceCommands(commands, resource));
+                groups.groups().forEach(group -> commands.add(new String[] {group.name(), group.command()}));
             }
             case DiscoverResult.ResourceList resources ->
-                    resources.resources().forEach(resource -> addResourceCalls(calls, resource));
+                    resources.resources().forEach(resource -> addResourceCommands(commands, resource));
             case DiscoverResult.MethodList methods ->
-                    methods.methods().forEach(method -> calls.add(new String[] {method.name(), method.call()}));
+                    methods.methods().forEach(method -> commands.add(new String[] {method.name(), method.command()}));
             case DiscoverResult.MixedListing mixed -> {
-                mixed.resources().forEach(resource -> addResourceCalls(calls, resource));
-                mixed.remote().forEach(method -> calls.add(new String[] {method.name(), method.call()}));
-                mixed.normal().forEach(method -> calls.add(new String[] {method.name(), method.call()}));
+                mixed.resources().forEach(resource -> addResourceCommands(commands, resource));
+                mixed.remote().forEach(method -> commands.add(new String[] {method.name(), method.command()}));
+                mixed.normal().forEach(method -> commands.add(new String[] {method.name(), method.command()}));
             }
             case DiscoverResult.NoMatch noMatch -> noMatch.paths()
-                    .forEach(alternative -> calls.add(new String[] {alternative.path(), alternative.call()}));
+                    .forEach(alternative -> commands.add(new String[] {alternative.path(), alternative.command()}));
             case DiscoverResult.Owners owners -> owners.owners()
-                    .forEach(owner -> calls.add(new String[] {owner.name(), owner.call()}));
+                    .forEach(owner -> commands.add(new String[] {owner.name(), owner.command()}));
             case DiscoverResult.EmptyBucket empty -> empty.elsewhere()
-                    .forEach(other -> calls.add(new String[] {other.bucket(), other.call()}));
+                    .forEach(other -> commands.add(new String[] {other.bucket(), other.command()}));
             default -> { }
         }
-        return calls;
+        return commands;
     }
 
     /** One row per accessor, named by its path and that accessor, with the row's path as the line it sits on. */
-    private static void addResourceCalls(List<String[]> calls, DiscoverResult.ResourceList.Resource resource) {
-        resource.calls().forEach((accessor, call) ->
-                calls.add(new String[] {resource.path() + " " + accessor, call, resource.path()}));
+    private static void addResourceCommands(List<String[]> commands, DiscoverResult.ResourceList.Resource resource) {
+        resource.commands().forEach((accessor, command) ->
+                commands.add(new String[] {resource.path() + " " + accessor, command, resource.path()}));
     }
 
     private static String nextOf(DiscoverResult result) {

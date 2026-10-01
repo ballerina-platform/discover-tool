@@ -110,7 +110,7 @@ public class DiscoverResultRenderingTest {
         JsonArray submodules = json.getAsJsonArray("submodules");
         Assert.assertEquals(submodules.size(), 2);
         Assert.assertEquals(submodules.get(0).getAsJsonObject().get("name").getAsString(), "dataloader");
-        Assert.assertEquals(submodules.get(0).getAsJsonObject().get("call").getAsString(),
+        Assert.assertEquals(submodules.get(0).getAsJsonObject().get("command").getAsString(),
                 "bal discover ballerina/graphql --module dataloader");
     }
 
@@ -160,7 +160,7 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(containers.get(0).getAsJsonObject().get("remote").getAsInt(), 3);
         Assert.assertFalse(containers.get(0).getAsJsonObject().has("resources"),
                 "a zero count is omitted rather than printed as 0");
-        Assert.assertEquals(containers.get(0).getAsJsonObject().get("call").getAsString(),
+        Assert.assertEquals(containers.get(0).getAsJsonObject().get("command").getAsString(),
                 "bal discover ballerinax/kafka client Caller");
         Assert.assertEquals(json.get("shown").getAsInt(), 2);
         Assert.assertEquals(json.get("total").getAsInt(), 2);
@@ -299,13 +299,13 @@ public class DiscoverResultRenderingTest {
         JsonArray resources = JsonParser.parseString(JsonRenderer.render(result))
                 .getAsJsonObject().getAsJsonArray("resources");
         Assert.assertEquals(resources.get(1).toString(),
-                "{\"path\":\"gists/:gistId\",\"accessors\":[\"get\",\"delete\"],\"calls\":{"
+                "{\"path\":\"gists/:gistId\",\"accessors\":[\"get\",\"delete\"],\"commands\":{"
                         + "\"get\":\"" + client + " gists/:gistId get\","
                         + "\"delete\":\"" + client + " gists/:gistId delete\"}}");
-        Assert.assertEquals(resources.get(2).getAsJsonObject().getAsJsonObject("calls").toString(),
+        Assert.assertEquals(resources.get(2).getAsJsonObject().getAsJsonObject("commands").toString(),
                 "{\"get\":\"" + client + " gists/starred get\"}");
         for (int i = 0; i < resources.size(); i++) {
-            Assert.assertFalse(resources.get(i).getAsJsonObject().has("call"), resources.get(i).toString());
+            Assert.assertFalse(resources.get(i).getAsJsonObject().has("command"), resources.get(i).toString());
         }
     }
 
@@ -348,7 +348,7 @@ public class DiscoverResultRenderingTest {
                 "Next: " + TWILIO + " --page 2"));
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.getAsJsonArray("methods").get(0).toString(),
-                "{\"name\":\"createAccount\",\"call\":\"" + TWILIO + " createAccount\"}");
+                "{\"name\":\"createAccount\",\"command\":\"" + TWILIO + " createAccount\"}");
         Assert.assertEquals(json.get("container").getAsString(), "Client");
         Assert.assertEquals(json.get("shown").getAsInt(), 40);
         Assert.assertEquals(json.get("total").getAsInt(), 199);
@@ -426,7 +426,7 @@ public class DiscoverResultRenderingTest {
         JsonArray chunks = JsonParser.parseString(JsonRenderer.render(result))
                 .getAsJsonObject().getAsJsonArray("chunks");
         Assert.assertEquals(chunks.get(1).getAsJsonObject().get("number").getAsInt(), 3);
-        Assert.assertEquals(chunks.get(1).getAsJsonObject().get("call").getAsString(), "bal discover pkg readme 3");
+        Assert.assertEquals(chunks.get(1).getAsJsonObject().get("command").getAsString(), "bal discover pkg readme 3");
     }
 
     @Test
@@ -542,7 +542,7 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.getAsJsonArray("resources").get(0).getAsJsonObject().get("path").getAsString(),
                 ":...path");
         Assert.assertEquals(json.getAsJsonArray("remote").get(1).toString(),
-                "{\"name\":\"get\",\"call\":\"" + HTTP + " get\"}");
+                "{\"name\":\"get\",\"command\":\"" + HTTP + " get\"}");
         Assert.assertEquals(json.getAsJsonArray("normal").get(0).getAsJsonObject().get("name").getAsString(),
                 "getCookieStore");
         Assert.assertEquals(json.get("shown").getAsInt(), 4);
@@ -642,7 +642,7 @@ public class DiscoverResultRenderingTest {
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonArray paths = json.getAsJsonArray("paths");
-        Assert.assertEquals(paths.get(1).getAsJsonObject().get("call").getAsString(),
+        Assert.assertEquals(paths.get(1).getAsJsonObject().get("command").getAsString(),
                 "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets");
         Assert.assertFalse(json.has("available"));
     }
@@ -669,7 +669,8 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.get("requested").getAsString(), "commit");
         JsonObject consumer = json.getAsJsonArray("owners").get(1).getAsJsonObject();
         Assert.assertEquals(consumer.get("matches").getAsInt(), 3);
-        Assert.assertEquals(consumer.get("call").getAsString(), "bal discover ballerinax/kafka client Consumer commit");
+        Assert.assertEquals(consumer.get("command").getAsString(),
+                "bal discover ballerinax/kafka client Consumer commit");
         Assert.assertEquals(json.get("shown").getAsInt(), 2);
         Assert.assertEquals(json.get("total").getAsInt(), 2);
     }
@@ -693,7 +694,7 @@ public class DiscoverResultRenderingTest {
         JsonObject client = json.getAsJsonArray("elsewhere").get(0).getAsJsonObject();
         Assert.assertEquals(client.get("bucket").getAsString(), "client");
         Assert.assertEquals(client.get("count").getAsInt(), 3);
-        Assert.assertEquals(client.get("call").getAsString(), "bal discover ballerinax/kafka client");
+        Assert.assertEquals(client.get("command").getAsString(), "bal discover ballerinax/kafka client");
     }
 
     private static final String TWILIO = "bal discover ballerinax/twilio client Client";
@@ -709,11 +710,11 @@ public class DiscoverResultRenderingTest {
 
     /** A resource row whose command for each accessor is {@code prefix} and the accessor. */
     private static DiscoverResult.ResourceList.Resource resource(String path, String prefix, String... accessors) {
-        Map<String, String> calls = new LinkedHashMap<>();
+        Map<String, String> commands = new LinkedHashMap<>();
         for (String accessor : accessors) {
-            calls.put(accessor, prefix + " " + accessor);
+            commands.put(accessor, prefix + " " + accessor);
         }
-        return new DiscoverResult.ResourceList.Resource(path, List.of(accessors), calls);
+        return new DiscoverResult.ResourceList.Resource(path, List.of(accessors), commands);
     }
 
     private static String lines(String... lines) {

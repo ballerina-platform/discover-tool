@@ -28,11 +28,11 @@ import java.util.Map;
  *
  * <p>Every answer has the same frame: a header naming where the caller is ({@code ballerinax/github · client ·
  * Client}) and a count line, then the entries one per line in aligned columns, grouped under plain headings, then
- * a footer holding the notes, how much was left out and the {@code Next:} commands. Where the JSON rendering gives
- * every row its own {@code call} (a resource row its {@code calls}, one per accessor), a large listing prints the
- * shared shape of those commands once in the footer instead; a row whose command does not fit that shape (a name
- * that needs shell quoting, a group opened without the listing's accessor) carries its own. No colour and no
- * wrapping, so the output stays as greppable as the JSON.
+ * a footer holding the notes, how much was left out and the {@code Next:} commands. Where the JSON rendering
+ * gives every row its own {@code command} (a resource row its {@code commands}, one per accessor), a large
+ * listing prints the shared shape of those commands once in the footer instead; a row whose command does not fit
+ * that shape (a name that needs shell quoting, a group opened without the listing's accessor) carries its own.
+ * No colour and no wrapping, so the output stays as greppable as the JSON.
  *
  * @since 0.1.0
  */
@@ -109,7 +109,7 @@ public final class TextRenderer {
         if (!bucketList.submodules().isEmpty()) {
             TextTable submodules = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
             bucketList.submodules().forEach(submodule ->
-                    submodules.row(submodule.name(), submodule.call(), submodule.summary()));
+                    submodules.row(submodule.name(), submodule.command(), submodule.summary()));
             layout.section("Submodules", submodules);
         }
         layout.warning(bucketList.warning());
@@ -130,7 +130,7 @@ public final class TextRenderer {
 
         List<DiscoverResult.ContainerRoster.Container> containers = roster.containers();
         Drill drill = Drill.of(containers.stream().map(DiscoverResult.ContainerRoster.Container::name).toList(),
-                containers.stream().map(DiscoverResult.ContainerRoster.Container::call).toList(), "<name>");
+                containers.stream().map(DiscoverResult.ContainerRoster.Container::command).toList(), "<name>");
         Map<String, List<Integer>> byListener = new LinkedHashMap<>();
         for (int i = 0; i < containers.size(); i++) {
             String listener = containers.get(i).listener();
@@ -175,7 +175,7 @@ public final class TextRenderer {
         Drill hereDrill = resourceDrill(here);
         layout.section("Here", resourceTable(here, hereDrill));
         Drill groupDrill = Drill.of(groups.groups().stream().map(DiscoverResult.PathGroups.Group::name).toList(),
-                groups.groups().stream().map(DiscoverResult.PathGroups.Group::call).toList(), "<group>");
+                groups.groups().stream().map(DiscoverResult.PathGroups.Group::command).toList(), "<group>");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
         for (int i = 0; i < groups.groups().size(); i++) {
             DiscoverResult.PathGroups.Group group = groups.groups().get(i);
@@ -231,7 +231,7 @@ public final class TextRenderer {
         layout.top(counted(chunks.total(), "matching chunk", "matching chunks"));
         List<DiscoverResult.ReadmeChunks.Chunk> rows = chunks.chunks();
         Drill drill = Drill.of(rows.stream().map(chunk -> String.valueOf(chunk.number())).toList(),
-                rows.stream().map(DiscoverResult.ReadmeChunks.Chunk::call).toList(), "<n>");
+                rows.stream().map(DiscoverResult.ReadmeChunks.Chunk::command).toList(), "<n>");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT,
                 TextTable.Column.count("line", "lines"), TextTable.Column.LEFT);
         for (int i = 0; i < rows.size(); i++) {
@@ -297,7 +297,7 @@ public final class TextRenderer {
                 + " matches '" + noMatch.requested() + "'.");
         layout.section("Did you mean", names(noMatch.candidates()));
         TextTable paths = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
-        noMatch.paths().forEach(alternative -> paths.row(alternative.path(), alternative.call()));
+        noMatch.paths().forEach(alternative -> paths.row(alternative.path(), alternative.command()));
         layout.section(noMatch.paths().size() + " paths carry that segment; pick one", paths);
         documented(layout, noMatch.documented());
         if (noMatch.available() != null) {
@@ -317,7 +317,7 @@ public final class TextRenderer {
         layout.top("'" + owners.requested() + "' is declared on " + owners.total() + " containers; pick one.");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.count("match", "matches"),
                 TextTable.Column.LEFT);
-        owners.owners().forEach(owner -> table.row(owner.name(), String.valueOf(owner.matches()), owner.call()));
+        owners.owners().forEach(owner -> table.row(owner.name(), String.valueOf(owner.matches()), owner.command()));
         layout.block(table.lines(INDENT));
         layout.warning(owners.warning());
         layout.more(owners.total() - owners.owners().size(), null);
@@ -327,7 +327,7 @@ public final class TextRenderer {
     private static void emptyBucket(Layout layout, DiscoverResult.EmptyBucket empty) {
         layout.top("This package declares nothing in " + empty.bucket() + ".");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
-        empty.elsewhere().forEach(other -> table.row(other.bucket(), String.valueOf(other.count()), other.call()));
+        empty.elsewhere().forEach(other -> table.row(other.bucket(), String.valueOf(other.count()), other.command()));
         layout.section("Elsewhere", table);
         layout.warning(empty.warning());
     }
@@ -383,13 +383,13 @@ public final class TextRenderer {
      */
     private static Drill resourceDrill(List<DiscoverResult.ResourceList.Resource> resources) {
         List<List<String>> literals = new ArrayList<>();
-        List<List<String>> calls = new ArrayList<>();
+        List<List<String>> commands = new ArrayList<>();
         for (DiscoverResult.ResourceList.Resource resource : resources) {
-            literals.add(resource.calls().keySet().stream().map(accessor -> resource.path() + " " + accessor)
+            literals.add(resource.commands().keySet().stream().map(accessor -> resource.path() + " " + accessor)
                     .toList());
-            calls.add(List.copyOf(resource.calls().values()));
+            commands.add(List.copyOf(resource.commands().values()));
         }
-        return Drill.ofRows(literals, calls, "<path> <accessor>");
+        return Drill.ofRows(literals, commands, "<path> <accessor>");
     }
 
     /**
@@ -406,7 +406,7 @@ public final class TextRenderer {
 
     private static Drill methodDrill(List<DiscoverResult.Method> methods) {
         return Drill.of(methods.stream().map(DiscoverResult.Method::name).toList(),
-                methods.stream().map(DiscoverResult.Method::call).toList(), "<name>");
+                methods.stream().map(DiscoverResult.Method::command).toList(), "<name>");
     }
 
     private static TextTable methodTable(List<DiscoverResult.Method> methods, Drill drill) {
@@ -452,7 +452,7 @@ public final class TextRenderer {
     }
 
     /**
-     * The one command shape a listing's per-row {@code call}s share — the row's own name swapped for a
+     * The one command shape a listing's per-row {@code command}s share — the row's own name swapped for a
      * placeholder — and, for each row, its commands only where substituting its name into that shape would not
      * reproduce them exactly.
      *
@@ -461,18 +461,20 @@ public final class TextRenderer {
      */
     private record Drill(String pattern, List<List<String>> unfit) {
 
-        static Drill of(List<String> literals, List<String> calls, String placeholder) {
+        static Drill of(List<String> literals, List<String> commands, String placeholder) {
             return ofRows(literals.stream().map(List::of).toList(),
-                    calls.stream().map(call -> call == null ? List.<String>of() : List.of(call)).toList(),
+                    commands.stream()
+                            .map(command -> command == null ? List.<String>of() : List.of(command))
+                            .toList(),
                     placeholder);
         }
 
         /** Each row with any number of commands, {@code literals} naming each one in the same order. */
-        static Drill ofRows(List<List<String>> literals, List<List<String>> calls, String placeholder) {
+        static Drill ofRows(List<List<String>> literals, List<List<String>> commands, String placeholder) {
             Map<String, Integer> shapes = new LinkedHashMap<>();
-            for (int row = 0; row < calls.size(); row++) {
-                for (int i = 0; i < calls.get(row).size(); i++) {
-                    String shape = shapeOf(calls.get(row).get(i), literals.get(row).get(i), placeholder);
+            for (int row = 0; row < commands.size(); row++) {
+                for (int i = 0; i < commands.get(row).size(); i++) {
+                    String shape = shapeOf(commands.get(row).get(i), literals.get(row).get(i), placeholder);
                     if (shape != null) {
                         shapes.merge(shape, 1, Integer::sum);
                     }
@@ -483,12 +485,12 @@ public final class TextRenderer {
                     .map(Map.Entry::getKey)
                     .orElse(null);
             List<List<String>> unfit = new ArrayList<>();
-            for (int row = 0; row < calls.size(); row++) {
+            for (int row = 0; row < commands.size(); row++) {
                 List<String> own = new ArrayList<>();
-                for (int i = 0; i < calls.get(row).size(); i++) {
-                    String call = calls.get(row).get(i);
-                    if (pattern == null || !call.equals(pattern.replace(placeholder, literals.get(row).get(i)))) {
-                        own.add(call);
+                for (int i = 0; i < commands.get(row).size(); i++) {
+                    String command = commands.get(row).get(i);
+                    if (pattern == null || !command.equals(pattern.replace(placeholder, literals.get(row).get(i)))) {
+                        own.add(command);
                     }
                 }
                 unfit.add(List.copyOf(own));
@@ -496,13 +498,13 @@ public final class TextRenderer {
             return new Drill(pattern, List.copyOf(unfit));
         }
 
-        /** {@code call} with its last whole-word occurrence of {@code literal} replaced, or {@code null}. */
-        private static String shapeOf(String call, String literal, String placeholder) {
+        /** {@code command} with its last whole-word occurrence of {@code literal} replaced, or {@code null}. */
+        private static String shapeOf(String command, String literal, String placeholder) {
             String needle = " " + literal;
-            for (int at = call.lastIndexOf(needle); at >= 0; at = call.lastIndexOf(needle, at - 1)) {
+            for (int at = command.lastIndexOf(needle); at >= 0; at = command.lastIndexOf(needle, at - 1)) {
                 int end = at + needle.length();
-                if (end == call.length() || call.charAt(end) == ' ') {
-                    return call.substring(0, at + 1) + placeholder + call.substring(end);
+                if (end == command.length() || command.charAt(end) == ' ') {
+                    return command.substring(0, at + 1) + placeholder + command.substring(end);
                 }
             }
             return null;
