@@ -18,6 +18,8 @@
 
 package io.ballerina.tools.discover;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.HttpTransport;
@@ -33,6 +35,7 @@ import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -103,6 +106,10 @@ public class PointersTest {
                         new Containers.Options(List.of(container.name()))))));
                 commands.addAll(commandsOf(expect(Containers.render(context, scope,
                         new Containers.Options(List.of(container.name(), "zzznosuchmember"))))));
+                for (List<String> selector : narrowingSelectors(container)) {
+                    commands.addAll(commandsOf(expect(Containers.render(context, scope,
+                            new Containers.Options(selector)))));
+                }
             }
         }
 
@@ -113,6 +120,19 @@ public class PointersTest {
                     Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1)))));
         }
         return commands;
+    }
+
+    /**
+     * The selections a caller narrows with, beyond naming a container: a name substring (which must never be
+     * re-typed as a path) and a top-level path with an accessor (which must ride along into every group).
+     */
+    private static List<List<String>> narrowingSelectors(Surface.Container container) {
+        List<List<String>> selectors = new ArrayList<>();
+        container.memberNames().stream().findFirst().filter(name -> name.length() > 3)
+                .ifPresent(name -> selectors.add(List.of(container.name(), name.substring(1, name.length() - 1))));
+        container.operations().stream().findFirst().ifPresent(operation -> selectors.add(
+                List.of(container.name(), operation.segments().get(0), operation.fn().accessor())));
+        return selectors;
     }
 
     private static List<String> commandsOf(DiscoverResult result) {
@@ -177,49 +197,98 @@ public class PointersTest {
         return view.value();
     }
 
+    /** How many levels past the first answers a printed command is followed. */
+    private static final int DEPTH = 2;
+
+    /**
+     * Bounds on the walk past the first answers, so a deep walk over github's 903 operations stays a unit test:
+     * how many of one answer's own commands are followed, and how many commands one fixture runs past the first
+     * level. Every command the first answers print is always run.
+     */
+    private static final int PER_ANSWER = 6;
+
+    private static final int BUDGET = 80;
+
     @Test(dataProvider = "fixtures")
     public void everyCommandADocumentPrintsRunsAndAnswers(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         String pkg = context.qualified().qualified();
         HttpOptions http = centralFor(slug);
 
-        Set<String> runnable = new LinkedHashSet<>();
-        Set<String> templates = new LinkedHashSet<>();
-        Set<String> foreign = new LinkedHashSet<>();
-        for (String text : commandsOf(context)) {
-            if (text.contains("<") || text.contains(">")) {
-                templates.add(text);
-            } else if (!text.contains(" " + pkg)) {
-                foreign.add(text);
-            } else {
-                runnable.add(text);
+        List<String> level = new ArrayList<>(new LinkedHashSet<>(commandsOf(context)));
+        Set<String> seen = new LinkedHashSet<>();
+        int ran = 0;
+        int deep = 0;
+        for (int depth = 0; depth <= DEPTH && !level.isEmpty(); depth++) {
+            List<String> deeper = new ArrayList<>();
+            for (String text : level) {
+                if (!seen.add(text) || !runnable(slug, pkg, text)) {
+                    continue;
+                }
+                if (depth > 0 && deep++ >= BUDGET) {
+                    break;
+                }
+                ran++;
+                List<String> printed = followed(slug, http, text);
+                for (String command : printed) {
+                    Assert.assertNotEquals(command, text, slug + ": `" + text + "` points back at itself");
+                }
+                deeper.addAll(printed.subList(0, Math.min(PER_ANSWER, printed.size())));
             }
+            level = deeper;
         }
+        Assert.assertTrue(ran > 0, slug + ": no document printed a runnable command");
+    }
 
-        Assert.assertFalse(runnable.isEmpty(), slug + ": no document printed a runnable command");
-        for (String text : runnable) {
-            StringBuilder out = new StringBuilder();
-            StringBuilder err = new StringBuilder();
-            int code = Cli.run(argv(text), new Cli.Streams(out::append, err::append), http);
-            Assert.assertEquals(code, 0, slug + ": `" + text + "` failed with " + err);
-            Assert.assertFalse(out.toString().isBlank(), slug + ": `" + text + "` answered with nothing");
-            // Exit 0 is not enough on its own: "nothing matched" is an exit-0 answer too, and a pointer that lands
-            // on one is exactly the loop this test exists to catch.
-            Assert.assertFalse(JsonParser.parseString(out.toString()).getAsJsonObject().has("candidates"),
-                    slug + ": `" + text + "` matched nothing:\n" + out);
-        }
-
-        // A template is the grammar rather than an argument, so it has to LOOK like one: every angle-bracket slot
-        // is a placeholder name, never a value that leaked out of a rendering.
-        for (String text : templates) {
+    /**
+     * Whether a printed command can be run against this fixture — asserting the shape of the two kinds that
+     * cannot, so an exclusion cannot become a hiding place.
+     */
+    private static boolean runnable(String slug, String pkg, String text) {
+        if (text.contains("<") || text.contains(">")) {
+            // A template is the grammar rather than an argument, so it has to LOOK like one: every angle-bracket
+            // slot is a placeholder name, never a value that leaked out of a rendering.
             Assert.assertTrue(Pattern.compile("<[A-Za-z][^>]*>").matcher(text).find(),
                     slug + ": `" + text + "` has an angle bracket that is not a slot");
+            return false;
         }
-        // A foreign command is a cross-package edge, so it has to name a real coordinate and this
-        // package must not be it.
-        for (String text : foreign) {
+        if (!text.contains(" " + pkg)) {
+            // A cross-package edge, so it has to name a real coordinate and this package must not be it.
             Assert.assertTrue(Pattern.compile("bal discover \\w+ [\\w.]+/[\\w.]+").matcher(text).find(),
                     slug + ": `" + text + "` names no package coordinate");
+            return false;
+        }
+        return true;
+    }
+
+    /** Runs one printed command and returns every command its own answer prints. */
+    private static List<String> followed(String slug, HttpOptions http, String text) {
+        StringBuilder out = new StringBuilder();
+        StringBuilder err = new StringBuilder();
+        int code = Cli.run(argv(text), new Cli.Streams(out::append, err::append), http);
+        Assert.assertEquals(code, 0, slug + ": `" + text + "` failed with " + err);
+        Assert.assertFalse(out.toString().isBlank(), slug + ": `" + text + "` answered with nothing");
+        JsonObject answer = JsonParser.parseString(out.toString()).getAsJsonObject();
+        // Exit 0 is not enough on its own: "nothing matched" is an exit-0 answer too, and a pointer that lands
+        // on one is exactly the loop this test exists to catch.
+        Assert.assertFalse(answer.has("candidates"), slug + ": `" + text + "` matched nothing:\n" + out);
+        List<String> printed = new ArrayList<>();
+        collectCommands(answer, printed);
+        return printed;
+    }
+
+    private static void collectCommands(JsonElement element, List<String> into) {
+        if (element.isJsonArray()) {
+            element.getAsJsonArray().forEach(child -> collectCommands(child, into));
+        } else if (element.isJsonObject()) {
+            for (Map.Entry<String, JsonElement> field : element.getAsJsonObject().entrySet()) {
+                if ((field.getKey().equals("call") || field.getKey().equals("next"))
+                        && field.getValue().isJsonPrimitive()) {
+                    into.add(field.getValue().getAsString());
+                } else {
+                    collectCommands(field.getValue(), into);
+                }
+            }
         }
     }
 

@@ -110,6 +110,16 @@ public class ViewsAgreeTest {
     /** Across every fixture — a single fixture legitimately checks zero, see below. */
     private static final AtomicInteger TOTAL_CHECKED = new AtomicInteger();
 
+    /** How many single-callable answers the corpus walk reached, across every fixture. */
+    private static final AtomicInteger SIGNATURES = new AtomicInteger();
+
+    /**
+     * Below the corpus's own count — every named member plus up to {@value #OPERATIONS_PER_CONTAINER} operations
+     * per container — by a margin, so adding a fixture never fails this, but a selector grammar that quietly stops
+     * resolving members does.
+     */
+    private static final int MINIMUM_SIGNATURES = 900;
+
     /** How many resource operations per container are drilled into — github alone has 903. */
     private static final int OPERATIONS_PER_CONTAINER = 25;
 
@@ -132,9 +142,12 @@ public class ViewsAgreeTest {
                 for (List<String> selector : selectors) {
                     DiscoverResult answer = expectAnswer(Containers.render(context, scope,
                             new Containers.Options(selector)), scope.verb() + " " + selector);
-                    if (!(answer instanceof DiscoverResult.Signature signature)) {
-                        continue;
-                    }
+                    // An exact member name or an exact path plus its accessor names ONE callable; anything else
+                    // here is the selector grammar failing to reach something the package declares.
+                    Assert.assertTrue(answer instanceof DiscoverResult.Signature, slug + " " + scope.verb() + " "
+                            + selector + " did not resolve to one callable: " + answer.getClass().getSimpleName());
+                    DiscoverResult.Signature signature = (DiscoverResult.Signature) answer;
+                    SIGNATURES.incrementAndGet();
                     List<String> quoted = new ArrayList<>(List.of(signature.declaration().split("\n", -1)));
                     signature.types().forEach(type -> quoted.addAll(List.of(type.declaration().split("\n", -1))));
                     for (String line : quoted) {
@@ -161,6 +174,8 @@ public class ViewsAgreeTest {
     public void atLeastOneSignatureWasActuallyChecked() {
         Assert.assertTrue(TOTAL_CHECKED.get() > 0,
                 "nothing was checked across any fixture, so the test above passed vacuously");
+        Assert.assertTrue(SIGNATURES.get() >= MINIMUM_SIGNATURES,
+                SIGNATURES.get() + " single-callable answers checked, fewer than " + MINIMUM_SIGNATURES);
     }
 
     // -----------------------------------------------------------------------
