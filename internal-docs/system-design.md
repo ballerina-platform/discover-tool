@@ -134,6 +134,17 @@ override and a parser could not.
 | `Readme`          | the readme verbatim, or one section of it                                       |
 | `ReadmeChunks`    | the readme sections a selector or `--filter` matched                            |
 
+The text rendering is laid out for a person at a terminal: a header naming where the answer is (package,
+`--module`, bucket, container, selectors, `--filter` — from a `TextRenderer.Context` `Cli` builds out of the
+argument list, since the JSON never needs to echo the request), a count line, one entry per line in columns
+padded to the longest name (`TextTable`), plain section headings, and a footer of notes, the truncation line
+and `Next:` commands. Where every row of a large listing has a `call`, the footer prints the shape they share
+once, with a placeholder (`Next: bal discover ballerinax/github client Client <group>`), and only a row its
+name cannot be substituted into — one needing shell quoting, a group opened without the listing's accessor —
+prints its own; owners, alternatives, `Elsewhere` and submodules keep a command on every row, since those
+commands are the answer. No colour and no wrapping, so it pipes to `grep` and `less` intact; the whole readme
+stays verbatim.
+
 JSON field names follow the RFC's worked examples where one exists (`buckets`, `groups`, `resources`,
 `path`, `accessors`, `methods`, `shown`, `total`, `next`, `call`). `CompactJson` writes object fields inline
 and one array element per line: valid JSON either way, and far fewer lines than indented JSON, which is the
@@ -149,7 +160,7 @@ against the recorded payloads, then follows what those answers print two levels 
 each must exit 0 with something other than a `NoMatch`, and none may print the command that produced it.
 Commands with a `<slot>` are templates and are checked for shape, not run.
 
-Every answer about one container names it in `container` (a `Container:` line in text). A `Signature`'s `form`
+Every answer about one container names it in `container` (in the header line, in text). A `Signature`'s `form`
 is `->`, `.` or, for a constructor, `new`.
 
 **A `Signature` quotes; it never re-spells.** Its `declaration` and each of its `types` come from
@@ -185,9 +196,9 @@ Over the ceiling:
 - **Everything else is cut** at 40 and points at `--filter`: a roster of containers and a mixed listing.
 
 A cut answer always says so — `shown`/`total` and the `next` command in JSON (plus `page`/`pages` when
-paged), a trailing `... N more, narrow further: <command>` line in text (`... N more (page P of Q), next page:
-<command>` when paged, `N` counting what follows this page) — so a partial list is never mistaken for a
-complete one.
+paged), a `... N more, narrow further` line and a `Next: <command>` line in text (`... N more (page P of
+Q)` when paged, `N` counting what follows this page) — so a partial list is never mistaken for a complete
+one.
 
 `--filter` narrows within the bucket already selected, client-side, over the payload already in memory; it
 is never sent to Central. It is a case-insensitive substring of an entry's surface text (name, path, parameter
@@ -313,7 +324,7 @@ discover-tool/
         │   ├── central/schema/{CentralDocs,Schema}
         │   ├── model/{Library,TypeDef,Fn,Service,TypeRef,Param,ReturnDef,RecordField,
         │   │          ClientClass,FromCentral,Patches,Defaults,Pipeline,ModuleRef}
-        │   ├── render/{DiscoverResult,JsonRenderer,TextRenderer,CompactJson,
+        │   ├── render/{DiscoverResult,JsonRenderer,TextRenderer,TextTable,CompactJson,
         │   │           Signatures,TypeDefs,Documents,Identifiers}
         │   ├── symbols/{Declarations,Names,PathTree,Surface,Filter}
         │   ├── views/{Containers,Readme,Readmes,Closure,TypeView}
@@ -357,7 +368,7 @@ ballerina-platform's GitHub Packages, so building needs a `read:packages` token 
 | `PointersTest` | Every `call`/`next` command the first answers print (bare, filtered, per container, by name substring, by path plus accessor) is RUN through the real CLI against the recorded payload, then what those print is followed two levels further on a bounded sample; each must exit 0 with something other than "nothing matched", and none may point back at the command that printed it. |
 | `SelectionCarryTest` | A page, a group and a canonical command re-select exactly what the listing was a window onto: the selector, the accessor and the `--filter` ride along, a substring never becomes a path, the depth cap counts literal segments, and an out-of-range `--page` fails. |
 | `ViewsTest` | The `.buckets.txt`/`.buckets.json` snapshots, the entry ceiling over every fixture (listed sizes, `shown` against what is listed, a `next` on every cut listing, nested `NoMatch.available` listings included), and the resolution and tolerance rules. Also where path ordering is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
-| `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object, no text rendering carries Markdown report furniture, no `note` carries a Markdown backtick, and quoted Ballerina carries no fences of the tool's own. |
+| `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object, no text rendering carries Markdown report furniture, no `note` carries a Markdown backtick, every text listing puts one entry per line with its columns lined up and every JSON `call`/`next` reachable from the text, and quoted Ballerina carries no fences of the tool's own. |
 | `render/DiscoverResultRenderingTest` | Every result shape, in both renderers, driven directly. |
 | `CliTest` | Parsing, streams, exit codes and `--output` together, in-process against a recorded payload, including following resource `call` fields to the signatures they name. |
 | `SurfaceTest` | That the bucket partition is exhaustive and disjoint, and that a `client object` type Central files as an ordinary declaration is still a `client`. |
