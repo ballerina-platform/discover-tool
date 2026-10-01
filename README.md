@@ -50,7 +50,15 @@ What a package has:
 
 ```
 $ bal discover ballerinax/kafka
-client, service, class, readme
+ballerinax/kafka
+4 buckets
+
+  client
+  service
+  class
+  readme
+
+Next: bal discover ballerinax/kafka <bucket>
 
 $ bal discover ballerinax/kafka | cat
 {"buckets":[
@@ -61,30 +69,116 @@ $ bal discover ballerinax/kafka | cat
 ]}
 ```
 
-A bucket with too many resource paths to list is grouped by path segment. Every listing about one container
-names it first:
+At a terminal every answer opens with a header naming where it is — package, bucket, container, selector —
+and a count, lists one entry per line in aligned columns, and ends with a footer: notes, how much was left
+out, and the `Next:` commands. A listing whose JSON gives every row its own `call` prints the shape those
+commands share once, as a `Next:` line with a placeholder; a row whose command does not fit that shape (a path
+that needs shell quoting, say) carries its own beside it.
+
+Several containers in one bucket are a roster with their member counts; service types are listed under the
+listener they bind to:
+
+```
+$ bal discover ballerina/http client
+ballerina/http · client
+10 clients
+
+  ClientObject                           7 resources  15 remote
+  StatusCodeClientObject                 7 resources  15 remote
+  Caller                                               5 remote  1 normal
+  Client                                 7 resources  15 remote  4 normal
+  ClientOAuth2Handler                                  1 remote  2 normal
+  FailoverClient                         7 resources  15 remote  1 normal
+  ListenerLdapUserStoreBasicAuthHandler                2 remote
+  ListenerOAuth2Handler                                1 remote
+  LoadBalanceClient                      7 resources  15 remote
+  StatusCodeClient                       7 resources  15 remote  4 normal
+
+Next: bal discover ballerina/http client <name>
+
+$ bal discover ballerina/http service
+ballerina/http · service
+7 service types
+
+http:Listener
+  Service
+  ServiceContract
+  RequestInterceptor
+  ResponseInterceptor
+  RequestErrorInterceptor
+  ResponseErrorInterceptor
+  InterceptableService      1 normal
+
+Next: bal discover ballerina/http service <name>
+```
+
+A bucket with too many resource paths to list is grouped by path segment:
 
 ```
 $ bal discover ballerinax/github client
-Container: Client
-Groups: repos (421), orgs (200), user (93), teams (34), users (34), gists (19), projects (19), app (13), repositories (11), notifications (7), search (7), marketplace_listing (6), applications (5), assignments (3), classrooms (3), advisories (2), codes_of_conduct (2), enterprises (2), gitignore (2), installation (2), licenses (2), markdown (2), . (1), app-manifests (1), apps (1), emojis (1), events (1), feeds (1), issues (1), meta (1), networks (1), octocat (1), organizations (1), rate_limit (1), versions (1), zen (1)
+ballerinax/github · client · Client
+36 path groups
+
+Groups (operations under each)
+  repos                421
+  orgs                 200
+  user                  93
+  teams                 34
+  users                 34
+  gists                 19
+  projects              19
+  app                   13
+  repositories          11
+  notifications          7
+  search                 7
+  marketplace_listing    6
+  applications           5
+  assignments            3
+  classrooms             3
+  advisories             2
+  codes_of_conduct       2
+  enterprises            2
+  gitignore              2
+  installation           2
+  licenses               2
+  markdown               2
+  .                      1
+  app-manifests          1
+  apps                   1
+  emojis                 1
+  events                 1
+  feeds                  1
+  issues                 1
+  meta                   1
+  networks               1
+  octocat                1
+  organizations          1
+  rate_limit             1
+  versions               1
+  zen                    1
+
+Next: bal discover ballerinax/github client Client <group>
 ```
 
 A group small enough to list shows one entry per path, with every accessor it answers to:
 
 ```
 $ bal discover ballerinax/github client gists
-Container: Client
-gists — get, post
-gists/:gistId — get, delete, patch
-gists/:gistId/comments — get, post
-gists/:gistId/comments/:commentId — get, delete, patch
-gists/:gistId/star — get, put, delete
-gists/:gistId/forks — get, post
-gists/:gistId/:sha — get
-gists/:gistId/commits — get
-gists/'public — get
-gists/starred — get
+ballerinax/github · client · Client · gists
+10 resource paths
+
+  gists                              get, post
+  gists/:gistId                      get, delete, patch
+  gists/:gistId/comments             get, post
+  gists/:gistId/comments/:commentId  get, delete, patch
+  gists/:gistId/star                 get, put, delete
+  gists/:gistId/forks                get, post
+  gists/:gistId/:sha                 get
+  gists/:gistId/commits              get
+  gists/'public                      get                 bal discover ballerinax/github client Client "gists/'public" get
+  gists/starred                      get
+
+Next: bal discover ballerinax/github client Client <path> <accessor>
 ```
 
 Operations that end exactly at a grouped prefix are listed beside its groups rather than as a group of their
@@ -92,11 +186,22 @@ own, and a group deeper than the top is named by its full path:
 
 ```
 $ bal discover ballerinax/github client repos
-Container: Client
-Here:
-repos/:owner/:repo — get, delete, patch
-Groups: repos/:owner/:repo/actions (72), repos/:owner/:repo/branches (36), repos/:owner/:repo/pulls (31), ...
-... 25 more, narrow further: bal discover ballerinax/github client Client repos --filter <keyword>
+ballerinax/github · client · Client · repos
+1 resource path here, 64 path groups
+
+Here
+  repos/:owner/:repo  get, delete, patch
+
+Groups (operations under each)
+  repos/:owner/:repo/actions                   72
+  repos/:owner/:repo/branches                  36
+  repos/:owner/:repo/pulls                     31
+  ...
+  repos/:owner/:repo/notifications              2
+
+... 25 more, narrow further
+Next: bal discover ballerinax/github client Client <group>
+Next: bal discover ballerinax/github client Client repos --filter <keyword>
 ```
 
 In JSON, an entry with exactly one accessor carries a `call` field: the ready-to-run command that opens its
@@ -121,6 +226,8 @@ signature names, one level deep:
 
 ```
 $ bal discover ballerinax/kafka client Producer send
+ballerinax/kafka · client · Producer · send
+
 # Produces records to the Kafka server.
 # ```ballerina
 # kafka:Error? result = producer->send({value: "Hello World".toBytes(), topic: "kafka-topic"});
@@ -129,67 +236,107 @@ $ bal discover ballerinax/kafka client Producer send
 # + return - A `kafka:Error` if send action fails to send data or else '()'
 isolated remote function send(AnydataProducerRecord producerRecord) returns Error?;
 
-Types it names (2):
+Types it names (2)
+  # Details related to the anydata producer record.
+  public type AnydataProducerRecord record {|
+      # Topic to which the record will be appended
+      string topic;
+      # Key that is included in the record
+      anydata key?;
+      # Anydata record content
+      anydata value;
+      # Timestamp of the record, in milliseconds since epoch
+      int timestamp?;
+      # Partition to which the record should be sent
+      int partition?;
+      # Map of headers to be included with the record
+      map<byte[]|byte[][]|string|string[]> headers?;
+  |};
 
-# Details related to the anydata producer record.
-public type AnydataProducerRecord record {|
-    # Topic to which the record will be appended
-    string topic;
-    # Key that is included in the record
-    anydata key?;
-    # Anydata record content
-    anydata value;
-    # Timestamp of the record, in milliseconds since epoch
-    int timestamp?;
-    # Partition to which the record should be sent
-    int partition?;
-    # Map of headers to be included with the record
-    map<byte[]|byte[][]|string|string[]> headers?;
-|};
-
-# Defines the common error type for the module.
-public type Error distinct error;
+  # Defines the common error type for the module.
+  public type Error distinct error;
 ```
 
 A listing over the ceiling says so, with the command that continues it:
 
 ```
 $ bal discover ballerinax/twilio client
-Container: Client
-Methods: createAccount, createAddress, createApplication, createCall, createCallFeedbackSummary, createCallRecording, createIncomingPhoneNumber, createIncomingPhoneNumberAssignedAddOn, createIncomingPhoneNumberLocal, createIncomingPhoneNumberMobile, createIncomingPhoneNumberTollFree, createMessage, createMessageFeedback, createNewKey, createNewSigningKey, createParticipant, createPayments, createQueue, createSipAuthCallsCredentialListMapping, createSipAuthCallsIpAccessControlListMapping, createSipAuthRegistrationsCredentialListMapping, createSipCredential, createSipCredentialList, createSipCredentialListMapping, createSipDomain, createSipIpAccessControlList, createSipIpAccessControlListMapping, createSipIpAddress, createSiprec, createStream, createToken, createUsageTrigger, createUserDefinedMessage, createUserDefinedMessageSubscription, createValidationRequest, deleteAddress, deleteApplication, deleteCall, deleteCallFeedbackSummary, deleteCallRecording
-... 159 more (page 1 of 5), next page: bal discover ballerinax/twilio client Client --page 2
+ballerinax/twilio · client · Client
+199 methods
+
+  createAccount
+  createAddress
+  createApplication
+  createCall
+  ...
+  deleteCallRecording
+
+... 159 more (page 1 of 5)
+Next: bal discover ballerinax/twilio client Client --page 2
 
 $ bal discover ballerinax/twilio client --filter message
-Container: Client
-Methods: createMessage, createMessageFeedback, createUserDefinedMessage, createUserDefinedMessageSubscription, deleteMedia, deleteMessage, deleteUserDefinedMessageSubscription, fetchMedia, fetchMessage, listCallNotification, listMedia, listMessage, listNotification, updateMessage
+ballerinax/twilio · client · Client · --filter message
+14 methods
+
+  createMessage
+  createMessageFeedback
+  createUserDefinedMessage
+  createUserDefinedMessageSubscription
+  deleteMedia
+  deleteMessage
+  deleteUserDefinedMessageSubscription
+  fetchMedia
+  fetchMessage
+  listCallNotification
+  listMedia
+  listMessage
+  listNotification
+  updateMessage
 ```
 
 A selector that matches nothing is still an answer (exit 0), naming the closest names and what is there:
 
 ```
 $ bal discover ballerinax/kafka client Producer sendd
+ballerinax/kafka · client · Producer · sendd
 Nothing on Producer matches 'sendd'.
-Did you mean: send, sendWithMetadata
-Available:
-Container: Producer
-Methods: 'flush, close, getTopicPartitions, send, sendWithMetadata
+
+Did you mean
+  send
+  sendWithMetadata
+
+Available
+  5 methods
+
+    'flush
+    close
+    getTopicPartitions
+    send
+    sendWithMetadata
 ```
 
 A member declared on several containers is never picked silently:
 
 ```
 $ bal discover ballerinax/kafka client commit
-'commit' is declared on 2 containers — pick one:
-  Caller (2 matches): bal discover ballerinax/kafka client Caller commit
-  Consumer (3 matches): bal discover ballerinax/kafka client Consumer commit
+ballerinax/kafka · client · commit
+'commit' is declared on 2 containers; pick one.
+
+  Caller    2 matches  bal discover ballerinax/kafka client Caller commit
+  Consumer  3 matches  bal discover ballerinax/kafka client Consumer commit
 ```
 
 A large readme can be narrowed to the sections that mention a keyword:
 
 ```
 $ bal discover ballerinax/kafka readme --filter producer
-1. Kafka producer (18 lines)
-4. Data serialization (26 lines)
+ballerinax/kafka · readme · --filter producer
+2 matching chunks
+
+  1  Kafka producer      18 lines
+  4  Data serialization  26 lines
+
+Next: bal discover ballerinax/kafka readme <n>
 ```
 
 ## Output
@@ -231,8 +378,8 @@ No listing shows more than **40 entries**. Over that:
   points at `--filter`.
 
 A cut listing always says so: `shown`/`total` plus `next` (the command that continues it) in JSON, or a
-trailing `... N more, narrow further: <command>` line in text — `... N more (page P of Q), next page:
-<command>` for a paged one, where `N` counts what comes after this page and JSON adds `page`/`pages`.
+`... N more, narrow further` line followed by `Next: <command>` in text — `... N more (page P of Q)` for a
+paged one, where `N` counts what comes after this page and JSON adds `page`/`pages`.
 
 ### Paths
 
