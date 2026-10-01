@@ -1,28 +1,4 @@
-{"container":"Client","resources":[
-{"path":":...path","accessors":[
-"post",
-"put",
-"patch",
-"delete",
-"head",
-"get",
-"options"
-],"calls":{"post":"bal discover ballerinax/sap client Client :...path post","put":"bal discover ballerinax/sap client Client :...path put","patch":"bal discover ballerinax/sap client Client :...path patch","delete":"bal discover ballerinax/sap client Client :...path delete","head":"bal discover ballerinax/sap client Client :...path head","get":"bal discover ballerinax/sap client Client :...path get","options":"bal discover ballerinax/sap client Client :...path options"}}
-],"remote":[
-{"name":"delete","call":"bal discover ballerinax/sap client Client delete"},
-{"name":"get","call":"bal discover ballerinax/sap client Client get"},
-{"name":"head","call":"bal discover ballerinax/sap client Client head"},
-{"name":"options","call":"bal discover ballerinax/sap client Client options"},
-{"name":"patch","call":"bal discover ballerinax/sap client Client patch"},
-{"name":"post","call":"bal discover ballerinax/sap client Client post"},
-{"name":"put","call":"bal discover ballerinax/sap client Client put"}
-],"shown":8,"total":8}
-{"bucket":"service","total":0,"elsewhere":[
-{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}
-]}
-{"bucket":"class","total":0,"elsewhere":[
-{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}
-]}
-{"bucket":"funcs","total":0,"elsewhere":[
-{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}
-]}
+{"container":"Client","resources":[{"path":":...path","accessors":["post","put","patch","delete","head","get","options"],"calls":{"post":"bal discover ballerinax/sap client Client :...path post","put":"bal discover ballerinax/sap client Client :...path put","patch":"bal discover ballerinax/sap client Client :...path patch","delete":"bal discover ballerinax/sap client Client :...path delete","head":"bal discover ballerinax/sap client Client :...path head","get":"bal discover ballerinax/sap client Client :...path get","options":"bal discover ballerinax/sap client Client :...path options"}}],"remote":[{"name":"delete","call":"bal discover ballerinax/sap client Client delete"},{"name":"get","call":"bal discover ballerinax/sap client Client get"},{"name":"head","call":"bal discover ballerinax/sap client Client head"},{"name":"options","call":"bal discover ballerinax/sap client Client options"},{"name":"patch","call":"bal discover ballerinax/sap client Client patch"},{"name":"post","call":"bal discover ballerinax/sap client Client post"},{"name":"put","call":"bal discover ballerinax/sap client Client put"}],"shown":8,"total":8}
+{"bucket":"service","total":0,"elsewhere":[{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}]}
+{"bucket":"class","total":0,"elsewhere":[{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}]}
+{"bucket":"funcs","total":0,"elsewhere":[{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}]}

@@ -1,21 +1,4 @@
-{"bucket":"client","total":0,"elsewhere":[
-{"bucket":"class","count":3,"call":"bal discover ballerina/xlsx class"},
-{"bucket":"funcs","count":6,"call":"bal discover ballerina/xlsx funcs"}
-]}
-{"bucket":"service","total":0,"elsewhere":[
-{"bucket":"class","count":3,"call":"bal discover ballerina/xlsx class"},
-{"bucket":"funcs","count":6,"call":"bal discover ballerina/xlsx funcs"}
-]}
-{"containers":[
-{"name":"Workbook","normal":12,"call":"bal discover ballerina/xlsx class Workbook"},
-{"name":"Sheet","normal":21,"call":"bal discover ballerina/xlsx class Sheet"},
-{"name":"Table","normal":18,"call":"bal discover ballerina/xlsx class Table"}
-],"shown":3,"total":3}
-{"methods":[
-{"name":"fromBytes","call":"bal discover ballerina/xlsx funcs fromBytes"},
-{"name":"fromFile","call":"bal discover ballerina/xlsx funcs fromFile"},
-{"name":"parseSheet","call":"bal discover ballerina/xlsx funcs parseSheet"},
-{"name":"parseTable","call":"bal discover ballerina/xlsx funcs parseTable"},
-{"name":"writeSheet","call":"bal discover ballerina/xlsx funcs writeSheet"},
-{"name":"writeTable","call":"bal discover ballerina/xlsx funcs writeTable"}
-],"shown":6,"total":6}
+{"bucket":"client","total":0,"elsewhere":[{"bucket":"class","count":3,"call":"bal discover ballerina/xlsx class"},{"bucket":"funcs","count":6,"call":"bal discover ballerina/xlsx funcs"}]}
+{"bucket":"service","total":0,"elsewhere":[{"bucket":"class","count":3,"call":"bal discover ballerina/xlsx class"},{"bucket":"funcs","count":6,"call":"bal discover ballerina/xlsx funcs"}]}
+{"containers":[{"name":"Workbook","normal":12,"call":"bal discover ballerina/xlsx class Workbook"},{"name":"Sheet","normal":21,"call":"bal discover ballerina/xlsx class Sheet"},{"name":"Table","normal":18,"call":"bal discover ballerina/xlsx class Table"}],"shown":3,"total":3}
+{"methods":[{"name":"fromBytes","call":"bal discover ballerina/xlsx funcs fromBytes"},{"name":"fromFile","call":"bal discover ballerina/xlsx funcs fromFile"},{"name":"parseSheet","call":"bal discover ballerina/xlsx funcs parseSheet"},{"name":"parseTable","call":"bal discover ballerina/xlsx funcs parseTable"},{"name":"writeSheet","call":"bal discover ballerina/xlsx funcs writeSheet"},{"name":"writeTable","call":"bal discover ballerina/xlsx funcs writeTable"}],"shown":6,"total":6}

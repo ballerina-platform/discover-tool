@@ -26,8 +26,9 @@ import java.util.List;
 /**
  * {@link DiscoverResult} → the structured JSON an agent's tooling reads by default.
  *
- * <p>Field names are exactly the RFC's own worked examples where one exists. {@link CompactJson} is the only
- * thing that turns the {@link JsonObject} built here into bytes, so every response shares one layout rule.
+ * <p>Field names are exactly the RFC's own worked examples where one exists. Every answer is written as ONE line —
+ * an agent's tooling cuts output with {@code head}/{@code tail} by line, so a line per array element is a cut
+ * through the middle of the answer — with fields in the order they are added here.
  *
  * @since 0.1.0
  */
@@ -37,7 +38,7 @@ public final class JsonRenderer {
     }
 
     public static String render(DiscoverResult result) {
-        return CompactJson.write(toJson(result));
+        return toJson(result).toString();
     }
 
     private static JsonObject toJson(DiscoverResult result) {
