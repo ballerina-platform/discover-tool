@@ -1,0 +1,51 @@
+{"methods":[
+"createAccount",
+"createAddress",
+"createApplication",
+"createCall",
+"createCallFeedbackSummary",
+"createCallRecording",
+"createIncomingPhoneNumber",
+"createIncomingPhoneNumberAssignedAddOn",
+"createIncomingPhoneNumberLocal",
+"createIncomingPhoneNumberMobile",
+"createIncomingPhoneNumberTollFree",
+"createMessage",
+"createMessageFeedback",
+"createNewKey",
+"createNewSigningKey",
+"createParticipant",
+"createPayments",
+"createQueue",
+"createSipAuthCallsCredentialListMapping",
+"createSipAuthCallsIpAccessControlListMapping",
+"createSipAuthRegistrationsCredentialListMapping",
+"createSipCredential",
+"createSipCredentialList",
+"createSipCredentialListMapping",
+"createSipDomain",
+"createSipIpAccessControlList",
+"createSipIpAccessControlListMapping",
+"createSipIpAddress",
+"createSiprec",
+"createStream",
+"createToken",
+"createUsageTrigger",
+"createUserDefinedMessage",
+"createUserDefinedMessageSubscription",
+"createValidationRequest",
+"deleteAddress",
+"deleteApplication",
+"deleteCall",
+"deleteCallFeedbackSummary",
+"deleteCallRecording"
+],"shown":40,"total":199,"next":"bal discover ballerinax/twilio client Client --page 2"}
+{"bucket":"service","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/twilio client"}
+]}
+{"bucket":"class","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/twilio client"}
+]}
+{"bucket":"funcs","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/twilio client"}
+]}

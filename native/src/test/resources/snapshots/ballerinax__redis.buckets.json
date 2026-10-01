@@ -1,0 +1,51 @@
+{"methods":[
+"append",
+"auth",
+"bitCount",
+"bitOpAnd",
+"bitOpNot",
+"bitOpOr",
+"bitOpXor",
+"bLPop",
+"bRPop",
+"close",
+"clusterInfo",
+"decr",
+"decrBy",
+"del",
+"echo",
+"exists",
+"expire",
+"flushAll",
+"flushDb",
+"get",
+"getBit",
+"getRange",
+"getSet",
+"hDel",
+"hExists",
+"hGet",
+"hGetAll",
+"hIncrBy",
+"hIncrByFloat",
+"hKeys",
+"hLen",
+"hMGet",
+"hMSet",
+"hSet",
+"hSetNx",
+"hStrLen",
+"hVals",
+"incr",
+"incrBy",
+"incrByFloat"
+],"shown":40,"total":112,"next":"bal discover ballerinax/redis client Client --page 2"}
+{"bucket":"service","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/redis client"}
+]}
+{"bucket":"class","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/redis client"}
+]}
+{"bucket":"funcs","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/redis client"}
+]}

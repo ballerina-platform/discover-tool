@@ -29,7 +29,6 @@ import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.render.Documents;
-import io.ballerina.tools.discover.render.Report;
 import io.ballerina.tools.discover.render.Signatures;
 import io.ballerina.tools.discover.render.TypeDefs;
 import org.testng.Assert;
@@ -54,44 +53,6 @@ public class RenderTest {
     private static final TypeDef.Rec RECORD = new TypeDef.Rec("Stars", "A star count.", List.of(
             new RecordField("owner", "", new TypeRef("string")),
             new RecordField("count", "", new TypeRef("int"), "0", true)));
-
-    /**
-     * Line one states the document's own length, in both registers.
-     *
-     * <p>The only defence the tool has against a filter. Piping is not a habit this tool can argue an agent out
-     * of — measured at 19 of 19 calls before the skill said "never pipe it" and 19 of 19 after — and a
-     * {@code | head -150} is silent: the closure of one github operation is 535 lines, so 72% of it went missing
-     * with nothing in what came back to say so. One of those cuts landed mid-record, and the model was handed a
-     * record whose last field had no closing brace.
-     *
-     * <p>A length on line one turns that silence into arithmetic the reader can do: 150 lines arrived, the
-     * document says 535. It survives every filter that could cause the problem, because line one is the one line
-     * a window always keeps.
-     */
-    @Test
-    public void lineOneStatesTheDocumentsOwnLength() {
-        String report = Documents.withLength("<!-- bal discover client v1 -->\n# Clients\n\nbody\n");
-        Assert.assertEquals(report.lines().findFirst().orElseThrow(),
-                "<!-- bal discover client v1 · 4 lines -->");
-
-        String code = Documents.withLength("// ballerinax/github:6.0.0\n\npublic type X record {|\n|};\n");
-        Assert.assertEquals(code.lines().findFirst().orElseThrow(),
-                "// ballerinax/github:6.0.0 · 4 lines");
-
-        // The count is the WHOLE document, so a reader comparing it against what arrived is comparing like with
-        // like. Counting the body only would make a complete 4-line document look like a cut 3-line one.
-        Assert.assertEquals(code.lines().count(), 4);
-        Assert.assertEquals(report.lines().count(), 4);
-
-        // A one-line document is still stamped: `funcs` on a package with none is exactly that, and "1 lines"
-        // reading oddly is a smaller cost than a reader unable to tell a complete answer from a cut one.
-        Assert.assertEquals(Documents.withLength("// nothing\n"), "// nothing · 1 lines\n");
-
-        // Anything whose first line is neither marker is left alone rather than guessed at. `--help` goes out
-        // through a different path and has no business carrying a length.
-        String plain = "Usage: bal discover find <keywords>...\n";
-        Assert.assertEquals(Documents.withLength(plain), plain);
-    }
 
     @Test
     public void aModuleAliasIsTheLastDottedSegmentOfThePackagePath() {
@@ -541,31 +502,6 @@ public class RenderTest {
                         + "// Library: test/pkg\n"
                         + "// ============================================================\n"
                         + "import test/pkg;\n");
-    }
-
-    @Test
-    public void columnsAreWideEnoughForTheLongestEntryAndNeverTruncate() {
-        // Truncating a name would make it unusable as the next command's argument.
-        // Column width is the longest entry plus one, and one more space joins them, so every column starts on a
-        // 9-character boundary here. Four per row, and the row is right-trimmed.
-        List<String> rows = Report.columns(List.of("a 1", "bbbbb 2", "c 3", "d 4", "e 5"));
-        Assert.assertEquals(rows, List.of("a 1      bbbbb 2  c 3      d 4", "e 5"));
-    }
-
-    @Test
-    public void aReportSeparatesMultiLineDeclarationsWithABlankLine() {
-        // A doc comment makes a declaration multi-line, and `# Get a repository` followed straight by the next
-        // declaration's comment reads as one four-line comment on one function.
-        Assert.assertTrue(new Report("client").ballerina(List.of("# doc\nfunction a();", "function b();"))
-                .toString().contains("function a();\n\nfunction b();"));
-        Assert.assertTrue(new Report("client").ballerina(List.of("function a();", "function b();"))
-                .toString().contains("function a();\nfunction b();"));
-    }
-
-    @Test
-    public void aReportOpensOnItsMarkerAndEndsWithOneNewline() {
-        String document = new Report("overview").heading(1, "Title").paragraph("body").toString();
-        Assert.assertEquals(document, "<!-- bal discover overview v1 -->\n# Title\n\nbody\n");
     }
 
     @Test

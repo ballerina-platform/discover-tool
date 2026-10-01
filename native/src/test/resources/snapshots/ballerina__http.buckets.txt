@@ -1,0 +1,9 @@
+== client ==
+ClientObject, StatusCodeClientObject, Caller, Client, ClientOAuth2Handler, FailoverClient, ListenerLdapUserStoreBasicAuthHandler, ListenerOAuth2Handler, LoadBalanceClient, StatusCodeClient
+== service ==
+Service (binds to http:Listener), ServiceContract (binds to http:Listener), RequestInterceptor (binds to http:Listener), ResponseInterceptor (binds to http:Listener), RequestErrorInterceptor (binds to http:Listener), ResponseErrorInterceptor (binds to http:Listener), InterceptableService (binds to http:Listener)
+== class ==
+ClientBasicAuthHandler, ClientBearerTokenAuthHandler, ClientSelfSignedJwtAuthHandler, Cookie, CookieStore, CsvPersistentCookieHandler, DefaultStatus, Headers, HttpCache, HttpFuture, ListenerFileUserStoreBasicAuthHandler, ListenerJwtAuthHandler, LoadBalancerRoundRobinRule, PushPromise, Request, RequestCacheControl, RequestContext, Response, ResponseCacheControl, StatusAccepted, StatusAlreadyReported, StatusBadGateway, StatusBadRequest, StatusConflict, StatusContinue, StatusCreated, StatusEarlyHints, StatusExpectationFailed, StatusFailedDependency, StatusForbidden, StatusFound, StatusGatewayTimeout, StatusGone, StatusHttpVersionNotSupported, StatusIMUsed, StatusInsufficientStorage, StatusInternalServerError, StatusLengthRequired, StatusLocked, StatusLoopDetected
+... 43 more, narrow further: bal discover ballerina/http class --filter <keyword>
+== funcs ==
+Methods: authenticateResource, createHttpCachingClient, createHttpSecureClient, getDefaultListener, getHeaderMap, getQueryMap, parseHeader

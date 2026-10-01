@@ -1,0 +1,32 @@
+== client ==
+users/:userId/drafts — get, post
+users/:userId/drafts/send — post
+users/:userId/drafts/:id — get, put, delete
+users/:userId/history — get
+users/:userId/labels — get, post
+users/:userId/labels/:id — get, put, delete, patch
+users/:userId/messages — get, post
+users/:userId/messages/batchDelete — post
+users/:userId/messages/batchModify — post
+users/:userId/messages/'import — post
+users/:userId/messages/send — post
+users/:userId/messages/:id — get, delete
+users/:userId/messages/:id/modify — post
+users/:userId/messages/:id/trash — post
+users/:userId/messages/:id/untrash — post
+users/:userId/messages/:messageId/attachments/:id — get
+users/:userId/profile — get
+users/:userId/threads — get
+users/:userId/threads/:id — get, delete
+users/:userId/threads/:id/modify — post
+users/:userId/threads/:id/trash — post
+users/:userId/threads/:id/untrash — post
+== service ==
+service: none in this package
+Elsewhere: client (1)
+== class ==
+class: none in this package
+Elsewhere: client (1)
+== funcs ==
+funcs: none in this package
+Elsewhere: client (1)

@@ -1,0 +1,51 @@
+{"methods":[
+"addColumnsAfter",
+"addColumnsAfterBySheetName",
+"addColumnsBefore",
+"addColumnsBeforeBySheetName",
+"addRowsAfter",
+"addRowsAfterBySheetName",
+"addRowsBefore",
+"addRowsBeforeBySheetName",
+"addSheet",
+"appendValue",
+"appendValues",
+"clearAll",
+"clearAllBySheetName",
+"clearCell",
+"clearRange",
+"copyTo",
+"copyToBySheetName",
+"createOrUpdateColumn",
+"createOrUpdateRow",
+"createSpreadsheet",
+"deleteColumns",
+"deleteColumnsBySheetName",
+"deleteRowByDataFilter",
+"deleteRows",
+"deleteRowsBySheetName",
+"deleteSpreadsheet",
+"getCell",
+"getColumn",
+"getRange",
+"getRow",
+"getRowByDataFilter",
+"getSheetByName",
+"getSheets",
+"openSpreadsheetById",
+"openSpreadsheetByUrl",
+"removeSheet",
+"removeSheetByName",
+"renameSheet",
+"renameSpreadsheet",
+"setCell"
+],"shown":40,"total":43,"next":"bal discover ballerinax/googleapis.sheets client Client --page 2"}
+{"bucket":"service","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/googleapis.sheets client"}
+]}
+{"bucket":"class","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/googleapis.sheets client"}
+]}
+{"bucket":"funcs","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/googleapis.sheets client"}
+]}

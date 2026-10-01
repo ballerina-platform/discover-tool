@@ -1,0 +1,12 @@
+== client ==
+Methods: addColumnsAfter, addColumnsAfterBySheetName, addColumnsBefore, addColumnsBeforeBySheetName, addRowsAfter, addRowsAfterBySheetName, addRowsBefore, addRowsBeforeBySheetName, addSheet, appendValue, appendValues, clearAll, clearAllBySheetName, clearCell, clearRange, copyTo, copyToBySheetName, createOrUpdateColumn, createOrUpdateRow, createSpreadsheet, deleteColumns, deleteColumnsBySheetName, deleteRowByDataFilter, deleteRows, deleteRowsBySheetName, deleteSpreadsheet, getCell, getColumn, getRange, getRow, getRowByDataFilter, getSheetByName, getSheets, openSpreadsheetById, openSpreadsheetByUrl, removeSheet, removeSheetByName, renameSheet, renameSpreadsheet, setCell
+... 3 more, narrow further: bal discover ballerinax/googleapis.sheets client Client --page 2
+== service ==
+service: none in this package
+Elsewhere: client (1)
+== class ==
+class: none in this package
+Elsewhere: client (1)
+== funcs ==
+funcs: none in this package
+Elsewhere: client (1)

@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover;
 
+import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.HttpTransport;
 import io.ballerina.tools.discover.cli.Cli;
@@ -48,9 +49,9 @@ import java.util.regex.Pattern;
  * followed it ran the same wrong shape again.
  *
  * <p>All three are the same defect, and this is the general form of the test: extract every {@code bal discover}
- * command a bucket can print — from a Markdown answer's backtick-quoted prose, and from a structured answer's own
- * {@code call}/{@code next} fields directly, since the RFC's plain text carries no backticks to scan for — run it
- * through the real CLI against the recorded payload, and require exit 0. A new pointer cannot be added wrong.
+ * command a bucket can print — read off every answer's own {@code call}/{@code next} fields — run it through the
+ * real CLI against the recorded payload, and require exit 0 with something other than "nothing matched". A new
+ * pointer cannot be added wrong.
  *
  * <p>Two exclusions, both principled. A command containing an angle-bracket slot is a TEMPLATE — {@code <Name>} or
  * {@code <keyword>} is the grammar, not an argument — and a command naming a DIFFERENT package is a cross-package
@@ -60,9 +61,6 @@ import java.util.regex.Pattern;
  * @since 0.1.0
  */
 public class PointersTest {
-
-    /** A command as a Markdown document prints it, inside backticks. */
-    private static final Pattern COMMAND = Pattern.compile("`(bal discover [^`]+)`");
 
     @DataProvider(name = "fixtures")
     public Object[][] fixtures() {
@@ -85,9 +83,8 @@ public class PointersTest {
     }
 
     /**
-     * Every command a fixture's buckets can print, from every {@link Containers.Answer} shape a bucket query can
-     * produce, plus every shape {@code readme} can answer with. {@code Overview} is gone outright — the
-     * bare-package listing replaced it, and its own pointer coverage lives wherever that listing's is tested.
+     * Every command a fixture's buckets can print, from every shape a bucket query can produce, plus every shape
+     * {@code readme} can answer with.
      *
      * <p>Deliberately the same breadth {@code RegisterTest} uses: a pointer printed only by the roster of a
      * package with 91 classes is exactly the one nobody checks by hand.
@@ -97,7 +94,7 @@ public class PointersTest {
         for (Surface.Scope scope : Surface.Scope.values()) {
             commands.addAll(commandsOf(expect(Containers.render(context, scope, Containers.Options.bare()))));
             commands.addAll(commandsOf(expect(Containers.render(context, scope,
-                    new Containers.Options(List.of(), "config", false, false, 1)))));
+                    new Containers.Options(List.of(), "config", 1)))));
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 if (container.isModule()) {
                     continue;
@@ -109,29 +106,13 @@ public class PointersTest {
             }
         }
 
-        commands.addAll(commandsOf(expectResult(Readme.render(context, Readme.Options.BARE))));
-        commands.addAll(commandsOf(expectResult(Readme.render(context, new Readme.Options(null, "config", 1)))));
+        commands.addAll(commandsOf(expect(Readme.render(context, Readme.Options.BARE))));
+        commands.addAll(commandsOf(expect(Readme.render(context, new Readme.Options(null, "config", 1)))));
         for (Readme.Chunk chunk : Readme.chunksOf(context)) {
-            commands.addAll(commandsOf(expectResult(
+            commands.addAll(commandsOf(expect(
                     Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1)))));
         }
         return commands;
-    }
-
-    /** Every command one answer prints — backtick-scanned from Markdown, or read off a structured result's own
-     * fields, since the RFC's plain text carries no backticks to scan for. */
-    private static List<String> commandsOf(Containers.Answer answer) {
-        return switch (answer) {
-            case Containers.Answer.Markdown markdown -> {
-                List<String> found = new ArrayList<>();
-                Matcher command = COMMAND.matcher(markdown.text());
-                while (command.find()) {
-                    found.add(command.group(1).trim());
-                }
-                yield found;
-            }
-            case Containers.Answer.Structured structured -> commandsOf(structured.result());
-        };
     }
 
     private static List<String> commandsOf(DiscoverResult result) {
@@ -161,6 +142,26 @@ public class PointersTest {
                 chunks.chunks().forEach(chunk -> commands.add(chunk.call()));
                 addIfPresent(commands, chunks.next());
             }
+            case DiscoverResult.Signature ignored -> {
+                // The end of a drill-down: nothing further to open.
+            }
+            case DiscoverResult.MixedListing mixed -> {
+                mixed.resources().forEach(resource -> addIfPresent(commands, resource.call()));
+                addIfPresent(commands, mixed.next());
+            }
+            case DiscoverResult.NoMatch noMatch -> {
+                noMatch.paths().forEach(alternative -> commands.add(alternative.call()));
+                if (noMatch.available() != null) {
+                    commands.addAll(commandsOf(noMatch.available()));
+                }
+                commands.add(noMatch.next());
+            }
+            case DiscoverResult.Owners owners -> {
+                owners.owners().forEach(owner -> commands.add(owner.call()));
+                addIfPresent(commands, owners.next());
+            }
+            case DiscoverResult.EmptyBucket empty ->
+                    empty.elsewhere().forEach(other -> commands.add(other.call()));
         }
         return commands;
     }
@@ -171,12 +172,7 @@ public class PointersTest {
         }
     }
 
-    private static Containers.Answer expect(Result<Containers.Answer> view) {
-        Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
-        return view.value();
-    }
-
-    private static DiscoverResult expectResult(Result<DiscoverResult> view) {
+    private static DiscoverResult expect(Result<DiscoverResult> view) {
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
         return view.value();
     }
@@ -207,6 +203,10 @@ public class PointersTest {
             int code = Cli.run(argv(text), new Cli.Streams(out::append, err::append), http);
             Assert.assertEquals(code, 0, slug + ": `" + text + "` failed with " + err);
             Assert.assertFalse(out.toString().isBlank(), slug + ": `" + text + "` answered with nothing");
+            // Exit 0 is not enough on its own: "nothing matched" is an exit-0 answer too, and a pointer that lands
+            // on one is exactly the loop this test exists to catch.
+            Assert.assertFalse(JsonParser.parseString(out.toString()).getAsJsonObject().has("candidates"),
+                    slug + ": `" + text + "` matched nothing:\n" + out);
         }
 
         // A template is the grammar rather than an argument, so it has to LOOK like one: every angle-bracket slot

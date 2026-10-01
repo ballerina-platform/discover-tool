@@ -1,0 +1,10 @@
+== client ==
+client: none in this package
+Elsewhere: class (3), funcs (6)
+== service ==
+service: none in this package
+Elsewhere: class (3), funcs (6)
+== class ==
+Workbook, Sheet, Table
+== funcs ==
+Methods: fromBytes, fromFile, parseSheet, parseTable, writeSheet, writeTable

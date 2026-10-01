@@ -25,7 +25,6 @@ import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.render.DiscoverResult;
-import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
@@ -152,18 +151,13 @@ public final class Cli {
         }
 
         if (bucket == null) {
-            // The one response already built on the RFC's result IR: one source, rendered by whichever of the
-            // two renderers `--output` (or the TTY default) selects. The buckets `Containers` still answers keep
-            // their own Markdown-report shape below, regardless of `--output`, until that view moves onto the
-            // IR too.
             emit(bucketList(loaded.value()), streams, root.output, interactive);
             return 0;
         }
 
         if ("readme".equals(bucket)) {
             // Not derived from call-site grammar, so it shares no code with Containers — see Readme's own class
-            // comment for why. Already on the result IR from the start, both cases: unlike the four container
-            // verbs, there is no still-Markdown answer here to keep around until item 11 gets to it.
+            // comment for why.
             List<String> readmeSelectors = rest.subList(1, rest.size());
             Readme.Options readmeOptions = new Readme.Options(
                     readmeSelectors.isEmpty() ? null : String.join(" ", readmeSelectors), root.filter, root.page);
@@ -176,8 +170,8 @@ public final class Cli {
         }
 
         Containers.Options containerOptions =
-                new Containers.Options(rest.subList(1, rest.size()), root.filter, false, false, root.page);
-        Result<Containers.Answer> answer = switch (bucket) {
+                new Containers.Options(rest.subList(1, rest.size()), root.filter, root.page);
+        Result<DiscoverResult> answer = switch (bucket) {
             case "client" -> Containers.render(loaded.value(), Surface.Scope.CLIENT, containerOptions);
             case "service" -> Containers.render(loaded.value(), Surface.Scope.SERVICE, containerOptions);
             case "class" -> Containers.render(loaded.value(), Surface.Scope.CLASS, containerOptions);
@@ -187,15 +181,7 @@ public final class Cli {
         if (!answer.isOk()) {
             return fail(answer.failure(), streams);
         }
-        switch (answer.value()) {
-            case Containers.Answer.Markdown markdown ->
-                    // The one point every Markdown document passes through, which is why the length stamp goes
-                    // here — see Documents.withLength for what it defends against. The structured case below
-                    // carries no such stamp: it is not part of the RFC's shape for that response.
-                    streams.out().accept(Documents.withLength(markdown.text()));
-            case Containers.Answer.Structured structured ->
-                    emit(structured.result(), streams, root.output, interactive);
-        }
+        emit(answer.value(), streams, root.output, interactive);
         return 0;
     }
 

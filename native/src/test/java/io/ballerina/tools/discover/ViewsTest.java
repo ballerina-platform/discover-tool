@@ -20,6 +20,8 @@ package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.render.DiscoverResult;
+import io.ballerina.tools.discover.render.JsonRenderer;
+import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
@@ -29,14 +31,13 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 /**
- * The report documents, snapshotted, plus the composition rules that decide their shape.
+ * Every bucket's answers, snapshotted in both renderings, plus the composition rules that decide their shape.
  *
- * <p>{@link ViewsAgreeTest} proves a view never invents a signature; this proves the documents themselves do not
+ * <p>{@link ViewsAgreeTest} proves a view never invents a signature; this proves the answers themselves do not
  * change silently. The two together are why a rendering change has to be a reviewable diff rather than something an
  * agent discovers at run time.
  *
@@ -53,55 +54,53 @@ public class ViewsTest {
      * What shape a fixture's bare {@code client} listing answers with. Real shapes, not estimates — surveyed
      * directly against every fixture's own {@code Surface.Container} entries.
      *
-     * <p>Naming a container by itself now reaches the RFC's result IR for ANY container whose entries are purely
-     * resources or purely remote/normal methods, whether or not the ceiling is actually crossed — "one source,
-     * multiple renderers" applies to every response, not just the ones over the ceiling. Grouping ({@link
-     * DiscoverResultKind#PATH_GROUPS}) and pagination ({@link DiscoverResultKind#METHOD_LIST} with a {@code next})
-     * are what engage once a listing is actually over {@value Containers#MAX_ENTRIES}; under it, the same shapes
-     * still appear, just flat. {@link DiscoverResultKind#CONTAINER_ROSTER} is the other structured shape a
-     * {@code client} bucket can take — several client containers in one bucket, unrelated to any one container's
-     * own entry count.
-     *
-     * <p>Only three fixtures are absent from this map: {@code ballerina__log} and {@code ballerina__xlsx} declare
-     * no client at all (a scope-empty Markdown message), and {@code ballerinax__sap}'s one Client mixes resources
-     * and named methods, which stays the Markdown {@code mixedAnswer} — see {@link Containers}'s own note on why
-     * that combination has no JSON shape yet.
+     * <p>Grouping ({@link Shape#PATH_GROUPS}) and pagination ({@link Shape#METHOD_LIST} with a {@code next}) are
+     * what engage once a listing is actually over {@value Containers#MAX_ENTRIES}; under it, the same shapes still
+     * appear, just flat. {@code ballerinax__sap}'s one client mixes resources with named methods, and
+     * {@code ballerina__log}/{@code ballerina__xlsx} declare no client at all.
      */
-    private static final Map<String, DiscoverResultKind> STRUCTURED_CLIENT_SHAPE = Map.ofEntries(
+    private static final Map<String, Shape> CLIENT_SHAPE = Map.ofEntries(
             // Resource-only: grouped by path segment once over the ceiling (github, slack), flat under it (gmail).
-            Map.entry("ballerinax__github", DiscoverResultKind.PATH_GROUPS),
-            Map.entry("ballerinax__slack", DiscoverResultKind.PATH_GROUPS),
-            Map.entry("ballerinax__googleapis.gmail", DiscoverResultKind.RESOURCE_LIST),
+            Map.entry("ballerinax__github", Shape.PATH_GROUPS),
+            Map.entry("ballerinax__slack", Shape.PATH_GROUPS),
+            Map.entry("ballerinax__googleapis.gmail", Shape.RESOURCE_LIST),
             // Remote/normal-method-only: paginated once over the ceiling, flat under it.
-            Map.entry("ballerinax__twilio", DiscoverResultKind.METHOD_LIST),
-            Map.entry("ballerinax__redis", DiscoverResultKind.METHOD_LIST),
-            Map.entry("ballerinax__googleapis.sheets", DiscoverResultKind.METHOD_LIST),
-            Map.entry("ballerina__graphql", DiscoverResultKind.METHOD_LIST),
-            Map.entry("ballerinax__postgresql", DiscoverResultKind.METHOD_LIST),
+            Map.entry("ballerinax__twilio", Shape.METHOD_LIST),
+            Map.entry("ballerinax__redis", Shape.METHOD_LIST),
+            Map.entry("ballerinax__googleapis.sheets", Shape.METHOD_LIST),
+            Map.entry("ballerina__graphql", Shape.METHOD_LIST),
+            Map.entry("ballerinax__postgresql", Shape.METHOD_LIST),
             // Several client containers in one bucket — a roster regardless of any one container's own size.
-            Map.entry("ballerina__http", DiscoverResultKind.CONTAINER_ROSTER),
-            Map.entry("ballerinax__kafka", DiscoverResultKind.CONTAINER_ROSTER));
+            Map.entry("ballerina__http", Shape.CONTAINER_ROSTER),
+            Map.entry("ballerinax__kafka", Shape.CONTAINER_ROSTER),
+            Map.entry("ballerinax__sap", Shape.MIXED_LISTING),
+            Map.entry("ballerina__log", Shape.EMPTY_BUCKET),
+            Map.entry("ballerina__xlsx", Shape.EMPTY_BUCKET));
 
-    private enum DiscoverResultKind { CONTAINER_ROSTER, PATH_GROUPS, RESOURCE_LIST, METHOD_LIST }
+    private enum Shape { CONTAINER_ROSTER, PATH_GROUPS, RESOURCE_LIST, METHOD_LIST, MIXED_LISTING, EMPTY_BUCKET }
 
     @DataProvider(name = "fixtures")
     public Object[][] fixtures() {
         return FixtureCorpus.fixtureRows();
     }
 
-    private static Path viewSnapshot(String slug, String view) {
-        return FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + "." + view + ".md");
+    private static DiscoverResult result(Result<DiscoverResult> view, String what) {
+        Assert.assertTrue(view.isOk(), what + " failed: " + (view.isOk() ? "" : view.failure().describe()));
+        return view.value();
     }
 
-    /** The Markdown text of a bare bucket listing, or empty when it answered on the structured IR instead. */
-    private static java.util.Optional<String> render(String slug, Surface.Scope scope) {
-        Result<Containers.Answer> view = Containers.render(
-                FixtureCorpus.loadedFixture(slug), scope, Containers.Options.bare());
-        Assert.assertTrue(view.isOk(), scope.verb() + " failed for " + slug + ": "
-                + (view.isOk() ? "" : view.failure().describe()));
-        return view.value() instanceof Containers.Answer.Markdown markdown
-                ? java.util.Optional.of(markdown.text())
-                : java.util.Optional.empty();
+    private static DiscoverResult render(LoadedPackage loaded, Surface.Scope scope, List<String> selectors) {
+        return result(Containers.render(loaded, scope, new Containers.Options(selectors)),
+                scope.verb() + " " + selectors);
+    }
+
+    private static <T extends DiscoverResult> T as(Class<T> shape, DiscoverResult result) {
+        Assert.assertTrue(shape.isInstance(result), "expected " + shape.getSimpleName() + ", got " + result);
+        return shape.cast(result);
+    }
+
+    private static DiscoverResult.Signature signature(LoadedPackage loaded, Surface.Scope scope, String... selectors) {
+        return as(DiscoverResult.Signature.class, render(loaded, scope, List.of(selectors)));
     }
 
     // -----------------------------------------------------------------------
@@ -109,20 +108,23 @@ public class ViewsTest {
     // -----------------------------------------------------------------------
 
     /**
-     * One snapshot per scope, because the three verbs share one implementation — for every bucket that still
-     * answers in Markdown. The five (fixture, scope) pairs over the entry ceiling answer on the result IR
-     * instead ({@link #structuredListingsMatchTheSurveyedShape} pins those), which quotes no Ballerina to
-     * snapshot here.
+     * Every bucket's bare listing, in both renderings — one file per fixture per renderer, one section per bucket,
+     * because the four buckets share one implementation.
      */
     @Test(dataProvider = "fixtures")
-    public void everyScopesListingIsUnchanged(String slug) {
+    public void everyBucketsListingIsUnchanged(String slug) {
+        LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
+        StringBuilder text = new StringBuilder();
+        StringBuilder json = new StringBuilder();
         for (Surface.Scope scope : Surface.Scope.values()) {
-            if (Surface.of(FixtureCorpus.libraryFor(slug), scope).isEmpty()) {
-                continue;
-            }
-            render(slug, scope).ifPresent(document -> FixtureCorpus.matchesSnapshot(
-                    viewSnapshot(slug, scope.verb()), document, slug + " " + scope.verb()));
+            DiscoverResult listing = render(loaded, scope, List.of());
+            text.append("== ").append(scope.verb()).append(" ==\n").append(TextRenderer.render(listing)).append("\n");
+            json.append(JsonRenderer.render(listing)).append("\n");
         }
+        FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + ".buckets.txt"),
+                text.toString(), slug + " text");
+        FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + ".buckets.json"),
+                json.toString(), slug + " json");
     }
 
     // -----------------------------------------------------------------------
@@ -130,89 +132,56 @@ public class ViewsTest {
     // -----------------------------------------------------------------------
 
     /**
-     * Every bucket listing stays inside the RFC's {@value Containers#MAX_ENTRIES}-entry ceiling — the property
-     * the byte budget used to hold from the OTHER side (bytes of quoted Ballerina). Checked generically, over
-     * every fixture and every bucket: a structured answer's own {@code shown} can never exceed the ceiling,
-     * whatever shape it took to get there.
+     * Every bucket listing stays inside the RFC's {@value Containers#MAX_ENTRIES}-entry ceiling, whatever shape it
+     * took to get there.
      */
     @Test(dataProvider = "fixtures")
-    public void everyStructuredListingStaysInsideTheEntryCeiling(String slug) {
+    public void everyListingStaysInsideTheEntryCeiling(String slug) {
+        LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
         for (Surface.Scope scope : Surface.Scope.values()) {
-            if (Surface.of(FixtureCorpus.libraryFor(slug), scope).isEmpty()) {
-                continue;
+            List<DiscoverResult> answers = new java.util.ArrayList<>(List.of(render(loaded, scope, List.of())));
+            for (Surface.Container container : Surface.of(loaded.library(), scope)) {
+                if (!container.isModule()) {
+                    answers.add(render(loaded, scope, List.of(container.name())));
+                }
             }
-            Containers.Answer answer = expectAnswer(
-                    Containers.render(FixtureCorpus.loadedFixture(slug), scope, Containers.Options.bare()),
-                    slug + " " + scope.verb());
-            if (!(answer instanceof Containers.Answer.Structured structured)) {
-                continue;
+            for (DiscoverResult answer : answers) {
+                int shown = switch (answer) {
+                    case DiscoverResult.ContainerRoster roster -> roster.containers().size();
+                    case DiscoverResult.PathGroups groups -> groups.groups().size();
+                    case DiscoverResult.ResourceList resources -> resources.shown();
+                    case DiscoverResult.MethodList methods -> methods.shown();
+                    case DiscoverResult.MixedListing mixed -> mixed.shown();
+                    case DiscoverResult.Owners owners -> owners.owners().size();
+                    case DiscoverResult.Signature ignored -> 1;
+                    case DiscoverResult.NoMatch ignored -> 0;
+                    case DiscoverResult.EmptyBucket ignored -> 0;
+                    // Neither reachable from Containers — readme is its own bucket, the bucket list is the CLI's.
+                    case DiscoverResult.BucketList ignored -> 0;
+                    case DiscoverResult.Readme ignored -> 0;
+                    case DiscoverResult.ReadmeChunks ignored -> 0;
+                };
+                Assert.assertTrue(shown <= Containers.MAX_ENTRIES,
+                        slug + " " + scope.verb() + ": " + shown + " entries shown, over the ceiling");
             }
-            int shown = switch (structured.result()) {
-                case DiscoverResult.ContainerRoster roster -> roster.containers().size();
-                case DiscoverResult.PathGroups groups -> groups.groups().size();
-                case DiscoverResult.ResourceList resources -> resources.shown();
-                case DiscoverResult.MethodList methods -> methods.shown();
-                // Neither reachable from Containers, which is all this loop drives — readme is its own bucket.
-                case DiscoverResult.BucketList ignored -> 0;
-                case DiscoverResult.Readme ignored -> 0;
-                case DiscoverResult.ReadmeChunks ignored -> 0;
-            };
-            Assert.assertTrue(shown <= Containers.MAX_ENTRIES,
-                    slug + " " + scope.verb() + ": " + shown + " entries shown, over the ceiling");
         }
     }
 
-    /**
-     * Every fixture's bare {@code client} listing answers with the shape surveyed directly against real fixture
-     * data — see {@link #STRUCTURED_CLIENT_SHAPE}.
-     */
+    /** Every fixture's bare {@code client} listing answers with the shape surveyed — see {@link #CLIENT_SHAPE}. */
     @Test(dataProvider = "fixtures")
-    public void structuredListingsMatchTheSurveyedShape(String slug) {
-        Containers.Answer answer = expectAnswer(
-                Containers.render(FixtureCorpus.loadedFixture(slug), Surface.Scope.CLIENT, Containers.Options.bare()),
-                slug + " client");
-        DiscoverResultKind expected = STRUCTURED_CLIENT_SHAPE.get(slug);
-        if (expected == null) {
-            Assert.assertTrue(answer instanceof Containers.Answer.Markdown,
-                    slug + ": expected a flat Markdown client listing, got " + answer);
-            return;
-        }
-        Assert.assertTrue(answer instanceof Containers.Answer.Structured,
-                slug + ": expected a structured client listing, got " + answer);
-        DiscoverResult result = ((Containers.Answer.Structured) answer).result();
-        switch (expected) {
-            case CONTAINER_ROSTER -> Assert.assertTrue(result instanceof DiscoverResult.ContainerRoster,
-                    slug + ": expected a container roster, got " + result);
-            case PATH_GROUPS -> Assert.assertTrue(result instanceof DiscoverResult.PathGroups,
-                    slug + ": expected path groups, got " + result);
-            case RESOURCE_LIST -> Assert.assertTrue(result instanceof DiscoverResult.ResourceList,
-                    slug + ": expected a flat resource list, got " + result);
-            case METHOD_LIST -> Assert.assertTrue(result instanceof DiscoverResult.MethodList,
-                    slug + ": expected a method list, got " + result);
-        }
-    }
-
-    private static Containers.Answer expectAnswer(Result<Containers.Answer> view, String what) {
-        Assert.assertTrue(view.isOk(), what + " failed: " + (view.isOk() ? "" : view.failure().describe()));
-        return view.value();
-    }
-
-    /** The Markdown text of an answer expected to have no ceiling problem — everything below the ceiling test. */
-    private static String markdown(Result<Containers.Answer> view, String what) {
-        Containers.Answer answer = expectAnswer(view, what);
-        Assert.assertTrue(answer instanceof Containers.Answer.Markdown,
-                what + ": expected Markdown, got a structured answer instead");
-        return ((Containers.Answer.Markdown) answer).text();
-    }
-
-    /**
-     * True for the one Markdown shape that means "this selector matched nothing" — the shape a resolution test
-     * is checking the ABSENCE of, whether the successful case lands as Markdown (one entry, or a mixed
-     * resource+method container) or as a structured resource/method listing.
-     */
-    private static boolean isNothingMatched(Containers.Answer answer) {
-        return answer instanceof Containers.Answer.Markdown markdown
-                && markdown.text().contains("| Matched | nothing");
+    public void clientListingsMatchTheSurveyedShape(String slug) {
+        DiscoverResult result = render(FixtureCorpus.loadedFixture(slug), Surface.Scope.CLIENT, List.of());
+        Shape expected = CLIENT_SHAPE.get(slug);
+        Assert.assertNotNull(expected, slug + " has no surveyed shape");
+        Class<? extends DiscoverResult> shape = switch (expected) {
+            case CONTAINER_ROSTER -> DiscoverResult.ContainerRoster.class;
+            case PATH_GROUPS -> DiscoverResult.PathGroups.class;
+            case RESOURCE_LIST -> DiscoverResult.ResourceList.class;
+            case METHOD_LIST -> DiscoverResult.MethodList.class;
+            case MIXED_LISTING -> DiscoverResult.MixedListing.class;
+            case EMPTY_BUCKET -> DiscoverResult.EmptyBucket.class;
+        };
+        as(shape, result);
     }
 
     // -----------------------------------------------------------------------
@@ -222,42 +191,59 @@ public class ViewsTest {
     @Test
     public void aSingleResultIsAnsweredInFullRatherThanByPrintingItsNameBack() {
         // T15. An exact one-of-many name match printed the name and forced a second call for the signature the
-        // caller had already identified. One result is the case where the richest tier always fits.
-        LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
-        String document = markdown(Containers.render(kafka, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Producer", "send"))), "Producer send");
-        // `send` is an EXACT member name, so it wins over the substring pass that would also have matched
-        // `sendWithMetadata` — which is what makes "exactly one result" reachable at all.
-        Assert.assertTrue(document.contains("| Showing | the declaration in full"), document);
-        Assert.assertTrue(document.contains("remote function send("), document);
-        // The FULL tier is the only one that prints the `# +` parameter rows, which is what makes it richer rather
-        // than merely shorter than the listing.
-        Assert.assertTrue(document.contains("# + "), document);
+        // caller had already identified. `send` is an EXACT member name, so it wins over the substring pass that
+        // would also have matched `sendWithMetadata` — which is what makes "exactly one result" reachable at all.
+        DiscoverResult.Signature send =
+                signature(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, "Producer", "send");
+        Assert.assertEquals(send.container(), "Producer");
+        Assert.assertEquals(send.kind(), "remote");
+        Assert.assertEquals(send.name(), "send");
+        Assert.assertEquals(send.form(), "->");
+        Assert.assertTrue(send.declaration().contains("remote function send("), send.declaration());
+        // The `# +` parameter rows are what make it richer rather than merely shorter than the listing.
+        Assert.assertTrue(send.declaration().contains("# + "), send.declaration());
+        Assert.assertFalse(send.params().isEmpty(), send.toString());
+        Assert.assertNotNull(send.returns(), send.toString());
         // And the types the signature names arrive with it, one level deep, so the common flow is one call.
-        Assert.assertTrue(document.contains("## The types it names"), document);
+        Assert.assertFalse(send.types().isEmpty(), send.toString());
+    }
+
+    @Test
+    public void aResourceSignatureCarriesItsPathAndAccessorAndKeepsPathParametersOutOfParams() {
+        DiscoverResult.Signature caches = signature(FixtureCorpus.loadedFixture("ballerinax__github"),
+                Surface.Scope.CLIENT, "Client", "delete", "repos/:owner/:repo/actions/caches");
+        Assert.assertEquals(caches.kind(), "resource");
+        Assert.assertNull(caches.name());
+        Assert.assertEquals(caches.accessor(), "delete");
+        Assert.assertEquals(caches.path(), "repos/:owner/:repo/actions/caches");
+        Assert.assertTrue(caches.params().stream().noneMatch(param -> param.name().equals("owner")),
+                caches.params().toString());
+        Assert.assertTrue(caches.params().stream().anyMatch(param -> "inclusion".equals(param.kind())
+                && param.type().equals("ActionsDeleteActionsCacheByKeyQueries")), caches.params().toString());
     }
 
     @Test
     public void aMemberNameResolvesAndNamesItsOwnerRatherThanFailing() {
         // T3, the sweep's most-hit ergonomic bug: a name that was not a container was discarded, and the
         // suggestion rebuilt the command WITHOUT it, so following the advice looped.
-        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        String document = markdown(Containers.render(http, Surface.Scope.CLASS,
-                new Containers.Options(List.of("toStringValue"))), "toStringValue");
-        Assert.assertTrue(document.contains("| Note | `toStringValue` is declared on `Cookie`"), document);
-        Assert.assertTrue(document.contains("bal discover ballerina/http class Cookie toStringValue"), document);
+        DiscoverResult.Signature answer =
+                signature(FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLASS, "toStringValue");
+        Assert.assertTrue(answer.note().contains("`toStringValue` is declared on `Cookie`"), answer.note());
+        Assert.assertTrue(answer.note().contains("bal discover ballerina/http class Cookie toStringValue"),
+                answer.note());
     }
 
     @Test
     public void aMemberOnSeveralContainersIsARosterOfOwnersNotAFailure() {
         // The other half of T3. Picking one owner silently is what the path side refuses to do, so the answer is
         // the owners with counts and the command that opens each.
-        LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
-        String document = markdown(Containers.render(kafka, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("commit"))), "commit");
-        Assert.assertTrue(document.contains("owners"), document);
-        Assert.assertTrue(document.contains("`bal discover ballerinax/kafka client Caller commit`"), document);
-        Assert.assertTrue(document.contains("`bal discover ballerinax/kafka client Consumer commit`"), document);
+        DiscoverResult.Owners owners = as(DiscoverResult.Owners.class,
+                render(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, List.of("commit")));
+        Assert.assertEquals(owners.requested(), "commit");
+        List<String> calls = owners.owners().stream().map(DiscoverResult.Owners.Owner::call).toList();
+        Assert.assertTrue(calls.contains("bal discover ballerinax/kafka client Caller commit"), calls.toString());
+        Assert.assertTrue(calls.contains("bal discover ballerinax/kafka client Consumer commit"), calls.toString());
+        Assert.assertEquals(owners.total(), owners.owners().size());
     }
 
     @Test
@@ -266,22 +252,14 @@ public class ViewsTest {
         // Without tolerance every kind guess risks a wasted round trip; with it the split costs one printed line.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
 
-        // A class, asked of `client`. Cookie's own class-scope answer is now the structured IR (it declares
-        // several methods), so the kind-tolerance note travels as that answer's own `note` field rather than a
-        // Markdown facts row — see DiscoverResult's own note on why that field exists.
-        Containers.Answer asClient = expectAnswer(Containers.render(http, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Cookie"))), "Cookie");
-        Assert.assertTrue(asClient instanceof Containers.Answer.Structured, asClient.toString());
-        DiscoverResult cookieResult = ((Containers.Answer.Structured) asClient).result();
-        String note = cookieResult instanceof DiscoverResult.MethodList methodList ? methodList.note() : null;
-        Assert.assertNotNull(note, cookieResult.toString());
-        Assert.assertTrue(note.contains("`Cookie` is addressed by `class`"), note);
-        Assert.assertTrue(note.contains("bal discover ballerina/http class Cookie"), note);
+        DiscoverResult.MethodList cookie =
+                as(DiscoverResult.MethodList.class, render(http, Surface.Scope.CLIENT, List.of("Cookie")));
+        Assert.assertNotNull(cookie.note(), cookie.toString());
+        Assert.assertTrue(cookie.note().contains("`Cookie` is addressed by `class`"), cookie.note());
+        Assert.assertTrue(cookie.note().contains("bal discover ballerina/http class Cookie"), cookie.note());
 
-        // A record, asked of `client`: not a callable at all. There is no more bucket that answers for a bare
-        // declaration name — `type` had no RFC equivalent and was dropped along with it — so this now fails with
-        // near-miss candidates rather than answering from the code register.
-        Result<Containers.Answer> asType = Containers.render(http, Surface.Scope.CLIENT,
+        // A record, asked of `client`: not a callable at all, and no bucket answers for a bare declaration name.
+        Result<DiscoverResult> asType = Containers.render(http, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("ClientConfiguration")));
         Assert.assertFalse(asType.isOk(), "no bucket answers for a non-callable declaration any more");
         Assert.assertTrue(asType.failure() instanceof Failure.SymbolNotFound, asType.failure().describe());
@@ -292,79 +270,73 @@ public class ViewsTest {
         // The claim a design revision got wrong: HTTP-verb parsing cannot be confined to one verb, because in
         // Ballerina a client IS a class. `ballerina/http:Client` declares seven resource functions either way.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        String document = markdown(Containers.render(http, Surface.Scope.CLASS,
-                new Containers.Options(List.of("Client", "get", "path"))), "Client get path");
-        Assert.assertTrue(document.contains("is addressed by `client`"), document);
+        DiscoverResult.Signature get = signature(http, Surface.Scope.CLASS, "Client", "get", "path");
+        Assert.assertTrue(get.note().contains("is addressed by `client`"), get.note());
         // Quoted from what the tool prints, not re-spelled from memory: the rest-parameter form is
-        // `[PathParamType ...path]`, with the ellipsis bound to the NAME. An assertion written the other way round
-        // passes only against a renderer that has the same bug.
-        Assert.assertTrue(document.contains("resource function get [PathParamType ...path]"), document);
+        // `[PathParamType ...path]`, with the ellipsis bound to the NAME.
+        Assert.assertTrue(get.declaration().contains("resource function get [PathParamType ...path]"),
+                get.declaration());
 
         // And on a container WITHOUT resource functions the same token is a member name, finds none, and the
         // recovery names what that container actually declares.
-        String cookie = markdown(Containers.render(http, Surface.Scope.CLASS,
-                new Containers.Options(List.of("Cookie", "get"))), "Cookie get");
-        Assert.assertTrue(cookie.contains("| Matched | nothing on `Cookie`"), cookie);
-        Assert.assertTrue(cookie.contains("toStringValue"), cookie);
+        DiscoverResult.NoMatch cookie =
+                as(DiscoverResult.NoMatch.class, render(http, Surface.Scope.CLASS, List.of("Cookie", "get")));
+        Assert.assertEquals(cookie.container(), "Cookie");
+        Assert.assertTrue(TextRenderer.render(cookie.available()).contains("toStringValue"), cookie.toString());
     }
 
     @Test
     public void aConstructorIsPartOfTheContainerAndIsReachable() {
-        // T14: `ops` could not address one, and the only document that carried it was `overview --client <Name>`,
-        // which no longer exists. `init` is the one method every caller has to write.
-        LoadedPackage sheets = FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets");
-        // sheets' Client is remote-only and over the ceiling (44 methods incl. init), so the bare listing is now
-        // structured — see structuredListingsMatchTheSurveyedShape. `init` is still individually addressable.
-        String byName = markdown(Containers.render(sheets, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client", "init"))), "Client init");
-        Assert.assertTrue(byName.contains("function init("), byName);
+        // T14: `init` is the one method every caller has to write, so it is individually addressable even though
+        // a listing never counts it.
+        DiscoverResult.Signature init = signature(
+                FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"), Surface.Scope.CLIENT, "Client", "init");
+        Assert.assertEquals(init.kind(), "constructor");
+        Assert.assertEquals(init.form(), ".");
+        Assert.assertTrue(init.declaration().contains("function init("), init.declaration());
     }
 
     @Test
     public void aClientWithBothHalvesIsAnsweredWithBothSplitByCallForm() {
         // `ballerina/http`'s `Client` declares 7 resource functions and 19 named ones. The shipped view printed
-        // the 7 under a fact row reading `(7 of 7)` and said nothing about `execute`, `forward`, `submit`, the
-        // promise set or the circuit-breaker controls — reachable from no verb in the tool.
-        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        String document = markdown(Containers.render(http, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client"))), "Client");
-        Assert.assertTrue(document.contains("## Resource functions —"), document);
-        Assert.assertTrue(document.contains("## Remote functions —"), document);
-        // The call form is printed on every section heading, because `->` versus `.` is the fact a caller came for
-        // and both signature errors in the 2026-08-15 sweep came from its absence.
-        Assert.assertTrue(document.contains(", call with `->`"), document);
-        Assert.assertTrue(document.contains("## Normal functions —"), document);
-        Assert.assertTrue(document.contains(", call with `.`"), document);
-        Assert.assertTrue(document.contains("execute"), document);
-        Assert.assertTrue(document.contains("getCookieStore"), document);
+        // the 7 and said nothing about `execute`, `forward`, `submit`, the promise set or the circuit-breaker
+        // controls — reachable from no verb in the tool.
+        DiscoverResult.MixedListing mixed = as(DiscoverResult.MixedListing.class,
+                render(FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLIENT, List.of("Client")));
+        Assert.assertFalse(mixed.resources().isEmpty(), mixed.toString());
+        Assert.assertTrue(mixed.remote().contains("execute"), mixed.remote().toString());
+        Assert.assertTrue(mixed.normal().contains("getCookieStore"), mixed.normal().toString());
+        Assert.assertEquals(mixed.shown(), mixed.total());
+        Assert.assertEquals(mixed.total(), mixed.resources().size() + mixed.remote().size() + mixed.normal().size());
+        // The call form is printed on every section, because `->` versus `.` is the fact a caller came for.
+        String text = TextRenderer.render(mixed);
+        Assert.assertTrue(text.contains("Resources (->):"), text);
+        Assert.assertTrue(text.contains("Remote (->): "), text);
+        Assert.assertTrue(text.contains("Normal (.): "), text);
     }
 
     @Test
     public void aScopeWithNothingInItSaysWhereTheCallableSurfaceIs() {
-        // A honest empty answer rather than an implied absence: kafka declares no module-level function, and the
-        // reply names the verbs that DO have something plus their counts.
-        String document = markdown(Containers.render(FixtureCorpus.loadedFixture("ballerinax__kafka"),
-                Surface.Scope.MODULE, Containers.Options.bare()), "kafka funcs");
-        Assert.assertTrue(document.contains("| Module functions | this package declares none |"), document);
-        Assert.assertTrue(document.contains("`bal discover ballerinax/kafka client`"), document);
-        Assert.assertTrue(document.contains("`bal discover ballerinax/kafka class`"), document);
+        // An honest empty answer rather than an implied absence: kafka declares no module-level function, and the
+        // reply names the buckets that DO have something plus their counts.
+        DiscoverResult.EmptyBucket empty = as(DiscoverResult.EmptyBucket.class,
+                render(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.MODULE, List.of()));
+        Assert.assertEquals(empty.bucket(), "funcs");
+        List<String> calls = empty.elsewhere().stream().map(DiscoverResult.EmptyBucket.Elsewhere::call).toList();
+        Assert.assertTrue(calls.contains("bal discover ballerinax/kafka client"), calls.toString());
+        Assert.assertTrue(calls.contains("bal discover ballerinax/kafka class"), calls.toString());
     }
 
     @Test
     public void aModuleFunctionCarriesPublicAndAMemberDoesNot() {
         // The renderer is chosen by SCOPE rather than by shape, which is the same split the API document draws.
-        // Asserting the keyword is what catches the wrong one. The bare funcs listing is now the structured IR
-        // (http declares 7 standalone functions), which carries no declaration text at all, so this resolves ONE
-        // by name to reach the full Markdown signature — same as the member case right below it.
-        String funcs = markdown(Containers.render(FixtureCorpus.loadedFixture("ballerina__http"),
-                Surface.Scope.MODULE, new Containers.Options(List.of("getDefaultListener"))), "getDefaultListener");
-        Assert.assertTrue(funcs.contains("public isolated function "), funcs);
-        // Cookie's own bare listing is now the structured IR too (it declares several methods), so this
-        // resolves ONE member by name — the same reason the module-function half above does — and checks that
-        // ITS signature carries no `public`, which a class member never does.
-        String cookie = markdown(Containers.render(FixtureCorpus.loadedFixture("ballerina__http"),
-                Surface.Scope.CLASS, new Containers.Options(List.of("Cookie", "toStringValue"))), "Cookie");
-        Assert.assertFalse(cookie.contains("\npublic isolated function "),
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        DiscoverResult.Signature funcs = signature(http, Surface.Scope.MODULE, "getDefaultListener");
+        Assert.assertNull(funcs.container());
+        Assert.assertEquals(funcs.kind(), "function");
+        Assert.assertTrue(funcs.declaration().contains("public isolated function "), funcs.declaration());
+        DiscoverResult.Signature cookie = signature(http, Surface.Scope.CLASS, "Cookie", "toStringValue");
+        Assert.assertFalse(cookie.declaration().contains("\npublic isolated function "),
                 "a member does not carry public");
     }
 
@@ -373,14 +345,8 @@ public class ViewsTest {
      *
      * <p>The measured defect: {@code client ballerinax/slack Client "post chat\.postMessage"} matched nothing,
      * while the same request with the accessor as its own argument matched. Ballerina escapes the dot in a path
-     * segment, so {@code chat\.postMessage} is what every fenced signature this tool emits contains — and an
-     * agent that copies one back as a single quoted argument was told there is no such operation, on a client
-     * declaring 174. It cost a real run one call.
-     *
-     * <p>The cause is not the tree, which has always taken both spellings: it is that a one-token selector is
-     * matched against an entry's LABEL, and the label is built unescaped for prose. So the two spellings met on
-     * a comparison that had never been given the same normalisation the path walk has, and the register split
-     * that the whole design rests on leaked into the argument grammar.
+     * segment, so {@code chat\.postMessage} is what every quoted signature this tool emits contains — and an
+     * agent that copies one back as a single quoted argument was told there is no such operation.
      */
     @Test
     public void aSelectorResolvesInTheSpellingTheDocumentPrints() {
@@ -390,52 +356,33 @@ public class ViewsTest {
                 List.of("Client", "post chat.postMessage"),
                 List.of("Client", "post", "chat\\.postMessage"),
                 List.of("Client", "post", "chat.postMessage"))) {
-            String document = markdown(Containers.render(slack, Surface.Scope.CLIENT,
-                    new Containers.Options(selectors)), selectors.toString());
-            Assert.assertTrue(document.contains("resource function post chat\\.postMessage"),
-                    selectors + " did not resolve:\n" + document);
+            DiscoverResult.Signature post =
+                    as(DiscoverResult.Signature.class, render(slack, Surface.Scope.CLIENT, selectors));
+            Assert.assertTrue(post.declaration().contains("resource function post chat\\.postMessage"),
+                    selectors + " did not resolve:\n" + post.declaration());
         }
 
-        // The same for github's `-`, which needs the same escape INSIDE a fence and appears in 40-odd paths, but
-        // reads back unescaped — `readableSegment`'s own reasoning: `code\-scanning` is correct source, and
-        // `code-scanning` is what is typeable and reportable outside one. `alerts` has more than one accessor,
-        // so this lands on the structured IR's own `path` field rather than one full fenced signature.
+        // The same for github's `-`, which needs the same escape inside a declaration but reads back unescaped —
+        // and an accessor with a path names exactly that operation.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
         for (String path : List.of("code\\-scanning/alerts", "code-scanning/alerts")) {
-            Containers.Answer answer = expectAnswer(Containers.render(github, Surface.Scope.CLIENT,
-                    new Containers.Options(List.of("Client", "get repos/{owner}/{repo}/" + path))), path);
+            DiscoverResult answer = render(github, Surface.Scope.CLIENT,
+                    List.of("Client", "get repos/{owner}/{repo}/" + path));
             Assert.assertTrue(resourcePaths(answer).stream().anyMatch(p -> p.contains("code-scanning/alerts")),
                     path + ": " + resourcePaths(answer));
         }
     }
 
     /**
-     * A miss in the CODE register is bounded, like a miss in the report register already was.
-     *
-     * <p>Measured: {@code client ballerinax/github Client nosuchthingatall -r} answered with 42,746 bytes — every
-     * one of 903 labels, on a single line, for a typo. The report register answers the same miss in about 800 and
-     * points at the listing, so the budget rule held everywhere except the one path a caller reaches
-     * by making a mistake, which is the path least worth spending 10,000 tokens on.
-     *
-     * <p>Bounded by the same {@code MAX_LISTING_BYTES}, and it must still name the recovery — an empty answer
-     * that offers no next command is exactly the failure this guards against.
-     */
-    /**
      * {@code new} addresses the constructor, which Ballerina spells {@code init}.
      *
-     * <p>Measured twice, in two separate sweeps: an agent asked for
-     * {@code client ballerinax/redis Client new}, was told nothing matched on a container declaring 112 members,
-     * and found it on the next call as {@code init}. One wasted round trip each time, for a guess that is correct
-     * in most languages an agent has read.
+     * <p>Measured twice, in two separate sweeps: an agent asked for {@code client ballerinax/redis Client new}, was
+     * told nothing matched on a container declaring 112 members, and found it on the next call as {@code init}.
      *
-     * <p>An INPUT alias, not an output one — the document still prints {@code init}, because it prints what the
-     * package declares. That is the same trade already made for {@code {owner}} / {@code [string owner]} and for
-     * the escaped path spellings: the tool accepts what a caller will plausibly type and quotes only what is real.
-     *
-     * <p><b>A REAL {@code new} wins.</b> github declares {@code repos/[string owner]/[string repo]/codespaces/'new},
-     * so on that client the token addresses an operation and the alias must not shadow it. The path walk runs before
-     * the alias for exactly this reason, and the second half of this test pins it — an alias that outranked a
-     * declared name would be the tool answering a different question from the one asked.
+     * <p>An INPUT alias, not an output one — the answer still prints {@code init}, because it prints what the
+     * package declares. <b>A REAL {@code new} wins.</b> github declares
+     * {@code repos/[string owner]/[string repo]/codespaces/'new}, so on that client the token addresses an
+     * operation and the alias must not shadow it.
      */
     @Test
     public void newAddressesTheConstructorUnlessSomethingIsReallyCalledThat() {
@@ -445,21 +392,19 @@ public class ViewsTest {
                 if (container.constructor().isEmpty() || declaresNew(container)) {
                     continue;
                 }
-                String document = markdown(Containers.render(loaded, Surface.Scope.CLIENT,
-                        new Containers.Options(List.of(container.name(), "new"))),
-                        slug + "/" + container.name() + " new");
-                Assert.assertFalse(document.contains("| Matched | nothing"),
-                        slug + "/" + container.name() + ": `new` found no constructor:\n" + document);
-                Assert.assertTrue(document.contains("function init("),
-                        slug + "/" + container.name() + ": the real name is not printed:\n" + document);
+                DiscoverResult.Signature init = as(DiscoverResult.Signature.class,
+                        render(loaded, Surface.Scope.CLIENT, List.of(container.name(), "new")));
+                Assert.assertTrue(init.declaration().contains("function init("),
+                        slug + "/" + container.name() + ": the real name is not printed:\n" + init.declaration());
             }
         }
 
         // And the declared one wins where there is one.
-        String github = markdown(Containers.render(FixtureCorpus.loadedFixture("ballerinax__github"),
-                Surface.Scope.CLIENT, new Containers.Options(List.of("Client", "new"))), "github Client new");
-        Assert.assertTrue(github.contains("codespaces/'new("),
+        String github = TextRenderer.render(render(FixtureCorpus.loadedFixture("ballerinax__github"),
+                Surface.Scope.CLIENT, List.of("Client", "new")));
+        Assert.assertTrue(github.contains("codespaces/'new"),
                 "a declared `new` must outrank the constructor alias:\n" + github);
+        Assert.assertFalse(github.contains("function init("), github);
     }
 
     /** Does this container hold anything genuinely named {@code new} — a member, or a path segment? */
@@ -471,39 +416,28 @@ public class ViewsTest {
     }
 
     @Test
-    public void aMissInTheCodeRegisterIsBoundedAndStillNamesTheRecovery() {
+    public void aSelectorThatMatchesNothingIsAnsweredWithWhatIsThere() {
+        // Exit 0 with the alternatives rather than a failure: an empty selection is a fact about the container,
+        // and the caller's next move is in the answer.
         for (String slug : FixtureCorpus.listFixtures()) {
             LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
             for (Surface.Container container : Surface.of(loaded.library(), Surface.Scope.CLIENT)) {
-                String document = markdown(Containers.render(loaded, Surface.Scope.CLIENT,
-                        new Containers.Options(
-                                List.of(container.name(), "zzznosuchthing"), null, true, false, 1)),
-                        slug + "/" + container.name() + " -r zzznosuchthing");
-                Assert.assertTrue(Texts.byteLength(document) <= 4_000,
-                        slug + "/" + container.name() + ": a miss cost "
-                                + Texts.byteLength(document) + " bytes:\n" + document);
-                // Still Ballerina, and still a way out.
-                Assert.assertFalse(document.contains("| "), slug + ": a table in the code register");
-                Assert.assertTrue(document.contains("bal discover " + loaded.qualified().qualified() + " client"),
-                        slug + ": the miss offers no next command:\n" + document);
+                DiscoverResult.NoMatch miss = as(DiscoverResult.NoMatch.class,
+                        render(loaded, Surface.Scope.CLIENT, List.of(container.name(), "zzznosuchthing")));
+                Assert.assertEquals(miss.requested(), "zzznosuchthing");
+                Assert.assertEquals(miss.next(),
+                        "bal discover " + loaded.pkgArgument() + " client " + container.name());
+                Assert.assertNotNull(miss.available(), slug + "/" + container.name());
             }
         }
     }
 
     @Test
-    public void aSelectorThatMatchesNothingIsAnsweredWithWhatIsThere() {
-        // Exit 0 with the alternatives rather than a failure: an empty selection is a fact about the container,
-        // and the caller's next move is in the document.
-        for (String slug : FixtureCorpus.listFixtures()) {
-            for (Surface.Container container : Surface.of(
-                    FixtureCorpus.libraryFor(slug), Surface.Scope.CLIENT)) {
-                String document = markdown(Containers.render(FixtureCorpus.loadedFixture(slug),
-                        Surface.Scope.CLIENT,
-                        new Containers.Options(List.of(container.name(), "zzznosuchthing"))),
-                        slug + "/" + container.name() + " zzznosuchthing");
-                Assert.assertTrue(document.contains("| Requested | `zzznosuchthing` |"), document);
-            }
-        }
+    public void aNearMissIsOfferedAsACandidate() {
+        DiscoverResult.NoMatch miss = as(DiscoverResult.NoMatch.class, render(
+                FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, List.of("Producer", "sendd")));
+        Assert.assertTrue(miss.candidates().contains("send"), miss.candidates().toString());
+        Assert.assertTrue(TextRenderer.render(miss).contains("Did you mean: "), TextRenderer.render(miss));
     }
 
     // -----------------------------------------------------------------------
@@ -513,17 +447,14 @@ public class ViewsTest {
     @Test
     public void aWildcardNamesEveryBranchItAlsoMatchedRatherThanTakingTheBusiestSilently() {
         // GITHUB-02. `*` matches any child and children are ordered busiest-first, so `repos/*/*` meant "the
-        // busiest branch" and returned 420 of 421 under exit 0 with nothing in the header to say so. The
-        // container is over the ceiling here (grouped, structured), so the branch not taken travels as the
-        // structured answer's own `note` rather than a Markdown facts row.
+        // busiest branch" and returned 420 of 421 under exit 0 with nothing to say so.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
         String note = clientNote(github, "repos/*/*");
         // Named by where it GOES, not where it forks: `repos/{templateOwner}` alone is not an address.
         Assert.assertNotNull(note, "repos/*/* should name the branch it did not take");
         Assert.assertTrue(note.contains("also matched `repos/:templateOwner/:templateRepo/generate` (1), "
                 + "not included here"), note);
-        // And only when a branch was actually dropped, or it is noise on every other lookup: `repos` alone never
-        // walks into the parameter level at all, so there is no fork to report yet.
+        // And only when a branch was actually dropped, or it is noise on every other lookup.
         Assert.assertNull(clientNote(github, "repos"), "no fork was walked into yet");
     }
 
@@ -531,9 +462,8 @@ public class ViewsTest {
     public void aTrailingSegmentIsLocatedUnderTheMatchedPrefixWhenItIsUnambiguous() {
         // `repos/owner/repo/caches` is a real request: `caches` exists, at `.../actions/caches`. The anchored
         // answer — "no `caches` under `repos/{owner}/{repo}`" — is correct and costs a round trip.
-        LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        Containers.Answer answer = clientAnswer(github, "repos/owner/repo/caches");
-        DiscoverResult.ResourceList resources = (DiscoverResult.ResourceList) structuredResultOf(answer);
+        DiscoverResult.ResourceList resources = as(DiscoverResult.ResourceList.class,
+                clientAnswer(FixtureCorpus.loadedFixture("ballerinax__github"), "repos/owner/repo/caches"));
         Assert.assertEquals(resources.note(), "relocated to `repos/:owner/:repo/actions/caches` — the only "
                 + "match for that segment under the requested prefix");
         Assert.assertTrue(resources.resources().stream()
@@ -544,124 +474,109 @@ public class ViewsTest {
     @Test
     public void aTrailingSegmentFoundInSeveralPlacesIsListedRatherThanPicked() {
         // Rule 2, and it is the whole reason anchoring exists: picking one of several is the failure the anchored
-        // walk was built to prevent, so the answer stops at the list — still the Markdown `nothingMatched`
-        // fallback, since an ambiguous relocation resolves to no entries at all rather than to too many.
+        // walk was built to prevent, so the answer stops at the list, each with the command that opens it.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
         // `secrets` exists under `actions`, `codespaces` AND `dependabot`, and they are three different APIs.
-        String document = client(github, "repos/owner/repo/secrets");
-        Assert.assertTrue(document.contains("3 paths carry that segment"), document);
-        Assert.assertTrue(document.contains("repos/:owner/:repo/actions/secrets"), document);
-        Assert.assertTrue(document.contains("repos/:owner/:repo/dependabot/secrets"), document);
-        // Every path it offers has to be one the tree actually holds, which is asserted exhaustively in
-        // ViewsAgreeTest; here the point is that more than one was found and none was chosen.
-        Assert.assertFalse(document.contains("| Located |"), document);
+        DiscoverResult.NoMatch miss =
+                as(DiscoverResult.NoMatch.class, clientAnswer(github, "repos/owner/repo/secrets"));
+        List<String> paths = miss.paths().stream().map(DiscoverResult.NoMatch.Alternative::path).toList();
+        Assert.assertEquals(paths.size(), 3, paths.toString());
+        Assert.assertTrue(paths.contains("repos/:owner/:repo/actions/secrets"), paths.toString());
+        Assert.assertTrue(paths.contains("repos/:owner/:repo/dependabot/secrets"), paths.toString());
+        Assert.assertTrue(miss.paths().get(0).call().startsWith("bal discover ballerinax/github client Client "),
+                miss.paths().get(0).call());
+        // The paths ARE the way forward, so no generic listing competes with them.
+        Assert.assertNull(miss.available());
     }
 
     @Test
     public void placeholderSpellingsAllAddressTheSameSegment() {
-        // Already shipped and kept: an agent that copied a path out of a fenced signature types `[string owner]`,
-        // one that read it off a tree types `{owner}`, and one that typed it from memory types `owner`. All three
-        // reach the exact same structured answer — records compare by value, so equality is the whole check.
+        // An agent that copied a path out of a declaration types `[string owner]`, one that read it off a tree
+        // types `{owner}`, and one that typed it from memory types `owner`. All three reach the exact same answer —
+        // records compare by value, so equality is the whole check.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        DiscoverResult bare = structuredResultOf(clientAnswer(github, "repos/owner/repo"));
-        Assert.assertEquals(structuredResultOf(clientAnswer(github, "repos/{owner}/{repo}")), bare);
-        Assert.assertEquals(structuredResultOf(clientAnswer(github, "repos/[string owner]/[string repo]")), bare);
-        Assert.assertNotNull(clientNote(github, "repos/*/*"));
+        DiscoverResult bare = clientAnswer(github, "repos/owner/repo");
+        Assert.assertEquals(clientAnswer(github, "repos/{owner}/{repo}"), bare);
+        Assert.assertEquals(clientAnswer(github, "repos/[string owner]/[string repo]"), bare);
+        Assert.assertEquals(clientAnswer(github, "repos/:owner/:repo"), bare);
     }
 
-    /** The structured result inside a {@code client} bucket answer that is expected not to be Markdown. */
-    private static DiscoverResult structuredResultOf(Containers.Answer answer) {
-        Assert.assertTrue(answer instanceof Containers.Answer.Structured, answer.toString());
-        return ((Containers.Answer.Structured) answer).result();
-    }
-
-    /** The {@code note} field of a structured resource answer, or {@code null} for a flat resource list too. */
+    /** The {@code note} field of a resource-shaped answer. */
     private static String clientNote(LoadedPackage loaded, String path) {
-        return switch (structuredResultOf(clientAnswer(loaded, path))) {
+        return switch (clientAnswer(loaded, path)) {
             case DiscoverResult.ResourceList resources -> resources.note();
             case DiscoverResult.PathGroups groups -> groups.note();
             default -> throw new AssertionError("not a resource-shaped answer for " + path);
         };
     }
 
-    private static Containers.Answer clientAnswer(LoadedPackage loaded, String path) {
-        return expectAnswer(Containers.render(loaded, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client", path))), "Client " + path);
+    private static DiscoverResult clientAnswer(LoadedPackage loaded, String path) {
+        return render(loaded, Surface.Scope.CLIENT, List.of("Client", path));
     }
 
-    private static String client(LoadedPackage loaded, String path) {
-        return markdown(Containers.render(loaded, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client", path))), "Client " + path);
-    }
-
-    /** A structured answer's resource paths, for a test that does not care which listing shape it landed on. */
-    private static List<String> resourcePaths(Containers.Answer answer) {
+    /** An answer's resource paths, for a test that does not care which listing shape it landed on. */
+    private static List<String> resourcePaths(DiscoverResult answer) {
         return switch (answer) {
-            case Containers.Answer.Structured structured -> switch (structured.result()) {
-                case DiscoverResult.ResourceList resources ->
-                        resources.resources().stream().map(DiscoverResult.ResourceList.Resource::path).toList();
-                case DiscoverResult.PathGroups groups ->
-                        groups.groups().stream().map(DiscoverResult.PathGroups.Group::name).toList();
-                default -> throw new AssertionError("not a resource-shaped answer: " + structured.result());
-            };
-            case Containers.Answer.Markdown markdown -> throw new AssertionError(
-                    "expected a structured resource answer, got Markdown: " + markdown.text());
+            case DiscoverResult.ResourceList resources ->
+                    resources.resources().stream().map(DiscoverResult.ResourceList.Resource::path).toList();
+            case DiscoverResult.PathGroups groups ->
+                    groups.groups().stream().map(DiscoverResult.PathGroups.Group::name).toList();
+            case DiscoverResult.Signature signature when signature.path() != null -> List.of(signature.path());
+            default -> throw new AssertionError("not a resource-shaped answer: " + answer);
         };
     }
 
     @Test
     public void searchingAContainerFiltersOnParameterAndTypeNamesTooNotOnlyOnTheName() {
         // The reason `--filter` searches the signature rather than the name alone: an agent that knows it holds
-        // an `ActionsCacheList` and wants the call returning one has no other way to ask. github's client is
-        // over the ceiling, so a `--filter`-narrowed answer is the structured IR — never grouped or paginated,
-        // since a filter is a claim the caller already knows roughly what they want.
-        Containers.Answer answer = expectAnswer(Containers.render(
+        // an `ActionsCacheList` and wants the call returning one has no other way to ask.
+        DiscoverResult answer = result(Containers.render(
                 FixtureCorpus.loadedFixture("ballerinax__github"), Surface.Scope.CLIENT,
-                new Containers.Options(List.of(), "ActionsCacheList", false, false, 1)), "ActionsCacheList");
-        List<String> paths = resourcePaths(answer);
-        Assert.assertFalse(paths.isEmpty(), "ActionsCacheList should match at least one resource path");
+                new Containers.Options(List.of(), "ActionsCacheList", 1)), "ActionsCacheList");
+        Assert.assertFalse(resourcePaths(answer).isEmpty(), "ActionsCacheList should match at least one path");
     }
 
     /**
      * {@code --filter} is a single keyword, not a path matcher — the RFC's own "simple case-insensitive
-     * substring/keyword match", replacing this tool's earlier {@code -s} flag's unordered AND over every
-     * whitespace/slash-split token. A multi-segment path narrows through the POSITIONAL selector instead
-     * ({@code aSelectorResolvesInTheSpellingTheDocumentPrints} and friends already cover that walk); this is
-     * what a single keyword — including one built out of segment-shaped text — still finds as a contiguous
-     * substring.
+     * substring/keyword match". A multi-segment path narrows through the POSITIONAL selector instead.
      */
     @Test
     public void filterIsASingleKeywordSubstringNotAPathMatcher() {
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        // One literal segment, contiguous in the space-joined surface text of any resource under it.
-        Containers.Answer answer = expectAnswer(Containers.render(github, Surface.Scope.CLIENT,
-                new Containers.Options(List.of(), "caches", false, false, 1)), "caches");
+        DiscoverResult answer = result(Containers.render(github, Surface.Scope.CLIENT,
+                new Containers.Options(List.of(), "caches", 1)), "caches");
         Assert.assertFalse(resourcePaths(answer).isEmpty(), "caches should match at least one resource path");
 
-        // A query that is genuinely absent still reports nothing, or the fix would just be a match-everything.
-        // That "nothing" is the Markdown `nothingMatched` fallback — an empty selection is a fact about the
-        // container, answered with what IS there, never an empty structured listing.
-        Containers.Answer absent = expectAnswer(Containers.render(github, Surface.Scope.CLIENT,
-                new Containers.Options(List.of(), "zzznopealsonope", false, false, 1)), "zzznopealsonope");
-        Assert.assertTrue(isNothingMatched(absent), "a genuinely absent keyword must match nothing: " + absent);
+        // A query that is genuinely absent still reports nothing, or the fix would just be a match-everything —
+        // answered with what IS there, never an empty listing.
+        DiscoverResult absent = result(Containers.render(github, Surface.Scope.CLIENT,
+                new Containers.Options(List.of(), "zzznopealsonope", 1)), "zzznopealsonope");
+        DiscoverResult.NoMatch miss = as(DiscoverResult.NoMatch.class, absent);
+        Assert.assertEquals(miss.requested(), "zzznopealsonope");
+    }
+
+    @Test
+    public void aFilterThatMatchesNoContainerInABucketIsAnsweredWithTheBucket() {
+        DiscoverResult.NoMatch miss = as(DiscoverResult.NoMatch.class, result(Containers.render(
+                FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLIENT,
+                new Containers.Options(List.of(), "zzznopealsonope", 1)), "http client --filter"));
+        Assert.assertNull(miss.container());
+        as(DiscoverResult.ContainerRoster.class, miss.available());
+        Assert.assertEquals(miss.next(), "bal discover ballerina/http client");
     }
 
     /**
-     * The escaped spelling is searchable too, because it is the one the documents print.
-     *
-     * <p>The same normalisation the positional selector got: a caller who copies
-     * {@code chat\.postMessage} out of a fenced signature and puts it behind {@code --filter} is copying this
-     * tool's own output.
+     * The escaped spelling is searchable too, because it is the one the declarations print.
      */
     @Test
     public void searchingAContainerAcceptsTheEscapedSpelling() {
         // slack's Client has exactly one resource matching either spelling, so the filtered selection narrows to
-        // one entry and answers in full — the same `fullAnswer` a one-of-many name match reaches.
+        // one entry and answers in full.
         LoadedPackage slack = FixtureCorpus.loadedFixture("ballerinax__slack");
         for (String query : List.of("chat\\.postMessage", "chat.postMessage")) {
-            String answer = markdown(Containers.render(slack, Surface.Scope.CLIENT,
-                    new Containers.Options(List.of(), query, false, false, 1)), query);
-            Assert.assertTrue(answer.contains("chat\\.postMessage"), query + " did not find it: " + answer);
+            DiscoverResult.Signature post = as(DiscoverResult.Signature.class, result(Containers.render(
+                    slack, Surface.Scope.CLIENT, new Containers.Options(List.of(), query, 1)), query));
+            Assert.assertTrue(post.declaration().contains("chat\\.postMessage"), query + ": " + post.declaration());
         }
     }
 
@@ -669,11 +584,7 @@ public class ViewsTest {
      * A path parameter answers to brackets WITHOUT the type, which is what half-remembering produces.
      *
      * <p>Measured: an agent typed {@code repos/[owner]/[repo]/issues} — the declaration form
-     * {@code [string owner]} with the type dropped — and matched nothing on 903 resource functions. Three
-     * spellings resolved and this fourth did not.
-     *
-     * <p>It was not merely unhandled, it was mis-parsed: the old pattern required something before the name, so
-     * on {@code [owner]} it backtracked and read the parameter's name as {@code r}.
+     * {@code [string owner]} with the type dropped — and matched nothing on 903 resource functions.
      */
     @Test
     public void aPathParameterAnswersToBracketsWithoutTheType() {
@@ -682,23 +593,16 @@ public class ViewsTest {
                 "repos/[owner]/[repo]/issues",
                 "repos/[string owner]/[string repo]/issues",
                 "repos/{owner}/{repo}/issues",
+                "repos/:owner/:repo/issues",
                 "repos/owner/repo/issues")) {
-            Containers.Answer answer = expectAnswer(Containers.render(github, Surface.Scope.CLIENT,
-                    new Containers.Options(List.of("Client", path))), path);
-            Assert.assertFalse(isNothingMatched(answer), path + " did not resolve: " + answer);
+            DiscoverResult answer = clientAnswer(github, path);
+            Assert.assertFalse(answer instanceof DiscoverResult.NoMatch, path + " did not resolve: " + answer);
         }
     }
 
     /**
-     * An accessor and a path in ONE argument reach the path walk, whatever spelling the path is in.
-     *
-     * <p>A caller copying a line out of a fenced signature copies the whole thing —
-     * {@code get [PathParamType ...path]} — as a single quoted argument. Split across two arguments every
-     * spelling already resolved; as one token only the display spelling did, because a one-token selector was
-     * compared against an entry's LABEL and never handed to the walk that understands the other spellings.
-     *
-     * <p>So the one-token form now splits on its first word when that word is an accessor the container
-     * declares. Member names cannot contain whitespace, which is what makes the split safe.
+     * An accessor and a path in ONE argument reach the path walk, whatever spelling the path is in — which is
+     * what copying a whole line out of a declaration as a single quoted argument produces.
      */
     @Test
     public void anAccessorAndAPathInOneArgumentReachThePathWalk() {
@@ -707,16 +611,15 @@ public class ViewsTest {
                 "get [PathParamType ...path]",
                 "get [path]",
                 "get {...path}")) {
-            Containers.Answer answer = expectAnswer(Containers.render(http, Surface.Scope.CLIENT,
-                    new Containers.Options(List.of("Client", selector))), selector);
-            Assert.assertFalse(isNothingMatched(answer), selector + " did not resolve: " + answer);
+            DiscoverResult answer = render(http, Surface.Scope.CLIENT, List.of("Client", selector));
+            Assert.assertFalse(answer instanceof DiscoverResult.NoMatch, selector + " did not resolve: " + answer);
         }
 
         // A leading word that is NOT an accessor stays one member name, or `Producer send` would be parsed as
         // an accessor called `Producer`.
-        String member = markdown(Containers.render(FixtureCorpus.loadedFixture("ballerinax__kafka"),
-                Surface.Scope.CLIENT, new Containers.Options(List.of("Producer", "send"))), "Producer send");
-        Assert.assertTrue(member.contains("function send("), member);
+        DiscoverResult.Signature send =
+                signature(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, "Producer", "send");
+        Assert.assertTrue(send.declaration().contains("function send("), send.declaration());
     }
 
     // -----------------------------------------------------------------------

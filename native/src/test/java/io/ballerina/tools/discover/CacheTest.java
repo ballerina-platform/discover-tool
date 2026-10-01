@@ -446,10 +446,9 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
-        // A bucket, not the bare package. kafka's client bucket is a roster (3 clients), so this is the JSON
-        // default off a TTY — the warning travels as the structured answer's own `warning` field, not a
-        // Markdown facts row, which is what `Containers.roster` threads `loaded.warning()` into. See
-        // aBarePackageWarningFlowsThroughBothRenderers below for the bare-package path.
+        // A bucket, not the bare package: kafka's client bucket is a roster (3 clients), and off a TTY the warning
+        // travels as that answer's own `warning` field. See aBarePackageWarningFlowsThroughBothRenderers below for
+        // the bare-package path.
         Cli.run(List.of(PKG, "client"), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 

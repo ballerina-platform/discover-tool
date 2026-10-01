@@ -325,7 +325,9 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerina/http", "client", "FailoverClient"),
                 capture.streams(), centralFor("ballerina__http", "2.16.6"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertTrue(capture.stdout().contains("`FailoverClient`"));
+        JsonObject json = JsonParser.parseString(capture.stdout()).getAsJsonObject();
+        Assert.assertTrue(json.has("resources") && json.has("remote"), capture.stdout());
+        Assert.assertTrue(json.getAsJsonArray("remote").toString().contains("\"submit\""), capture.stdout());
     }
 
     @Test
@@ -345,15 +347,177 @@ public class CliTest {
     }
 
     @Test
-    public void aPackageWithNoModuleFunctionsGetsAnHonestEmptyReportAtExit0() {
+    public void aPackageWithNoModuleFunctionsGetsAnHonestEmptyAnswerAtExit0() {
+        Capture json = run(List.of("ballerinax/kafka", "funcs"), "ballerinax__kafka", "4.6.5", false);
+        JsonObject empty = JsonParser.parseString(json.stdout()).getAsJsonObject();
+        Assert.assertEquals(empty.get("bucket").getAsString(), "funcs");
+        Assert.assertEquals(empty.get("total").getAsInt(), 0);
+        Assert.assertTrue(json.stdout().contains("\"call\":\"bal discover ballerinax/kafka client\""), json.stdout());
+
+        Capture text = run(List.of("ballerinax/kafka", "funcs"), "ballerinax__kafka", "4.6.5", true);
+        Assert.assertTrue(text.stdout().startsWith("funcs: none in this package\nElsewhere: client ("),
+                text.stdout());
+    }
+
+    // -----------------------------------------------------------------------
+    // Every container answer honours --output
+    // -----------------------------------------------------------------------
+
+    private static Capture run(List<String> argv, String slug, String version, boolean interactive) {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka", "funcs"), capture.streams(),
-                centralFor("ballerinax__kafka", "4.6.5"));
-        Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertTrue(capture.stdout().contains("| Module functions | this package declares none |"),
-                capture.stdout());
-        Assert.assertTrue(capture.stdout().contains("`bal discover ballerinax/kafka client`"),
-                capture.stdout());
+        int exitCode = Cli.run(argv, capture.streams(), centralFor(slug, version), null, interactive);
+        Assert.assertEquals(exitCode, 0, String.join(" ", argv) + " -> " + capture.stderr());
+        Assert.assertEquals(capture.stderr(), "", String.join(" ", argv));
+        Assert.assertTrue(capture.stdout().endsWith("\n"), capture.stdout());
+        return capture;
+    }
+
+    @Test
+    public void aSingleSignatureIsStructuredJsonOffATerminalAndTheBareDeclarationAtOne() {
+        List<String> argv = List.of("ballerinax/kafka", "client", "Producer", "send");
+        JsonObject json = JsonParser.parseString(run(argv, "ballerinax__kafka", "4.6.5", false).stdout())
+                .getAsJsonObject();
+        Assert.assertEquals(json.get("container").getAsString(), "Producer");
+        Assert.assertEquals(json.get("kind").getAsString(), "remote");
+        Assert.assertEquals(json.get("name").getAsString(), "send");
+        Assert.assertEquals(json.get("form").getAsString(), "->");
+        Assert.assertTrue(json.get("declaration").getAsString().contains("remote function send("), json.toString());
+        Assert.assertFalse(json.getAsJsonArray("params").isEmpty(), json.toString());
+        Assert.assertTrue(json.has("returns"), json.toString());
+        Assert.assertFalse(json.getAsJsonArray("types").isEmpty(), json.toString());
+
+        String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
+        Assert.assertTrue(text.startsWith("# "), "the declaration's own doc comment comes first: " + text);
+        Assert.assertTrue(text.contains("remote function send("), text);
+        Assert.assertTrue(text.contains("\n\nTypes it names ("), text);
+    }
+
+    @Test
+    public void aResourceSignatureNamesItsPathAndAccessorInJson() {
+        List<String> argv = List.of("ballerinax/github", "client", "repos/:owner/:repo/actions/caches", "delete");
+        JsonObject json = JsonParser.parseString(run(argv, "ballerinax__github", "6.0.0", false).stdout())
+                .getAsJsonObject();
+        Assert.assertTrue(json.has("kind"), json.toString());
+        Assert.assertEquals(json.get("kind").getAsString(), "resource");
+        Assert.assertEquals(json.get("accessor").getAsString(), "delete");
+        Assert.assertEquals(json.get("path").getAsString(), "repos/:owner/:repo/actions/caches");
+        Assert.assertFalse(json.has("name"), json.toString());
+    }
+
+    /**
+     * The RFC's own worked example: every single-accessor entry under github's {@code gists} carries a {@code call},
+     * and running it opens exactly that resource's signature — never the listing it came from again.
+     */
+    @Test
+    public void everyResourceCallOpensExactlyThatSignature() {
+        for (String[] listing : new String[][] {
+                {"ballerinax/github", "ballerinax__github", "gists"},
+                {"ballerinax/googleapis.gmail", "ballerinax__googleapis.gmail", null}}) {
+            List<String> argv = listing[2] == null
+                    ? List.of(listing[0], "client")
+                    : List.of(listing[0], "client", listing[2]);
+            JsonArray resources = JsonParser.parseString(run(argv, listing[1], "1.0.0", false).stdout())
+                    .getAsJsonObject().getAsJsonArray("resources");
+            int followed = 0;
+            for (JsonElement element : resources) {
+                JsonObject resource = element.getAsJsonObject();
+                if (!resource.has("call")) {
+                    continue;
+                }
+                List<String> call = argv(resource.get("call").getAsString());
+                JsonObject signature = JsonParser.parseString(run(call, listing[1], "1.0.0", false).stdout())
+                        .getAsJsonObject();
+                Assert.assertEquals(signature.get("path").getAsString(), resource.get("path").getAsString(),
+                        String.join(" ", call));
+                Assert.assertEquals(signature.get("accessor").getAsString(),
+                        resource.getAsJsonArray("accessors").get(0).getAsString(), String.join(" ", call));
+                followed++;
+            }
+            Assert.assertTrue(followed > 0, String.join(" ", argv) + " printed no call");
+        }
+    }
+
+    /** A printed command as argv: {@code bal discover} dropped, double quotes honoured. */
+    private static List<String> argv(String command) {
+        List<String> tokens = new java.util.ArrayList<>();
+        java.util.regex.Matcher token = java.util.regex.Pattern.compile("\"([^\"]*)\"|(\\S+)").matcher(command);
+        while (token.find()) {
+            tokens.add(token.group(1) != null ? token.group(1) : token.group(2));
+        }
+        Assert.assertEquals(tokens.subList(0, 2), List.of("bal", "discover"), command);
+        return tokens.subList(2, tokens.size());
+    }
+
+    @Test
+    public void aMixedContainerIsSplitByCallFormInBothRenderings() {
+        List<String> argv = List.of("ballerina/http", "client", "Client");
+        JsonObject json = JsonParser.parseString(run(argv, "ballerina__http", "2.16.6", false).stdout())
+                .getAsJsonObject();
+        Assert.assertFalse(json.getAsJsonArray("resources").isEmpty(), json.toString());
+        Assert.assertTrue(json.getAsJsonArray("remote").toString().contains("\"execute\""), json.toString());
+        Assert.assertTrue(json.getAsJsonArray("normal").toString().contains("\"getCookieStore\""), json.toString());
+        Assert.assertEquals(json.get("shown").getAsInt(), json.get("total").getAsInt());
+
+        String text = run(argv, "ballerina__http", "2.16.6", true).stdout();
+        Assert.assertTrue(text.startsWith("Resources (->):\n"), text);
+        Assert.assertTrue(text.contains("\nRemote (->): "), text);
+        Assert.assertTrue(text.contains("\nNormal (.): "), text);
+    }
+
+    @Test
+    public void aSelectorThatMatchesNothingIsExitZeroWithWhatIsThereInBothRenderings() {
+        List<String> argv = List.of("ballerinax/kafka", "client", "Producer", "sendd");
+        JsonObject json = JsonParser.parseString(run(argv, "ballerinax__kafka", "4.6.5", false).stdout())
+                .getAsJsonObject();
+        Assert.assertEquals(json.get("requested").getAsString(), "sendd");
+        Assert.assertEquals(json.get("container").getAsString(), "Producer");
+        Assert.assertTrue(json.getAsJsonArray("candidates").toString().contains("\"send\""), json.toString());
+        Assert.assertTrue(json.getAsJsonObject("available").has("methods"), json.toString());
+        Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerinax/kafka client Producer");
+
+        String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
+        Assert.assertTrue(text.startsWith("Nothing on Producer matches 'sendd'.\nDid you mean: "), text);
+        Assert.assertTrue(text.contains("\nAvailable:\nMethods: "), text);
+    }
+
+    @Test
+    public void aFilterThatMatchesNothingIsExitZeroWithWhatIsThere() {
+        List<String> argv = List.of("ballerinax/github", "client", "--filter", "zzznopealsonope");
+        JsonObject json = JsonParser.parseString(run(argv, "ballerinax__github", "6.0.0", false).stdout())
+                .getAsJsonObject();
+        Assert.assertEquals(json.get("requested").getAsString(), "zzznopealsonope");
+        Assert.assertTrue(json.getAsJsonObject("available").has("groups"), json.toString());
+    }
+
+    @Test
+    public void aMemberOnSeveralContainersListsTheOwnersInBothRenderings() {
+        List<String> argv = List.of("ballerinax/kafka", "client", "commit");
+        JsonObject json = JsonParser.parseString(run(argv, "ballerinax__kafka", "4.6.5", false).stdout())
+                .getAsJsonObject();
+        Assert.assertEquals(json.get("requested").getAsString(), "commit");
+        Assert.assertTrue(json.toString().contains(
+                "\"call\":\"bal discover ballerinax/kafka client Consumer commit\""), json.toString());
+        Assert.assertEquals(json.get("shown").getAsInt(), json.get("total").getAsInt());
+
+        String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
+        Assert.assertTrue(text.startsWith("'commit' is declared on "), text);
+        Assert.assertTrue(text.contains("Consumer (3 matches)"), text);
+    }
+
+    @Test
+    public void noContainerAnswerIsMarkdownInEitherRendering() {
+        for (List<String> argv : List.of(
+                List.of("ballerinax/kafka", "client", "Producer", "send"),
+                List.of("ballerinax/kafka", "client", "Producer", "nosuch"),
+                List.of("ballerinax/kafka", "client", "commit"),
+                List.of("ballerinax/kafka", "funcs"))) {
+            for (boolean interactive : List.of(true, false)) {
+                String out = run(argv, "ballerinax__kafka", "4.6.5", interactive).stdout();
+                Assert.assertFalse(out.contains("<!-- bal discover"), out);
+                Assert.assertFalse(out.contains("| | |"), out);
+                Assert.assertFalse(out.contains("\n```"), out);
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -369,8 +533,7 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerinax/kafka", "readme"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        // Verbatim means no report furniture at all — not even the format marker every other still-Markdown
-        // answer opens on.
+        // Verbatim means no furniture at all, not even a format marker.
         Assert.assertFalse(capture.stdout().startsWith("<!-- bal discover"), capture.stdout());
         Assert.assertTrue(capture.stdout().length() > 500, capture.stdout());
     }

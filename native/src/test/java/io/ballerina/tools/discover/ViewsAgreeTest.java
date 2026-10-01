@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.model.TypeDef;
+import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.TypeDefs;
 import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.Names;
@@ -55,16 +56,16 @@ import java.util.regex.Pattern;
  * that does not exist, an included-record parameter became two invented ones, and {@code isolated resource
  * function} was dropped along with the {@code ->} call form it implies.
  *
- * <p>Six properties, over every fixture:
+ * <p>Five properties, over every fixture:
  *
  * <ol>
- *   <li>every signature a container verb prints appears in that fixture's {@code api} snapshot;
- *   <li>{@code overview} generates NO signature at all — it is a map, so anything it quotes is the readme;
+ *   <li>every declaration a single-result answer quotes — its own, and every type it names — appears in that
+ *       fixture's {@code api} snapshot;
  *   <li>every {@code type <Name>} body is {@code renderTypeDef} of that declaration exactly;
  *   <li>every declaration resolves through {@code type}, and every name {@code type} resolves is in the index —
  *       in both directions;
  *   <li>every path the tree offers is reachable, and every path reached is one the tree offers;
- *   <li>{@code -r} closures terminate, do not repeat a declaration, and stay inside their budget.
+ *   <li>closures terminate, do not repeat a declaration, and stay inside their budget.
  * </ol>
  *
  * @since 0.1.0
@@ -74,26 +75,6 @@ public class ViewsAgreeTest {
     @DataProvider(name = "fixtures")
     public Object[][] fixtures() {
         return FixtureCorpus.fixtureRows();
-    }
-
-    /** Ballerina lines inside fenced ballerina blocks, the only place a report may hold any. */
-    private static List<String> fencedBallerina(String document) {
-        List<String> lines = new ArrayList<>();
-        boolean inside = false;
-        for (String line : document.split("\n", -1)) {
-            if (line.startsWith("```ballerina")) {
-                inside = true;
-                continue;
-            }
-            if (line.startsWith("```")) {
-                inside = false;
-                continue;
-            }
-            if (inside && !line.trim().isEmpty()) {
-                lines.add(line);
-            }
-        }
-        return lines;
     }
 
     private static Set<String> snapshotLines(String slug) {
@@ -116,13 +97,7 @@ public class ViewsAgreeTest {
         return paths;
     }
 
-    private static String expect(Result<String> view, String what) {
-        Assert.assertTrue(view.isOk(), what + " failed: "
-                + (view.isOk() ? "" : view.failure().describe()));
-        return view.value();
-    }
-
-    private static Containers.Answer expectAnswer(Result<Containers.Answer> view, String what) {
+    private static DiscoverResult expectAnswer(Result<DiscoverResult> view, String what) {
         Assert.assertTrue(view.isOk(), what + " failed: "
                 + (view.isOk() ? "" : view.failure().describe()));
         return view.value();
@@ -135,87 +110,57 @@ public class ViewsAgreeTest {
     /** Across every fixture — a single fixture legitimately checks zero, see below. */
     private static final AtomicInteger TOTAL_CHECKED = new AtomicInteger();
 
+    /** How many resource operations per container are drilled into — github alone has 903. */
+    private static final int OPERATIONS_PER_CONTAINER = 25;
+
     /**
-     * Every container verb, over every container that still answers in Markdown.
-     *
-     * <p>{@code --all} is gone — the RFC's entry ceiling has no escape hatch — so there is one tier per container
-     * to check now, not two. A container over the ceiling answers on the result IR instead (a roster, a grouped
-     * or paginated listing), which quotes no Ballerina at all; this oracle is specifically about what a Markdown
-     * answer QUOTES, so those are skipped rather than checked vacuously.
-     *
-     * <p>The vacuous-check itself moved from per-fixture to {@link #TOTAL_CHECKED}, checked once across the whole
-     * class in {@link #atLeastOneSignatureWasActuallyChecked()}: naming a container by itself now reaches the
-     * structured IR (not Markdown) for any container with more than one purely-resource or purely-named entry,
-     * which is most containers in most fixtures — a fixture built entirely of those legitimately checks zero here.
+     * Every single-result answer: every named member of every container, and the first
+     * {@value #OPERATIONS_PER_CONTAINER} resource operations of each, drilled into one at a time.
      */
     @Test(dataProvider = "fixtures")
-    public void everySignatureAContainerVerbPrintsIsInTheApiSnapshotVerbatim(String slug) {
+    public void everyDeclarationASingleResultQuotesIsInTheApiSnapshotVerbatim(String slug) {
         Set<String> snapshot = snapshotLines(slug);
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
 
         for (Surface.Scope scope : Surface.Scope.values()) {
             for (Surface.Container container : Surface.of(context.library(), scope)) {
-                List<String> selector = container.isModule() ? List.of() : List.of(container.name());
-                Containers.Answer answer = expectAnswer(Containers.render(context, scope,
-                        new Containers.Options(selector)), scope.verb() + " " + container.name());
-                if (!(answer instanceof Containers.Answer.Markdown markdown)) {
-                    continue;
-                }
-                for (String line : fencedBallerina(markdown.text())) {
-                    Assert.assertTrue(snapshot.contains(line.stripLeading()),
-                            slug + " " + scope.verb() + " " + container.name()
-                                    + " quotes a line api does not:\n  " + line);
-                    TOTAL_CHECKED.incrementAndGet();
+                List<String> owner = container.isModule() ? List.of() : List.of(container.name());
+                List<List<String>> selectors = new ArrayList<>();
+                container.memberNames().forEach(name -> selectors.add(with(owner, name)));
+                container.operations().stream().limit(OPERATIONS_PER_CONTAINER).forEach(operation ->
+                        selectors.add(with(owner, operation.fn().accessor(), String.join("/", operation.segments()))));
+                for (List<String> selector : selectors) {
+                    DiscoverResult answer = expectAnswer(Containers.render(context, scope,
+                            new Containers.Options(selector)), scope.verb() + " " + selector);
+                    if (!(answer instanceof DiscoverResult.Signature signature)) {
+                        continue;
+                    }
+                    List<String> quoted = new ArrayList<>(List.of(signature.declaration().split("\n", -1)));
+                    signature.types().forEach(type -> quoted.addAll(List.of(type.declaration().split("\n", -1))));
+                    for (String line : quoted) {
+                        if (line.isBlank()) {
+                            continue;
+                        }
+                        Assert.assertTrue(snapshot.contains(line.stripLeading()),
+                                slug + " " + scope.verb() + " " + selector + " quotes a line api does not:\n  "
+                                        + line);
+                        TOTAL_CHECKED.incrementAndGet();
+                    }
                 }
             }
         }
+    }
+
+    private static List<String> with(List<String> prefix, String... more) {
+        List<String> selector = new ArrayList<>(prefix);
+        selector.addAll(List.of(more));
+        return selector;
     }
 
     @AfterClass(alwaysRun = true)
     public void atLeastOneSignatureWasActuallyChecked() {
         Assert.assertTrue(TOTAL_CHECKED.get() > 0,
                 "nothing was checked across any fixture, so the test above passed vacuously");
-    }
-
-    /**
-     * A {@code -r} response is the code register, and its declarations are {@code renderTypeDef} exactly.
-     *
-     * <p>The register is a property of the document, not the verb. A {@code -r} answer is reached through a
-     * container verb but is nothing but declarations, so it is pasteable whole — and every one of its lines
-     * is still a line of the API document.
-     */
-    @Test(dataProvider = "fixtures")
-    public void everyLineAResolvedAnswerPrintsIsInTheApiSnapshotVerbatim(String slug) {
-        Set<String> snapshot = snapshotLines(slug);
-        LoadedPackage context = FixtureCorpus.loadedFixture(slug);
-
-        for (Surface.Scope scope : Surface.Scope.values()) {
-            for (Surface.Container container : Surface.of(context.library(), scope)) {
-                List<String> selector = container.isModule() ? List.of() : List.of(container.name());
-                Containers.Answer answer = expectAnswer(Containers.render(context, scope,
-                        new Containers.Options(selector, null, true, false, 1)),
-                        scope.verb() + " " + container.name() + " -r");
-                Assert.assertTrue(answer instanceof Containers.Answer.Markdown,
-                        "the code register is always Markdown");
-                String document = ((Containers.Answer.Markdown) answer).text();
-                // A fence at the START of a line would be this document's own structure. One inside a `#` doc
-                // comment is the package author's sample — kafka documents `producer->send` that way — and every
-                // fence the corpus carries is of that second kind.
-                Assert.assertFalse(Pattern.compile("^\\s*```", Pattern.MULTILINE).matcher(document).find(),
-                        slug + ": a fence at line start in the code register");
-                Assert.assertFalse(document.contains("<!-- bal discover"),
-                        slug + ": a report marker in the code register");
-                for (String line : document.split("\n", -1)) {
-                    // The tool's own voice is `//`; everything else is a declaration or the package's `#` docs,
-                    // and those have to be findable in the API document verbatim.
-                    if (line.isBlank() || line.stripLeading().startsWith("//")) {
-                        continue;
-                    }
-                    Assert.assertTrue(snapshot.contains(line.stripLeading()),
-                            slug + " " + scope.verb() + " -r prints a line api does not:\n  " + line);
-                }
-            }
-        }
     }
 
     // -----------------------------------------------------------------------
@@ -371,7 +316,7 @@ public class ViewsAgreeTest {
     }
 
     // -----------------------------------------------------------------------
-    // 6. -r terminates, does not repeat, and stays bounded
+    // 5. Closures terminate, do not repeat, and stay bounded
     // -----------------------------------------------------------------------
 
     /**
@@ -448,29 +393,29 @@ public class ViewsAgreeTest {
     }
 
     @Test
-    public void aResolvedAnswerCanStartFromAFunctionAndReachesTheIncludedRecordParameter() {
-        // The whole reason `-r` moved off `type`. The caches DELETE on github takes
-        // `*ActionsDeleteActionsCacheByKeyQueries` — an included record whose FIELDS are the call's named
-        // arguments — and no signature line spells those out, so the flow used to cost two calls and the design
-        // sample that skipped it invented two parameters instead.
+    public void aSingleResultReachesTheIncludedRecordParameterItNames() {
+        // The caches DELETE on github takes `*ActionsDeleteActionsCacheByKeyQueries` — an included record whose
+        // FIELDS are the call's named arguments — and no signature line spells those out, so the flow used to cost
+        // two calls and the design sample that skipped it invented two parameters instead.
         LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__github");
-        Result<Containers.Answer> view = Containers.render(context, Surface.Scope.CLIENT,
-                new Containers.Options(
-                        List.of("Client", "delete", "repos/{owner}/{repo}/actions/caches"),
-                        null, true, false, 1));
-        Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
-        Assert.assertTrue(view.value() instanceof Containers.Answer.Markdown,
-                "the code register is always Markdown");
-        String document = ((Containers.Answer.Markdown) view.value()).text();
-        Assert.assertTrue(document.contains("resource function delete repos/[string owner]/[string repo]"
-                + "/actions/caches("), document);
-        Assert.assertTrue(document.contains("*ActionsDeleteActionsCacheByKeyQueries queries"), document);
-        Assert.assertTrue(document.contains("public type ActionsDeleteActionsCacheByKeyQueries record"),
-                document);
-        Assert.assertTrue(document.contains("public type ActionsCacheList record"), document);
+        DiscoverResult view = expectAnswer(Containers.render(context, Surface.Scope.CLIENT,
+                new Containers.Options(List.of("Client", "delete", "repos/{owner}/{repo}/actions/caches"))),
+                "caches delete");
+        Assert.assertTrue(view instanceof DiscoverResult.Signature, view.toString());
+        DiscoverResult.Signature signature = (DiscoverResult.Signature) view;
+        Assert.assertTrue(signature.declaration().contains(
+                "resource function delete repos/[string owner]/[string repo]/actions/caches("),
+                signature.declaration());
+        Assert.assertTrue(signature.declaration().contains("*ActionsDeleteActionsCacheByKeyQueries queries"),
+                signature.declaration());
+        String types = signature.types().stream()
+                .map(DiscoverResult.Signature.Type::declaration)
+                .reduce("", (left, right) -> left + "\n" + right);
+        Assert.assertTrue(types.contains("public type ActionsDeleteActionsCacheByKeyQueries record"), types);
+        Assert.assertTrue(types.contains("public type ActionsCacheList record"), types);
         // And the field the design sample re-spelled as `key` keeps its apostrophe, because it is quoted rather
         // than re-written: `key` is a Ballerina keyword.
-        Assert.assertTrue(document.contains("'key?;"), document);
+        Assert.assertTrue(types.contains("'key?;"), types);
     }
 
     @Test

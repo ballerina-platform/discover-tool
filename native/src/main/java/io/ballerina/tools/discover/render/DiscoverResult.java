@@ -28,15 +28,9 @@ import java.util.List;
  * <p>Field names follow the RFC's own worked examples wherever one exists ({@code buckets}, {@code groups}/
  * {@code name}/{@code count}, {@code resources}/{@code path}/{@code accessors}, {@code methods}, {@code shown}/
  * {@code total}/{@code next}/{@code call}). {@link ContainerRoster} has no RFC example to match — several
- * containers in one bucket is existing, pre-RFC behaviour — so its field names are this rewrite's own choice.
- *
- * <p>Still not defined here: a single fully-resolved signature. {@code Containers} keeps rendering that case
- * (an exact one-of-one match) through its existing rich Markdown — declaration syntax, doc comments, and the
- * type closure the signature names — rather than folding it into this IR now. That is a real, tested capability
- * with no ceiling problem to solve (it is already exactly one result), so the RFC-alignment plan's item 4 scope
- * (the output-size ceiling, resource grouping, pagination and {@code --filter}) does not require touching it;
- * giving it a proper structured JSON shape of its own is left as a follow-up rather than decided under this
- * item's time pressure.
+ * containers in one bucket is existing, pre-RFC behaviour — so its field names are this rewrite's own choice, as
+ * are those of every other shape the RFC shows no example for ({@link Signature}, {@link MixedListing},
+ * {@link NoMatch}, {@link Owners}, {@link EmptyBucket}).
  *
  * @since 0.1.0
  */
@@ -233,5 +227,129 @@ public sealed interface DiscoverResult {
          * @param call the command that opens it
          */
         public record Chunk(int number, String title, int lines, String call) { }
+    }
+
+    /**
+     * Exactly one callable — the terminal answer of a drill-down, e.g. {@code client "gists/'public" get}.
+     *
+     * @param container the container that declares it, or {@code null} for a module-level function
+     * @param kind {@code resource}, {@code remote}, {@code normal}, {@code constructor} or {@code function} (a
+     *     module-level one)
+     * @param name the method's name ({@code init} for a constructor), or {@code null} for a resource
+     * @param accessor a resource's accessor, or {@code null} otherwise
+     * @param path a resource's path, {@code :name}-spelled for parameters, or {@code null} otherwise
+     * @param form how it is called: {@code ->} or {@code .}
+     * @param declaration the Ballerina declaration with its doc comment, quoted verbatim from the shared renderer
+     * @param params its parameters, in declaration order — a resource's path parameters live in {@code path}
+     * @param returns its return type, or {@code null} when it returns nothing
+     * @param deprecated whether calling it is discouraged
+     * @param types the declarations its signature names, one level deep, within the closure budget
+     * @param omitted the names the closure budget left out of {@code types}
+     * @param documented other entries a {@code --filter} matched only in their documentation
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     * @param note kind tolerance, a path advisory or a service's listener, joined — or {@code null}
+     */
+    record Signature(
+            String container, String kind, String name, String accessor, String path, String form,
+            String declaration, List<Parameter> params, String returns, boolean deprecated,
+            List<Type> types, List<String> omitted, List<String> documented, String warning, String note)
+            implements DiscoverResult {
+
+        /**
+         * @param name the parameter's name
+         * @param type its type, qualified with the module prefix it needs
+         * @param defaultValue its default expression, or {@code null} when it has none
+         * @param kind {@code inclusion} or {@code rest} for those forms, {@code null} for a plain parameter
+         * @param description its own documentation, or empty
+         */
+        public record Parameter(String name, String type, String defaultValue, String kind, String description) { }
+
+        /**
+         * @param name the declared name
+         * @param declaration the declaration, verbatim
+         */
+        public record Type(String name, String declaration) { }
+    }
+
+    /**
+     * A container answering to both {@code ->path.accessor()} and {@code ->name()}/{@code .name()} — the
+     * {@link ResourceList} and {@link MethodList} shapes side by side, split by call form.
+     *
+     * @param resources the resource paths shown
+     * @param remote the remote method names shown, alphabetical
+     * @param normal the plain method names shown, alphabetical
+     * @param shown how many entries across all three are in this response
+     * @param total how many exist across all three
+     * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
+     * @param documented entries a {@code --filter} matched only in their documentation
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     * @param note the same joined advisory {@link ResourceList#note} carries, or {@code null}
+     */
+    record MixedListing(
+            List<ResourceList.Resource> resources, List<String> remote, List<String> normal, int shown,
+            int total, String next, List<String> documented, String warning, String note)
+            implements DiscoverResult { }
+
+    /**
+     * A selector or {@code --filter} that matched nothing — exit 0, with what IS there.
+     *
+     * @param requested the selector or filter keyword, as typed
+     * @param container the container it was looked for in, or {@code null} for a whole bucket
+     * @param candidates the closest names that do exist
+     * @param paths where a trailing path segment occurs, when it occurs in several places and none was picked
+     * @param available the listing the same command gives without the selector, or {@code null} when
+     *     {@code paths} already names the way forward
+     * @param next the command that lists everything there
+     * @param documented entries a {@code --filter} matched only in their documentation
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     * @param note the same joined advisory every other container answer carries, or {@code null}
+     */
+    record NoMatch(
+            String requested, String container, List<String> candidates, List<Alternative> paths,
+            DiscoverResult available, String next, List<String> documented, String warning, String note)
+            implements DiscoverResult {
+
+        /**
+         * @param path one full path carrying the requested segment
+         * @param call the command that opens it
+         */
+        public record Alternative(String path, String call) { }
+    }
+
+    /**
+     * One member name declared on several containers in a bucket — which one is the caller's choice, not a guess.
+     *
+     * @param requested the member name, as typed
+     * @param owners the containers declaring it, up to the ceiling
+     * @param total how many containers declare it
+     * @param next a command template naming the slot to fill, or {@code null} when nothing was cut off
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     */
+    record Owners(String requested, List<Owner> owners, int total, String next, String warning)
+            implements DiscoverResult {
+
+        /**
+         * @param name the container's name
+         * @param matches how many of its entries the selector matched
+         * @param call the command that opens the member on that container
+         */
+        public record Owner(String name, int matches, String call) { }
+    }
+
+    /**
+     * A bucket this package declares nothing in, and the buckets that do hold its callable surface.
+     *
+     * @param bucket the bucket asked for
+     * @param elsewhere every other callable bucket with something in it
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     */
+    record EmptyBucket(String bucket, List<Elsewhere> elsewhere, String warning) implements DiscoverResult {
+
+        /**
+         * @param bucket the bucket's name
+         * @param count containers in it — functions, for {@code funcs}
+         * @param call the command that opens it
+         */
+        public record Elsewhere(String bucket, int count, String call) { }
     }
 }

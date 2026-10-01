@@ -1,0 +1,13 @@
+== client ==
+Resources (->):
+:...path — post, put, patch, delete, head, get, options
+Remote (->): delete, get, head, options, patch, post, put
+== service ==
+service: none in this package
+Elsewhere: client (1)
+== class ==
+class: none in this package
+Elsewhere: client (1)
+== funcs ==
+funcs: none in this package
+Elsewhere: client (1)

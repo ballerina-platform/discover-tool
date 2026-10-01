@@ -1,0 +1,17 @@
+{"containers":[
+{"name":"Caller","remote":3,"call":"bal discover ballerinax/kafka client Caller"},
+{"name":"Consumer","remote":24,"call":"bal discover ballerinax/kafka client Consumer"},
+{"name":"Producer","remote":5,"call":"bal discover ballerinax/kafka client Producer"}
+],"shown":3,"total":3}
+{"methods":[],"shown":0,"total":0,"note":"binds to kafka:Listener"}
+{"containers":[
+{"name":"AvroDeserializer","normal":1,"call":"bal discover ballerinax/kafka class AvroDeserializer"},
+{"name":"AvroSerializer","normal":1,"call":"bal discover ballerinax/kafka class AvroSerializer"},
+{"name":"Deserializer","normal":1,"call":"bal discover ballerinax/kafka class Deserializer"},
+{"name":"Serializer","normal":1,"call":"bal discover ballerinax/kafka class Serializer"}
+],"shown":4,"total":4}
+{"bucket":"funcs","total":0,"elsewhere":[
+{"bucket":"client","count":3,"call":"bal discover ballerinax/kafka client"},
+{"bucket":"service","count":1,"call":"bal discover ballerinax/kafka service"},
+{"bucket":"class","count":4,"call":"bal discover ballerinax/kafka class"}
+]}

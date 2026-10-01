@@ -1,0 +1,28 @@
+{"resources":[
+{"path":":...path","accessors":[
+"post",
+"put",
+"patch",
+"delete",
+"head",
+"get",
+"options"
+]}
+],"remote":[
+"delete",
+"get",
+"head",
+"options",
+"patch",
+"post",
+"put"
+],"normal":[],"shown":8,"total":8}
+{"bucket":"service","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}
+]}
+{"bucket":"class","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}
+]}
+{"bucket":"funcs","total":0,"elsewhere":[
+{"bucket":"client","count":1,"call":"bal discover ballerinax/sap client"}
+]}

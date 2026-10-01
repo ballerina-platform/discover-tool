@@ -284,4 +284,187 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.getAsJsonArray("chunks").size(), 0);
         Assert.assertEquals(json.get("total").getAsInt(), 0);
     }
+
+    // -----------------------------------------------------------------------
+    // Signature
+    // -----------------------------------------------------------------------
+
+    private static DiscoverResult.Signature getPublicGists(List<DiscoverResult.Signature.Type> types,
+            List<String> omitted, String note) {
+        return new DiscoverResult.Signature("Client", "resource", null, "get", "gists/'public", "->",
+                "resource function get gists/'public(map<string|string[]> headers = {}, *GistsListPublicQueries "
+                        + "queries) returns BaseGist[]|error;",
+                List.of(new DiscoverResult.Signature.Parameter("headers", "map<string|string[]>", "{}", null, ""),
+                        new DiscoverResult.Signature.Parameter(
+                                "queries", "GistsListPublicQueries", null, "inclusion", "Queries to send")),
+                "BaseGist[]|error", false, types, omitted, List.of(), null, note);
+    }
+
+    @Test
+    public void aSignatureIsTheBareDeclarationInTextAndStructuredInJson() {
+        DiscoverResult result = getPublicGists(List.of(), List.of(), null);
+        Assert.assertEquals(TextRenderer.render(result),
+                "resource function get gists/'public(map<string|string[]> headers = {}, *GistsListPublicQueries "
+                        + "queries) returns BaseGist[]|error;");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("container").getAsString(), "Client");
+        Assert.assertEquals(json.get("kind").getAsString(), "resource");
+        Assert.assertFalse(json.has("name"), "a resource is addressed by path and accessor, not a name");
+        Assert.assertEquals(json.get("accessor").getAsString(), "get");
+        Assert.assertEquals(json.get("path").getAsString(), "gists/'public");
+        Assert.assertEquals(json.get("form").getAsString(), "->");
+        Assert.assertEquals(json.get("returns").getAsString(), "BaseGist[]|error");
+        JsonArray params = json.getAsJsonArray("params");
+        Assert.assertEquals(params.get(0).getAsJsonObject().get("default").getAsString(), "{}");
+        Assert.assertFalse(params.get(0).getAsJsonObject().has("kind"), "a plain parameter carries no kind");
+        Assert.assertFalse(params.get(0).getAsJsonObject().has("description"), "an empty description is omitted");
+        Assert.assertEquals(params.get(1).getAsJsonObject().get("kind").getAsString(), "inclusion");
+        Assert.assertEquals(json.getAsJsonArray("types").size(), 0);
+        Assert.assertFalse(json.has("omitted"));
+        Assert.assertFalse(json.has("deprecated"), "only a deprecated callable says so");
+    }
+
+    @Test
+    public void aSignaturesTypesFollowItAndWhatTheBudgetLeftOutIsNamed() {
+        DiscoverResult result = getPublicGists(
+                List.of(new DiscoverResult.Signature.Type("BaseGist", "public type BaseGist record {|\n|};")),
+                List.of("GistFile"), "relocated to `gists/'public`");
+        Assert.assertEquals(TextRenderer.render(result), "Note: relocated to `gists/'public`\n"
+                + "resource function get gists/'public(map<string|string[]> headers = {}, *GistsListPublicQueries "
+                + "queries) returns BaseGist[]|error;\n\n"
+                + "Types it names (1):\n\n"
+                + "public type BaseGist record {|\n|};\n\n"
+                + "1 more past the closure budget, not shown: GistFile");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        JsonObject type = json.getAsJsonArray("types").get(0).getAsJsonObject();
+        Assert.assertEquals(type.get("name").getAsString(), "BaseGist");
+        Assert.assertEquals(type.get("declaration").getAsString(), "public type BaseGist record {|\n|};");
+        Assert.assertEquals(json.getAsJsonArray("omitted").get(0).getAsString(), "GistFile");
+        Assert.assertEquals(json.get("note").getAsString(), "relocated to `gists/'public`");
+    }
+
+    // -----------------------------------------------------------------------
+    // MixedListing
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void aMixedListingIsSectionedByCallFormInTextAndThreeArraysInJson() {
+        DiscoverResult result = new DiscoverResult.MixedListing(
+                List.of(new DiscoverResult.ResourceList.Resource(":...path", List.of("get", "post"), null)),
+                List.of("execute", "get"), List.of("getCookieStore"), 4, 4, null, List.of(), null, null);
+        Assert.assertEquals(TextRenderer.render(result), "Resources (->):\n:...path — get, post\n"
+                + "Remote (->): execute, get\n"
+                + "Normal (.): getCookieStore");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.getAsJsonArray("resources").get(0).getAsJsonObject().get("path").getAsString(),
+                ":...path");
+        Assert.assertEquals(json.getAsJsonArray("remote").toString(), "[\"execute\",\"get\"]");
+        Assert.assertEquals(json.getAsJsonArray("normal").toString(), "[\"getCookieStore\"]");
+        Assert.assertEquals(json.get("shown").getAsInt(), 4);
+        Assert.assertEquals(json.get("total").getAsInt(), 4);
+        Assert.assertFalse(json.has("documented"));
+    }
+
+    @Test
+    public void aTruncatedMixedListingSaysSoAndNamesDocumentationOnlyMatches() {
+        DiscoverResult result = new DiscoverResult.MixedListing(
+                List.of(), List.of("execute"), List.of(), 1, 45, "bal discover pkg client Client --filter <keyword>",
+                List.of("forward"), null, null);
+        Assert.assertEquals(TextRenderer.render(result), "Remote (->): execute\n"
+                + "Matched by documentation only: forward\n"
+                + "... 44 more, narrow further: bal discover pkg client Client --filter <keyword>");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("next").getAsString(), "bal discover pkg client Client --filter <keyword>");
+        Assert.assertEquals(json.getAsJsonArray("documented").get(0).getAsString(), "forward");
+    }
+
+    // -----------------------------------------------------------------------
+    // NoMatch
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void aMissNamesTheClosestNamesAndWhatIsThereInBothRenderings() {
+        DiscoverResult result = new DiscoverResult.NoMatch("sendd", "Producer", List.of("send"), List.of(),
+                new DiscoverResult.MethodList(List.of("close", "send"), 2, 2, null),
+                "bal discover ballerinax/kafka client Producer", List.of(), null, null);
+        Assert.assertEquals(TextRenderer.render(result), "Nothing on Producer matches 'sendd'.\n"
+                + "Did you mean: send\n"
+                + "Available:\n"
+                + "Methods: close, send");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("requested").getAsString(), "sendd");
+        Assert.assertEquals(json.get("container").getAsString(), "Producer");
+        Assert.assertEquals(json.getAsJsonArray("candidates").toString(), "[\"send\"]");
+        Assert.assertEquals(json.getAsJsonObject("available").getAsJsonArray("methods").size(), 2);
+        Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerinax/kafka client Producer");
+        Assert.assertFalse(json.has("paths"), "no ambiguous segment, so no paths key");
+    }
+
+    @Test
+    public void anAmbiguousSegmentListsEveryPathWithTheCommandThatOpensIt() {
+        DiscoverResult result = new DiscoverResult.NoMatch("repos/owner/repo/secrets", "Client", List.of(),
+                List.of(new DiscoverResult.NoMatch.Alternative("repos/:owner/:repo/actions/secrets",
+                                "bal discover ballerinax/github client Client repos/:owner/:repo/actions/secrets"),
+                        new DiscoverResult.NoMatch.Alternative("repos/:owner/:repo/dependabot/secrets",
+                                "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets")),
+                null, "bal discover ballerinax/github client Client", List.of(), null, null);
+        Assert.assertEquals(TextRenderer.render(result), "Nothing on Client matches 'repos/owner/repo/secrets'.\n"
+                + "2 paths carry that segment — pick one:\n"
+                + "  repos/:owner/:repo/actions/secrets\n"
+                + "  repos/:owner/:repo/dependabot/secrets\n"
+                + "List everything: bal discover ballerinax/github client Client");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        JsonArray paths = json.getAsJsonArray("paths");
+        Assert.assertEquals(paths.get(1).getAsJsonObject().get("call").getAsString(),
+                "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets");
+        Assert.assertFalse(json.has("available"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Owners and EmptyBucket
+    // -----------------------------------------------------------------------
+
+    @Test
+    public void aMemberOnSeveralContainersListsTheOwnersInBothRenderings() {
+        DiscoverResult result = new DiscoverResult.Owners("commit",
+                List.of(new DiscoverResult.Owners.Owner(
+                                "Caller", 1, "bal discover ballerinax/kafka client Caller commit"),
+                        new DiscoverResult.Owners.Owner(
+                                "Consumer", 3, "bal discover ballerinax/kafka client Consumer commit")),
+                2, null, null);
+        Assert.assertEquals(TextRenderer.render(result),
+                "'commit' is declared on 2 containers — pick one:\nCaller (1 match), Consumer (3 matches)");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("requested").getAsString(), "commit");
+        JsonObject consumer = json.getAsJsonArray("owners").get(1).getAsJsonObject();
+        Assert.assertEquals(consumer.get("matches").getAsInt(), 3);
+        Assert.assertEquals(consumer.get("call").getAsString(), "bal discover ballerinax/kafka client Consumer commit");
+        Assert.assertEquals(json.get("shown").getAsInt(), 2);
+        Assert.assertEquals(json.get("total").getAsInt(), 2);
+    }
+
+    @Test
+    public void anEmptyBucketNamesTheBucketsThatAreNot() {
+        DiscoverResult result = new DiscoverResult.EmptyBucket("funcs",
+                List.of(new DiscoverResult.EmptyBucket.Elsewhere("client", 3, "bal discover ballerinax/kafka client"),
+                        new DiscoverResult.EmptyBucket.Elsewhere("class", 4, "bal discover ballerinax/kafka class")),
+                null);
+        Assert.assertEquals(TextRenderer.render(result),
+                "funcs: none in this package\nElsewhere: client (3), class (4)");
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("bucket").getAsString(), "funcs");
+        Assert.assertEquals(json.get("total").getAsInt(), 0);
+        JsonObject client = json.getAsJsonArray("elsewhere").get(0).getAsJsonObject();
+        Assert.assertEquals(client.get("bucket").getAsString(), "client");
+        Assert.assertEquals(client.get("count").getAsInt(), 3);
+        Assert.assertEquals(client.get("call").getAsString(), "bal discover ballerinax/kafka client");
+    }
 }

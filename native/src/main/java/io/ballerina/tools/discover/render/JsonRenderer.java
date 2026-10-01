@@ -21,6 +21,8 @@ package io.ballerina.tools.discover.render;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.util.List;
+
 /**
  * {@link DiscoverResult} → the structured JSON an agent's tooling reads by default.
  *
@@ -47,6 +49,11 @@ public final class JsonRenderer {
             case DiscoverResult.MethodList methods -> methodList(methods);
             case DiscoverResult.Readme readme -> readme(readme);
             case DiscoverResult.ReadmeChunks chunks -> readmeChunks(chunks);
+            case DiscoverResult.Signature signature -> signature(signature);
+            case DiscoverResult.MixedListing mixed -> mixedListing(mixed);
+            case DiscoverResult.NoMatch noMatch -> noMatch(noMatch);
+            case DiscoverResult.Owners owners -> owners(owners);
+            case DiscoverResult.EmptyBucket empty -> emptyBucket(empty);
         };
     }
 
@@ -132,21 +139,7 @@ public final class JsonRenderer {
 
     private static JsonObject resourceList(DiscoverResult.ResourceList resources) {
         JsonObject json = new JsonObject();
-        JsonArray array = new JsonArray();
-        for (DiscoverResult.ResourceList.Resource resource : resources.resources()) {
-            JsonObject entry = new JsonObject();
-            entry.addProperty("path", resource.path());
-            JsonArray accessors = new JsonArray();
-            resource.accessors().forEach(accessors::add);
-            entry.add("accessors", accessors);
-            // Deliberately omitted on a multi-accessor entry: a flat `call` field would have to guess which
-            // accessor, which is exactly the "don't guess, be explicit or say nothing" the RFC states for this.
-            if (resource.call() != null) {
-                entry.addProperty("call", resource.call());
-            }
-            array.add(entry);
-        }
-        json.add("resources", array);
+        json.add("resources", resources(resources.resources()));
         json.addProperty("shown", resources.shown());
         json.addProperty("total", resources.total());
         if (resources.next() != null) {
@@ -216,5 +209,157 @@ public final class JsonRenderer {
             json.addProperty("warning", chunks.warning());
         }
         return json;
+    }
+
+    private static JsonArray resources(List<DiscoverResult.ResourceList.Resource> resources) {
+        JsonArray array = new JsonArray();
+        for (DiscoverResult.ResourceList.Resource resource : resources) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("path", resource.path());
+            entry.add("accessors", strings(resource.accessors()));
+            // Deliberately omitted on a multi-accessor entry: a flat `call` field would have to guess which
+            // accessor, which is exactly the "don't guess, be explicit or say nothing" the RFC states for this.
+            if (resource.call() != null) {
+                entry.addProperty("call", resource.call());
+            }
+            array.add(entry);
+        }
+        return array;
+    }
+
+    private static JsonObject signature(DiscoverResult.Signature signature) {
+        JsonObject json = new JsonObject();
+        addIfPresent(json, "container", signature.container());
+        json.addProperty("kind", signature.kind());
+        addIfPresent(json, "name", signature.name());
+        addIfPresent(json, "accessor", signature.accessor());
+        addIfPresent(json, "path", signature.path());
+        json.addProperty("form", signature.form());
+        json.addProperty("declaration", signature.declaration());
+        JsonArray params = new JsonArray();
+        for (DiscoverResult.Signature.Parameter param : signature.params()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", param.name());
+            entry.addProperty("type", param.type());
+            addIfPresent(entry, "default", param.defaultValue());
+            addIfPresent(entry, "kind", param.kind());
+            if (!param.description().isEmpty()) {
+                entry.addProperty("description", param.description());
+            }
+            params.add(entry);
+        }
+        json.add("params", params);
+        addIfPresent(json, "returns", signature.returns());
+        if (signature.deprecated()) {
+            json.addProperty("deprecated", true);
+        }
+        JsonArray types = new JsonArray();
+        for (DiscoverResult.Signature.Type type : signature.types()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", type.name());
+            entry.addProperty("declaration", type.declaration());
+            types.add(entry);
+        }
+        json.add("types", types);
+        addIfNotEmpty(json, "omitted", signature.omitted());
+        addIfNotEmpty(json, "documented", signature.documented());
+        addNotices(json, signature.warning(), signature.note());
+        return json;
+    }
+
+    private static JsonObject mixedListing(DiscoverResult.MixedListing mixed) {
+        JsonObject json = new JsonObject();
+        json.add("resources", resources(mixed.resources()));
+        json.add("remote", strings(mixed.remote()));
+        json.add("normal", strings(mixed.normal()));
+        json.addProperty("shown", mixed.shown());
+        json.addProperty("total", mixed.total());
+        addIfPresent(json, "next", mixed.next());
+        addIfNotEmpty(json, "documented", mixed.documented());
+        addNotices(json, mixed.warning(), mixed.note());
+        return json;
+    }
+
+    private static JsonObject noMatch(DiscoverResult.NoMatch noMatch) {
+        JsonObject json = new JsonObject();
+        json.addProperty("requested", noMatch.requested());
+        addIfPresent(json, "container", noMatch.container());
+        json.add("candidates", strings(noMatch.candidates()));
+        if (!noMatch.paths().isEmpty()) {
+            JsonArray paths = new JsonArray();
+            for (DiscoverResult.NoMatch.Alternative alternative : noMatch.paths()) {
+                JsonObject entry = new JsonObject();
+                entry.addProperty("path", alternative.path());
+                entry.addProperty("call", alternative.call());
+                paths.add(entry);
+            }
+            json.add("paths", paths);
+        }
+        if (noMatch.available() != null) {
+            json.add("available", toJson(noMatch.available()));
+        }
+        json.addProperty("next", noMatch.next());
+        addIfNotEmpty(json, "documented", noMatch.documented());
+        addNotices(json, noMatch.warning(), noMatch.note());
+        return json;
+    }
+
+    private static JsonObject owners(DiscoverResult.Owners owners) {
+        JsonObject json = new JsonObject();
+        json.addProperty("requested", owners.requested());
+        JsonArray array = new JsonArray();
+        for (DiscoverResult.Owners.Owner owner : owners.owners()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", owner.name());
+            entry.addProperty("matches", owner.matches());
+            entry.addProperty("call", owner.call());
+            array.add(entry);
+        }
+        json.add("owners", array);
+        json.addProperty("shown", owners.owners().size());
+        json.addProperty("total", owners.total());
+        addIfPresent(json, "next", owners.next());
+        addIfPresent(json, "warning", owners.warning());
+        return json;
+    }
+
+    private static JsonObject emptyBucket(DiscoverResult.EmptyBucket empty) {
+        JsonObject json = new JsonObject();
+        json.addProperty("bucket", empty.bucket());
+        json.addProperty("total", 0);
+        JsonArray elsewhere = new JsonArray();
+        for (DiscoverResult.EmptyBucket.Elsewhere other : empty.elsewhere()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("bucket", other.bucket());
+            entry.addProperty("count", other.count());
+            entry.addProperty("call", other.call());
+            elsewhere.add(entry);
+        }
+        json.add("elsewhere", elsewhere);
+        addIfPresent(json, "warning", empty.warning());
+        return json;
+    }
+
+    private static JsonArray strings(List<String> values) {
+        JsonArray array = new JsonArray();
+        values.forEach(array::add);
+        return array;
+    }
+
+    private static void addIfPresent(JsonObject json, String field, String value) {
+        if (value != null) {
+            json.addProperty(field, value);
+        }
+    }
+
+    private static void addIfNotEmpty(JsonObject json, String field, List<String> values) {
+        if (!values.isEmpty()) {
+            json.add(field, strings(values));
+        }
+    }
+
+    private static void addNotices(JsonObject json, String warning, String note) {
+        addIfPresent(json, "warning", warning);
+        addIfPresent(json, "note", note);
     }
 }
