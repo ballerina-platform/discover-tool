@@ -514,21 +514,26 @@ public class ViewsAgreeTest {
     public void aServiceTemplateIsWrittenOnlyForATypeTheListenerAccepts() {
         // HTTP-14. Every service object type used to get `service X on new Listener(…)`, and 5 of the 10 the
         // corpus produced do not compile — http's four interceptors and graphql's `Interceptor` are service
-        // objects a listener does not accept. The signal is the listener's `attach` parameter type; the inclusion
-        // that would make the other two subtypes of it is not in the payload at all.
+        // objects a listener does not accept. The signal is the listener's `attach` parameter type plus the
+        // inclusions the recorded source shows: `ServiceContract` and `InterceptableService` write `*Service;`.
         String http = FixtureCorpus.renderFixture("ballerina__http");
-        Assert.assertTrue(http.contains("service http:Service on new http:Listener(port, config) {"), "http");
-        for (String unattachable : List.of("ServiceContract", "RequestInterceptor", "ResponseInterceptor",
-                "RequestErrorInterceptor", "ResponseErrorInterceptor", "InterceptableService")) {
+        for (String attachable : List.of("Service", "ServiceContract", "InterceptableService")) {
+            Assert.assertTrue(http.contains("service http:" + attachable + " on new http:Listener(port, config) {"),
+                    attachable);
+        }
+        for (String unattachable : List.of("RequestInterceptor", "ResponseInterceptor",
+                "RequestErrorInterceptor", "ResponseErrorInterceptor")) {
             Assert.assertFalse(http.contains("service http:" + unattachable + " on new"), unattachable);
             // Named, not silently dropped, and its contract is still the declaration in the Types section.
             Assert.assertTrue(http.contains("//   http:" + unattachable), unattachable);
             Assert.assertTrue(http.contains("public type " + unattachable + " distinct service object {"),
                     unattachable);
         }
+        Assert.assertFalse(http.contains("cannot confirm"), "the source settles every http pairing");
         String graphql = FixtureCorpus.renderFixture("ballerina__graphql");
         Assert.assertTrue(graphql.contains("service graphql:Service on new"), "graphql");
         Assert.assertFalse(graphql.contains("service graphql:Interceptor on new"), "graphql interceptor");
+        Assert.assertTrue(graphql.contains("//   graphql:Interceptor"), "graphql interceptor is named");
         // kafka's one service type IS the attached type, so nothing is withheld and no note is printed.
         String kafka = FixtureCorpus.renderFixture("ballerinax__kafka");
         Assert.assertTrue(kafka.contains("service kafka:Service on new"), "kafka");

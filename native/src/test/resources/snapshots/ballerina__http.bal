@@ -5140,19 +5140,23 @@ service http:Service on new http:Listener(port, config) {
     // readme` reproduces it.
 }
 
-// These service object types are declared above; this reader cannot confirm that http:Listener
-// accepts them, so it writes no attachment template for them:
-//   http:ServiceContract
+service http:ServiceContract on new http:Listener(port, config) {
+    // Central publishes no method contract for this service type. The listener may still require
+    // one — add the resource or remote methods the package's guide shows; `bal discover <org>/<name>
+    // readme` reproduces it.
+}
+
+service http:InterceptableService on new http:Listener(port, config) {
+    # Function to define interceptor pipeline
+    # + return - The `http:Interceptor|http:Interceptor[]`
+    function createInterceptors() returns http:Interceptor|http:Interceptor[]; // Special Agent Note: Interceptor FROM ballerina/http module
+}
+
+// Declared above, but no listener of this package accepts them, so no template is written:
 //   http:RequestInterceptor
 //   http:ResponseInterceptor
 //   http:RequestErrorInterceptor
 //   http:ResponseErrorInterceptor
-//   http:InterceptableService
-// http:Listener.attach takes one specific type. A `distinct service object` type reaches it only
-// by INCLUDING that type, and Central publishes no inclusion for an object type — so some of these
-// do attach and some do not, and the payload cannot say which. An interceptor type, for one, reaches
-// the runtime as a `createInterceptors()` return rather than as an attachment. The package's own
-// guide is where the usage of each is written; `bal discover <org>/<name> readme` reproduces it.
 
 // --- Annotations ---
 

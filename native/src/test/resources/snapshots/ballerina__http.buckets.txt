@@ -16,16 +16,18 @@ ballerina/http · client
 Next: bal discover ballerina/http client <name>
 == service ==
 ballerina/http · service
-7 service types
+3 service types
 
 http:Listener
   Service
   ServiceContract
+  InterceptableService  1 normal
+
+Not attachable to a listener
   RequestInterceptor
   ResponseInterceptor
   RequestErrorInterceptor
   ResponseErrorInterceptor
-  InterceptableService      1 normal
 
 Next: bal discover ballerina/http service <name>
 == class ==

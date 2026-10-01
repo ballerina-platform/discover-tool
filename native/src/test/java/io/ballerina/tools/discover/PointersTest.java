@@ -358,7 +358,7 @@ public class PointersTest {
         }
         if (!text.contains(" " + pkg)) {
             // A cross-package edge, so it has to name a real coordinate and this package must not be it.
-            Assert.assertTrue(Pattern.compile("bal discover \\w+ [\\w.]+/[\\w.]+").matcher(text).find(),
+            Assert.assertTrue(Pattern.compile("bal discover [\\w.]+/[\\w.]+ ").matcher(text).find(),
                     slug + ": `" + text + "` names no package coordinate");
             return false;
         }

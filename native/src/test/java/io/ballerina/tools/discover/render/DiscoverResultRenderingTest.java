@@ -197,6 +197,37 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
+    public void aServiceTypeNoListenerAcceptsIsListedApartAndPagedWithTheRest() {
+        DiscoverResult result = new DiscoverResult.ContainerRoster(
+                List.of(new DiscoverResult.ContainerRoster.Container(
+                        "Service", 0, 0, 0, "http:Listener", "bal discover ballerina/http service Service")),
+                1, new DiscoverResult.Paging(1, 2, 2), "bal discover ballerina/http service --page 2", null,
+                List.of(new DiscoverResult.ContainerRoster.NotAttachable(
+                        "RequestInterceptor", "bal discover ballerina/http service RequestInterceptor")),
+                3);
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "1 container",
+                "",
+                "http:Listener",
+                "  Service",
+                "",
+                "Not attachable to a listener",
+                "  RequestInterceptor",
+                "",
+                "... 2 more (page 1 of 2)",
+                "Next: bal discover ballerina/http service <name>",
+                "Next: bal discover ballerina/http service --page 2"));
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        JsonObject first = json.getAsJsonArray("notAttachable").get(0).getAsJsonObject();
+        Assert.assertEquals(first.get("name").getAsString(), "RequestInterceptor");
+        Assert.assertEquals(first.get("command").getAsString(),
+                "bal discover ballerina/http service RequestInterceptor");
+        Assert.assertEquals(json.get("notAttachableTotal").getAsInt(), 3);
+        Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerina/http service --page 2");
+    }
+
+    @Test
     public void aPagedContainerRosterNamesWhatWasCutInBothRenderings() {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(new DiscoverResult.ContainerRoster.Container(

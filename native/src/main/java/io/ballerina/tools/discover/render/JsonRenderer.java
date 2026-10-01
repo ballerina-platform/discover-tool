@@ -108,6 +108,19 @@ public final class JsonRenderer {
         if (roster.next() != null) {
             json.addProperty("next", roster.next());
         }
+        if (!roster.notAttachable().isEmpty()) {
+            JsonArray notAttachable = new JsonArray();
+            for (DiscoverResult.ContainerRoster.NotAttachable type : roster.notAttachable()) {
+                JsonObject entry = new JsonObject();
+                entry.addProperty("name", type.name());
+                entry.addProperty("command", type.command());
+                notAttachable.add(entry);
+            }
+            json.add("notAttachable", notAttachable);
+        }
+        if (roster.notAttachableTotal() > roster.notAttachable().size()) {
+            json.addProperty("notAttachableTotal", roster.notAttachableTotal());
+        }
         if (roster.warning() != null) {
             json.addProperty("warning", roster.warning());
         }

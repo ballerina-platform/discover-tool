@@ -117,13 +117,29 @@ public sealed interface DiscoverResult {
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
+     * @param notAttachable the {@code service} bucket's service types no listener of the package accepts — still
+     *     addressable by name, listed apart so they are never read as bindable — on this page: they follow the
+     *     bindable containers in one paged listing, so the two together stay under the ceiling
+     * @param notAttachableTotal how many such types the bucket (or the {@code --filter}) selects
      */
-    record ContainerRoster(List<Container> containers, int total, Paging paging, String next, String warning)
-            implements DiscoverResult {
+    record ContainerRoster(List<Container> containers, int total, Paging paging, String next, String warning,
+            List<NotAttachable> notAttachable, int notAttachableTotal) implements DiscoverResult {
 
         public ContainerRoster(List<Container> containers, int total, String next) {
             this(containers, total, null, next, null);
         }
+
+        public ContainerRoster(List<Container> containers, int total, Paging paging, String next, String warning) {
+            this(containers, total, paging, next, warning, List.of(), 0);
+        }
+
+        /**
+         * A service type no listener accepts — an interceptor, or a type a service returns rather than attaches.
+         *
+         * @param name the type's own name
+         * @param command the command that opens it
+         */
+        public record NotAttachable(String name, String command) { }
 
         /**
          * @param name the container's own name

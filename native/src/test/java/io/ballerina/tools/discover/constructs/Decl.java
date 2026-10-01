@@ -182,6 +182,11 @@ public final class Decl {
      * methods — so a synthetic listener without it exercises a shape no real payload has.
      */
     public static Decl listenerAttaching(String attachedType, String name, Decl... initParams) {
+        return listenerAttaching(Node.named(attachedType, "types"), name, initParams);
+    }
+
+    /** A listener whose {@code attach} takes any type expression — a union, an alias, another module's type. */
+    public static Decl listenerAttaching(Node attachedType, String name, Decl... initParams) {
         Decl decl = of(name);
         JsonObject init = method("init", initParams).json();
         decl.json.add("initMethod", init);
@@ -190,7 +195,7 @@ public final class Decl {
         decl.json.add("methods", methods);
         JsonArray lifecycle = new JsonArray();
         lifecycle.add(method("attach",
-                param("s", Node.named(attachedType, "types")),
+                param("s", attachedType),
                 param("name", Node.builtin("string[]|string?"))).json());
         decl.json.add("lifeCycleMethods", lifecycle);
         return decl;

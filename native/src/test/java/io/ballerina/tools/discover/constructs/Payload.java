@@ -150,6 +150,11 @@ public final class Payload {
 
     /** The IR, or an assertion naming where the synthetic payload failed the schema. */
     public Library library() {
+        return Pipeline.build(module());
+    }
+
+    /** The parsed module, before the pipeline — for a case about one of the pipeline's own inputs. */
+    public CentralDocs.Module module() {
         String qualified = module.get("orgName").getAsString() + "/" + module.get("id").getAsString();
         Result<CentralDocs> parsed = Schema.parse(raw(), qualified);
         if (!parsed.isOk()) {
@@ -164,7 +169,7 @@ public final class Payload {
         if (!selected.isOk()) {
             throw new AssertionError("no module named " + qualified + " in the synthetic payload");
         }
-        return Pipeline.build(selected.value());
+        return selected.value();
     }
 
     /** The whole {@code api} document, header and all. */

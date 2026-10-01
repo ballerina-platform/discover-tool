@@ -15,11 +15,10 @@ Normal (.)
 Next: bal discover ballerinax/postgresql client Client <name>
 == service ==
 ballerinax/postgresql · service
-This package declares nothing in service.
+1 service type
 
-Elsewhere
-  client    1  bal discover ballerinax/postgresql client
-  class   125  bal discover ballerinax/postgresql class
+postgresql:CdcListener
+  cdc:Service  bal discover ballerinax/cdc service Service
 == class ==
 ballerinax/postgresql · class
 125 classes
@@ -73,5 +72,6 @@ ballerinax/postgresql · funcs
 This package declares nothing in funcs.
 
 Elsewhere
-  client    1  bal discover ballerinax/postgresql client
-  class   125  bal discover ballerinax/postgresql class
+  client     1  bal discover ballerinax/postgresql client
+  service    1  bal discover ballerinax/postgresql service
+  class    125  bal discover ballerinax/postgresql class
