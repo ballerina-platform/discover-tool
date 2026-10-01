@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.central;
 
+import java.io.InputStream;
 import java.util.Optional;
 
 /**
@@ -36,10 +37,11 @@ public interface HttpTransport {
     Reply get(String url, long timeoutMs);
 
     /**
-     * One binary GET — a package archive rather than a JSON document — with no retries: every caller of this
-     * treats a missing answer as "fall back to what the docs payload says", so the reason is not worth carrying.
+     * One binary GET — a package archive rather than a JSON document — as a stream the caller closes, with no
+     * retries: every caller treats a missing answer as "fall back to what the docs payload says", so the reason is
+     * not worth carrying. {@code timeoutMs} bounds the whole transfer, body included: a read past it fails.
      */
-    default Optional<byte[]> download(String url, long timeoutMs) {
+    default Optional<InputStream> openStream(String url, long timeoutMs) {
         return Optional.empty();
     }
 

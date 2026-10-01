@@ -206,8 +206,8 @@ public class ConstructTest {
             }
         }
 
-        Assert.assertEquals(cases.size(), 86, "the construct matrix changed size");
-        Assert.assertEquals(faithful, 85, "the number of constructs we render faithfully changed");
+        Assert.assertEquals(cases.size(), 81, "the construct matrix changed size");
+        Assert.assertEquals(faithful, 80, "the number of constructs we render faithfully changed");
         Assert.assertEquals(broken, 1, "the number of constructs with an open finding changed");
         Assert.assertEquals(List.copyOf(byFinding.keySet()), PINNED,
                 "the set of findings this suite pins changed; case index: " + byFinding);

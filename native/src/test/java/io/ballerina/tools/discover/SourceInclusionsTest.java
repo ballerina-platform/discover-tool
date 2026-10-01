@@ -30,6 +30,7 @@ import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.model.ObjectInclusions;
 import io.ballerina.tools.discover.source.SourceInclusions;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -38,10 +39,13 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -56,6 +60,31 @@ public class SourceInclusionsTest {
     private static final QualifiedName HTTP = QualifiedName.parse("ballerina/http").value();
 
     private static final Version VERSION = Version.parse("2.16.6").value();
+
+    private static final CentralClient.ResolvedVersion RESOLVED = new CentralClient.ResolvedVersion(VERSION, false);
+
+    /** Central with nothing local to look in — no test here reads a real Ballerina home or distribution. */
+    private static final CentralRepository CENTRAL = CentralRepository.withLocalSources(List.of());
+
+    private final List<Path> made = new ArrayList<>();
+
+    @AfterMethod
+    public void removeTemporaryDirectories() throws IOException {
+        for (Path root : made) {
+            try (Stream<Path> walk = Files.walk(root)) {
+                for (Path path : walk.sorted(Comparator.reverseOrder()).toList()) {
+                    Files.deleteIfExists(path);
+                }
+            }
+        }
+        made.clear();
+    }
+
+    private DocsCache diskCache() throws IOException {
+        Path root = Files.createTempDirectory("discover-inclusions");
+        made.add(root);
+        return DiskCache.at(root, 0700);
+    }
 
     private static final String BALA_URL = "https://files.example/ballerina-http-java21-2.16.6.bala";
 
@@ -121,7 +150,25 @@ public class SourceInclusionsTest {
                 public type Wrapped readonly & (distinct service object { *cdc:Service; });
                 public type Record record {| *Base; |};
                 """)).orElseThrow();
-        Assert.assertEquals(inclusions.byType(), Map.of("Plain", List.of("Base"), "Wrapped", List.of("cdc:Service")));
+        Assert.assertEquals(inclusions.byType(),
+                Map.of("Plain", List.of("Base"), "Wrapped", List.of("ballerinax/cdc:Service")));
+    }
+
+    /** What a prefix stands for is the file's own import, alias included; a prefix nothing imports is dropped. */
+    @Test
+    public void aPrefixIsResolvedThroughItsFilesImports() {
+        ObjectInclusions inclusions = SourceInclusions.parse(Map.of(
+                "a.bal", """
+                        import ballerinax/cdc as c;
+                        public type Audit distinct service object { *c:Service; };
+                        """,
+                "b.bal", """
+                        import ballerinax/googleapis.gmail;
+                        public type Mail service object { *gmail:Service; *unknown:Service; };
+                        """)).orElseThrow();
+        Assert.assertEquals(inclusions.byType(), Map.of(
+                "Audit", List.of("ballerinax/cdc:Service"),
+                "Mail", List.of("ballerinax/googleapis.gmail:Service")));
     }
 
     @Test
@@ -146,38 +193,53 @@ public class SourceInclusionsTest {
 
     @Test
     public void theDerivedAnswerIsCachedSoTheArchiveIsFetchedOnce() throws IOException {
-        Path root = Files.createTempDirectory("discover-inclusions");
-        DocsCache cache = DiskCache.at(root, 0700);
+        DocsCache cache = diskCache();
         FakeTransport transport = central(Optional.of(bala(httpSources())));
 
         Optional<ObjectInclusions> first = SourceInclusions.load(
-                CentralRepository.INSTANCE, HTTP, VERSION, "http", options(transport, cache));
+                CENTRAL, HTTP, RESOLVED, "http", options(transport, cache));
         int calls = transport.calls();
         Optional<ObjectInclusions> second = SourceInclusions.load(
-                CentralRepository.INSTANCE, HTTP, VERSION, "http", options(transport, cache));
+                CENTRAL, HTTP, RESOLVED, "http", options(transport, cache));
 
         Assert.assertTrue(first.isPresent());
         Assert.assertEquals(second, first);
         Assert.assertEquals(transport.calls(), calls, "the second load reached the network");
-        Path entry = root.resolve("v2/inclusions/central/ballerina/http/2.16.6/http.json");
-        Assert.assertEquals(JsonParser.parseString(Files.readString(entry)).getAsJsonObject()
+        DocsCache.DocsKey key = new DocsCache.DocsKey("central", "ballerina", "http", "2.16.6");
+        Assert.assertEquals(cache.readInclusions(key, "http", SourceInclusions.DERIVATION).getAsJsonObject()
                 .getAsJsonArray("ServiceContract").get(0).getAsString(), "Service");
+    }
+
+    /** An answer an older derivation cached is never served: what the reader records may have changed since. */
+    @Test
+    public void anEntryAnOlderDerivationCachedIsNotRead() throws IOException {
+        DocsCache cache = diskCache();
+        DocsCache.DocsKey key = new DocsCache.DocsKey("central", "ballerina", "http", "2.16.6");
+        cache.writeInclusions(key, "http", "0", JsonParser.parseString("{}"));
+        FakeTransport transport = central(Optional.of(bala(httpSources())));
+
+        Optional<ObjectInclusions> read = SourceInclusions.load(
+                CENTRAL, HTTP, RESOLVED, "http", options(transport, cache));
+
+        Assert.assertTrue(read.orElseThrow().byType().containsKey("ServiceContract"));
+        Assert.assertTrue(transport.urls().contains(BALA_URL));
     }
 
     @Test
     public void aDamagedCacheEntryIsAMissAndAFailedFetchIsNotCached() throws IOException {
-        Path root = Files.createTempDirectory("discover-inclusions");
-        DocsCache cache = DiskCache.at(root, 0700);
+        DocsCache cache = diskCache();
         DocsCache.DocsKey key = new DocsCache.DocsKey("central", "ballerina", "http", "2.16.6");
-        cache.writeInclusions(key, "http", JsonParser.parseString("{\"ServiceContract\":[1]}"));
+        String derivation = SourceInclusions.DERIVATION;
+        cache.writeInclusions(key, "http", derivation, JsonParser.parseString("{\"ServiceContract\":[1]}"));
 
-        Assert.assertTrue(SourceInclusions.load(CentralRepository.INSTANCE, HTTP, VERSION, "http",
+        Assert.assertTrue(SourceInclusions.load(CENTRAL, HTTP, RESOLVED, "http",
                 options(central(Optional.empty()), cache)).isEmpty());
-        Assert.assertEquals(cache.readInclusions(key, "http").toString(), "{\"ServiceContract\":[1]}");
+        Assert.assertEquals(cache.readInclusions(key, "http", derivation).toString(), "{\"ServiceContract\":[1]}");
 
-        Assert.assertTrue(SourceInclusions.load(CentralRepository.INSTANCE, HTTP, VERSION, "http",
+        Assert.assertTrue(SourceInclusions.load(CENTRAL, HTTP, RESOLVED, "http",
                 options(central(Optional.of(bala(httpSources()))), cache)).isPresent());
-        Assert.assertTrue(cache.readInclusions(key, "http").getAsJsonObject().has("InterceptableService"));
+        Assert.assertTrue(cache.readInclusions(key, "http", derivation).getAsJsonObject()
+                .has("InterceptableService"));
     }
 
     @Test
@@ -196,8 +258,8 @@ public class SourceInclusionsTest {
             }
 
             @Override
-            public Optional<Map<String, String>> fetchModuleSources(
-                    QualifiedName qualified, Version version, String moduleId, HttpOptions http) {
+            public Optional<Map<String, String>> fetchModuleSources(QualifiedName qualified,
+                    CentralClient.ResolvedVersion resolved, String moduleId, HttpOptions http) {
                 fetched.incrementAndGet();
                 return Optional.of(httpSources());
             }
@@ -215,9 +277,9 @@ public class SourceInclusionsTest {
         DocsCache cache = new MemoryCache();
         HttpOptions cached = HttpOptions.builder().cache(cache).build();
         HttpOptions refreshing = HttpOptions.builder().cache(cache).refresh(true).build();
-        SourceInclusions.load(counting, HTTP, VERSION, "http", cached);
-        SourceInclusions.load(counting, HTTP, VERSION, "http", cached);
-        SourceInclusions.load(counting, HTTP, VERSION, "http", refreshing);
+        SourceInclusions.load(counting, HTTP, RESOLVED, "http", cached);
+        SourceInclusions.load(counting, HTTP, RESOLVED, "http", cached);
+        SourceInclusions.load(counting, HTTP, RESOLVED, "http", refreshing);
         Assert.assertEquals(fetched.get(), 2);
     }
 
@@ -240,13 +302,14 @@ public class SourceInclusionsTest {
         }
 
         @Override
-        public com.google.gson.JsonElement readInclusions(DocsKey key, String module) {
-            return entries.get(key + module);
+        public com.google.gson.JsonElement readInclusions(DocsKey key, String module, String derivation) {
+            return entries.get(key + module + derivation);
         }
 
         @Override
-        public void writeInclusions(DocsKey key, String module, com.google.gson.JsonElement inclusions) {
-            entries.put(key + module, inclusions);
+        public void writeInclusions(
+                DocsKey key, String module, String derivation, com.google.gson.JsonElement inclusions) {
+            entries.put(key + module + derivation, inclusions);
         }
 
         @Override

@@ -537,7 +537,7 @@ public final class CentralClient {
             return Optional.empty();
         }
         return Coordinates.balaUrl(response.value())
-                .flatMap(balaUrl -> options.transport().download(balaUrl, options.timeoutMs()))
+                .flatMap(balaUrl -> options.transport().openStream(balaUrl, options.timeoutMs()))
                 .flatMap(archive -> Bala.moduleSources(archive, moduleId));
     }
 

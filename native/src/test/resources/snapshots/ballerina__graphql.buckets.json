@@ -1,4 +1,4 @@
 {"container":"Client","methods":[{"name":"execute","command":"bal discover ballerina/graphql client Client execute"},{"name":"executeWithType","command":"bal discover ballerina/graphql client Client executeWithType"}],"shown":2,"total":2}
-{"containers":[{"name":"Service","listener":"graphql:Listener","command":"bal discover ballerina/graphql service Service"}],"shown":1,"total":1,"notAttachable":[{"name":"Interceptor","command":"bal discover ballerina/graphql service Interceptor"}]}
+{"containers":[{"name":"Service","listener":"graphql:Listener","command":"bal discover ballerina/graphql service Service"}],"shown":2,"total":2,"notAttachable":[{"name":"Interceptor","command":"bal discover ballerina/graphql service Interceptor"}]}
 {"containers":[{"name":"Context","normal":8,"command":"bal discover ballerina/graphql class Context"},{"name":"Field","normal":7,"command":"bal discover ballerina/graphql class Field"}],"shown":2,"total":2}
 {"methods":[{"name":"__addError","command":"bal discover ballerina/graphql funcs __addError"},{"name":"getSdlString","command":"bal discover ballerina/graphql funcs getSdlString"}],"shown":2,"total":2}

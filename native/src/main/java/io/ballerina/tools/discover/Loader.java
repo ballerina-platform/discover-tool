@@ -26,14 +26,15 @@ import io.ballerina.tools.discover.central.PackageRepository;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.model.Bindings;
 import io.ballerina.tools.discover.model.FromCentral;
-import io.ballerina.tools.discover.model.ObjectInclusions;
+import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.source.SourceInclusions;
 import io.ballerina.tools.discover.views.Readmes;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * The whole capability in two steps: resolve which version to read, then read it once.
@@ -67,11 +68,9 @@ public final class Loader {
      *     several sources considered for ONE lookup, not one source picked ahead of time.
      * @param module the {@code --module} value, or {@code null} for the package's own default module — never a
      *     second fetch: the payload a repository already served for the package carries every module's data
-     * @param readsSource whether the answer shows which listener each service type binds to — the one thing the
-     *     package's source is read for, so every other answer never reads or downloads it
      */
     public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
-            String module, boolean readsSource) {
+            String module) {
 
         public LoadOptions {
             if (repositories.isEmpty()) {
@@ -79,18 +78,8 @@ public final class Loader {
             }
         }
 
-        public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
-                String module) {
-            this(http, projectDir, repositories, module, false);
-        }
-
         public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories) {
             this(http, projectDir, repositories, null);
-        }
-
-        /** The same options, reading the package source when it can settle a service binding. */
-        public LoadOptions readingSource() {
-            return new LoadOptions(http, projectDir, repositories, module, true);
         }
 
         public LoadOptions(HttpOptions http, String projectDir) {
@@ -237,21 +226,31 @@ public final class Loader {
         if (!module.isOk()) {
             return module.cast();
         }
-        // The source is read only for an answer that shows service bindings, and only when it can change them —
-        // never for a package without listeners, nor when every service type is already an attach target.
-        Optional<ObjectInclusions> inclusions = options.readsSource() && Bindings.needsSource(module.value())
-                ? SourceInclusions.load(fetched.repository(), qualified, resolved.version(), module.value().id(),
-                        options.http())
-                : Optional.empty();
+        Library library = Pipeline.build(module.value());
+        Supplier<Library> bound = Bindings.needsSource(module.value())
+                ? memoized(() -> Pipeline.build(module.value(), SourceInclusions.load(
+                        fetched.repository(), qualified, resolved, module.value().id(), options.http())))
+                : () -> library;
 
         return Result.ok(new LoadedPackage(
                 qualified,
                 resolved.version(),
-                Pipeline.build(module.value(), inclusions),
+                library,
                 Readmes.of(module.value()),
                 submodule,
                 submodulesOf(docs, qualified, submodule),
-                unverifiedWarning(resolved.stale())));
+                unverifiedWarning(resolved.stale()),
+                bound));
+    }
+
+    private static <T> Supplier<T> memoized(Supplier<T> compute) {
+        List<T> once = new ArrayList<>(1);
+        return () -> {
+            if (once.isEmpty()) {
+                once.add(compute.get());
+            }
+            return once.get(0);
+        };
     }
 
     /**

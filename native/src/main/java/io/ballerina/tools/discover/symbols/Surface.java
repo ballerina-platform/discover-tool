@@ -235,10 +235,9 @@ public final class Surface {
      * Every service type, each with the listener(s) it binds to — {@link Library#services()} already holds the
      * pairings, so this only has to group them back by service type name.
      *
-     * <p>Sourced from {@link Library#typeDefs()} for the name, description and BARE-NAME methods (the same
-     * declaration {@code type} and the code register quote), and from {@link Library#services()} only for the
-     * listener pairing — {@code services()}' own methods are qualified for the CALLER's module instead, which is
-     * a different rendering job ({@code Documents#renderService}), not a second copy of this one.
+     * <p>Sourced from {@link Library#typeDefs()} for the name, description and methods (the same declaration
+     * {@code type} and the code register quote), and from {@link Library#services()} only for the listener
+     * pairing.
      *
      * <p>A listener whose {@code attach} takes another module's type adds that type too, under the name a caller
      * writes it by ({@code cdc:Service}) and with no members of its own: its contract is the other module's.
@@ -316,6 +315,14 @@ public final class Surface {
         List<Container> normalised = containers.stream()
                 .filter(container -> Names.normalise(container.name()).equals(wanted))
                 .toList();
-        return normalised.size() == 1 ? Optional.of(normalised.get(0)) : Optional.empty();
+        if (normalised.size() == 1) {
+            return Optional.of(normalised.get(0));
+        }
+        // Another module's service type is listed under the name a caller writes it by, `cdc:Service`; its bare
+        // name reaches it too, when nothing else answers to it.
+        List<Container> qualified = containers.stream()
+                .filter(container -> container.name().endsWith(":" + requested))
+                .toList();
+        return normalised.isEmpty() && qualified.size() == 1 ? Optional.of(qualified.get(0)) : Optional.empty();
     }
 }

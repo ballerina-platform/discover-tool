@@ -29,9 +29,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The package source is read for the {@code service} bucket alone — the only answer that shows which listener a
- * service type binds to. {@code ballerina/http} is the case that would read it: four of its seven service types
- * are no listener's attach target.
+ * The package source is read only for an answer that shows a service type — the only answers that say which
+ * listener one binds to — however the caller reached it. {@code ballerina/http} is the case that would read it:
+ * four of its seven service types are no listener's attach target.
  *
  * @since 0.1.0
  */
@@ -87,8 +87,18 @@ public class SourceScopeTest {
         Assert.assertEquals(sourceRequestsOf(argv), List.of(), argv + " asked for the package source");
     }
 
-    @Test
-    public void theServiceBucketDoes() {
-        Assert.assertFalse(sourceRequestsOf(List.of("ballerina/http", "service")).isEmpty());
+    @DataProvider(name = "serviceAnswers")
+    public Object[][] serviceAnswers() {
+        return new Object[][] {
+                {List.of("ballerina/http", "service")},
+                {List.of("ballerina/http", "service", "Service")},
+                {List.of("ballerina/http", "class", "InterceptableService")},
+                {List.of("ballerina/http", "client", "RequestInterceptor")},
+        };
+    }
+
+    @Test(dataProvider = "serviceAnswers")
+    public void anAnswerShowingAServiceTypeDoes(List<String> argv) {
+        Assert.assertFalse(sourceRequestsOf(argv).isEmpty(), argv + " never asked for the package source");
     }
 }

@@ -249,10 +249,10 @@ public final class DiskCache implements DocsCache {
                 List.of(FORMAT, "docs", key.repository(), key.org(), key.name()));
     }
 
-    private Path inclusionsPath(DocsKey key, String module) {
+    private Path inclusionsPath(DocsKey key, String module, String derivation) {
         return entryPath(
-                List.of(key.repository(), key.org(), key.name(), key.version(), module),
-                List.of(FORMAT, "inclusions", key.repository(), key.org(), key.name(), key.version(),
+                List.of(key.repository(), key.org(), key.name(), key.version(), module, derivation),
+                List.of(FORMAT, "inclusions", derivation, key.repository(), key.org(), key.name(), key.version(),
                         module + ".json"));
     }
 
@@ -374,17 +374,17 @@ public final class DiskCache implements DocsCache {
     }
 
     @Override
-    public JsonElement readInclusions(DocsKey key, String module) {
+    public JsonElement readInclusions(DocsKey key, String module, String derivation) {
         if (!usable) {
             return null;
         }
-        Path path = inclusionsPath(key, module);
+        Path path = inclusionsPath(key, module, derivation);
         return path == null ? null : readJson(path);
     }
 
     @Override
-    public void writeInclusions(DocsKey key, String module, JsonElement inclusions) {
-        Path path = inclusionsPath(key, module);
+    public void writeInclusions(DocsKey key, String module, String derivation, JsonElement inclusions) {
+        Path path = inclusionsPath(key, module, derivation);
         if (path == null) {
             return;
         }

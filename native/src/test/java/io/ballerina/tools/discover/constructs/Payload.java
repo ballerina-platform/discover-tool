@@ -92,17 +92,12 @@ public final class Payload {
             "variables",
             "configurables");
 
-    /**
-     * The top-level sections {@link Documents} emits, in order. Matched exactly, because the generic
-     * service form prints a {@code // --- Service (generic) ---} line INSIDE the service section and a
-     * prefix match would treat it as a section of its own.
-     */
+    /** The top-level sections {@link Documents} emits, in order, matched exactly. */
     private static final List<String> SECTIONS = List.of(
             "// --- Types ---",
             "// --- Client ---",
             "// --- Functions ---",
             "// --- Listeners ---",
-            "// --- Service ---",
             "// --- Annotations ---");
 
     private final JsonObject module = new JsonObject();

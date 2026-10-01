@@ -1572,9 +1572,3 @@ public isolated class CdcListener {
     # + return - An `cdc:Error` if the listener cannot be stopped, or `()` if successful
     isolated function immediateStop() returns cdc:Error?; // Special Agent Note: Error FROM ballerinax/cdc module
 }
-
-// --- Service ---
-
-service cdc:Service on new postgresql:CdcListener(config) {
-    // ballerinax/cdc declares this service type's contract: `bal discover ballerinax/cdc service Service`.
-}

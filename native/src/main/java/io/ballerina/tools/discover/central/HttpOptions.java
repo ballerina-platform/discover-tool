@@ -152,6 +152,22 @@ public final class HttpOptions {
                 .build();
     }
 
+    /** The same options, allowing at most {@code value} attempts per request. */
+    public HttpOptions withMaxAttempts(int value) {
+        return builder()
+                .transport(transport)
+                .timeoutMs(timeoutMs)
+                .maxAttempts(value)
+                .budgetMs(budgetMs)
+                .baseDelayMs(baseDelayMs)
+                .cache(cache)
+                .refresh(refresh)
+                .clock(clock)
+                .jitter(jitter)
+                .sleeper(sleeper)
+                .build();
+    }
+
     public long now() {
         return clock.getAsLong();
     }

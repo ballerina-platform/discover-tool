@@ -145,10 +145,7 @@ public final class Cli {
         // `--refresh` is only known once arguments are parsed. The transport and the cache arrive from the process
         // wrapper, so the options are rebuilt here rather than there.
         HttpOptions resolved = http.withRefresh(root.refresh);
-        Loader.LoadOptions base = new Loader.LoadOptions(resolved, projectDir, root.module);
-        // Only the `service` bucket shows which listener a service type binds to. The bucket list and every
-        // `Elsewhere` count are the same without the source: a service type no listener accepts is still counted.
-        Loader.LoadOptions options = "service".equals(bucket) ? base.readingSource() : base;
+        Loader.LoadOptions options = new Loader.LoadOptions(resolved, projectDir, root.module);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified.value(), options);
         if (!loaded.isOk()) {
             return fail(loaded.failure(), streams);

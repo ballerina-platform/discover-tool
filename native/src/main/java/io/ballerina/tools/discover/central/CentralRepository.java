@@ -20,9 +20,9 @@ package io.ballerina.tools.discover.central;
 
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
-import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -39,20 +39,22 @@ import java.util.function.Supplier;
  */
 public final class CentralRepository implements PackageRepository {
 
-    public static final CentralRepository INSTANCE = new CentralRepository(HomeRepository::fromEnvironment);
+    public static final CentralRepository INSTANCE = new CentralRepository(LocalBalas::fromEnvironment);
 
-    private final Supplier<PackageRepository> local;
+    private final Supplier<List<ModuleSources>> local;
 
-    private CentralRepository(Supplier<PackageRepository> local) {
+    private CentralRepository(Supplier<List<ModuleSources>> local) {
         this.local = local;
     }
 
     /**
-     * Central, with {@code local} consulted for module sources before any archive is downloaded — the user's
-     * Ballerina home in production ({@link #INSTANCE}, resolved when first needed), an injected one in a test.
+     * Central, with {@code local} consulted in order for module sources before any archive is downloaded — the
+     * Ballerina home and distribution repositories in production ({@link #INSTANCE}, located when first needed),
+     * injected ones in a test.
      */
-    public static CentralRepository withLocalSources(PackageRepository local) {
-        return new CentralRepository(() -> local);
+    public static CentralRepository withLocalSources(List<ModuleSources> local) {
+        List<ModuleSources> copy = List.copyOf(local);
+        return new CentralRepository(() -> copy);
     }
 
     @Override
@@ -66,11 +68,24 @@ public final class CentralRepository implements PackageRepository {
         return CentralClient.fetchDocs(qualified, resolved, options);
     }
 
+    /**
+     * The local copies first, then Central's archive — fetched once, with no retry, and never for a version the
+     * registry could not confirm: with the network down, every {@code service} lookup would otherwise spend the
+     * retry budget only to fall back to the docs payload anyway.
+     */
     @Override
     public Optional<Map<String, String>> fetchModuleSources(
-            QualifiedName qualified, Version version, String moduleId, HttpOptions options) {
-        return local.get().fetchModuleSources(qualified, version, moduleId, options)
-                .or(() -> CentralClient.fetchModuleSources(qualified, version, moduleId, options));
+            QualifiedName qualified, CentralClient.ResolvedVersion resolved, String moduleId, HttpOptions options) {
+        for (ModuleSources candidate : local.get()) {
+            Optional<Map<String, String>> found = candidate.moduleSources(qualified, resolved.version(), moduleId,
+                    options);
+            if (found.isPresent()) {
+                return found;
+            }
+        }
+        return resolved.stale()
+                ? Optional.empty()
+                : CentralClient.fetchModuleSources(qualified, resolved.version(), moduleId, options.withMaxAttempts(1));
     }
 
     @Override

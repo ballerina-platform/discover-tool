@@ -20,6 +20,8 @@ package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.central.HttpTransport;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -88,9 +90,9 @@ final class FakeTransport implements HttpTransport {
     }
 
     @Override
-    public Optional<byte[]> download(String url, long timeoutMs) {
+    public Optional<InputStream> openStream(String url, long timeoutMs) {
         urls.add(url);
-        return download.apply(url);
+        return download.apply(url).map(ByteArrayInputStream::new);
     }
 
     @Override

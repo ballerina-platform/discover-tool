@@ -20,6 +20,7 @@ package io.ballerina.tools.discover.views;
 
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
+import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
@@ -193,6 +194,9 @@ public final class Containers {
 
     private static Result<DiscoverResult> render(
             LoadedPackage loaded, Surface.Scope scope, Options options, String note) {
+        if (scope == Surface.Scope.SERVICE) {
+            loaded = loaded.withBindings();
+        }
         List<Surface.Container> containers = Surface.of(loaded.library(), scope);
         if (containers.isEmpty()) {
             return elsewhere(loaded, scope, options);
@@ -363,7 +367,7 @@ public final class Containers {
             return null;
         }
         return pairings.stream()
-                .map(service -> service.listener().name())
+                .map(Service::listener)
                 .distinct()
                 .collect(Collectors.joining(", "));
     }
@@ -380,12 +384,47 @@ public final class Containers {
         Optional<Service> foreign = foreignPairing(container);
         if (foreign.isPresent()) {
             return "binds to " + names + "; declared in " + foreign.get().declaredIn().map(ModuleRef::coordinate)
-                    .orElse("") + " — " + foreignCommand(foreign.get());
+                    .orElse("") + " — " + foreignCommand(loaded, foreign.get());
         }
-        boolean allConfirmed = container.pairings().stream().allMatch(Service::isAttachable);
-        return allConfirmed
+        String unconfirmed = unconfirmedReason(container);
+        return unconfirmed == null
                 ? "binds to " + names
-                : "binds to " + names + " — not confirmed by the package's own attach() signature";
+                : "may bind to " + names + " — not confirmed: " + unconfirmed;
+    }
+
+    /** Why a container's pairing is not confirmed, or {@code null} when every one of them is. */
+    private static String unconfirmedReason(Surface.Container container) {
+        for (Service pairing : container.pairings()) {
+            switch (pairing.binding()) {
+                case SOURCE_UNAVAILABLE -> {
+                    return "the package source, which shows which service types include the listener's attach() "
+                            + "type, was unavailable";
+                }
+                case NO_ATTACH_EVIDENCE -> {
+                    return "the listener publishes no attach() signature to read its service type from";
+                }
+                case CONFIRMED, NONE -> {
+                }
+            }
+        }
+        return null;
+    }
+
+    /** {@link #unconfirmedReason}, as the short label a roster groups such service types under. */
+    private static String unconfirmedLabel(Surface.Container container) {
+        for (Service pairing : container.pairings()) {
+            switch (pairing.binding()) {
+                case SOURCE_UNAVAILABLE -> {
+                    return "package source unavailable";
+                }
+                case NO_ATTACH_EVIDENCE -> {
+                    return "listener publishes no attach()";
+                }
+                case CONFIRMED, NONE -> {
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -484,6 +523,7 @@ public final class Containers {
                         (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
                         (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
                         listenerNames(container),
+                        unconfirmedLabel(container),
                         openCommand(loaded, scope, container, options)))
                 .toList();
         List<DiscoverResult.ContainerRoster.NotAttachable> notAttachable =
@@ -491,8 +531,8 @@ public final class Containers {
                         .map(container -> new DiscoverResult.ContainerRoster.NotAttachable(
                                 container.name(), openCommand(loaded, scope, container, options)))
                         .toList();
-        return Result.ok(new DiscoverResult.ContainerRoster(items, bindable.size(), window.paging(),
-                window.next(command), loaded.warning(), notAttachable, unattachable.size()));
+        return Result.ok(new DiscoverResult.ContainerRoster(items, bindable.size() + unattachable.size(),
+                window.paging(), window.next(command), loaded.warning(), notAttachable, unattachable.size()));
     }
 
     private static boolean namedByFilter(Surface.Container container, Options options) {
@@ -508,7 +548,7 @@ public final class Containers {
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, Options options) {
         Optional<Service> foreign = foreignPairing(container);
         if (foreign.isPresent()) {
-            return foreignCommand(foreign.get());
+            return foreignCommand(loaded, foreign.get());
         }
         return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + container.name()
                 + (namedByFilter(container, options) ? "" : filterArgument(options));
@@ -518,9 +558,20 @@ public final class Containers {
         return container.pairings().stream().filter(service -> service.declaredIn().isPresent()).findFirst();
     }
 
-    private static String foreignCommand(Service service) {
-        return "bal discover " + service.declaredIn().map(ModuleRef::coordinate).orElse("") + " service "
-                + service.name();
+    /**
+     * The command that opens another module's service type in its own package. Unpinned, as every command this
+     * tool prints is. A module of THIS package — a sibling of the one being read — is reached through
+     * {@code --module}, since the package boundary is known; another package's dotted module path is passed as
+     * written, and its version lookup walks up to the package that contains it.
+     */
+    private static String foreignCommand(LoadedPackage loaded, Service service) {
+        ModuleRef module = service.declaredIn().orElseThrow();
+        QualifiedName pkg = loaded.qualified();
+        String target = module.coordinate();
+        if (module.orgName().equals(pkg.org()) && module.moduleName().startsWith(pkg.name() + ".")) {
+            target = pkg.qualified() + " --module " + module.moduleName().substring(pkg.name().length() + 1);
+        }
+        return "bal discover " + target + " service " + service.name();
     }
 
     /**
@@ -794,6 +845,13 @@ public final class Containers {
     private static Result<DiscoverResult> answer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, String note) {
+        if (container.scope() == Surface.Scope.SERVICE) {
+            // However the caller reached it — `class Interceptor` as well as `service Interceptor` — a service
+            // type's answer says which listener it binds to, and that is settled from the source.
+            loaded = loaded.withBindings();
+            container = Surface.byName(Surface.of(loaded.library(), Surface.Scope.SERVICE), container.name())
+                    .orElse(container);
+        }
         note = mergeNotes(note, listenerNote(loaded, container));
         List<Entry> selected = select(container, selectors);
         List<String> documented = List.of();

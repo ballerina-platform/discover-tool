@@ -836,14 +836,6 @@ public isolated class Listener {
     isolated function detach(Service 'service) returns error?;
 }
 
-// --- Service ---
-
-service kafka:Service on new kafka:Listener(bootstrapServers, config) {
-    // Central publishes no method contract for this service type. The listener may still require
-    // one — add the resource or remote methods the package's guide shows; `bal discover <org>/<name>
-    // readme` reproduces it.
-}
-
 // --- Annotations ---
 
 # The annotation which is used to define the payload parameter in the `onConsumerRecord` service method.

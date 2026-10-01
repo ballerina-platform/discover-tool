@@ -22,6 +22,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.ballerina.compiler.syntax.tree.DistinctTypeDescriptorNode;
+import io.ballerina.compiler.syntax.tree.ImportDeclarationNode;
 import io.ballerina.compiler.syntax.tree.IntersectionTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.ModuleMemberDeclarationNode;
 import io.ballerina.compiler.syntax.tree.ModulePartNode;
@@ -34,8 +35,8 @@ import io.ballerina.compiler.syntax.tree.SyntaxTree;
 import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
 import io.ballerina.compiler.syntax.tree.TypeReferenceNode;
 import io.ballerina.tools.discover.QualifiedName;
-import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.cache.DocsCache;
+import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.PackageRepository;
 import io.ballerina.tools.discover.model.ObjectInclusions;
@@ -61,31 +62,42 @@ import java.util.Optional;
  */
 public final class SourceInclusions {
 
+    /**
+     * Which derivation produced a cached answer. Bumped whenever what {@link #parse} records changes, so an answer
+     * an older reader cached is never served in place of what this one would derive.
+     */
+    public static final String DERIVATION = "2";
+
     private SourceInclusions() {
     }
 
     /**
-     * The inclusions of {@code moduleId} at {@code version}, from the cache when it holds them, otherwise from
+     * The inclusions of {@code moduleId} at the resolved version, from the cache when it holds them, otherwise from
      * {@code repository}'s published source — and then cached, since a version's source never changes.
      */
     public static Optional<ObjectInclusions> load(PackageRepository repository, QualifiedName qualified,
-            Version version, String moduleId, HttpOptions options) {
+            CentralClient.ResolvedVersion resolved, String moduleId, HttpOptions options) {
         DocsCache cache = options.cache();
-        DocsCache.DocsKey key =
-                new DocsCache.DocsKey(repository.id(), qualified.org(), qualified.name(), version.text());
+        DocsCache.DocsKey key = new DocsCache.DocsKey(
+                repository.id(), qualified.org(), qualified.name(), resolved.version().text());
         if (!options.refresh()) {
-            Optional<ObjectInclusions> cached = fromJson(cache.readInclusions(key, moduleId));
+            Optional<ObjectInclusions> cached = fromJson(cache.readInclusions(key, moduleId, DERIVATION));
             if (cached.isPresent()) {
                 return cached;
             }
         }
-        Optional<ObjectInclusions> read = repository.fetchModuleSources(qualified, version, moduleId, options)
+        Optional<ObjectInclusions> read = repository.fetchModuleSources(qualified, resolved, moduleId, options)
                 .flatMap(SourceInclusions::parse);
-        read.ifPresent(inclusions -> cache.writeInclusions(key, moduleId, toJson(inclusions)));
+        read.ifPresent(inclusions -> cache.writeInclusions(key, moduleId, DERIVATION, toJson(inclusions)));
         return read;
     }
 
-    /** Every object type declared across {@code files} that includes something, with what it includes. */
+    /**
+     * Every object type declared across {@code files} that includes something, with what it includes: a bare
+     * name for this module's own type, {@code org/module:Name} for another module's — the prefix a file wrote
+     * resolved through that file's own imports, so {@code import ballerinax/cdc as c; *c:Service;} and
+     * {@code *cdc:Service;} record the same thing. A prefix no import declares is dropped.
+     */
     public static Optional<ObjectInclusions> parse(Map<String, String> files) {
         try {
             Map<String, List<String>> byType = new LinkedHashMap<>();
@@ -98,6 +110,7 @@ public final class SourceInclusions {
 
     private static void collect(SyntaxTree tree, Map<String, List<String>> byType) {
         ModulePartNode root = tree.rootNode();
+        Map<String, String> imports = imports(root);
         for (ModuleMemberDeclarationNode member : root.members()) {
             if (!(member instanceof TypeDefinitionNode definition)) {
                 continue;
@@ -106,7 +119,7 @@ public final class SourceInclusions {
                 List<String> included = new ArrayList<>();
                 for (Node objectMember : object.members()) {
                     if (objectMember instanceof TypeReferenceNode reference) {
-                        nameOf(reference.typeName()).ifPresent(included::add);
+                        nameOf(reference.typeName(), imports).ifPresent(included::add);
                     }
                 }
                 if (!included.isEmpty()) {
@@ -114,6 +127,30 @@ public final class SourceInclusions {
                 }
             });
         }
+    }
+
+    /** Each prefix a file's imports put in scope, to the {@code org/module} it names. */
+    private static Map<String, String> imports(ModulePartNode root) {
+        Map<String, String> imports = new LinkedHashMap<>();
+        for (ImportDeclarationNode declaration : root.imports()) {
+            if (declaration.orgName().isEmpty()) {
+                continue;
+            }
+            List<String> segments = new ArrayList<>();
+            declaration.moduleName().forEach(segment -> segments.add(unquoted(segment.text())));
+            if (segments.isEmpty()) {
+                continue;
+            }
+            String prefix = declaration.prefix()
+                    .map(alias -> unquoted(alias.prefix().text()))
+                    .orElse(segments.get(segments.size() - 1));
+            imports.put(prefix, declaration.orgName().get().orgName().text() + "/" + String.join(".", segments));
+        }
+        return imports;
+    }
+
+    private static String unquoted(String identifier) {
+        return identifier.startsWith("'") ? identifier.substring(1) : identifier;
     }
 
     private static Optional<ObjectTypeDescriptorNode> objectOf(Node type) {
@@ -127,11 +164,12 @@ public final class SourceInclusions {
         };
     }
 
-    private static Optional<String> nameOf(Node reference) {
+    private static Optional<String> nameOf(Node reference, Map<String, String> imports) {
         return switch (reference) {
             case SimpleNameReferenceNode simple -> Optional.of(simple.name().text());
             case QualifiedNameReferenceNode qualified ->
-                    Optional.of(qualified.modulePrefix().text() + ":" + qualified.identifier().text());
+                    Optional.ofNullable(imports.get(unquoted(qualified.modulePrefix().text())))
+                            .map(module -> module + ":" + qualified.identifier().text());
             default -> Optional.empty();
         };
     }

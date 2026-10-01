@@ -18,7 +18,9 @@
 
 package io.ballerina.tools.discover.central;
 
+import java.io.FilterInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -75,20 +77,57 @@ public final class JdkHttpTransport implements HttpTransport {
     }
 
     @Override
-    public Optional<byte[]> download(String url, long timeoutMs) {
+    public Optional<InputStream> openStream(String url, long timeoutMs) {
+        long deadline = System.nanoTime() + Duration.ofMillis(timeoutMs).toNanos();
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(url))
                     .GET()
                     .timeout(Duration.ofMillis(timeoutMs))
                     .build();
-            HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
             int status = response.statusCode();
-            return status >= 200 && status < 300 ? Optional.ofNullable(response.body()) : Optional.empty();
+            if (status < 200 || status >= 300) {
+                response.body().close();
+                return Optional.empty();
+            }
+            return Optional.of(new DeadlineStream(response.body(), deadline));
         } catch (IOException | IllegalArgumentException failed) {
             return Optional.empty();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return Optional.empty();
+        }
+    }
+
+    /**
+     * A response body that stops answering at a deadline. The request timeout covers only the wait for headers; a
+     * server trickling a large body would otherwise hold the command for as long as it liked.
+     */
+    private static final class DeadlineStream extends FilterInputStream {
+
+        private final long deadline;
+
+        DeadlineStream(InputStream body, long deadline) {
+            super(body);
+            this.deadline = deadline;
+        }
+
+        private void check() throws IOException {
+            if (System.nanoTime() - deadline > 0) {
+                throw new IOException("download timed out");
+            }
+        }
+
+        @Override
+        public int read() throws IOException {
+            check();
+            return super.read();
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) throws IOException {
+            check();
+            return super.read(buffer, offset, length);
         }
     }
 

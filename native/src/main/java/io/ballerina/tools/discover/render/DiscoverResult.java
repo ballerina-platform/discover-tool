@@ -112,7 +112,8 @@ public sealed interface DiscoverResult {
      * before naming one.
      *
      * @param containers the containers on this page, up to the ceiling
-     * @param total how many the bucket (or the {@code --filter}) selects
+     * @param total how many the bucket (or the {@code --filter}) selects — in {@code service}, the
+     *     not-attachable types included
      * @param paging which page this is, or {@code null} when the whole roster fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
@@ -148,9 +149,15 @@ public sealed interface DiscoverResult {
          * @param normal how many plain (non-remote) methods it declares
          * @param listener the listener(s) this service type binds to, joined, or {@code null} outside the
          *     {@code service} bucket
+         * @param unconfirmed why that pairing is not confirmed, or {@code null} when it is
          * @param command the command that opens it
          */
-        public record Container(String name, int resources, int remote, int normal, String listener, String command) {
+        public record Container(String name, int resources, int remote, int normal, String listener,
+                String unconfirmed, String command) {
+
+            public Container(String name, int resources, int remote, int normal, String listener, String command) {
+                this(name, resources, remote, normal, listener, null, command);
+            }
 
             public Container(String name, int resources, int remote, int normal, String command) {
                 this(name, resources, remote, normal, null, command);

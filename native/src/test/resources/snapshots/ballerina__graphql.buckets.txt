@@ -8,7 +8,7 @@ ballerina/graphql · client · Client
 Next: bal discover ballerina/graphql client Client <name>
 == service ==
 ballerina/graphql · service
-1 service type
+2 service types
 
 graphql:Listener
   Service

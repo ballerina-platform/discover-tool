@@ -70,8 +70,8 @@ public class PackageRepositoryTest {
         }
 
         @Override
-        public Optional<Map<String, String>> fetchModuleSources(
-                QualifiedName qualified, Version version, String moduleId, HttpOptions options) {
+        public Optional<Map<String, String>> fetchModuleSources(QualifiedName qualified,
+                CentralClient.ResolvedVersion resolved, String moduleId, HttpOptions options) {
             sourceCalls++;
             return sources;
         }
@@ -123,8 +123,9 @@ public class PackageRepositoryTest {
     }
 
     private static Result<LoadedPackage> loadHttp(FakeRepository repository) {
-        return Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
-                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository)).readingSource());
+        Result<LoadedPackage> loaded = Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository)));
+        return loaded.isOk() ? Result.ok(loaded.value().withBindings()) : loaded;
     }
 
     private static FakeRepository http(Optional<Map<String, String>> sources) {
@@ -145,12 +146,12 @@ public class PackageRepositoryTest {
         List<Service> services = loaded.value().library().services();
         Assert.assertEquals(services.stream().map(Service::name).toList(),
                 List.of("Service", "ServiceContract", "InterceptableService"));
-        Assert.assertTrue(services.stream().allMatch(Service::isAttachable));
+        Assert.assertTrue(services.stream().allMatch(Service::isConfirmed));
     }
 
-    /** An answer that shows no service binding never asks for the source, however much it could settle. */
+    /** Loading reads no source; settling the bindings does, once, from the repository that served the docs. */
     @Test
-    public void onlyAnAnswerShowingBindingsReadsTheSource() {
+    public void theSourceIsReadOnlyWhenTheBindingsAreSettled() {
         FakeRepository repository = http(FixtureCorpus.recordedSources("ballerina__http"));
 
         Result<LoadedPackage> loaded = Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
@@ -158,6 +159,9 @@ public class PackageRepositoryTest {
 
         Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
         Assert.assertEquals(repository.sourceCalls, 0);
+        loaded.value().withBindings();
+        loaded.value().withBindings();
+        Assert.assertEquals(repository.sourceCalls, 1);
     }
 
     /**
@@ -173,7 +177,7 @@ public class PackageRepositoryTest {
         Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
         List<Service> services = loaded.value().library().services();
         Assert.assertEquals(services.size(), 7);
-        Assert.assertEquals(services.stream().filter(Service::isAttachable).map(Service::name).toList(),
+        Assert.assertEquals(services.stream().filter(Service::isConfirmed).map(Service::name).toList(),
                 List.of("Service"));
     }
 

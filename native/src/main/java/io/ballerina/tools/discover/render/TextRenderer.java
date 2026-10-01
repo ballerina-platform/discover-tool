@@ -143,8 +143,11 @@ public final class TextRenderer {
         Drill drill = Drill.of(names, commands, "<name>");
         Map<String, List<Integer>> byListener = new LinkedHashMap<>();
         for (int i = 0; i < containers.size(); i++) {
-            String listener = containers.get(i).listener();
-            byListener.computeIfAbsent(listener, key -> new ArrayList<>()).add(i);
+            DiscoverResult.ContainerRoster.Container container = containers.get(i);
+            String heading = container.listener() == null || container.unconfirmed() == null
+                    ? container.listener()
+                    : container.listener() + " — not confirmed (" + container.unconfirmed() + ")";
+            byListener.computeIfAbsent(heading, key -> new ArrayList<>()).add(i);
         }
         boolean paired = !byListener.containsKey(null) || byListener.size() > 1;
         byListener.forEach((listener, rows) -> {
@@ -171,7 +174,8 @@ public final class TextRenderer {
         }
         layout.section("Not attachable to a listener", unattachable);
         layout.warning(roster.warning());
-        layout.more(remaining(containers.size(), roster.total(), roster.paging()), roster.paging());
+        layout.more(remaining(containers.size() + notAttachable.size(), roster.total(), roster.paging()),
+                roster.paging());
         layout.next(drill.pattern());
         layout.next(roster.next());
     }

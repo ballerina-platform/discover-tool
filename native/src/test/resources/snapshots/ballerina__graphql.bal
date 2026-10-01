@@ -641,17 +641,6 @@ public class Listener {
     isolated function immediateStop() returns Error?;
 }
 
-// --- Service ---
-
-service graphql:Service on new graphql:Listener(listenTo, configuration) {
-    // Central publishes no method contract for this service type. The listener may still require
-    // one — add the resource or remote methods the package's guide shows; `bal discover <org>/<name>
-    // readme` reproduces it.
-}
-
-// Declared above, but no listener of this package accepts them, so no template is written:
-//   graphql:Interceptor
-
 // --- Annotations ---
 
 # Represents the annotation of the ID type.
