@@ -214,7 +214,8 @@ public final class Documents {
                 + "one, reaches");
         lines.add("// the runtime as a `createInterceptors()` return rather than as an attachment. The "
                 + "package's own");
-        lines.add("// guide is where the usage of each is written; `bal discover overview` reproduces it.");
+        lines.add("// guide is where the usage of each is written; `bal discover <org>/<name> readme` "
+                + "reproduces it.");
         return String.join("\n", lines);
     }
 
@@ -237,8 +238,8 @@ public final class Documents {
             lines.add("    // Central publishes no method contract for this service type. The listener may "
                     + "still require");
             lines.add("    // one — add the resource or remote methods the package's guide shows; "
-                    + "`bal discover overview`");
-            lines.add("    // reproduces it.");
+                    + "`bal discover <org>/<name>");
+            lines.add("    // readme` reproduces it.");
         }
         // The same renderer every other callable uses, so a service method keeps its parameter defaults, its
         // optionality, its doc comment and its import note. The hand-rolled copy this replaces kept none of
