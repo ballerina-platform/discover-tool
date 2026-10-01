@@ -35,7 +35,6 @@ dist/
 .vscode/
 
 # Local-only internal notes
-internal-docs/CONTEXT.md
 target/
 CLAUDE.md
 .claude/

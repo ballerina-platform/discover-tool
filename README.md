@@ -498,17 +498,13 @@ and caching is off when none of them is usable.
 
 ## Installing it
 
-The tool is not on Ballerina Central yet, so `bal tool pull discover` does not resolve it; see
-`internal-docs/distribution.md` for what is left. Until then, build and install it locally through the same
-packaging a Central publish uses:
+Once released, install it from Ballerina Central:
 
 ```bash
-./gradlew :bal-tool:build -PpublishToLocalCentral=true          # pack the bala, push it to the local repository
-bal tool pull discover:<version> --repository=local              # register it as an active tool
-bal discover --help                                              # smoke test
+bal tool pull discover
 ```
 
-`<version>` is `gradle.properties`' `version` without its `-SNAPSHOT` suffix.
+Until then, build and install it locally; see [Install a local build](#install-a-local-build).
 
 ## Building from the source
 
@@ -518,13 +514,28 @@ bal discover --help                                              # smoke test
 - A GitHub token with `read:packages`, exported as `packagePAT` (and your login as `packageUser`).
   `org.ballerinalang:ballerina-cli`, which provides the `BLauncherCmd` interface `bal` discovers the tool
   through, is published only to ballerina-platform's GitHub Packages, which needs authentication even for a
-  public read.
+  public read. In GitHub Actions the repository's own `GITHUB_TOKEN` is enough.
 
 ```bash
 gh auth refresh -h github.com -s read:packages
 export packageUser="$(gh api /user -q .login)"
 export packagePAT="$(gh auth token)"
 ```
+
+### Project layout
+
+| Path | What it is |
+|---|---|
+| `native/` | The tool itself (`io.ballerina.tools.discover`): Central client and cache, the model built from Central's docs payload, the bucket views, and the JSON/text renderers. |
+| `bal-tool/` | Packs `native`'s jar into the `ballerina/tool_discover` bala (platform `java21`) with `io.ballerina.plugin`, the way `openapi-tools` packs `bal openapi`. |
+| `config/resources/` | The `Ballerina.toml`/`BalTool.toml` templates for the bala. `BalTool.toml` declares the tool id `discover`, the name `bal` dispatches on. |
+| `native/src/test/resources/fixtures/` | Recorded Central payloads; the whole test suite runs against them, offline. |
+| `native/src/test/resources/snapshots/` | Per fixture, the `.bal` API document and every bucket's bare listing as `.buckets.txt`/`.buckets.json`. |
+
+Every dependency (`ballerina-cli`, `picocli`, `gson`) is `compileOnly`: they are on the Ballerina
+distribution's runtime classpath (`bre/lib`), so the jar bundles only this tool's own classes. The catch is
+version coupling: no code here may rely on a feature newer than the version `bre/lib` ships (`picocli` 4.0.1).
+HTTP is `java.net.http` from the JDK.
 
 ### Build and test
 
@@ -542,10 +553,23 @@ UPDATE_SNAPSHOTS=1 ./gradlew :native:test               # answer snapshots and u
 BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :native:test   # after re-recording the fixtures
 ```
 
-The `.bal` API snapshots under `native/src/test/resources/snapshots/` have no update switch on purpose: they
-are the oracle every quoted declaration is checked against.
+The `.bal` API snapshots have no update switch on purpose: they are the oracle every quoted declaration is
+checked against.
 
-## Verifying a build against live Central
+### Install a local build
+
+This is the same packaging a Central publish uses:
+
+```bash
+./gradlew :bal-tool:build -PpublishToLocalCentral=true          # pack the bala, push it to the local repository
+bal tool pull discover:<version> --repository=local              # register it as an active tool
+bal discover --help                                              # smoke test
+```
+
+`<version>` is `gradle.properties`' `version` without its `-SNAPSHOT` suffix. Re-run the first two commands
+after any change to `native` or `bal-tool`. Remove the tool with `bal tool remove discover`.
+
+### Verify a build against live Central
 
 The test suite proves the pipeline against recorded payloads. It cannot prove that `bal` routes to the
 installed tool, that arguments survive `bal`'s launcher, or that exit codes reach the shell, so after a CLI
@@ -569,10 +593,17 @@ check 1 ballerina/http nosuchbucket
 check 1 no-such-org/no-such-pkg
 ```
 
-## Design notes
+### Release
 
-`internal-docs/system-design.md` describes the architecture and the reasoning behind it;
-`internal-docs/distribution.md` covers packaging and publishing.
+CI builds and tests every pull request on Ubuntu and Windows (`.github/workflows/pull-request.yml`).
+Publishing is manual, from GitHub Actions:
+
+- `central-publish.yml` pushes the current build to the dev or stage Central.
+- `publish-release.yml` runs the shared `ballerina-library` release template for `ballerina/tool_discover`: it
+  releases the `gradle.properties` version from a `release-<version>` branch, tags it `v<version>`, publishes
+  the bala to Central and opens a sync pull request with the next `-SNAPSHOT` version.
+
+Before releasing, move `CHANGELOG.md`'s `[Unreleased]` entries under the new version.
 
 ## Contributing to Ballerina
 
