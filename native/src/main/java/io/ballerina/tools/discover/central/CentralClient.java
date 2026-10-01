@@ -18,10 +18,8 @@
 
 package io.ballerina.tools.discover.central;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
@@ -37,7 +35,6 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -68,24 +65,6 @@ public final class CentralClient {
      * immutable and never expires.
      */
     public static final long LATEST_TTL_MS = 600_000;
-
-    /** How many hits one search asks Central for. */
-    private static final int SEARCH_LIMIT = 30;
-
-    /**
-     * The pull count below which a package is treated as unadopted and moved to the end of the results.
-     *
-     * <p>Measured against Central rather than guessed. For {@code q=http client} its relevance order is right at
-     * the top — {@code ballerina/http} first — and the damage is four abandoned packages salted through the middle:
-     * {@code tharmigank/http.client.wrapper} at 1 pull ranks FOURTH, {@code sabtharm/http} at 18 ranks seventh, and
-     * {@code lakshansivagnanasothy/client_stubs} at 122 ranks eighth. An agent reading top-down picks one of them.
-     *
-     * <p>1,000 is where the two populations separate on this evidence. Everything below it in the measured samples
-     * is a personal experiment; the lowest-pull packages a caller might legitimately want — {@code ballerina/mqtt}
-     * at 2,460 and {@code choreo/mediation.log_message} at 2,890 — sit clearly above it. A low count is not a
-     * verdict on quality, only on adoption, which is why these are demoted rather than dropped.
-     */
-    private static final long ADOPTION_FLOOR = 1_000;
 
     private CentralClient() {
     }
@@ -533,89 +512,6 @@ public final class CentralClient {
         }
         List<String> versions = Coordinates.publishedVersions(response.value());
         return versions.isEmpty() ? null : String.join(", ", versions);
-    }
-
-    // -----------------------------------------------------------------------
-    // Registry search
-    // -----------------------------------------------------------------------
-
-    /**
-     * Packages matching a free-text query, with the unadopted ones demoted.
-     *
-     * <p>Central's RELEVANCE is kept, because measured it is good: {@code ballerinax/kafka} is first for
-     * {@code kafka messaging} and {@code ballerina/http} is first for {@code http client}. Sorting the whole list
-     * by pull count instead was tried and is worse in a way that matters more — it ranks {@code ballerina/crypto}
-     * above {@code ballerinax/kafka} for a Kafka query, because popularity is not relevance and the most-pulled
-     * package that merely matched is almost never the answer.
-     *
-     * <p>So the correction is the narrowest one that fixes the actual defect: a STABLE PARTITION on
-     * {@link #ADOPTION_FLOOR}, which moves the abandoned packages out of the middle of the list and changes
-     * nothing else about the order.
-     *
-     * <p>Never a cache read or write: the query space is unbounded and the answer is the one thing about Central
-     * that genuinely changes.
-     */
-    public static Result<SearchHit.Results> searchPackages(List<String> keywords, HttpOptions options) {
-        String query = String.join(" ", keywords);
-        String url = CENTRAL_BASE_URL + "registry/search-packages?q=" + encode(query)
-                + "&limit=" + SEARCH_LIMIT + "&offset=0";
-        Result<JsonElement> response = fetchJson(url, options);
-        if (!response.isOk()) {
-            return response.cast();
-        }
-        JsonElement raw = response.value();
-        if (!raw.isJsonObject()) {
-            return Result.err(new Failure.Upstream(
-                    url, 1, "search answered with something other than an object",
-                    Failure.UPSTREAM_SUGGESTION, null));
-        }
-        JsonObject body = raw.getAsJsonObject();
-        List<SearchHit> hits = new ArrayList<>();
-        JsonElement packages = body.get("packages");
-        if (packages != null && packages.isJsonArray()) {
-            for (JsonElement entry : packages.getAsJsonArray()) {
-                SearchHit hit = toHit(entry);
-                if (hit != null) {
-                    hits.add(hit);
-                }
-            }
-        }
-        // A stable partition: `false` sorts before `true`, so the adopted keep Central's relevance order and the
-        // rest follow in theirs.
-        hits.sort(Comparator.comparing(hit -> hit.pullCount() < ADOPTION_FLOOR));
-        int total = body.has("count") && body.get("count").isJsonPrimitive()
-                ? body.get("count").getAsInt()
-                : hits.size();
-        return Result.ok(new SearchHit.Results(List.copyOf(hits), total));
-    }
-
-    private static SearchHit toHit(JsonElement entry) {
-        if (entry == null || !entry.isJsonObject()) {
-            return null;
-        }
-        JsonObject json = entry.getAsJsonObject();
-        String org = Json.text(json, "organization");
-        String name = Json.text(json, "name");
-        if (org.isEmpty() || name.isEmpty()) {
-            return null;
-        }
-        List<String> keywords = new ArrayList<>();
-        JsonElement rawKeywords = json.get("keywords");
-        if (rawKeywords != null && rawKeywords.isJsonArray()) {
-            JsonArray array = rawKeywords.getAsJsonArray();
-            for (JsonElement keyword : array) {
-                if (keyword.isJsonPrimitive() && keyword.getAsJsonPrimitive().isString()) {
-                    keywords.add(keyword.getAsString());
-                }
-            }
-        }
-        long pullCount = 0;
-        JsonElement pulls = json.get("pullCount");
-        if (pulls != null && pulls.isJsonPrimitive() && pulls.getAsJsonPrimitive().isNumber()) {
-            pullCount = pulls.getAsLong();
-        }
-        return new SearchHit(org, name, Json.text(json, "version"), Json.text(json, "summary"),
-                List.copyOf(keywords), pullCount);
     }
 
     private static String encode(String segment) {

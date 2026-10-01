@@ -24,7 +24,6 @@ import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.HttpTransport;
-import io.ballerina.tools.discover.central.SearchHit;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.central.schema.Schema;
 import org.testng.Assert;
@@ -519,99 +518,5 @@ public class ClientTest {
         Map<String, String> versions =
                 DependenciesToml.parse("[[package]]\norg = \"ballerinax\"\nname = \"github\"\n");
         Assert.assertEquals(versions.size(), 0);
-    }
-
-    // -----------------------------------------------------------------------
-    // Registry search
-    // -----------------------------------------------------------------------
-
-    @Test
-    public void anUnadoptedPackageIsMovedOutOfTheMiddleOfTheResults() {
-        // The real defect, in Central's real order for `q=http client`: tharmigank/http.client.wrapper has ONE
-        // pull and ranks fourth, above ballerina/sql and ballerina/websocket. An agent reading top-down picks it.
-        String body = """
-                {"count": 1351, "packages": [
-                  {"organization":"ballerina","name":"http","version":"2.16.6","pullCount":1862507},
-                  {"organization":"ballerinax","name":"client.config","version":"3.1.0","pullCount":133297},
-                  {"organization":"ballerinax","name":"health.clients.fhir","version":"2.0.0","pullCount":12509},
-                  {"organization":"tharmigank","name":"http.client.wrapper","version":"0.1.0","pullCount":1},
-                  {"organization":"ballerina","name":"sql","version":"1.15.0","pullCount":171335},
-                  {"organization":"ballerina","name":"websocket","version":"2.15.5","pullCount":127084}
-                ]}
-                """;
-        Result<SearchHit.Results> result = CentralClient.searchPackages(
-                List.of("http", "client"), fast(FakeTransport.always(FakeTransport.ok(body))).build());
-        Assert.assertTrue(result.isOk());
-        Assert.assertEquals(
-                result.value().hits().stream().map(SearchHit::qualified).toList(),
-                List.of("ballerina/http", "ballerinax/client.config", "ballerinax/health.clients.fhir",
-                        "ballerina/sql", "ballerina/websocket", "tharmigank/http.client.wrapper"),
-                "the one-pull package moves to the end and nothing else changes position");
-        Assert.assertEquals(result.value().total(), 1351, "the report says how much of the index it shows");
-    }
-
-    @Test
-    public void centralsRelevanceIsKeptBecausePopularityIsNotRelevance() {
-        // The counter-case that rules out sorting the whole list by pull count. This is Central's real order for
-        // `q=kafka messaging`: it puts ballerinax/kafka FIRST, and a pull-count sort would rank ballerina/crypto
-        // and ballerina/http above it — burying the actual answer under two packages that merely matched.
-        String body = """
-                {"count": 230, "packages": [
-                  {"organization":"ballerinax","name":"kafka","version":"4.6.5","pullCount":60747},
-                  {"organization":"ballerina","name":"messaging","version":"1.0.0","pullCount":7836},
-                  {"organization":"ballerina","name":"http","version":"2.16.6","pullCount":1862507},
-                  {"organization":"ballerina","name":"crypto","version":"2.12.1","pullCount":1684059}
-                ]}
-                """;
-        Result<SearchHit.Results> result = CentralClient.searchPackages(
-                List.of("kafka", "messaging"), fast(FakeTransport.always(FakeTransport.ok(body))).build());
-        Assert.assertTrue(result.isOk());
-        Assert.assertEquals(result.value().hits().get(0).qualified(), "ballerinax/kafka",
-                "the package the caller asked about has to stay first");
-        Assert.assertEquals(
-                result.value().hits().stream().map(SearchHit::qualified).toList(),
-                List.of("ballerinax/kafka", "ballerina/messaging", "ballerina/http", "ballerina/crypto"),
-                "every one of these is adopted, so the order is Central's untouched");
-    }
-
-    @Test
-    public void aLegitimateLowPullPackageStaysWhereCentralPutIt() {
-        // The floor has to separate two populations, not just "small" from "large". `ballerina/mqtt` at 2,460 pulls
-        // and `choreo/mediation.log_message` at 2,890 are real packages a Kafka query should surface in place.
-        String body = """
-                {"count": 230, "packages": [
-                  {"organization":"choreo","name":"mediation.log_message","version":"1.0.0","pullCount":2890},
-                  {"organization":"nobody","name":"experiment","version":"0.1.0","pullCount":18},
-                  {"organization":"ballerina","name":"mqtt","version":"1.3.0","pullCount":2460}
-                ]}
-                """;
-        Result<SearchHit.Results> result = CentralClient.searchPackages(
-                List.of("messaging"), fast(FakeTransport.always(FakeTransport.ok(body))).build());
-        Assert.assertTrue(result.isOk());
-        Assert.assertEquals(
-                result.value().hits().stream().map(SearchHit::qualified).toList(),
-                List.of("choreo/mediation.log_message", "ballerina/mqtt", "nobody/experiment"));
-    }
-
-    @Test
-    public void searchSendsTheQueryAsOneQueryParameter() {
-        FakeTransport transport = FakeTransport.always(FakeTransport.ok("{\"count\":0,\"packages\":[]}"));
-        Result<SearchHit.Results> result =
-                CentralClient.searchPackages(List.of("kafka", "messaging"), fast(transport).build());
-        Assert.assertTrue(result.isOk());
-        Assert.assertTrue(result.value().hits().isEmpty());
-        Assert.assertTrue(transport.urls().get(0).contains("registry/search-packages?q=kafka+messaging"),
-                transport.urls().get(0));
-    }
-
-    @Test
-    public void aSearchEntryMissingItsCoordinatesIsDroppedRatherThanRenderedNameless() {
-        String body = "{\"count\":2,\"packages\":[{\"name\":\"orphan\"},"
-                + "{\"organization\":\"ballerina\",\"name\":\"io\",\"pullCount\":5}]}";
-        Result<SearchHit.Results> result = CentralClient.searchPackages(
-                List.of("io"), fast(FakeTransport.always(FakeTransport.ok(body))).build());
-        Assert.assertTrue(result.isOk());
-        Assert.assertEquals(result.value().hits().size(), 1);
-        Assert.assertEquals(result.value().hits().get(0).qualified(), "ballerina/io");
     }
 }
