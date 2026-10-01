@@ -22,6 +22,7 @@ import io.ballerina.tools.discover.central.HttpTransport;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -37,6 +38,7 @@ final class FakeTransport implements HttpTransport {
 
     private final Function<String, Reply> answer;
     private final List<String> urls = new ArrayList<>();
+    private Function<String, Optional<byte[]>> download = url -> Optional.empty();
 
     private FakeTransport(Function<String, Reply> answer) {
         this.answer = answer;
@@ -77,6 +79,18 @@ final class FakeTransport implements HttpTransport {
 
     static Reply status(int status) {
         return new Reply.Answered(status, "");
+    }
+
+    /** Serve binary downloads — a package archive — through {@code download}; every one is empty otherwise. */
+    FakeTransport downloading(Function<String, Optional<byte[]>> download) {
+        this.download = download;
+        return this;
+    }
+
+    @Override
+    public Optional<byte[]> download(String url, long timeoutMs) {
+        urls.add(url);
+        return download.apply(url);
     }
 
     @Override

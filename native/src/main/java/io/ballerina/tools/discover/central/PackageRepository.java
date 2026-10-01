@@ -20,7 +20,11 @@ package io.ballerina.tools.discover.central;
 
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
+
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Where a package's version and its docs payload come from — the seam a source other than Ballerina Central
@@ -42,6 +46,16 @@ public interface PackageRepository {
 
     /** The API docs for one already-resolved version. */
     Result<CentralDocs> fetchDocs(QualifiedName qualified, CentralClient.ResolvedVersion resolved, HttpOptions options);
+
+    /**
+     * The published Ballerina source of one module of an already-resolved version, file name to text — or empty
+     * when this repository cannot serve it, for any reason. Empty is a correct answer, not a failure: the only
+     * reader falls back to what {@link #fetchDocs} already says.
+     *
+     * @param moduleId the module's full id as Central names it — {@code http}, or {@code http.httpscerr}
+     */
+    Optional<Map<String, String>> fetchModuleSources(
+            QualifiedName qualified, Version version, String moduleId, HttpOptions options);
 
     /**
      * This repository's own stable, filesystem-safe identity — the cache key's repository dimension (see
