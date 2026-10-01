@@ -124,7 +124,7 @@ public class PackageRepositoryTest {
 
     private static Result<LoadedPackage> loadHttp(FakeRepository repository) {
         return Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
-                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository)));
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository)).readingSource());
     }
 
     private static FakeRepository http(Optional<Map<String, String>> sources) {
@@ -146,6 +146,18 @@ public class PackageRepositoryTest {
         Assert.assertEquals(services.stream().map(Service::name).toList(),
                 List.of("Service", "ServiceContract", "InterceptableService"));
         Assert.assertTrue(services.stream().allMatch(Service::isAttachable));
+    }
+
+    /** An answer that shows no service binding never asks for the source, however much it could settle. */
+    @Test
+    public void onlyAnAnswerShowingBindingsReadsTheSource() {
+        FakeRepository repository = http(FixtureCorpus.recordedSources("ballerina__http"));
+
+        Result<LoadedPackage> loaded = Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository)));
+
+        Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
+        Assert.assertEquals(repository.sourceCalls, 0);
     }
 
     /**
