@@ -156,20 +156,21 @@ public final class TextRenderer {
             }
         });
         layout.warning(roster.warning());
-        layout.more(roster.total() - containers.size(), null);
+        layout.more(remaining(containers.size(), roster.total(), roster.paging()), roster.paging());
         layout.next(drill.pattern());
         layout.next(roster.next());
     }
 
     private static void pathGroups(Layout layout, DiscoverResult.PathGroups groups) {
         List<DiscoverResult.ResourceList.Resource> here = groups.resources();
-        if (groups.groups().isEmpty()) {
-            layout.top(counted(groups.total(), "resource path", "resource paths"));
-        } else if (here.isEmpty()) {
-            layout.top(counted(groups.total(), "path group", "path groups"));
+        DiscoverResult.PathGroups.Counts counts = groups.counts();
+        if (counts.groups() == 0) {
+            layout.top(counted(counts.resources(), "resource path", "resource paths"));
+        } else if (counts.resources() == 0) {
+            layout.top(counted(counts.groups(), "path group", "path groups"));
         } else {
-            layout.top(counted(here.size(), "resource path", "resource paths") + " here, "
-                    + counted(groups.total() - here.size(), "path group", "path groups"));
+            layout.top(counted(counts.resources(), "resource path", "resource paths") + " here, "
+                    + counted(counts.groups(), "path group", "path groups"));
         }
 
         Drill hereDrill = resourceDrill(here);
@@ -184,7 +185,8 @@ public final class TextRenderer {
         layout.section("Groups (operations under each)", table);
 
         layout.notices(groups.note(), groups.warning());
-        layout.more(groups.total() - here.size() - groups.groups().size(), null);
+        layout.more(remaining(here.size() + groups.groups().size(), groups.total(), groups.paging()),
+                groups.paging());
         layout.next(hereDrill.pattern());
         layout.next(groupDrill.pattern());
         layout.next(groups.next());
@@ -194,6 +196,7 @@ public final class TextRenderer {
         layout.top(counted(resources.total(), "resource path", "resource paths"));
         Drill drill = resourceDrill(resources.resources());
         layout.block(resourceTable(resources.resources(), drill).lines(INDENT));
+        documented(layout, resources.documented());
         layout.notices(resources.note(), resources.warning());
         layout.more(remaining(resources.shown(), resources.total(), resources.paging()), resources.paging());
         layout.next(drill.pattern());
@@ -206,6 +209,7 @@ public final class TextRenderer {
                 : counted(methods.total(), "method", "methods"));
         Drill drill = methodDrill(methods.methods());
         layout.block(methodTable(methods.methods(), drill).lines(INDENT));
+        documented(layout, methods.documented());
         layout.notices(methods.note(), methods.warning());
         layout.more(remaining(methods.shown(), methods.total(), methods.paging()), methods.paging());
         layout.next(drill.pattern());
@@ -262,6 +266,9 @@ public final class TextRenderer {
                 names(signature.omitted()));
         documented(layout, signature.documented());
         layout.notices(signature.note(), signature.warning());
+        layout.more(remaining(signature.documented().names().size(), signature.documented().total(),
+                signature.paging()), signature.paging());
+        layout.next(signature.next());
     }
 
     private static void mixedListing(Layout layout, DiscoverResult.MixedListing mixed) {
@@ -307,10 +314,14 @@ public final class TextRenderer {
             block.add("Available");
             block.addAll(indented(available.render().lines().toList()));
             layout.block(block);
-        } else {
-            layout.next(noMatch.next());
         }
         layout.notices(noMatch.note(), noMatch.warning());
+        if (noMatch.paging() != null) {
+            layout.more(noMatch.paging().remaining(), noMatch.paging());
+            layout.next(noMatch.next());
+        } else if (noMatch.available() == null) {
+            layout.next(noMatch.next());
+        }
     }
 
     private static void owners(Layout layout, DiscoverResult.Owners owners) {
@@ -319,8 +330,8 @@ public final class TextRenderer {
                 TextTable.Column.LEFT);
         owners.owners().forEach(owner -> table.row(owner.name(), String.valueOf(owner.matches()), owner.command()));
         layout.block(table.lines(INDENT));
-        layout.warning(owners.warning());
-        layout.more(owners.total() - owners.owners().size(), null);
+        layout.notices(owners.note(), owners.warning());
+        layout.more(remaining(owners.owners().size(), owners.total(), owners.paging()), owners.paging());
         layout.next(owners.next());
     }
 
@@ -428,8 +439,16 @@ public final class TextRenderer {
         return table;
     }
 
+    /**
+     * Documentation-only matches on this page — or, on a page that holds none of them while a later one does,
+     * one line saying how many are coming, so they are never silently absent.
+     */
     private static void documented(Layout layout, DiscoverResult.Documented documented) {
         int shown = documented.names().size();
+        if (shown == 0 && documented.total() > 0) {
+            layout.block(List.of("Matched by documentation only: " + documented.total() + ", on a later page"));
+            return;
+        }
         layout.section("Matched by documentation only"
                 + (shown < documented.total() ? " (" + shown + " of " + documented.total() + ")" : ""),
                 names(documented.names()));

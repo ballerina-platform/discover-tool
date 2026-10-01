@@ -70,10 +70,10 @@ import java.util.stream.Collectors;
  * <p><b>OUTPUT SIZE IS AN ENTRY/LINE CEILING NOW, NOT A BYTE BUDGET.</b> The RFC replaces this tool's earlier
  * byte-budget tier ladder (bytes of quoted Ballerina, degrading through four tiers) with a hard ceiling of
  * {@value #MAX_ENTRIES} entries per listing: under it, everything is shown; over it, resource paths selected by a
- * path GROUP by segment, and methods, mixed listings and any resource selection that cannot group PAGE with
- * {@code --page}, all honestly disclosing {@code shown}/{@code total} and the exact next command rather than
- * silently degrading. Every answer is a {@link DiscoverResult}, so {@code --output} renders all of them the same
- * way.
+ * path GROUP by segment, and every listing — a roster, a level of groups, methods, a mixed listing, a resource
+ * selection that cannot group, and documentation-only matches — PAGES with {@code --page}, all honestly
+ * disclosing {@code shown}/{@code total} and the exact next command rather than silently degrading. Every answer
+ * is a {@link DiscoverResult}, so {@code --output} renders all of them the same way.
  *
  * <p><b>THE VIEWS QUOTE, THEY NEVER RE-SPELL.</b> Every declaration printed here comes from
  * {@link Signatures} or {@link TypeDefs} byte-for-byte. That is what {@code ViewsAgreeTest} pins, and the reason
@@ -93,9 +93,8 @@ public final class Containers {
 
     /**
      * The {@code number}-th {@value #MAX_ENTRIES}-wide window into a {@code total}-sized list — the page-clamping
-     * arithmetic every paginated listing in this tool shares (a flat method or resource listing and a mixed one
-     * here, a filtered readme-chunk listing in {@link Readme}), so a future fix to the page-boundary rule only has
-     * to be made once.
+     * arithmetic every paginated listing in this tool shares (every listing here, a filtered readme-chunk listing
+     * in {@link Readme}), so a future fix to the page-boundary rule only has to be made once.
      *
      * <p>A page outside the listing is a usage failure naming the valid range, never an empty answer: an empty
      * page with no {@code next} reads exactly like a listing that has nothing in it.
@@ -171,7 +170,7 @@ public final class Containers {
     /**
      * @param selectors everything after the package: a container name, a member, an accessor and a path
      * @param filter the {@code --filter} keyword, or {@code null}
-     * @param page {@code --page}, 1-indexed, for a method listing over the ceiling
+     * @param page {@code --page}, 1-indexed, for any listing over the ceiling
      */
     public record Options(List<String> selectors, String filter, int page) {
 
@@ -204,7 +203,7 @@ public final class Containers {
             if (containers.size() == 1) {
                 return answer(loaded, scope, containers.get(0), List.of(), options, note);
             }
-            return Result.ok(roster(loaded, scope, containers, options, loaded.warning()));
+            return roster(loaded, scope, containers, options);
         }
 
         // 1. An exact container name always wins, so no casing heuristic is needed anywhere. `client sheets
@@ -272,7 +271,7 @@ public final class Containers {
             return answer(loaded, scope, owner, selectors, options,
                     note != null ? note : ownerNote(loaded, scope, owner, selectors));
         }
-        return Result.ok(owners(loaded, scope, owners, selectors));
+        return owners(loaded, scope, owners, selectors, options, note);
     }
 
     /**
@@ -431,40 +430,54 @@ public final class Containers {
 
     /**
      * Several containers and nothing to choose between them yet — the RFC's entry ceiling, applied to a roster
-     * of containers rather than to one container's own members.
+     * of containers rather than to one container's own members, and paged like every other listing.
+     *
+     * <p>{@code --filter} keeps a container whose own NAME matches as well as one with a matching member, and a
+     * name match opens the whole container rather than its members narrowed by the keyword: a container that
+     * declares no methods at all ({@code ballerinax/postgresql}'s {@code *Value} classes) has nothing else for
+     * the keyword to match.
      */
-    private static DiscoverResult roster(
-            LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers, Options options,
-            String warning) {
+    private static Result<DiscoverResult> roster(
+            LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers, Options options) {
         String pkg = loaded.pkgArgument();
+        String bucket = "bal discover " + pkg + " " + scope.verb();
         List<Surface.Container> selected = options.filtered()
                 ? containers.stream()
-                        .filter(container -> !filterEntries(container, options).surface().isEmpty())
+                        .filter(container -> namedByFilter(container, options)
+                                || !filterEntries(container, options).surface().isEmpty())
                         .toList()
                 : containers;
 
         if (selected.isEmpty()) {
             List<String> names = containers.stream().map(Surface.Container::name).toList();
-            return new DiscoverResult.NoMatch(options.filter(), null, Names.nearMisses(options.filter(), names),
-                    List.of(), roster(loaded, scope, containers, Options.bare(), null),
-                    "bal discover " + pkg + " " + scope.verb(), DiscoverResult.Documented.NONE, warning, null);
+            return Result.ok(new DiscoverResult.NoMatch(options.filter(), null,
+                    Names.nearMisses(options.filter(), names), List.of(),
+                    roster(loaded, scope, containers, Options.bare()).value(), bucket,
+                    DiscoverResult.Documented.NONE, null, loaded.warning(), null));
         }
 
-        List<Surface.Container> shown = selected.subList(0, Math.min(MAX_ENTRIES, selected.size()));
-        List<DiscoverResult.ContainerRoster.Container> items = shown.stream()
+        String command = bucket + filterArgument(options);
+        Result<Page> page = Page.of(options.page(), selected.size(), command);
+        if (!page.isOk()) {
+            return page.cast();
+        }
+        Page window = page.value();
+        List<DiscoverResult.ContainerRoster.Container> items = selected.subList(window.from(), window.to()).stream()
                 .map(container -> new DiscoverResult.ContainerRoster.Container(
                         container.name(),
-                        container.operations().size(),
+                        (int) container.operations().stream().map(PathTree.Operation::segments).distinct().count(),
                         (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
                         (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
                         listenerNames(container),
-                        "bal discover " + pkg + " " + scope.verb() + " " + container.name()
-                                + filterArgument(options)))
+                        bucket + " " + container.name()
+                                + (namedByFilter(container, options) ? "" : filterArgument(options))))
                 .toList();
-        String next = shown.size() < selected.size()
-                ? "bal discover " + pkg + " " + scope.verb() + " --filter <keyword>"
-                : null;
-        return new DiscoverResult.ContainerRoster(items, selected.size(), next, warning);
+        return Result.ok(new DiscoverResult.ContainerRoster(
+                items, selected.size(), window.paging(), window.next(command), loaded.warning()));
+    }
+
+    private static boolean namedByFilter(Surface.Container container, Options options) {
+        return options.filtered() && Filter.matches(options.filter(), container.name());
     }
 
     /**
@@ -473,20 +486,25 @@ public final class Containers {
      * <p>The answer is the OWNERS with counts, each ending in the command that opens it — never a bare
      * validation failure, and never a silent pick of one.
      */
-    private static DiscoverResult owners(
+    private static Result<DiscoverResult> owners(
             LoadedPackage loaded, Surface.Scope scope, Map<Surface.Container, List<Entry>> owners,
-            List<String> selectors) {
-        String pkg = loaded.pkgArgument();
+            List<String> selectors, Options options, String note) {
+        String bucket = "bal discover " + loaded.pkgArgument() + " " + scope.verb();
         String member = shellWords(selectors);
+        String command = bucket + member + filterArgument(options);
+        Result<Page> page = Page.of(options.page(), owners.size(), command);
+        if (!page.isOk()) {
+            return page.cast();
+        }
+        Page window = page.value();
         List<DiscoverResult.Owners.Owner> listed = owners.entrySet().stream()
-                .limit(MAX_ENTRIES)
+                .skip(window.from())
+                .limit(window.to() - window.from())
                 .map(entry -> new DiscoverResult.Owners.Owner(entry.getKey().name(), entry.getValue().size(),
-                        "bal discover " + pkg + " " + scope.verb() + " " + entry.getKey().name() + member))
+                        bucket + " " + entry.getKey().name() + member))
                 .toList();
-        String next = listed.size() < owners.size()
-                ? "bal discover " + pkg + " " + scope.verb() + " <container>" + member
-                : null;
-        return new DiscoverResult.Owners(String.join(" ", selectors), listed, owners.size(), next, loaded.warning());
+        return Result.ok(new DiscoverResult.Owners(String.join(" ", selectors), listed, owners.size(),
+                window.paging(), window.next(command), loaded.warning(), note));
     }
 
     // -----------------------------------------------------------------------
@@ -735,28 +753,42 @@ public final class Containers {
             Options options, String note) {
         note = mergeNotes(note, listenerNote(container));
         List<Entry> selected = select(container, selectors);
-        DiscoverResult.Documented documented = DiscoverResult.Documented.NONE;
+        List<String> documented = List.of();
 
         if (options.filtered()) {
             Filter.Split<Entry> split = Filter.apply(options.filter(), selected,
                     entry -> Filter.surfaceOf(entry.fn()), entry -> Filter.docsOf(entry.fn()));
             selected = split.surface();
-            List<String> names = split.documented().stream().map(Entry::label).toList();
-            documented = new DiscoverResult.Documented(names.subList(0, Math.min(MAX_ENTRIES, names.size())),
-                    names.size());
+            documented = split.documented().stream().map(Entry::label).toList();
         }
 
         if (selected.isEmpty() && selectors.isEmpty() && !options.filtered()) {
             return Result.ok(new DiscoverResult.MethodList(containerName(container), List.of(), 0, 0, null, null,
-                    loaded.warning(), note));
+                    DiscoverResult.Documented.NONE, loaded.warning(), note));
         }
         if (selected.isEmpty()) {
-            return Result.ok(nothingMatched(loaded, scope, container, selectors, options, documented, note));
+            return nothingMatched(loaded, scope, container, selectors, options, documented, note);
         }
         if (selected.size() == 1) {
-            return Result.ok(signature(loaded, container, selectors, selected.get(0), documented, note));
+            return signature(loaded, scope, container, selectors, selected.get(0), options, documented, note);
         }
         return listing(loaded, scope, container, selectors, selected, options, documented, loaded.warning(), note);
+    }
+
+    /**
+     * Documentation-only matches when they are an answer's only list — beside one signature, or as all a
+     * {@code --filter} found — paged on their own once over the ceiling, so the command that produced the answer,
+     * turned a page, reaches the rest. At or under the ceiling this is page 1 whatever was asked: the answer is
+     * not paged, and {@code Cli} rejects any other {@code --page} against it.
+     */
+    private static Result<Page> documentedPage(List<String> documented, Options options, String command) {
+        return Page.of(documented.size() > MAX_ENTRIES ? options.page() : 1, documented.size(), command);
+    }
+
+    private static DiscoverResult.Documented documentedOn(Page window, List<String> documented, int offset) {
+        return documented.isEmpty()
+                ? DiscoverResult.Documented.NONE
+                : new DiscoverResult.Documented(window.slice(documented, offset), documented.size());
     }
 
     /**
@@ -767,8 +799,7 @@ public final class Containers {
      */
     private static Result<DiscoverResult> listing(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> selected, Options options, DiscoverResult.Documented documented, String warning,
-            String note) {
+            List<Entry> selected, Options options, List<String> documented, String warning, String note) {
         List<Entry> callable = selected.stream()
                 .filter(entry -> !(entry.fn() instanceof Fn.Constructor))
                 .toList();
@@ -778,9 +809,9 @@ public final class Containers {
             return mixedAnswer(loaded, scope, container, selectors, callable, options, documented, warning, note);
         }
         if (hasResources) {
-            return resourceAnswer(loaded, scope, container, selectors, callable, options, warning, note);
+            return resourceAnswer(loaded, scope, container, selectors, callable, options, documented, warning, note);
         }
-        return methodAnswer(loaded, scope, container, selectors, callable, options, warning, note);
+        return methodAnswer(loaded, scope, container, selectors, callable, options, documented, warning, note);
     }
 
     /**
@@ -789,11 +820,17 @@ public final class Containers {
      * <p>Exit 0 with the alternatives rather than a failure: an empty selection is a fact about the container,
      * and the caller's next move is in the answer.
      */
-    private static DiscoverResult nothingMatched(
+    private static Result<DiscoverResult> nothingMatched(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            Options options, DiscoverResult.Documented documented, String note) {
+            Options options, List<String> documented, String note) {
         String asked = options.filtered() ? options.filter() : String.join(" ", selectors);
         String command = baseCommand(loaded, scope, container);
+        String repeated = command + selectorArguments(container, selectors) + filterArgument(options);
+        Result<Page> page = documentedPage(documented, options, repeated);
+        if (!page.isOk()) {
+            return page.cast();
+        }
+        Page window = page.value();
 
         // Rule 2 of segment location: more than one occurrence is LISTED and the request stops there. Picking
         // one is exactly the failure anchoring exists to prevent.
@@ -817,12 +854,12 @@ public final class Containers {
             }
         }
         DiscoverResult available = alternatives.isEmpty() && !all.isEmpty()
-                ? listing(loaded, scope, container, List.of(), all, Options.bare(),
-                        DiscoverResult.Documented.NONE, null, null).value()
+                ? listing(loaded, scope, container, List.of(), all, Options.bare(), List.of(), null, null).value()
                 : null;
-        return new DiscoverResult.NoMatch(asked, containerName(container),
-                Names.nearMisses(asked, names), alternatives, available, command, documented,
-                loaded.warning(), note);
+        return Result.ok(new DiscoverResult.NoMatch(asked, containerName(container),
+                Names.nearMisses(asked, names), alternatives, available,
+                window.paging() == null ? command : window.next(repeated),
+                documentedOn(window, documented, 0), window.paging(), loaded.warning(), note));
     }
 
     // -----------------------------------------------------------------------
@@ -836,9 +873,16 @@ public final class Containers {
      * caches DELETE on github names {@code ActionsDeleteActionsCacheByKeyQueries}, the included-record parameter
      * whose fields are the call's named arguments, and no signature line spells those out.
      */
-    private static DiscoverResult signature(
-            LoadedPackage loaded, Surface.Container container, List<String> selectors, Entry entry,
-            DiscoverResult.Documented documented, String note) {
+    private static Result<DiscoverResult> signature(
+            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
+            Entry entry, Options options, List<String> documented, String note) {
+        String command = baseCommand(loaded, scope, container) + selectorArguments(container, selectors)
+                + filterArgument(options);
+        Result<Page> page = documentedPage(documented, options, command);
+        if (!page.isOk()) {
+            return page.cast();
+        }
+        Page window = page.value();
         Fn fn = entry.fn();
         String declaration = container.isModule() && fn instanceof Fn.Standalone standalone
                 ? Signatures.renderStandaloneFunction(standalone)
@@ -885,12 +929,13 @@ public final class Containers {
             case Fn.Standalone standalone -> standalone.name();
             case Fn.Constructor ignored -> "init";
         };
-        return new DiscoverResult.Signature(
+        return Result.ok(new DiscoverResult.Signature(
                 container.isModule() ? null : container.name(), kind, name,
                 fn instanceof Fn.Resource resource ? resource.accessor() : null,
                 fn instanceof Fn.Resource ? pathName(entry.path()) : null,
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
-                types, omitted, documented, loaded.warning(), mergeNotes(note, pathNote(container, selectors)));
+                types, omitted, documentedOn(window, documented, 0), window.paging(), window.next(command),
+                loaded.warning(), mergeNotes(note, pathNote(container, selectors))));
     }
 
     /**
@@ -902,8 +947,7 @@ public final class Containers {
      */
     private static Result<DiscoverResult> mixedAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> callable, Options options, DiscoverResult.Documented documented, String warning,
-            String note) {
+            List<Entry> callable, Options options, List<String> documented, String warning, String note) {
         String base = baseCommand(loaded, scope, container);
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
         List<DiscoverResult.ResourceList.Resource> resources = mergedResources(
@@ -912,18 +956,19 @@ public final class Containers {
         List<DiscoverResult.Method> normal = methodsOf(callable, Fn.Normal.class, base);
         int total = resources.size() + remote.size() + normal.size();
 
-        Result<Page> page = Page.of(options.page(), total, command);
+        Result<Page> page = Page.of(options.page(), total + documented.size(), command);
         if (!page.isOk()) {
             return page.cast();
         }
         Page window = page.value();
+        List<DiscoverResult.ResourceList.Resource> shownResources = window.slice(resources, 0);
+        List<DiscoverResult.Method> shownRemote = window.slice(remote, resources.size());
+        List<DiscoverResult.Method> shownNormal = window.slice(normal, resources.size() + remote.size());
         return Result.ok(new DiscoverResult.MixedListing(containerName(container),
-                window.slice(resources, 0),
-                window.slice(remote, resources.size()),
-                window.slice(normal, resources.size() + remote.size()),
+                shownResources, shownRemote, shownNormal,
                 new DiscoverResult.MixedListing.Counts(resources.size(), remote.size(), normal.size()),
-                window.to() - window.from(), total, window.paging(), window.next(command),
-                window.number() == 1 ? documented : DiscoverResult.Documented.NONE, warning,
+                shownResources.size() + shownRemote.size() + shownNormal.size(), total, window.paging(),
+                window.next(command), documentedOn(window, documented, total), warning,
                 mergeNotes(note, pathNote(container, selectors))));
     }
 
@@ -943,20 +988,21 @@ public final class Containers {
 
     private static Result<DiscoverResult> methodAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> callable, Options options, String warning, String note) {
+            List<Entry> callable, Options options, List<String> documented, String warning, String note) {
         // A page is turned on the SAME selection — selector and filter both — or paging would silently widen
         // back out to the container's full roster.
         String base = baseCommand(loaded, scope, container);
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
         List<DiscoverResult.Method> methods = methodsOf(callable, Fn.class, base);
-        Result<Page> page = Page.of(options.page(), methods.size(), command);
+        Result<Page> page = Page.of(options.page(), methods.size() + documented.size(), command);
         if (!page.isOk()) {
             return page.cast();
         }
         Page window = page.value();
-        List<DiscoverResult.Method> shown = methods.subList(window.from(), window.to());
+        List<DiscoverResult.Method> shown = window.slice(methods, 0);
         return Result.ok(new DiscoverResult.MethodList(containerName(container), shown, shown.size(),
-                methods.size(), window.paging(), window.next(command), warning, note));
+                methods.size(), window.paging(), window.next(command),
+                documentedOn(window, documented, methods.size()), warning, note));
     }
 
     // -----------------------------------------------------------------------
@@ -973,7 +1019,7 @@ public final class Containers {
      */
     private static Result<DiscoverResult> resourceAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> callable, Options options, String warning, String note) {
+            List<Entry> callable, Options options, List<String> documented, String warning, String note) {
         String base = baseCommand(loaded, scope, container);
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
         List<DiscoverResult.ResourceList.Resource> merged = mergedResources(callable, base);
@@ -992,24 +1038,29 @@ public final class Containers {
         if (groupable && merged.size() > MAX_ENTRIES) {
             Optional<PathTree> node = descend(PathTree.build(operationsOf(callable)), prefix.get());
             if (node.isPresent()) {
-                return Result.ok(groupedAnswer(container, selectors, node.get(), prefix.get(), base, warning,
-                        combinedNote));
+                return groupedAnswer(container, selectors, node.get(), prefix.get(), base, command, options.page(),
+                        warning, combinedNote);
             }
         }
 
-        Result<Page> page = Page.of(options.page(), merged.size(), command);
+        Result<Page> page = Page.of(options.page(), merged.size() + documented.size(), command);
         if (!page.isOk()) {
             return page.cast();
         }
         Page window = page.value();
-        List<DiscoverResult.ResourceList.Resource> shown = merged.subList(window.from(), window.to());
+        List<DiscoverResult.ResourceList.Resource> shown = window.slice(merged, 0);
         return Result.ok(new DiscoverResult.ResourceList(containerName(container), shown, shown.size(),
-                merged.size(), window.paging(), window.next(command), warning, combinedNote));
+                merged.size(), window.paging(), window.next(command),
+                documentedOn(window, documented, merged.size()), warning, combinedNote));
     }
 
-    private static DiscoverResult groupedAnswer(
+    /**
+     * The groups at one level, and the paths that end there, as one paged sequence: the paths first, since no
+     * group name reaches them, then the groups, busiest first.
+     */
+    private static Result<DiscoverResult> groupedAnswer(
             Surface.Container container, List<String> selectors, PathTree node, List<String> prefix, String base,
-            String warning, String note) {
+            String command, int requested, String warning, String note) {
         String accessor = pathRequest(container, selectors).map(PathRequest::accessor).orElse(null);
         List<PathTree.Operation> terminal = new ArrayList<>();
         Map<List<String>, PathTree> literalChildren = new LinkedHashMap<>();
@@ -1026,15 +1077,15 @@ public final class Containers {
         groups.sort(Comparator.comparingInt(DiscoverResult.PathGroups.Group::count).reversed()
                 .thenComparing(DiscoverResult.PathGroups.Group::name, Texts.LOCALE_ORDER));
 
-        List<DiscoverResult.ResourceList.Resource> shownHere = here.subList(0, Math.min(MAX_ENTRIES, here.size()));
-        List<DiscoverResult.PathGroups.Group> shownGroups =
-                groups.subList(0, Math.min(MAX_ENTRIES - shownHere.size(), groups.size()));
         int total = here.size() + groups.size();
-        String next = shownHere.size() + shownGroups.size() < total
-                ? base + selectorArguments(container, selectors) + " --filter <keyword>"
-                : null;
-        return new DiscoverResult.PathGroups(containerName(container), shownHere, shownGroups, total, next,
-                warning, note);
+        Result<Page> page = Page.of(requested, total, command);
+        if (!page.isOk()) {
+            return page.cast();
+        }
+        Page window = page.value();
+        return Result.ok(new DiscoverResult.PathGroups(containerName(container), window.slice(here, 0),
+                window.slice(groups, here.size()), new DiscoverResult.PathGroups.Counts(here.size(), groups.size()),
+                total, window.paging(), window.next(command), warning, note));
     }
 
     /**

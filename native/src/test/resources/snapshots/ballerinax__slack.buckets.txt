@@ -44,9 +44,9 @@ Groups (operations under each)
   admin.teams.settings.setDescription                       1
   admin.teams.settings.setDiscoverability                   1
 
-... 134 more, narrow further
+... 134 more (page 1 of 5)
 Next: bal discover ballerinax/slack client Client <group>
-Next: bal discover ballerinax/slack client Client --filter <keyword>
+Next: bal discover ballerinax/slack client Client --page 2
 == service ==
 ballerinax/slack · service
 This package declares nothing in service.

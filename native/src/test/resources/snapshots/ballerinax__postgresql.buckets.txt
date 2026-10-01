@@ -65,9 +65,9 @@ ballerinax/postgresql · class
   LineArrayValue
   LineOutParameter          1 normal
 
-... 85 more, narrow further
+... 85 more (page 1 of 4)
 Next: bal discover ballerinax/postgresql class <name>
-Next: bal discover ballerinax/postgresql class --filter <keyword>
+Next: bal discover ballerinax/postgresql class --page 2
 == funcs ==
 ballerinax/postgresql · funcs
 This package declares nothing in funcs.

@@ -107,6 +107,12 @@ public final class Filter {
         return new Split<>(List.copyOf(surface), List.copyOf(documented));
     }
 
+    /** Whether {@code text} matches the keyword the same way {@link #apply} matches an entry's surface. */
+    public static boolean matches(String query, String text) {
+        String keyword = normalise(query);
+        return keyword.isEmpty() || text.toLowerCase(Locale.ROOT).contains(keyword);
+    }
+
     private static String normalise(String query) {
         if (query == null || query.isBlank()) {
             return "";

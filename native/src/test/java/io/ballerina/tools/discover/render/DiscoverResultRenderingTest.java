@@ -25,6 +25,7 @@ import io.ballerina.tools.discover.Texts;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -138,7 +139,7 @@ public class DiscoverResultRenderingTest {
     // -----------------------------------------------------------------------
 
     @Test
-    public void aContainerRosterListsNamesInTextAndCallsInJson() {
+    public void aContainerRosterListsNamesInTextAndCommandsInJson() {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(
                         new DiscoverResult.ContainerRoster.Container(
@@ -196,21 +197,23 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
-    public void aTruncatedContainerRosterNamesWhatWasCutInBothRenderings() {
+    public void aPagedContainerRosterNamesWhatWasCutInBothRenderings() {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(new DiscoverResult.ContainerRoster.Container(
                         "A", 0, 1, 0, "bal discover pkg class A")),
-                91, "bal discover pkg class --page 2");
+                91, new DiscoverResult.Paging(1, 3, 51), "bal discover pkg class --page 2", null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "91 containers",
                 "",
                 "  A  1 remote",
                 "",
-                "... 90 more, narrow further",
+                "... 51 more (page 1 of 3)",
                 "Next: bal discover pkg class <name>",
                 "Next: bal discover pkg class --page 2"));
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("next").getAsString(), "bal discover pkg class --page 2");
+        Assert.assertEquals(json.get("page").getAsInt(), 1);
+        Assert.assertEquals(json.get("pages").getAsInt(), 3);
     }
 
     // -----------------------------------------------------------------------
@@ -219,30 +222,34 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void pathGroupsRenderTheRfcsGroupsShape() {
-        DiscoverResult result = new DiscoverResult.PathGroups(
+        DiscoverResult result = new DiscoverResult.PathGroups(null, List.of(),
                 List.of(
                         new DiscoverResult.PathGroups.Group(
                                 "repos", 421, "bal discover ballerinax/github client repos"),
                         new DiscoverResult.PathGroups.Group(
                                 "orgs", 124, "bal discover ballerinax/github client orgs")),
-                36, "bal discover ballerinax/github client --filter <keyword>");
+                new DiscoverResult.PathGroups.Counts(0, 42), 42, new DiscoverResult.Paging(1, 2, 40),
+                "bal discover ballerinax/github client --page 2", null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
-                "36 path groups",
+                "42 path groups",
                 "",
                 "Groups (operations under each)",
                 "  repos  421",
                 "  orgs   124",
                 "",
-                "... 34 more, narrow further",
+                "... 40 more (page 1 of 2)",
                 "Next: bal discover ballerinax/github client <group>",
-                "Next: bal discover ballerinax/github client --filter <keyword>"));
+                "Next: bal discover ballerinax/github client --page 2"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonArray groups = json.getAsJsonArray("groups");
         Assert.assertEquals(groups.get(0).getAsJsonObject().get("name").getAsString(), "repos");
         Assert.assertEquals(groups.get(0).getAsJsonObject().get("count").getAsInt(), 421);
         Assert.assertEquals(json.get("shown").getAsInt(), 2);
-        Assert.assertEquals(json.get("total").getAsInt(), 36);
+        Assert.assertEquals(json.get("total").getAsInt(), 42);
+        Assert.assertEquals(json.get("page").getAsInt(), 1);
+        Assert.assertEquals(json.get("pages").getAsInt(), 2);
+        Assert.assertEquals(json.getAsJsonObject("counts").toString(), "{\"groups\":42}");
         Assert.assertFalse(json.has("resources"), "nothing ends at the top level here");
     }
 
@@ -252,7 +259,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.PathGroups("Client",
                 List.of(resource("repos/:owner/:repo", client + " repos/:owner/:repo", "get", "patch", "delete")),
                 List.of(new DiscoverResult.PathGroups.Group("repos/actions", 38, client + " repos/actions get")),
-                2, null, null, null);
+                new DiscoverResult.PathGroups.Counts(1, 1), 2, null, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "1 resource path here, 1 path group",
@@ -272,6 +279,25 @@ public class DiscoverResultRenderingTest {
                 "repos/:owner/:repo");
         Assert.assertEquals(json.get("shown").getAsInt(), 2);
         Assert.assertEquals(json.get("total").getAsInt(), 2);
+    }
+
+    /** A page the paths ending here fill on their own still counts the groups that come after it. */
+    @Test
+    public void aPageHoldingOnlyThePathsEndingHereStillCountsTheGroups() {
+        String client = "bal discover pkg client Client";
+        List<DiscoverResult.ResourceList.Resource> here = new ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            here.add(resource("p" + i, client + " p" + i, "get"));
+        }
+        DiscoverResult result = new DiscoverResult.PathGroups("Client", here, List.of(),
+                new DiscoverResult.PathGroups.Counts(45, 3), 48, new DiscoverResult.Paging(1, 2, 8),
+                client + " --page 2", null, null);
+        String text = TextRenderer.render(result);
+        Assert.assertTrue(text.startsWith("Client\n45 resource paths here, 3 path groups\n"), text);
+        Assert.assertTrue(text.endsWith("\n... 8 more (page 1 of 2)\nNext: " + client + " <path> <accessor>\nNext: "
+                + client + " --page 2"), text);
+        Assert.assertEquals(JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject()
+                .getAsJsonObject("counts").toString(), "{\"resources\":45,\"groups\":3}");
     }
 
     // -----------------------------------------------------------------------
@@ -335,7 +361,7 @@ public class DiscoverResultRenderingTest {
     public void aPaginatedMethodListNamesTheNextPageInBothRenderings() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
                 methods(TWILIO, "createAccount", "createAddress"), 40, 199, new DiscoverResult.Paging(1, 5, 159),
-                TWILIO + " --page 2", null, null);
+                TWILIO + " --page 2", DiscoverResult.Documented.NONE, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "199 methods",
@@ -360,14 +386,15 @@ public class DiscoverResultRenderingTest {
     public void aLaterPageCountsOnlyWhatComesAfterIt() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
                 methods(TWILIO, "deleteConferenceRecording"), 40, 199, new DiscoverResult.Paging(2, 5, 119),
-                "bal discover ballerinax/twilio client Client --page 3", null, null);
+                "bal discover ballerinax/twilio client Client --page 3", DiscoverResult.Documented.NONE, null, null);
         Assert.assertTrue(TextRenderer.render(result).endsWith(lines(
                 "... 119 more (page 2 of 5)",
                 "Next: " + TWILIO + " <name>",
                 "Next: " + TWILIO + " --page 3")));
 
         DiscoverResult last = new DiscoverResult.MethodList("Client",
-                methods(TWILIO, "updateUsageTrigger"), 39, 199, new DiscoverResult.Paging(5, 5, 0), null, null, null);
+                methods(TWILIO, "updateUsageTrigger"), 39, 199, new DiscoverResult.Paging(5, 5, 0), null,
+                DiscoverResult.Documented.NONE, null, null);
         Assert.assertTrue(TextRenderer.render(last).endsWith("Last page (page 5 of 5)\nNext: " + TWILIO + " <name>"));
         Assert.assertFalse(JsonParser.parseString(JsonRenderer.render(last)).getAsJsonObject().has("next"));
     }
@@ -451,7 +478,25 @@ public class DiscoverResultRenderingTest {
                 List.of(new DiscoverResult.Signature.Parameter("headers", "map<string|string[]>", "{}", null, ""),
                         new DiscoverResult.Signature.Parameter(
                                 "queries", "GistsListPublicQueries", null, "inclusion", "Queries to send")),
-                "BaseGist[]|error", false, types, omitted, DiscoverResult.Documented.NONE, null, note);
+                "BaseGist[]|error", false, types, omitted, DiscoverResult.Documented.NONE, null, null, null, note);
+    }
+
+    @Test
+    public void aSignaturesDocumentationOnlyMatchesPageWithTheCommandThatReachesTheRest() {
+        String command = "bal discover pkg client Client echo --filter the";
+        DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
+                "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
+                false, List.of(), List.of(), new DiscoverResult.Documented(List.of("ping", "auth"), 82),
+                new DiscoverResult.Paging(2, 3, 2), command + " --page 3", null, null);
+        String text = TextRenderer.render(result);
+        Assert.assertTrue(text.contains("\nMatched by documentation only (2 of 82)\n  ping\n  auth\n"), text);
+        Assert.assertTrue(text.endsWith("\n... 2 more (page 2 of 3)\nNext: " + command + " --page 3"), text);
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
+        Assert.assertEquals(json.get("documentedTotal").getAsInt(), 82);
+        Assert.assertEquals(json.get("page").getAsInt(), 2);
+        Assert.assertEquals(json.get("pages").getAsInt(), 3);
+        Assert.assertEquals(json.get("next").getAsString(), command + " --page 3");
     }
 
     @Test
@@ -595,7 +640,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.NoMatch("sendd", "Producer", List.of("send"), List.of(),
                 new DiscoverResult.MethodList(methods("bal discover ballerinax/kafka client Producer", "close", "send"),
                         2, 2, null),
-                "bal discover ballerinax/kafka client Producer", DiscoverResult.Documented.NONE, null, null);
+                "bal discover ballerinax/kafka client Producer", DiscoverResult.Documented.NONE, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Producer",
                 "Nothing on Producer matches 'sendd'.",
@@ -627,7 +672,8 @@ public class DiscoverResultRenderingTest {
                                 "bal discover ballerinax/github client Client repos/:owner/:repo/actions/secrets"),
                         new DiscoverResult.NoMatch.Alternative("repos/:owner/:repo/dependabot/secrets",
                                 "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets")),
-                null, "bal discover ballerinax/github client Client", DiscoverResult.Documented.NONE, null, null);
+                null, "bal discover ballerinax/github client Client", DiscoverResult.Documented.NONE, null, null,
+                null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "Nothing on Client matches 'repos/owner/repo/secrets'.",
@@ -658,7 +704,7 @@ public class DiscoverResultRenderingTest {
                                 "Caller", 1, "bal discover ballerinax/kafka client Caller commit"),
                         new DiscoverResult.Owners.Owner(
                                 "Consumer", 3, "bal discover ballerinax/kafka client Consumer commit")),
-                2, null, null);
+                2, null, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "'commit' is declared on 2 containers; pick one.",
                 "",

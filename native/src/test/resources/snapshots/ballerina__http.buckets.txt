@@ -2,16 +2,16 @@
 ballerina/http · client
 10 clients
 
-  ClientObject                           7 resources  15 remote
-  StatusCodeClientObject                 7 resources  15 remote
-  Caller                                               5 remote  1 normal
-  Client                                 7 resources  15 remote  4 normal
-  ClientOAuth2Handler                                  1 remote  2 normal
-  FailoverClient                         7 resources  15 remote  1 normal
-  ListenerLdapUserStoreBasicAuthHandler                2 remote
-  ListenerOAuth2Handler                                1 remote
-  LoadBalanceClient                      7 resources  15 remote
-  StatusCodeClient                       7 resources  15 remote  4 normal
+  ClientObject                           1 resource  15 remote
+  StatusCodeClientObject                 1 resource  15 remote
+  Caller                                              5 remote  1 normal
+  Client                                 1 resource  15 remote  4 normal
+  ClientOAuth2Handler                                 1 remote  2 normal
+  FailoverClient                         1 resource  15 remote  1 normal
+  ListenerLdapUserStoreBasicAuthHandler               2 remote
+  ListenerOAuth2Handler                               1 remote
+  LoadBalanceClient                      1 resource  15 remote
+  StatusCodeClient                       1 resource  15 remote  4 normal
 
 Next: bal discover ballerina/http client <name>
 == service ==
@@ -73,9 +73,9 @@ ballerina/http · class
   StatusLocked
   StatusLoopDetected
 
-... 43 more, narrow further
+... 43 more (page 1 of 3)
 Next: bal discover ballerina/http class <name>
-Next: bal discover ballerina/http class --filter <keyword>
+Next: bal discover ballerina/http class --page 2
 == funcs ==
 ballerina/http · funcs
 7 functions

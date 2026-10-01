@@ -23,6 +23,7 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Loader;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
@@ -150,41 +151,63 @@ public final class Cli {
             return fail(loaded.failure(), streams);
         }
 
-        TextRenderer.Context where = new TextRenderer.Context(qualified.value().qualified(), root.module, rest,
-                root.filter);
-        if (bucket == null) {
-            emit(bucketList(loaded.value()), where, streams, root.output, interactive);
-            return 0;
-        }
-
-        if ("readme".equals(bucket)) {
-            // Not derived from call-site grammar, so it shares no code with Containers — see Readme's own class
-            // comment for why.
-            List<String> readmeSelectors = rest.subList(1, rest.size());
-            Readme.Options readmeOptions = new Readme.Options(
-                    readmeSelectors.isEmpty() ? null : String.join(" ", readmeSelectors), root.filter, root.page);
-            Result<DiscoverResult> readme = Readme.render(loaded.value(), readmeOptions);
-            if (!readme.isOk()) {
-                return fail(readme.failure(), streams);
-            }
-            emit(readme.value(), where, streams, root.output, interactive);
-            return 0;
-        }
-
-        Containers.Options containerOptions =
-                new Containers.Options(rest.subList(1, rest.size()), root.filter, root.page);
-        Result<DiscoverResult> answer = switch (bucket) {
-            case "client" -> Containers.render(loaded.value(), Surface.Scope.CLIENT, containerOptions);
-            case "service" -> Containers.render(loaded.value(), Surface.Scope.SERVICE, containerOptions);
-            case "class" -> Containers.render(loaded.value(), Surface.Scope.CLASS, containerOptions);
-            case "funcs" -> Containers.render(loaded.value(), Surface.Scope.MODULE, containerOptions);
-            default -> throw new IllegalStateException("unreachable: validated above");
-        };
+        // A blank keyword filters nothing, so it is no filter at all — normalised once, here, so no header or
+        // printed command downstream ever spells an empty `--filter`.
+        String filter = root.filter == null || root.filter.isBlank() ? null : root.filter;
+        Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
         if (!answer.isOk()) {
             return fail(answer.failure(), streams);
         }
+        if (root.page != 1 && answer.value().paging() == null) {
+            return fail(notPaged(root, filter), streams);
+        }
+        TextRenderer.Context where = new TextRenderer.Context(qualified.value().qualified(), root.module, rest,
+                filter);
         emit(answer.value(), where, streams, root.output, interactive);
         return 0;
+    }
+
+    private static Result<DiscoverResult> answer(
+            LoadedPackage loaded, String bucket, List<String> rest, String filter, int page) {
+        if (bucket == null) {
+            return Result.ok(bucketList(loaded));
+        }
+        List<String> selectors = rest.subList(1, rest.size());
+        if ("readme".equals(bucket)) {
+            // Not derived from call-site grammar, so it shares no code with Containers — see Readme's own class
+            // comment for why.
+            return Readme.render(loaded, new Readme.Options(
+                    selectors.isEmpty() ? null : String.join(" ", selectors), filter, page));
+        }
+        Containers.Options options = new Containers.Options(selectors, filter, page);
+        return switch (bucket) {
+            case "client" -> Containers.render(loaded, Surface.Scope.CLIENT, options);
+            case "service" -> Containers.render(loaded, Surface.Scope.SERVICE, options);
+            case "class" -> Containers.render(loaded, Surface.Scope.CLASS, options);
+            case "funcs" -> Containers.render(loaded, Surface.Scope.MODULE, options);
+            default -> throw new IllegalStateException("unreachable: validated above");
+        };
+    }
+
+    /**
+     * {@code --page} against an answer that does not page — a bare package, one signature, a whole readme, a
+     * no-match answer. Served as page 1 it would read as a page that exists; a listing's own range check is what
+     * rejects a page past the end of one that does page.
+     */
+    private static Failure notPaged(Commands.Root root, String filter) {
+        StringBuilder command = new StringBuilder("bal discover ").append(root.pkg);
+        if (root.module != null) {
+            command.append(" --module ").append(Texts.shellWord(root.module));
+        }
+        if (root.rest != null) {
+            root.rest.forEach(word -> command.append(' ').append(Texts.shellWord(word)));
+        }
+        if (filter != null) {
+            command.append(" --filter ").append(Texts.shellWord(filter));
+        }
+        return new Failure.Validation(
+                "--page " + root.page + " is out of range: this answer is not paged.",
+                "Drop --page: `" + command + "`.");
     }
 
     /** Renders a result with whichever of the two renderers {@code --output} (or the TTY default) selects. */
@@ -204,12 +227,7 @@ public final class Cli {
                 "The buckets are " + String.join(", ", Commands.BUCKETS) + ".");
     }
 
-    /**
-     * No bucket: which of them this package actually has.
-     *
-     * <p>Deliberately minimal for now — a bucket list and nothing else. Submodules, once {@code --module} exists
-     * to target one, are a bare-package fact too and land beside this.
-     */
+    /** No bucket: which of them this package (or the targeted module) actually has, and its other modules. */
     private static DiscoverResult.BucketList bucketList(LoadedPackage loaded) {
         List<String> buckets = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
@@ -243,6 +261,11 @@ public final class Cli {
         Failure output = rejectInvalidOutput(root);
         if (output != null) {
             return output;
+        }
+        if (root.page < 1) {
+            return new Failure.Validation(
+                    "--page " + root.page + " is out of range: pages are numbered from 1.",
+                    "Pass --page 1 or later, or drop it for the first page.");
         }
         return rejectVersionArguments(root);
     }
@@ -298,7 +321,8 @@ public final class Cli {
             if (token.startsWith("-")) {
                 return new Failure.Validation(
                         "Unknown option '" + token + "'.",
-                        "Known flags are --refresh and --help. Run with --help for usage.");
+                        "Known flags are --module/-m, --filter, --page, --output, --refresh and --help. "
+                                + "Run with --help for usage.");
             }
             return new Failure.Validation(
                     "Unexpected argument '" + token + "'.",

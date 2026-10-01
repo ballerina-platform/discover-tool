@@ -22,11 +22,12 @@ No bucket lists which of them this package has.
   --filter <keyword>     Narrow an already-selected bucket to entries whose name,
                          path, parameter or type matches this keyword, client-side.
                          Never sent to Central as a query.
-  --page <n>             1-indexed. Turns the page of any listing that pages over
-                         the entry ceiling: methods, resource paths that cannot be
-                         grouped, a container listed by call form (resources,
-                         remote, normal), and readme sections narrowed by --filter.
-                         A page outside the listing is an error.
+  --page <n>             1-indexed. Turns the page of any listing over the entry
+                         ceiling: a roster, a level of path groups, methods,
+                         resource paths, a container listed by call form,
+                         documentation-only matches, and readme sections narrowed by
+                         --filter. A page outside the listing, or against an answer
+                         that does not page, is an error.
   -m, --module <name>    Target this submodule instead of the package's default
                          module, the same everywhere including readme. The bare
                          submodule name only — <org/name> is always resolved as one

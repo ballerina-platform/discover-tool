@@ -82,7 +82,7 @@ public final class Readme {
 
     public static Result<DiscoverResult> render(LoadedPackage loaded, Options options) {
         String markdown = loaded.readme().orElse("");
-        if (markdown.isEmpty() && options.selector() == null && !options.filtered()) {
+        if (markdown.isEmpty()) {
             return Result.err(noReadme(loaded));
         }
         List<Chunk> chunks = chunksOf(markdown);
@@ -197,7 +197,7 @@ public final class Readme {
                     "Chunk " + requested + " (\"" + chunk.title() + "\") does not match --filter \""
                             + filter + "\".",
                     "Drop --filter to read it anyway: `bal discover " + loaded.pkgArgument() + " readme "
-                            + requested + "`."));
+                            + Texts.shellWord(requested) + "`."));
         }
         return Result.ok(toResult(chunk, chunks.size(), loaded));
     }
@@ -249,16 +249,23 @@ public final class Readme {
     /**
      * Narrows to the chunks whose title or body mentions the keyword — exactly one is answered in full, the
      * same rule every other bucket applies to an exact one-of-many match; more than one is a roster to choose
-     * from, paginated past {@value Containers#MAX_ENTRIES} like any other listing this tool ceilings.
+     * from, paginated past {@value Containers#MAX_ENTRIES} like any other listing this tool ceilings; none is the
+     * same no-match answer every other bucket gives, pointing back at the whole readme.
      */
     private static Result<DiscoverResult> filtered(LoadedPackage loaded, List<Chunk> chunks, Options options) {
         List<Chunk> matched = chunks.stream().filter(chunk -> matches(chunk, options.filter())).toList();
+        String pkg = loaded.pkgArgument();
 
+        if (matched.isEmpty()) {
+            return Result.ok(new DiscoverResult.NoMatch(options.filter(), null,
+                    Names.nearMisses(options.filter(), chunks.stream().map(Chunk::title).toList()), List.of(), null,
+                    "bal discover " + pkg + " readme", DiscoverResult.Documented.NONE, null, loaded.warning(),
+                    null));
+        }
         if (matched.size() == 1) {
             return Result.ok(toResult(matched.get(0), chunks.size(), loaded));
         }
 
-        String pkg = loaded.pkgArgument();
         List<DiscoverResult.ReadmeChunks.Chunk> items = matched.stream()
                 .map(chunk -> new DiscoverResult.ReadmeChunks.Chunk(
                         chunk.number(), chunk.title(), chunk.lines(),

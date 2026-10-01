@@ -40,6 +40,15 @@ import java.util.Map;
 public sealed interface DiscoverResult {
 
     /**
+     * Which page of a paginated answer this is, or {@code null} for an answer that is not paged — one that fits on
+     * one page, or a shape that never pages at all. A {@code --page} other than 1 is only valid against an answer
+     * that reports one.
+     */
+    default Paging paging() {
+        return null;
+    }
+
+    /**
      * Which page of a paginated listing this response is.
      *
      * @param page the page served, 1-indexed
@@ -58,10 +67,12 @@ public sealed interface DiscoverResult {
 
     /**
      * Entries a {@code --filter} matched only in their documentation, not in any name, path, parameter or type —
-     * under the same entry ceiling as every listing, since a common word can match most of a package.
+     * under the same entry ceiling as every listing, since a common word can match most of a package. Paged with
+     * {@code --page} like any listing: after the listing's own entries when the answer is a listing, on their own
+     * otherwise.
      *
-     * @param names the names shown, up to the ceiling
-     * @param total how many matched that way
+     * @param names the names on this page
+     * @param total how many matched that way, every page included
      */
     record Documented(List<String> names, int total) {
 
@@ -100,22 +111,23 @@ public sealed interface DiscoverResult {
      * Several containers in one bucket (several clients, several classes) — the roster a caller chooses from
      * before naming one.
      *
-     * @param containers every container in the bucket, up to the ceiling
-     * @param total how many the bucket actually declares
-     * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
+     * @param containers the containers on this page, up to the ceiling
+     * @param total how many the bucket (or the {@code --filter}) selects
+     * @param paging which page this is, or {@code null} when the whole roster fit on one
+     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      */
-    record ContainerRoster(List<Container> containers, int total, String next, String warning)
+    record ContainerRoster(List<Container> containers, int total, Paging paging, String next, String warning)
             implements DiscoverResult {
 
         public ContainerRoster(List<Container> containers, int total, String next) {
-            this(containers, total, next, null);
+            this(containers, total, null, next, null);
         }
 
         /**
          * @param name the container's own name
-         * @param resources how many resource paths it declares
+         * @param resources how many distinct resource paths it declares — several accessors on one path count once
          * @param remote how many remote methods it declares
          * @param normal how many plain (non-remote) methods it declares
          * @param listener the listener(s) this service type binds to, joined, or {@code null} outside the
@@ -135,11 +147,14 @@ public sealed interface DiscoverResult {
      * {@code repos (275), orgs (124), ...} shape.
      *
      * @param container the container these paths belong to
-     * @param resources the operations that end at this level rather than under a further group, one entry per
-     *     path — listed beside the groups because no group name could reach them without looping back here
-     * @param groups the groups shown, busiest first; {@code resources} and {@code groups} share the ceiling
+     * @param resources the operations on this page that end at this level rather than under a further group, one
+     *     entry per path — listed beside the groups because no group name could reach them without looping back
+     * @param groups the groups on this page, busiest first; {@code resources} then {@code groups} are one paged
+     *     sequence sharing the ceiling
+     * @param counts how many resource paths and groups the whole level holds, every page included
      * @param total how many entries (resources plus groups) exist at this level
-     * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
+     * @param paging which page this is, or {@code null} when the whole level fit on one
+     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
@@ -148,12 +163,18 @@ public sealed interface DiscoverResult {
      *     {@code null} when neither applies
      */
     record PathGroups(
-            String container, List<ResourceList.Resource> resources, List<Group> groups, int total, String next,
-            String warning, String note) implements DiscoverResult {
+            String container, List<ResourceList.Resource> resources, List<Group> groups, Counts counts, int total,
+            Paging paging, String next, String warning, String note) implements DiscoverResult {
 
         public PathGroups(List<Group> groups, int total, String next) {
-            this(null, List.of(), groups, total, next, null, null);
+            this(null, List.of(), groups, new Counts(0, total), total, null, next, null, null);
         }
+
+        /**
+         * @param resources resource paths ending at this level
+         * @param groups groups at this level
+         */
+        public record Counts(int resources, int groups) { }
 
         /**
          * @param name the group's path prefix, {@code /}-joined from the top of the bucket
@@ -174,6 +195,7 @@ public sealed interface DiscoverResult {
      * @param total how many exist at this level
      * @param paging which page this is, or {@code null} when the whole listing fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
+     * @param documented entries a {@code --filter} matched only in their documentation, paged after the paths
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
@@ -183,10 +205,10 @@ public sealed interface DiscoverResult {
      */
     record ResourceList(
             String container, List<Resource> resources, int shown, int total, Paging paging, String next,
-            String warning, String note) implements DiscoverResult {
+            Documented documented, String warning, String note) implements DiscoverResult {
 
         public ResourceList(List<Resource> resources, int shown, int total, String next) {
-            this(null, resources, shown, total, null, next, null, null);
+            this(null, resources, shown, total, null, next, Documented.NONE, null, null);
         }
 
         /**
@@ -217,8 +239,8 @@ public sealed interface DiscoverResult {
      * @param shown how many are in this response
      * @param total how many the container declares
      * @param paging which page this is, or {@code null} when the whole listing fit on one
-     * @param next the ready-to-run command that narrows further or turns the page, or {@code null} when nothing
-     *     was cut off
+     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
+     * @param documented entries a {@code --filter} matched only in their documentation, paged after the methods
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
@@ -228,10 +250,10 @@ public sealed interface DiscoverResult {
      */
     record MethodList(
             String container, List<Method> methods, int shown, int total, Paging paging, String next,
-            String warning, String note) implements DiscoverResult {
+            Documented documented, String warning, String note) implements DiscoverResult {
 
         public MethodList(List<Method> methods, int shown, int total, String next) {
-            this(null, methods, shown, total, null, next, null, null);
+            this(null, methods, shown, total, null, next, Documented.NONE, null, null);
         }
     }
 
@@ -301,14 +323,16 @@ public sealed interface DiscoverResult {
      * @param types the declarations its signature names, one level deep, within the closure budget
      * @param omitted the names the closure budget left out of {@code types}
      * @param documented other entries a {@code --filter} matched only in their documentation
+     * @param paging which page of {@code documented} this is, or {@code null} when it fit on one
+     * @param next the ready-to-run command that turns {@code documented}'s page, or {@code null} on the last
      * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note kind tolerance, a path advisory or a service's listener, joined — or {@code null}
      */
     record Signature(
             String container, String kind, String name, String accessor, String path, String form,
             String declaration, List<Parameter> params, String returns, boolean deprecated,
-            List<Type> types, List<String> omitted, Documented documented, String warning, String note)
-            implements DiscoverResult {
+            List<Type> types, List<String> omitted, Documented documented, Paging paging, String next,
+            String warning, String note) implements DiscoverResult {
 
         /**
          * @param name the parameter's name
@@ -342,8 +366,8 @@ public sealed interface DiscoverResult {
      * @param total how many exist across all three
      * @param paging which page this is, or {@code null} when the whole listing fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
-     * @param documented entries a {@code --filter} matched only in their documentation — on the first page only,
-     *     since they are not part of the paged sequence
+     * @param documented entries a {@code --filter} matched only in their documentation, paged as the sequence's
+     *     last section, after the normal methods
      * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the same joined advisory {@link ResourceList#note} carries, or {@code null}
      */
@@ -369,15 +393,17 @@ public sealed interface DiscoverResult {
      * @param paths where a trailing path segment occurs, when it occurs in several places and none was picked
      * @param available the listing the same command gives without the selector, or {@code null} when
      *     {@code paths} already names the way forward
-     * @param next the command that lists everything there
+     * @param next the command that lists everything there — or, once {@code documented} pages, the command that
+     *     turns its page, {@code null} on the last
      * @param documented entries a {@code --filter} matched only in their documentation
+     * @param paging which page of {@code documented} this is, or {@code null} when it fit on one
      * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the same joined advisory every other container answer carries, or {@code null}
      */
     record NoMatch(
             String requested, String container, List<String> candidates, List<Alternative> paths,
-            DiscoverResult available, String next, Documented documented, String warning, String note)
-            implements DiscoverResult {
+            DiscoverResult available, String next, Documented documented, Paging paging, String warning,
+            String note) implements DiscoverResult {
 
         /**
          * @param path one full path carrying the requested segment
@@ -390,13 +416,15 @@ public sealed interface DiscoverResult {
      * One member name declared on several containers in a bucket — which one is the caller's choice, not a guess.
      *
      * @param requested the member name, as typed
-     * @param owners the containers declaring it, up to the ceiling
+     * @param owners the containers on this page, up to the ceiling
      * @param total how many containers declare it
-     * @param next a command template naming the slot to fill, or {@code null} when nothing was cut off
+     * @param paging which page this is, or {@code null} when every owner fit on one
+     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null}
+     * @param note the kind-tolerance advisory when the member was found in a different bucket, or {@code null}
      */
-    record Owners(String requested, List<Owner> owners, int total, String next, String warning)
-            implements DiscoverResult {
+    record Owners(String requested, List<Owner> owners, int total, Paging paging, String next, String warning,
+            String note) implements DiscoverResult {
 
         /**
          * @param name the container's name
