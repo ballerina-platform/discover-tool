@@ -1,16 +1,65 @@
 == client ==
-Container: Client
-Methods: addColumnsAfter, addColumnsAfterBySheetName, addColumnsBefore, addColumnsBeforeBySheetName, addRowsAfter, addRowsAfterBySheetName, addRowsBefore, addRowsBeforeBySheetName, addSheet, appendValue, appendValues, clearAll, clearAllBySheetName, clearCell, clearRange, copyTo, copyToBySheetName, createOrUpdateColumn, createOrUpdateRow, createSpreadsheet, deleteColumns, deleteColumnsBySheetName, deleteRowByDataFilter, deleteRows, deleteRowsBySheetName, deleteSpreadsheet, getCell, getColumn, getRange, getRow, getRowByDataFilter, getSheetByName, getSheets, openSpreadsheetById, openSpreadsheetByUrl, removeSheet, removeSheetByName, renameSheet, renameSpreadsheet, setCell
-... 3 more (page 1 of 2), next page: bal discover ballerinax/googleapis.sheets client Client --page 2
+ballerinax/googleapis.sheets · client · Client
+43 methods
+
+  addColumnsAfter
+  addColumnsAfterBySheetName
+  addColumnsBefore
+  addColumnsBeforeBySheetName
+  addRowsAfter
+  addRowsAfterBySheetName
+  addRowsBefore
+  addRowsBeforeBySheetName
+  addSheet
+  appendValue
+  appendValues
+  clearAll
+  clearAllBySheetName
+  clearCell
+  clearRange
+  copyTo
+  copyToBySheetName
+  createOrUpdateColumn
+  createOrUpdateRow
+  createSpreadsheet
+  deleteColumns
+  deleteColumnsBySheetName
+  deleteRowByDataFilter
+  deleteRows
+  deleteRowsBySheetName
+  deleteSpreadsheet
+  getCell
+  getColumn
+  getRange
+  getRow
+  getRowByDataFilter
+  getSheetByName
+  getSheets
+  openSpreadsheetById
+  openSpreadsheetByUrl
+  removeSheet
+  removeSheetByName
+  renameSheet
+  renameSpreadsheet
+  setCell
+
+... 3 more (page 1 of 2)
+Next: bal discover ballerinax/googleapis.sheets client Client --page 2
 == service ==
-service: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/googleapis.sheets client
+ballerinax/googleapis.sheets · service
+This package declares nothing in service.
+
+Elsewhere
+  client  1  bal discover ballerinax/googleapis.sheets client
 == class ==
-class: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/googleapis.sheets client
+ballerinax/googleapis.sheets · class
+This package declares nothing in class.
+
+Elsewhere
+  client  1  bal discover ballerinax/googleapis.sheets client
 == funcs ==
-funcs: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/googleapis.sheets client
+ballerinax/googleapis.sheets · funcs
+This package declares nothing in funcs.
+
+Elsewhere
+  client  1  bal discover ballerinax/googleapis.sheets client

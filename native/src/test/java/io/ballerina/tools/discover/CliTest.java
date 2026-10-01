@@ -355,8 +355,10 @@ public class CliTest {
         Assert.assertTrue(json.stdout().contains("\"call\":\"bal discover ballerinax/kafka client\""), json.stdout());
 
         Capture text = run(List.of("ballerinax/kafka", "funcs"), "ballerinax__kafka", "4.6.5", true);
-        Assert.assertTrue(text.stdout().startsWith("funcs: none in this package\nElsewhere:\n"
-                        + "  client (3): bal discover ballerinax/kafka client\n"),
+        Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka · funcs\n"
+                        + "This package declares nothing in funcs.\n\n"
+                        + "Elsewhere\n"
+                        + "  client   3  bal discover ballerinax/kafka client\n"),
                 text.stdout());
     }
 
@@ -388,9 +390,10 @@ public class CliTest {
         Assert.assertFalse(json.getAsJsonArray("types").isEmpty(), json.toString());
 
         String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
-        Assert.assertTrue(text.startsWith("# "), "the declaration's own doc comment comes first: " + text);
+        Assert.assertTrue(text.startsWith("ballerinax/kafka · client · Producer · send\n\n# "),
+                "the header, then the declaration's own doc comment: " + text);
         Assert.assertTrue(text.contains("remote function send("), text);
-        Assert.assertTrue(text.contains("\n\nTypes it names ("), text);
+        Assert.assertTrue(text.contains("\n\nTypes it names (2)\n  # "), text);
     }
 
     @Test
@@ -460,9 +463,10 @@ public class CliTest {
         Assert.assertEquals(json.get("shown").getAsInt(), json.get("total").getAsInt());
 
         String text = run(argv, "ballerina__http", "2.16.6", true).stdout();
-        Assert.assertTrue(text.startsWith("Container: Client\nResources (->):\n"), text);
-        Assert.assertTrue(text.contains("\nRemote (->): "), text);
-        Assert.assertTrue(text.contains("\nNormal (.): "), text);
+        Assert.assertTrue(text.startsWith("ballerina/http · client · Client\n"), text);
+        Assert.assertTrue(text.contains("\n\nResources (->)\n  :...path  get, "), text);
+        Assert.assertTrue(text.contains("\n\nRemote (->)\n  delete\n  execute\n"), text);
+        Assert.assertTrue(text.contains("\n\nNormal (.)\n  circuitBreakerForceClose\n"), text);
     }
 
     @Test
@@ -477,8 +481,9 @@ public class CliTest {
         Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerinax/kafka client Producer");
 
         String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
-        Assert.assertTrue(text.startsWith("Nothing on Producer matches 'sendd'.\nDid you mean: "), text);
-        Assert.assertTrue(text.contains("\nAvailable:\nContainer: Producer\nMethods: "), text);
+        Assert.assertTrue(text.startsWith("ballerinax/kafka · client · Producer · sendd\n"
+                + "Nothing on Producer matches 'sendd'.\n\nDid you mean\n  send\n"), text);
+        Assert.assertTrue(text.contains("\n\nAvailable\n  5 methods\n\n    'flush\n    close\n"), text);
     }
 
     @Test
@@ -501,8 +506,9 @@ public class CliTest {
         Assert.assertEquals(json.get("shown").getAsInt(), json.get("total").getAsInt());
 
         String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
-        Assert.assertTrue(text.startsWith("'commit' is declared on "), text);
-        Assert.assertTrue(text.contains("Consumer (3 matches)"), text);
+        Assert.assertTrue(text.startsWith("ballerinax/kafka · client · commit\n'commit' is declared on "), text);
+        Assert.assertTrue(text.contains(
+                "\n  Consumer  3 matches  bal discover ballerinax/kafka client Consumer commit"), text);
     }
 
     @Test
@@ -613,10 +619,14 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerina/graphql"), capture.streams(),
                 centralForDocs(docs, "1.0.0"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertTrue(capture.stdout().contains("Submodules:"), capture.stdout());
-        Assert.assertTrue(capture.stdout().contains("dataloader — load data from graphql.dataloader"),
+        Assert.assertTrue(capture.stdout().contains("\n\nSubmodules\n"), capture.stdout());
+        Assert.assertTrue(capture.stdout().contains(
+                "\n  dataloader  bal discover ballerina/graphql --module dataloader  "
+                        + "load data from graphql.dataloader"),
                 capture.stdout());
-        Assert.assertTrue(capture.stdout().contains("subgraph — load data from graphql.subgraph"),
+        Assert.assertTrue(capture.stdout().contains(
+                "\n  subgraph    bal discover ballerina/graphql --module subgraph    "
+                        + "load data from graphql.subgraph"),
                 capture.stdout());
         // The default module addresses itself through its own buckets, never through the submodule list.
         Assert.assertFalse(capture.stdout().contains("load data from graphql\n"), capture.stdout());
@@ -687,13 +697,25 @@ public class CliTest {
         Assert.assertFalse(out.contains("<!-- bal discover"), out);
     }
 
+    private static final String KAFKA_BUCKETS = String.join("\n",
+            "ballerinax/kafka",
+            "4 buckets",
+            "",
+            "  client",
+            "  service",
+            "  class",
+            "  readme",
+            "",
+            "Next: bal discover ballerinax/kafka <bucket>",
+            "");
+
     @Test
     public void aBarePackageListsItsBucketsAsTextAtATerminal() {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertEquals(capture.stdout(), "client, service, class, readme\n");
+        Assert.assertEquals(capture.stdout(), KAFKA_BUCKETS);
     }
 
     @Test
@@ -701,7 +723,7 @@ public class CliTest {
         Capture asText = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "text"), asText.streams(),
                 centralFor("ballerinax__kafka", "4.6.5")), 0, asText.stderr());
-        Assert.assertEquals(asText.stdout(), "client, service, class, readme\n");
+        Assert.assertEquals(asText.stdout(), KAFKA_BUCKETS);
 
         Capture asJson = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "json"), asJson.streams(),

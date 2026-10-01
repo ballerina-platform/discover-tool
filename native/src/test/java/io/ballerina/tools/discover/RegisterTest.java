@@ -177,6 +177,183 @@ public class RegisterTest {
     }
 
     // -----------------------------------------------------------------------
+    // Text layout
+    // -----------------------------------------------------------------------
+
+    /** Each entry on a line of its own, in order — never a comma-joined run that wraps mid-word in a terminal. */
+    @Test(dataProvider = "fixtures")
+    public void everyTextListingPrintsOneEntryPerLine(String slug) {
+        int checked = 0;
+        for (Answer answer : answers(slug)) {
+            List<String> entries = entriesOf(answer.result());
+            List<String> lines = TextRenderer.render(answer.result()).lines().toList();
+            int previous = -1;
+            for (String entry : entries) {
+                int line = previous + 1;
+                while (line < lines.size() && !isRowFor(lines.get(line), entry)) {
+                    line++;
+                }
+                Assert.assertTrue(line < lines.size(), slug + " " + answer.label() + ": no line of its own for '"
+                        + entry + "'\n" + String.join("\n", lines));
+                previous = line;
+                checked++;
+            }
+        }
+        Assert.assertTrue(checked > 0, slug + ": no listing entry was checked");
+    }
+
+    /** Within a block of rows, every name is padded to the longest, so whatever follows it starts in one column. */
+    @Test(dataProvider = "fixtures")
+    public void everyTextBlockLinesUpItsColumns(String slug) {
+        for (Answer answer : answers(slug)) {
+            if (answer.result() instanceof DiscoverResult.Signature) {
+                continue;
+            }
+            List<String> lines = TextRenderer.render(answer.result()).lines().toList();
+            int start = 0;
+            while (start < lines.size()) {
+                int indent = indentOf(lines.get(start));
+                int end = start + 1;
+                while (end < lines.size() && indent >= 2 && indentOf(lines.get(end)) == indent) {
+                    end++;
+                }
+                if (indent >= 2) {
+                    assertAligned(lines.subList(start, end), indent, slug + " " + answer.label());
+                }
+                start = end;
+            }
+        }
+    }
+
+    /**
+     * Every command the JSON rendering gives a row is printable from the text: verbatim, or as a {@code Next:}
+     * shape whose placeholder that row's own name fills — and a listing that left entries out ends on the command
+     * that reaches them.
+     */
+    @Test(dataProvider = "fixtures")
+    public void everyTextAnswerCarriesEveryCommandTheJsonDoes(String slug) {
+        for (Answer answer : answers(slug)) {
+            String text = TextRenderer.render(answer.result());
+            String label = slug + " " + answer.label() + "\n" + text;
+            List<String> shapes = text.lines().filter(line -> line.startsWith("Next: "))
+                    .map(line -> line.substring("Next: ".length()))
+                    .toList();
+            for (String[] row : callsOf(answer.result())) {
+                String literal = row[0];
+                String call = row[1];
+                boolean reachable = text.contains(call) || shapes.stream().anyMatch(shape -> shape.contains("<")
+                        && call.equals(shape.substring(0, shape.indexOf('<')) + literal
+                                + shape.substring(shape.lastIndexOf('>') + 1)));
+                Assert.assertTrue(reachable, label + "\nmissing: " + call);
+            }
+            String next = nextOf(answer.result());
+            if (next != null) {
+                Assert.assertTrue(shapes.contains(next), label + "\nmissing Next: " + next);
+            }
+        }
+    }
+
+    private static boolean isRowFor(String line, String entry) {
+        String trimmed = line.strip();
+        return line.startsWith("  ") && trimmed.startsWith(entry)
+                && (trimmed.length() == entry.length() || trimmed.startsWith(entry + "  "));
+    }
+
+    private static int indentOf(String line) {
+        return line.isEmpty() ? -1 : line.length() - line.stripLeading().length();
+    }
+
+    private static void assertAligned(List<String> block, int indent, String label) {
+        int widest = block.stream().mapToInt(line -> nameOf(line, indent).length()).max().orElse(0);
+        for (String line : block) {
+            String name = nameOf(line, indent);
+            if (line.length() > indent + name.length()) {
+                Assert.assertTrue(line.length() > indent + widest + 2
+                                && line.substring(indent + name.length(), indent + widest + 2).isBlank(),
+                        label + ": a column out of line\n" + String.join("\n", block));
+            }
+        }
+    }
+
+    private static String nameOf(String line, int indent) {
+        String rest = line.substring(indent);
+        int gap = rest.indexOf("  ");
+        return gap < 0 ? rest : rest.substring(0, gap);
+    }
+
+    private static List<String> entriesOf(DiscoverResult result) {
+        List<String> entries = new ArrayList<>();
+        switch (result) {
+            case DiscoverResult.ContainerRoster roster ->
+                    roster.containers().forEach(container -> entries.add(container.name()));
+            case DiscoverResult.PathGroups groups -> {
+                groups.resources().forEach(resource -> entries.add(resource.path()));
+                groups.groups().forEach(group -> entries.add(group.name()));
+            }
+            case DiscoverResult.ResourceList resources ->
+                    resources.resources().forEach(resource -> entries.add(resource.path()));
+            case DiscoverResult.MethodList methods -> entries.addAll(methods.methods());
+            case DiscoverResult.MixedListing mixed -> {
+                mixed.resources().forEach(resource -> entries.add(resource.path()));
+                entries.addAll(mixed.remote());
+                entries.addAll(mixed.normal());
+                entries.addAll(mixed.documented());
+            }
+            case DiscoverResult.NoMatch noMatch -> {
+                entries.addAll(noMatch.candidates());
+                noMatch.paths().forEach(alternative -> entries.add(alternative.path()));
+            }
+            case DiscoverResult.Owners owners -> owners.owners().forEach(owner -> entries.add(owner.name()));
+            case DiscoverResult.EmptyBucket empty -> empty.elsewhere().forEach(other -> entries.add(other.bucket()));
+            default -> { }
+        }
+        return entries;
+    }
+
+    /** Each row's own name and the command the JSON rendering gives it. */
+    private static List<String[]> callsOf(DiscoverResult result) {
+        List<String[]> calls = new ArrayList<>();
+        switch (result) {
+            case DiscoverResult.ContainerRoster roster -> roster.containers()
+                    .forEach(container -> calls.add(new String[] {container.name(), container.call()}));
+            case DiscoverResult.PathGroups groups -> {
+                groups.resources().stream().filter(resource -> resource.call() != null).forEach(resource ->
+                        calls.add(new String[] {resource.path() + " " + resource.accessors().get(0), resource.call()}));
+                groups.groups().forEach(group -> calls.add(new String[] {group.name(), group.call()}));
+            }
+            case DiscoverResult.ResourceList resources -> resources.resources().stream()
+                    .filter(resource -> resource.call() != null).forEach(resource ->
+                            calls.add(new String[] {resource.path() + " " + resource.accessors().get(0),
+                                    resource.call()}));
+            case DiscoverResult.MixedListing mixed -> mixed.resources().stream()
+                    .filter(resource -> resource.call() != null).forEach(resource ->
+                            calls.add(new String[] {resource.path() + " " + resource.accessors().get(0),
+                                    resource.call()}));
+            case DiscoverResult.NoMatch noMatch -> noMatch.paths()
+                    .forEach(alternative -> calls.add(new String[] {alternative.path(), alternative.call()}));
+            case DiscoverResult.Owners owners -> owners.owners()
+                    .forEach(owner -> calls.add(new String[] {owner.name(), owner.call()}));
+            case DiscoverResult.EmptyBucket empty -> empty.elsewhere()
+                    .forEach(other -> calls.add(new String[] {other.bucket(), other.call()}));
+            default -> { }
+        }
+        return calls;
+    }
+
+    private static String nextOf(DiscoverResult result) {
+        return switch (result) {
+            case DiscoverResult.ContainerRoster roster -> roster.next();
+            case DiscoverResult.PathGroups groups -> groups.next();
+            case DiscoverResult.ResourceList resources -> resources.next();
+            case DiscoverResult.MethodList methods -> methods.next();
+            case DiscoverResult.MixedListing mixed -> mixed.next();
+            case DiscoverResult.NoMatch noMatch -> noMatch.available() == null ? noMatch.next() : null;
+            case DiscoverResult.Owners owners -> owners.next();
+            default -> null;
+        };
+    }
+
+    // -----------------------------------------------------------------------
     // The Ballerina an answer quotes
     // -----------------------------------------------------------------------
 

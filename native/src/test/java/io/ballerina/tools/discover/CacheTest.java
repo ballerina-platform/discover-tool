@@ -526,7 +526,7 @@ public class CacheTest {
         int textExit = Cli.run(List.of(PKG, "--output", "text"), text.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
         Assert.assertEquals(textExit, 0);
-        Assert.assertTrue(text.stdout().startsWith("Warning: the registry was unreachable"), text.stdout());
+        Assert.assertTrue(text.stdout().contains("\n\nWarning: the registry was unreachable"), text.stdout());
     }
 
     @Test

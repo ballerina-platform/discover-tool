@@ -1,16 +1,65 @@
 == client ==
-Container: Client
-Methods: append, auth, bitCount, bitOpAnd, bitOpNot, bitOpOr, bitOpXor, bLPop, bRPop, close, clusterInfo, decr, decrBy, del, echo, exists, expire, flushAll, flushDb, get, getBit, getRange, getSet, hDel, hExists, hGet, hGetAll, hIncrBy, hIncrByFloat, hKeys, hLen, hMGet, hMSet, hSet, hSetNx, hStrLen, hVals, incr, incrBy, incrByFloat
-... 72 more (page 1 of 3), next page: bal discover ballerinax/redis client Client --page 2
+ballerinax/redis · client · Client
+112 methods
+
+  append
+  auth
+  bitCount
+  bitOpAnd
+  bitOpNot
+  bitOpOr
+  bitOpXor
+  bLPop
+  bRPop
+  close
+  clusterInfo
+  decr
+  decrBy
+  del
+  echo
+  exists
+  expire
+  flushAll
+  flushDb
+  get
+  getBit
+  getRange
+  getSet
+  hDel
+  hExists
+  hGet
+  hGetAll
+  hIncrBy
+  hIncrByFloat
+  hKeys
+  hLen
+  hMGet
+  hMSet
+  hSet
+  hSetNx
+  hStrLen
+  hVals
+  incr
+  incrBy
+  incrByFloat
+
+... 72 more (page 1 of 3)
+Next: bal discover ballerinax/redis client Client --page 2
 == service ==
-service: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/redis client
+ballerinax/redis · service
+This package declares nothing in service.
+
+Elsewhere
+  client  1  bal discover ballerinax/redis client
 == class ==
-class: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/redis client
+ballerinax/redis · class
+This package declares nothing in class.
+
+Elsewhere
+  client  1  bal discover ballerinax/redis client
 == funcs ==
-funcs: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/redis client
+ballerinax/redis · funcs
+This package declares nothing in funcs.
+
+Elsewhere
+  client  1  bal discover ballerinax/redis client

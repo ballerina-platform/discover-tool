@@ -1,9 +1,29 @@
 == client ==
-Container: Client
-Methods: execute, executeWithType
+ballerina/graphql · client · Client
+2 methods
+
+  execute
+  executeWithType
 == service ==
-Service (binds to graphql:Listener), Interceptor (binds to graphql:Listener)
+ballerina/graphql · service
+2 service types
+
+graphql:Listener
+  Service
+  Interceptor  1 remote
+
+Next: bal discover ballerina/graphql service <name>
 == class ==
-Context, Field
+ballerina/graphql · class
+2 classes
+
+  Context  8 normal
+  Field    7 normal
+
+Next: bal discover ballerina/graphql class <name>
 == funcs ==
-Methods: __addError, getSdlString
+ballerina/graphql · funcs
+2 functions
+
+  __addError
+  getSdlString

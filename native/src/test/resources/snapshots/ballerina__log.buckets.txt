@@ -1,14 +1,38 @@
 == client ==
-client: none in this package
-Elsewhere:
-  class (3): bal discover ballerina/log class
-  funcs (11): bal discover ballerina/log funcs
+ballerina/log · client
+This package declares nothing in client.
+
+Elsewhere
+  class   3  bal discover ballerina/log class
+  funcs  11  bal discover ballerina/log funcs
 == service ==
-service: none in this package
-Elsewhere:
-  class (3): bal discover ballerina/log class
-  funcs (11): bal discover ballerina/log funcs
+ballerina/log · service
+This package declares nothing in service.
+
+Elsewhere
+  class   3  bal discover ballerina/log class
+  funcs  11  bal discover ballerina/log funcs
 == class ==
-Logger, LoggerRegistry, PrintableRawTemplate
+ballerina/log · class
+3 classes
+
+  Logger                7 normal
+  LoggerRegistry        2 normal
+  PrintableRawTemplate
+
+Next: bal discover ballerina/log class <name>
 == funcs ==
-Methods: evaluateTemplate, fromConfig, getLoggerRegistry, printDebug, printError, printInfo, printWarn, processTemplate, root, setOutputFile, toMaskedString
+ballerina/log · funcs
+11 functions
+
+  evaluateTemplate
+  fromConfig
+  getLoggerRegistry
+  printDebug
+  printError
+  printInfo
+  printWarn
+  processTemplate
+  root
+  setOutputFile
+  toMaskedString

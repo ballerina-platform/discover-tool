@@ -1,36 +1,46 @@
 == client ==
-Container: Client
-users/:userId/drafts — get, post
-users/:userId/drafts/send — post
-users/:userId/drafts/:id — get, put, delete
-users/:userId/history — get
-users/:userId/labels — get, post
-users/:userId/labels/:id — get, put, delete, patch
-users/:userId/messages — get, post
-users/:userId/messages/batchDelete — post
-users/:userId/messages/batchModify — post
-users/:userId/messages/'import — post
-users/:userId/messages/send — post
-users/:userId/messages/:id — get, delete
-users/:userId/messages/:id/modify — post
-users/:userId/messages/:id/trash — post
-users/:userId/messages/:id/untrash — post
-users/:userId/messages/:messageId/attachments/:id — get
-users/:userId/profile — get
-users/:userId/threads — get
-users/:userId/threads/:id — get, delete
-users/:userId/threads/:id/modify — post
-users/:userId/threads/:id/trash — post
-users/:userId/threads/:id/untrash — post
+ballerinax/googleapis.gmail · client · Client
+22 resource paths
+
+  users/:userId/drafts                               get, post
+  users/:userId/drafts/send                          post
+  users/:userId/drafts/:id                           get, put, delete
+  users/:userId/history                              get
+  users/:userId/labels                               get, post
+  users/:userId/labels/:id                           get, put, delete, patch
+  users/:userId/messages                             get, post
+  users/:userId/messages/batchDelete                 post
+  users/:userId/messages/batchModify                 post
+  users/:userId/messages/'import                     post                     bal discover ballerinax/googleapis.gmail client Client "users/:userId/messages/'import" post
+  users/:userId/messages/send                        post
+  users/:userId/messages/:id                         get, delete
+  users/:userId/messages/:id/modify                  post
+  users/:userId/messages/:id/trash                   post
+  users/:userId/messages/:id/untrash                 post
+  users/:userId/messages/:messageId/attachments/:id  get
+  users/:userId/profile                              get
+  users/:userId/threads                              get
+  users/:userId/threads/:id                          get, delete
+  users/:userId/threads/:id/modify                   post
+  users/:userId/threads/:id/trash                    post
+  users/:userId/threads/:id/untrash                  post
+
+Next: bal discover ballerinax/googleapis.gmail client Client <path> <accessor>
 == service ==
-service: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/googleapis.gmail client
+ballerinax/googleapis.gmail · service
+This package declares nothing in service.
+
+Elsewhere
+  client  1  bal discover ballerinax/googleapis.gmail client
 == class ==
-class: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/googleapis.gmail client
+ballerinax/googleapis.gmail · class
+This package declares nothing in class.
+
+Elsewhere
+  client  1  bal discover ballerinax/googleapis.gmail client
 == funcs ==
-funcs: none in this package
-Elsewhere:
-  client (1): bal discover ballerinax/googleapis.gmail client
+ballerinax/googleapis.gmail · funcs
+This package declares nothing in funcs.
+
+Elsewhere
+  client  1  bal discover ballerinax/googleapis.gmail client
