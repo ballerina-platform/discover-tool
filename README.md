@@ -37,7 +37,7 @@ left out.
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
-| `--page <n>`           | Turn the page of a listing that pages over the entry ceiling: methods, resource paths that cannot be grouped, a container listed by call form (resources, remote, normal), and readme sections narrowed by `--filter`. A page outside the listing is a `validation` failure. |
+| `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`.                 |
 | `--refresh`            | Ignore the cached payload and fetch it again.                                                          |
 
@@ -73,7 +73,8 @@ and the `Next:` commands. A listing whose JSON gives every row its own command (
 resource row) prints the shape those commands share once, as a `Next:` line with a placeholder; a row whose
 command does not fit that shape (a path that needs shell quoting, say) carries its own beside it.
 
-Several containers in one bucket are a roster with their member counts; service types are listed under the
+Several containers in one bucket are a roster with their member counts — resource paths, not the operations
+on them, so http's one `:...path` answering seven accessors counts once; service types are listed under the
 listener they bind to:
 
 ```
@@ -81,16 +82,16 @@ $ bal discover ballerina/http client
 ballerina/http · client
 10 clients
 
-  ClientObject                           7 resources  15 remote
-  StatusCodeClientObject                 7 resources  15 remote
-  Caller                                               5 remote  1 normal
-  Client                                 7 resources  15 remote  4 normal
-  ClientOAuth2Handler                                  1 remote  2 normal
-  FailoverClient                         7 resources  15 remote  1 normal
-  ListenerLdapUserStoreBasicAuthHandler                2 remote
-  ListenerOAuth2Handler                                1 remote
-  LoadBalanceClient                      7 resources  15 remote
-  StatusCodeClient                       7 resources  15 remote  4 normal
+  ClientObject                           1 resource  15 remote
+  StatusCodeClientObject                 1 resource  15 remote
+  Caller                                              5 remote  1 normal
+  Client                                 1 resource  15 remote  4 normal
+  ClientOAuth2Handler                                 1 remote  2 normal
+  FailoverClient                         1 resource  15 remote  1 normal
+  ListenerLdapUserStoreBasicAuthHandler               2 remote
+  ListenerOAuth2Handler                               1 remote
+  LoadBalanceClient                      1 resource  15 remote
+  StatusCodeClient                       1 resource  15 remote  4 normal
 
 Next: bal discover ballerina/http client <name>
 
@@ -197,10 +198,10 @@ Groups (operations under each)
   ...
   repos/:owner/:repo/notifications              2
 
-... 25 more, narrow further
+... 25 more (page 1 of 2)
 Next: bal discover ballerinax/github client Client <path> <accessor>
 Next: bal discover ballerinax/github client Client <group>
-Next: bal discover ballerinax/github client Client repos --filter <keyword>
+Next: bal discover ballerinax/github client Client repos --page 2
 ```
 
 In JSON, every resource entry carries a `commands` object keyed by accessor, in `accessors` order: for each
@@ -331,8 +332,21 @@ ballerinax/twilio · client · Client · --filter message
   listNotification
   updateMessage
 
+Matched by documentation only
+  listAvailablePhoneNumberLocal
+  listAvailablePhoneNumberMachineToMachine
+  listAvailablePhoneNumberMobile
+  listAvailablePhoneNumberNational
+  listAvailablePhoneNumberSharedCost
+  listAvailablePhoneNumberTollFree
+  listAvailablePhoneNumberVoip
+  listSigningKey
+
 Next: bal discover ballerinax/twilio client Client <name>
 ```
+
+The entries a `--filter` matched only in their documentation are named after the ones it matched by name,
+path, parameter or type, and paged after them under the same `--page` — each is one more call away by name.
 
 A selector that matches nothing is still an answer (exit 0), naming the closest names and what is there:
 
@@ -389,14 +403,14 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | bare package                         | `buckets`, `submodules` (`name`, `summary`, `command`)                                                              |
-| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `command`), `shown`, `total`, `next`             |
-| resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `shown`, `total`, `next` |
-| resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `next`              |
-| methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `next`                              |
+| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `command`), `shown`, `total`, `page`, `pages`, `next` |
+| resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `next` |
+| resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
+| methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `next`, `documented`                 |
 | more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented` |
-| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented`              |
-| member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `next`                                      |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented`, `page`, `pages`, `next` |
+| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented`, `page`, `pages` |
+| member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `page`, `pages`, `next`                    |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
 | readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
 | readme sections                      | `chunks` (`number`, `title`, `lines`, `command`), `shown`, `total`, `page`, `pages`, `next`                       |
@@ -404,8 +418,10 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 Any answer can also carry `warning` (the version could not be confirmed against the registry) and most can
 carry `note` (the symbol was found in a different bucket than the one asked, the path selector was relocated
 or a wildcard skipped a branch, or the service's listener). `documented` lists entries a `--filter` matched
-only in their documentation — at most 40 of them, with `documentedTotal` giving how many there are (in text, a
-`Matched by documentation only (40 of 102)` heading).
+only in their documentation, held to the same ceiling and paged with the same `--page`, with `documentedTotal`
+giving how many there are (in text, a `Matched by documentation only (40 of 102)` heading). Beside a listing
+they are its last section, after every entry the filter matched by name; beside one signature, or as all a
+filter found, they page on their own, and `next` turns that page.
 
 ### The entry ceiling
 
@@ -414,20 +430,24 @@ No listing shows more than **40 entries**. Over that:
 - resource paths selected by a path (or by nothing) **group** by their next literal path segment, up to four
   literal levels below the top; path parameters never form a group of their own, and a group carries the
   accessor the listing was narrowed by into its `command`;
-- methods of one call form **page**, alphabetically, with `--page <n>`, and so do resource paths that cannot
-  be grouped — selected by a name substring or `--filter`, or already four literal levels deep — and readme
-  sections narrowed by `--filter`. Every page keeps the selector and the `--filter`;
+- everything else **pages** with `--page <n>`: a roster of containers, a level of groups (the paths ending
+  there first, then the groups, with `counts` giving both across every page), methods of one call form
+  (alphabetically), resource paths that cannot be grouped — selected by a name substring or `--filter`, or
+  already four literal levels deep — and readme sections narrowed by `--filter`. Every page keeps the selector,
+  the `--filter` and the `--module`;
 - a container mixing call forms (resources with methods, or remote methods with normal ones) pages the same
   way, as one sequence — resource paths, then remote methods, then normal ones — so a page can end partway
   through one section and pick up the next; each page keeps the section headings (`resources`, `remote`,
   `normal` in JSON) for whatever it holds and omits the ones it holds nothing of, while `counts` (and the text
   header, `111 remote methods, 1 normal method`) gives every form's size across the whole listing, so a form
-  that only appears on a later page is never hidden. Documentation-only matches come on the first page only;
-- a roster of containers is cut at 40 and points at `--filter`.
+  that only appears on a later page is never hidden;
+- documentation-only matches page as described above; a roster's `--filter` keeps a container whose own name
+  matches (opened whole, since a container with no methods has nothing else to match) as well as one with a
+  matching member (opened narrowed).
 
-A cut listing always says so: `shown`/`total` plus `next` (the command that continues it) in JSON, or a
-`... N more, narrow further` line followed by `Next: <command>` in text — `... N more (page P of Q)` for a
-paged one, where `N` counts what comes after this page and JSON adds `page`/`pages`.
+A cut listing always says so: `shown`/`total`, `page`/`pages` and `next` (the `--page` command that continues
+it) in JSON, or a `... N more (page P of Q)` line followed by `Next: <command>` in text, where `N` counts what
+comes after this page.
 
 ### Paths
 

@@ -122,14 +122,14 @@ override and a parser could not.
 | Shape             | Answers                                                                         |
 | ----------------- | ------------------------------------------------------------------------------- |
 | `BucketList`      | a bare package: its buckets and its submodules                                  |
-| `ContainerRoster` | several containers in a bucket                                                  |
-| `PathGroups`      | resource paths grouped by segment, plus those ending at the grouped prefix      |
+| `ContainerRoster` | several containers in a bucket, paged                                           |
+| `PathGroups`      | resource paths grouped by segment, plus those ending at the grouped prefix, paged |
 | `ResourceList`    | resource paths, one entry per path with every accessor it answers to, paged     |
 | `MethodList`      | methods of one call form (or module functions), alphabetical, paged over the ceiling |
 | `MixedListing`    | a selection in more than one call form (resources, remote, normal), split by form, paged |
 | `Signature`       | exactly one callable, with the declarations its signature names                 |
 | `NoMatch`         | a selector or `--filter` that matched nothing, with what is there instead       |
-| `Owners`          | one member declared on several containers                                       |
+| `Owners`          | one member declared on several containers, paged                                |
 | `EmptyBucket`     | a bucket the package declares nothing in, and the buckets that do               |
 | `Readme`          | the readme verbatim, or one section of it                                       |
 | `ReadmeChunks`    | the readme sections a selector or `--filter` matched                            |
@@ -194,32 +194,42 @@ Over the ceiling:
   be the command that produced it. A group subdivides only while it is still over the ceiling, to at most four
   LITERAL levels below the top — surveyed against real connectors, three were always enough
   (`ballerinax/jira` needed the most), and the fourth is margin.
-- **Methods of one call form page**, alphabetically, with `--page <n>` (`Containers.Page`, shared with the
-  readme's section listing and the mixed listing below). So do resource paths that cannot be grouped: a
+- **A level of groups pages** past the ceiling as one sequence — the paths ending at the prefix first, then
+  the groups, busiest first — with `counts` giving both across every page (the text header too).
+- **Methods of one call form page**, alphabetically, with `--page <n>` (`Containers.Page`, shared by every
+  listing here and the readme's section listing). So do resource paths that cannot be grouped: a
   name-substring or `--filter` selection (there is no path prefix a group name could extend without inventing one) and one already past
   the depth cap. Grouping methods by a verb prefix was rejected: there is no fixed verb vocabulary across
   connectors to split on reliably (`ballerinax/twilio` alone has 199 remote methods on one client). A page
-  outside the listing is a `validation` failure naming the range, never an empty page.
+  outside the listing is a `validation` failure naming the range, never an empty page; so is `--page` below 1
+  (rejected by `Cli` before anything is fetched) and any `--page` but 1 against an answer that reports no
+  `paging()` — a bare package, one signature, a whole readme — which would otherwise be served as page 1.
 - **A mixed listing pages as one sequence** — any selection in more than one call form, remote beside normal
   methods included, since a flat list of names loses `->` against `.`: resource paths, then remote methods,
   then normal ones, windowed by the same `Containers.Page` (`Page.slice` cuts each section to the window), so a
   page can end partway through one section and start the next. Each page keeps its section split and omits a
   section it holds nothing of; `counts` gives every form's size across the whole listing (the text header too),
   so redis's `close`, which only page 3 holds, is announced on page 1. `next` is the `--page N+1` command
-  carrying the selector, `--filter` and `--module`, and documentation-only matches come on page 1 only.
-- **A roster of containers is cut** at 40 and points at `--filter`.
+  carrying the selector, `--filter` and `--module`.
+- **A roster of containers pages** the same way, and so do the owners of a member declared on several
+  containers. A roster's `--filter` keeps a container whose own name matches as well as one with a matching
+  member: a name match opens the whole container (postgresql's `*Value` classes declare no method at all, so
+  a filter over members alone could never reach them), a member match opens it narrowed by the filter. A
+  roster's `resources` counts distinct paths, as a listing does — not the operations on them.
 
-A cut answer always says so — `shown`/`total` and the `next` command in JSON (plus `page`/`pages` when
-paged), a `... N more, narrow further` line and a `Next: <command>` line in text (`... N more (page P of
-Q)` when paged, `N` counting what follows this page) — so a partial list is never mistaken for a complete
-one.
+A cut answer always says so — `shown`/`total`, `page`/`pages` and the `next` command in JSON, a
+`... N more (page P of Q)` line and a `Next: <command>` line in text, `N` counting what follows this page —
+so a partial list is never mistaken for a complete one.
 
 `--filter` narrows within the bucket already selected, client-side, over the payload already in memory; it
 is never sent to Central. It is a case-insensitive substring of an entry's surface text (name, path, parameter
 and type names). An entry that matches only in its documentation is not listed but named in `documented`,
 because rendering both buries the first set and dropping the second loses the caller who knows the capability
-but not the vocabulary. `documented` obeys the same 40-entry ceiling, with `documentedTotal` beside it: a
-common word (redis's `the`) matches over a hundred entries' docs.
+but not the vocabulary. `documented` obeys the same 40-entry ceiling, with `documentedTotal` beside it, and
+pages with the same `--page`: a common word (redis's `the`) matches over a hundred entries' docs. Beside a
+listing it is the paged sequence's last section, after every surface match; beside one signature, or as all a
+filter found (a `NoMatch`), it pages on its own and `next` turns that page. A blank `--filter` is no filter —
+`Cli` normalises it away before anything reads it.
 
 ---
 
@@ -265,7 +275,7 @@ matched in the `note`, because it takes the busiest one.
 | `symbols/Filter` | `--filter`, as a linear scan over the package in memory, returning surface matches and documentation-only matches separately. |
 | `views/Containers` | One implementation behind `client`, `service`, `class` and `funcs`. Holds the resolution order (exact container → exact member or path in scope → another bucket → substring member), the entry ceiling, grouping and paging. The selector grammar is read off the resolved CONTAINER, not the bucket: a client IS a class, so `class ballerina/http Client get ...` has to parse an accessor too. |
 | `views/Closure` | The type walk under a signature: breadth-first, bounded, naming what it dropped. |
-| `views/Readme` | The readme bucket: the whole readme, a section by number or title, or the sections `--filter` matches. A section counts only if it carries a fenced code block. |
+| `views/Readme` | The readme bucket: the whole readme, a section by number or title, or the sections `--filter` matches — none is a `NoMatch` pointing at the whole readme. A section counts only if it carries a fenced code block. A module with no readme fails `validation` however it is addressed. |
 | `Loader` | `loadPackage` is the only load, so no bucket is cheap because it skipped work another does. |
 | `cli/Cli` | argv → exit code, with streams, transport, cache, project directory and interactivity injected so tests drive the real command. |
 | `cli/DiscoverTool` | The process wrapper — the only place that reads the environment or exits. |
@@ -381,7 +391,7 @@ ballerina-platform's GitHub Packages, so building needs a `read:packages` token 
 | `CorpusTest` | Thirteen recorded payloads render byte-for-byte to thirteen committed `.bal` API snapshots — the oracle every quoted declaration is checked against. |
 | `ViewsAgreeTest` | **What makes the drill-down safe.** Every exact member name and every exact path plus accessor resolves to one `Signature` (over a corpus-wide floor), and every line it quotes appears in the API snapshot verbatim; every path the tree offers is reachable and nothing unoffered is; closures terminate, do not repeat and stay bounded. |
 | `PointersTest` | Every `command`/`commands`/`next` command the first answers print (bare, filtered, per container, by name substring, by path plus accessor) is RUN through the real CLI against the recorded payload, then what those print is followed two levels further on a bounded sample; each must exit 0 with something other than "nothing matched", and none may point back at the command that printed it. Every resource row's `commands`, one per accessor, must open exactly that path and accessor's signature, every method row's `command` exactly that method's, and every answer the CLI prints must be one line. |
-| `SelectionCarryTest` | A page, a group and a canonical command re-select exactly what the listing was a window onto: the selector, the accessor and the `--filter` ride along, a substring never becomes a path, the depth cap counts literal segments, and an out-of-range `--page` fails. A mixed listing over the ceiling pages across its section boundaries without repeating or skipping an entry — the recorded redis `Client` (111 remote, then `close`) and an edited http payload that also crosses resources into remote and a boundary on a middle page — and documentation-only matches stay under the ceiling. |
+| `SelectionCarryTest` | A page, a group and a canonical command re-select exactly what the listing was a window onto: the selector, the accessor and the `--filter` ride along, a substring never becomes a path, the depth cap counts literal segments, and an out-of-range `--page` fails. A mixed listing over the ceiling pages across its section boundaries without repeating or skipping an entry — the recorded redis `Client` (111 remote, then `close`) and an edited http payload that also crosses resources into remote and a boundary on a middle page. Documentation-only matches page to the last one, on their own and after a listing; a roster (postgresql's 125 classes) and a level of groups (github's `repos`) page with every entry reachable, a roster's `--filter` keeps a container by its own name, and a roster counts paths, not operations. |
 | `ViewsTest` | The `.buckets.txt`/`.buckets.json` snapshots, the entry ceiling over every fixture (listed sizes, `shown` against what is listed, a `next` on every cut listing, nested `NoMatch.available` listings included), and the resolution and tolerance rules. Also where path ordering is pinned: a locale collator, not `String::compareTo`, which disagree on real github segments. |
 | `RegisterTest` | Over every fixture and a broad set of queries: every answer renders as one JSON object on exactly one line (readmes included), no text rendering carries Markdown report furniture, no `note` carries a Markdown backtick, every text listing puts one entry per line with its columns lined up and every JSON `command`/`commands`/`next` reachable from the text, and quoted Ballerina carries no fences of the tool's own. |
 | `render/DiscoverResultRenderingTest` | Every result shape, in both renderers, driven directly. |

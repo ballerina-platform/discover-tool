@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Add a drill-down from a listing to a single method's or resource's signature, together with the types it names
 - Add the `--module`/`-m` flag to target a submodule, across every bucket
 - Add the `--filter` flag to narrow a bucket listing by keyword
-- Cap every listing at 40 entries, with `--page` to page through longer method, resource, mixed and readme listings
+- Cap every listing at 40 entries, with `--page` to page through any longer one
 - Add a ready-to-run next command to every listing entry: `command`, or `commands` keyed by accessor on resource rows,
   plus a `next` command when a listing continues
 - Add JSON output (one line per answer) and aligned human-readable text output, selected by `--output json|text` and
