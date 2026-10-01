@@ -21,7 +21,7 @@ the list of buckets the package has.
 | Bucket    | What it holds                                                                                            |
 | --------- | -------------------------------------------------------------------------------------------------------- |
 | `client`  | Objects reached with `->`: remote methods and resource functions (`client->path.accessor(...)`).         |
-| `service` | Service object types, each paired with the listener it attaches to.                                      |
+| `service` | Service object types, under the listener(s) that accept them; the rest are listed apart.                 |
 | `class`   | Plain objects reached with `.`.                                                                          |
 | `funcs`   | Module-level functions.                                                                                  |
 | `readme`  | The module's README, verbatim. `readme <n>` or `readme "<title>"` opens one code-carrying section.       |
@@ -39,7 +39,7 @@ left out.
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
 | `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`.                 |
-| `--refresh`            | Ignore the cached payload and fetch it again.                                                          |
+| `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again.                   |
 
 ## Walkthrough
 
@@ -75,7 +75,7 @@ command does not fit that shape (a path that needs shell quoting, say) carries i
 
 Several containers in one bucket are a roster with their member counts — resource paths, not the operations
 on them, so http's one `:...path` answering seven accessors counts once; service types are listed under the
-listener they bind to:
+listener they bind to, and the ones no listener accepts are listed apart, still addressable by name:
 
 ```
 $ bal discover ballerina/http client
@@ -97,18 +97,36 @@ Next: bal discover ballerina/http client <name>
 
 $ bal discover ballerina/http service
 ballerina/http · service
-7 service types
+3 service types
 
 http:Listener
   Service
   ServiceContract
+  InterceptableService  1 normal
+
+Not attachable to a listener
   RequestInterceptor
   ResponseInterceptor
   RequestErrorInterceptor
   ResponseErrorInterceptor
-  InterceptableService      1 normal
 
 Next: bal discover ballerina/http service <name>
+```
+
+A service type binds to a listener when it is the type the listener's `attach` takes (resolved through unions
+and type aliases) or includes that type (`*Service;`). Central's docs payload does not publish a service
+type's inclusions, so when some service type is not an `attach` target, `discover` reads the package's own
+source from its published bala, once per version, and caches what it finds. If the source cannot be read, the
+types it would have settled stay listed under the listener, and opening one says the pairing is not confirmed.
+A listener whose `attach` takes another package's type points there:
+
+```
+$ bal discover ballerinax/postgresql service
+ballerinax/postgresql · service
+1 service type
+
+postgresql:CdcListener
+  cdc:Service  bal discover ballerinax/cdc service Service
 ```
 
 A bucket with too many resource paths to list is grouped by path segment:
@@ -403,7 +421,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | bare package                         | `buckets`, `submodules` (`name`, `summary`, `command`)                                                              |
-| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `command`), `shown`, `total`, `page`, `pages`, `next` |
+| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `command`), `shown`, `total`, `page`, `pages`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page |
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `next` |
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `next`, `documented`                 |
@@ -484,9 +502,10 @@ Central's latest.
 
 ## Caching
 
-The raw Central payload is cached, keyed by package coordinates, with atomic writes. Any problem with the
-cache — missing, unreadable, corrupt, an unwritable directory — falls back to a live fetch silently; it is
-never a failure. The location is the first usable of:
+The raw Central payload is cached, keyed by package coordinates, with atomic writes, and so is what a
+package's source says about its service types' inclusions (the small derived answer, never the bala). Any
+problem with the cache — missing, unreadable, corrupt, an unwritable directory — falls back to a live fetch
+silently; it is never a failure. The location is the first usable of:
 
 1. `BAL_DISCOVER_CACHE=off` — caching disabled
 2. `BAL_DISCOVER_CACHE_DIR=<dir>`
