@@ -35,6 +35,7 @@ dependencies {
     checkstyle "com.puppycrawl.tools:checkstyle:${checkstylePluginVersion}"
 
     compileOnly "org.ballerinalang:ballerina-cli:${ballerinaLangVersion}"
+    compileOnly "org.ballerinalang:ballerina-lang:${ballerinaLangVersion}"
     compileOnly "org.ballerinalang:ballerina-parser:${ballerinaLangVersion}"
     compileOnly "org.ballerinalang:ballerina-tools-api:${ballerinaLangVersion}"
     compileOnly "info.picocli:picocli:${picocliVersion}"
@@ -81,6 +82,8 @@ test {
     useTestNG()
     maxHeapSize = '2048m'
     systemProperty 'project.version', "${project.version}"
+    // bal's own override of the user's Ballerina home, so no test ever reads the real ~/.ballerina.
+    environment 'BALLERINA_HOME_DIR', layout.buildDirectory.dir('test-ballerina-home').get().asFile.path
     testLogging {
         events 'failed'
         exceptionFormat 'full'

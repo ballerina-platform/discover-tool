@@ -25,6 +25,7 @@ import io.ballerina.tools.discover.central.schema.CentralDocs;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Ballerina Central, as a {@link PackageRepository}.
@@ -38,9 +39,20 @@ import java.util.Optional;
  */
 public final class CentralRepository implements PackageRepository {
 
-    public static final CentralRepository INSTANCE = new CentralRepository();
+    public static final CentralRepository INSTANCE = new CentralRepository(HomeRepository::fromEnvironment);
 
-    private CentralRepository() {
+    private final Supplier<PackageRepository> local;
+
+    private CentralRepository(Supplier<PackageRepository> local) {
+        this.local = local;
+    }
+
+    /**
+     * Central, with {@code local} consulted for module sources before any archive is downloaded — the user's
+     * Ballerina home in production ({@link #INSTANCE}, resolved when first needed), an injected one in a test.
+     */
+    public static CentralRepository withLocalSources(PackageRepository local) {
+        return new CentralRepository(() -> local);
     }
 
     @Override
@@ -57,7 +69,8 @@ public final class CentralRepository implements PackageRepository {
     @Override
     public Optional<Map<String, String>> fetchModuleSources(
             QualifiedName qualified, Version version, String moduleId, HttpOptions options) {
-        return CentralClient.fetchModuleSources(qualified, version, moduleId, options);
+        return local.get().fetchModuleSources(qualified, version, moduleId, options)
+                .or(() -> CentralClient.fetchModuleSources(qualified, version, moduleId, options));
     }
 
     @Override
