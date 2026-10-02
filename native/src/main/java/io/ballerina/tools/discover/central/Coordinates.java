@@ -67,10 +67,13 @@ public final class Coordinates {
      * Does this payload describe the {@code submodule} module page of this package version?
      *
      * <p>The mirror image of {@link #match} plus {@link #describesSubmodule}: the page answering
-     * {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact module, at that version, and flagged
-     * as NOT its package's default. The flag is what tells a submodule apart from a separately published package
-     * that happens to share the dotted name ({@code ballerinax/aws.s3} is a package, not a module of
-     * {@code ballerinax/aws}), so here an absent flag is not good enough.
+     * {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact module, at that version, flagged as
+     * NOT its package's default, and naming THIS package's default module among its {@code relatedModules}. The
+     * flag tells a submodule apart from a separately published package that shares the dotted name
+     * ({@code ballerinax/aws.s3} is a package, not a module of {@code ballerinax/aws}), so here an absent flag is
+     * not good enough. The related default module tells it apart from a submodule of a DIFFERENT package that
+     * shares the prefix: with {@code org/a.b} a package publishing {@code c}, {@code org/a --module b.c} reaches
+     * {@code a.b}'s page, whose default module is {@code a.b}, not {@code a}.
      */
     public static boolean matchModule(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
         if (raw == null || !raw.isJsonObject()) {
@@ -82,16 +85,38 @@ public final class Coordinates {
         }
         String id = qualified.name() + "." + submodule;
         for (JsonObject module : modules(raw)) {
-            JsonElement isDefault = module.get("isDefaultModule");
             if (id.equals(Json.string(module, "id"))
                     && qualified.org().equals(Json.string(module, "orgName"))
                     && version.text().equals(Json.string(module, "version"))
-                    && isDefault != null && isDefault.isJsonPrimitive()
-                    && isDefault.getAsJsonPrimitive().isBoolean() && !isDefault.getAsBoolean()) {
+                    && flagged(module, "isDefaultModule", false)
+                    && namesDefaultModule(module, qualified)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean namesDefaultModule(JsonObject module, QualifiedName qualified) {
+        JsonElement related = module.get("relatedModules");
+        if (related == null || !related.isJsonArray()) {
+            return false;
+        }
+        for (JsonElement entry : related.getAsJsonArray()) {
+            if (entry.isJsonObject()
+                    && qualified.name().equals(Json.string(entry.getAsJsonObject(), "id"))
+                    && qualified.org().equals(Json.string(entry.getAsJsonObject(), "orgName"))
+                    && flagged(entry.getAsJsonObject(), "isDefaultModule", true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Is the value exactly this boolean? Absent and non-boolean values are neither. */
+    private static boolean flagged(JsonObject owner, String key, boolean expected) {
+        JsonElement value = owner.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean()
+                && value.getAsBoolean() == expected;
     }
 
     /**
@@ -104,11 +129,9 @@ public final class Coordinates {
      */
     public static boolean describesSubmodule(JsonElement raw, QualifiedName qualified) {
         for (JsonObject module : modules(raw)) {
-            JsonElement isDefault = module.get("isDefaultModule");
             if (qualified.name().equals(Json.string(module, "id"))
                     && qualified.org().equals(Json.string(module, "orgName"))
-                    && isDefault != null && isDefault.isJsonPrimitive()
-                    && isDefault.getAsJsonPrimitive().isBoolean() && !isDefault.getAsBoolean()) {
+                    && flagged(module, "isDefaultModule", false)) {
                 return true;
             }
         }
@@ -141,8 +164,7 @@ public final class Coordinates {
         if (id == null || !qualified.org().equals(Json.string(module, "orgName"))) {
             return false;
         }
-        boolean named = id.equals(qualified.name()) || id.startsWith(qualified.name() + ".");
-        return named && version.text().equals(Json.string(module, "version"));
+        return id.equals(qualified.name()) && version.text().equals(Json.string(module, "version"));
     }
 
     /**
