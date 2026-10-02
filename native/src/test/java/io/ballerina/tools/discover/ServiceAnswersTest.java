@@ -173,8 +173,15 @@ public class ServiceAnswersTest {
     }
 
     @Test
+    public void aSiblingModulesServiceTypeIsReachedThroughModuleFromAnotherSubmodule() {
+        LoadedPackage loaded = attaching(Node.external("test", "pkg.b", "Service"), "a", "a", "b");
+        Assert.assertEquals(roster(loaded).containers().get(0).command(),
+                "bal discover test/pkg --module b service Service");
+    }
+
+    @Test
     public void theDefaultModuleIsReachedFromASubmoduleWithoutModule() {
-        LoadedPackage loaded = attaching("pkg.core", Node.external("test", "pkg.core", "Service"), "events");
+        LoadedPackage loaded = attachingIn("pkg.core", Node.external("test", "pkg.core", "Service"), "events");
         Assert.assertEquals(roster(loaded).containers().get(0).command(),
                 "bal discover test/pkg.core service Service");
     }
@@ -202,11 +209,11 @@ public class ServiceAnswersTest {
     }
 
     private static LoadedPackage attaching(Node serviceType, String module, String... submodules) {
-        return attaching("pkg", serviceType, module, submodules);
+        return attachingIn("pkg", serviceType, module, submodules);
     }
 
     /** {@code test/<name>}, read at {@code module} (the default when {@code null}), publishing {@code submodules}. */
-    private static LoadedPackage attaching(String name, Node serviceType, String module, String... submodules) {
+    private static LoadedPackage attachingIn(String name, Node serviceType, String module, String... submodules) {
         Payload payload = Payload.pkg("test", module == null ? name : name + "." + module)
                 .with("listeners", Decl.listenerAttaching(serviceType, "Listener"));
         return new LoadedPackage(QualifiedName.parse("test/" + name).value(), FixtureCorpus.FIXTURE_VERSION,
