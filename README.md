@@ -38,7 +38,7 @@ left out.
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
 | `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
-| `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`.                 |
+| `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again.                   |
 
 ## Walkthrough

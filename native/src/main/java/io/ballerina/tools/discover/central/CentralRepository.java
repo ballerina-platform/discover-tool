@@ -89,6 +89,12 @@ public final class CentralRepository implements PackageRepository {
     }
 
     @Override
+    public Result<CentralDocs> fetchModuleDocs(
+            QualifiedName qualified, String submodule, CentralClient.ResolvedVersion resolved, HttpOptions options) {
+        return CentralClient.fetchModuleDocs(qualified, submodule, resolved, options);
+    }
+
+    @Override
     public String id() {
         return CentralClient.REPOSITORY_ID;
     }

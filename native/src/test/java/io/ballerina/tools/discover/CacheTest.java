@@ -727,6 +727,38 @@ public class CacheTest {
         Assert.assertNull(cache.readDocs(AWS_AUTH_DOCS));
     }
 
+    @Test
+    public void aSubmodulePageIsCachedApartFromEveryPackageEntry() {
+        Path root = freshRoot();
+        DocsCache cache = cacheAt(root);
+        String page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").toString();
+        int[] docs = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerina/graphql.subgraph/1.17.0")) {
+                docs[0]++;
+                return FakeTransport.ok(page);
+            }
+            return url.endsWith("/registry/packages/ballerina/graphql")
+                    ? FakeTransport.ok("[\"1.17.0\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cache).build();
+        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+
+        Capture cold = new Capture();
+        Assert.assertEquals(Cli.run(argv, cold.streams(), http), 0, cold.stderr());
+        Capture warm = new Capture();
+        Assert.assertEquals(Cli.run(argv, warm.streams(), http), 0, warm.stderr());
+        Assert.assertEquals(docs[0], 1, "the second run must read the module page off disk");
+        Assert.assertEquals(warm.stdout(), cold.stdout());
+
+        Path v2 = root.resolve("v2");
+        Assert.assertTrue(Files.exists(v2.resolve("modules").resolve(CentralClient.REPOSITORY_ID)
+                .resolve("ballerina").resolve("graphql").resolve("subgraph").resolve("1.17.0.json")));
+        Assert.assertFalse(Files.exists(v2.resolve("docs").resolve(CentralClient.REPOSITORY_ID)
+                .resolve("ballerina").resolve("graphql.subgraph")), "a module page is never a package's entry");
+    }
+
     // -----------------------------------------------------------------------
 
     private static void write(Path path, String contents) {

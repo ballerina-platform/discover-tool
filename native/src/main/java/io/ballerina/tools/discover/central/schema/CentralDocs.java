@@ -503,6 +503,8 @@ public record CentralDocs(List<Module> modules) {
      * @param annotations every annotation the module declares
      * @param variables every module-level {@code public final} variable
      * @param configurables every {@code configurable} the module declares
+     * @param relatedModules every module of the package this module belongs to, itself included — the only place a
+     *     package's page names its submodules, since the page carries the default module alone
      */
     public record Module(
             String id,
@@ -538,5 +540,16 @@ public record CentralDocs(List<Module> modules) {
             List<ObjectDecl> serviceTypes,
             List<Annotation> annotations,
             List<VariableDecl> variables,
-            List<VariableDecl> configurables) { }
+            List<VariableDecl> configurables,
+            List<RelatedModule> relatedModules) { }
+
+    /**
+     * One module of a package, as another module of it names it.
+     *
+     * @param id the module id, e.g. {@code graphql.subgraph}
+     * @param orgName the organization
+     * @param summary the module's one-line summary
+     * @param isDefaultModule whether this is the package's own default module
+     */
+    public record RelatedModule(String id, String orgName, Optional<String> summary, boolean isDefaultModule) { }
 }

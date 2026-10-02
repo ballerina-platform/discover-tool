@@ -90,6 +90,12 @@ public class PackageRepositoryTest {
         }
 
         @Override
+        public Result<CentralDocs> fetchModuleDocs(QualifiedName qualified, String submodule,
+                CentralClient.ResolvedVersion resolved, HttpOptions options) {
+            throw new AssertionError("no test here loads a submodule");
+        }
+
+        @Override
         public String id() {
             return id;
         }

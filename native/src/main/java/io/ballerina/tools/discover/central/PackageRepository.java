@@ -57,6 +57,13 @@ public interface PackageRepository {
             QualifiedName qualified, CentralClient.ResolvedVersion resolved, String moduleId, HttpOptions options);
 
     /**
+     * One submodule's API docs at an already-resolved version of its package — {@code package-not-found} when
+     * this repository has no such module of that package.
+     */
+    Result<CentralDocs> fetchModuleDocs(
+            QualifiedName qualified, String submodule, CentralClient.ResolvedVersion resolved, HttpOptions options);
+
+    /**
      * This repository's own stable, filesystem-safe identity — the cache key's repository dimension (see
      * {@code io.ballerina.tools.discover.cache.DocsCache}), so two repositories answering the same
      * {@code org/name/version} differently never collide in one entry. Never free-form prose and never derived

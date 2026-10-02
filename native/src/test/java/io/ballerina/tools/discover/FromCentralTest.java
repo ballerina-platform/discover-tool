@@ -132,16 +132,26 @@ public class FromCentralTest {
 
     @Test
     public void aModuleFlagIsReachedByComposingItOntoThePackageName() {
-        CentralDocs docs = multiModule(List.of("graphql", "graphql.dataloader", "graphql.subgraph"), "ballerina");
+        CentralDocs page = Schema.parse(FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader"), "page")
+                .value();
         Result<CentralDocs.Module> selected =
-                FromCentral.selectModule(docs, qualified("ballerina/graphql"), "dataloader");
+                FromCentral.selectModule(page, qualified("ballerina/graphql"), "dataloader");
         Assert.assertTrue(selected.isOk());
         Assert.assertEquals(selected.value().id(), "graphql.dataloader");
     }
 
     @Test
+    public void aPackagesSubmodulesAreTheOnesItsPageNamesNotTheOnesItCarries() {
+        // Central's page for a package carries its default module alone; the rest are named in relatedModules.
+        CentralDocs docs = FixtureCorpus.loadFixture("ballerina__graphql");
+        Assert.assertEquals(docs.modules().size(), 1);
+        Assert.assertEquals(FromCentral.submodulesOf(docs, qualified("ballerina/graphql")).stream()
+                .map(CentralDocs.RelatedModule::id).toList(), List.of("graphql.dataloader", "graphql.subgraph"));
+    }
+
+    @Test
     public void aModuleFlagThatNamesNoSubmoduleFailsWithEveryBareSubmoduleName() {
-        CentralDocs docs = multiModule(List.of("graphql", "graphql.dataloader", "graphql.subgraph"), "ballerina");
+        CentralDocs docs = FixtureCorpus.loadFixture("ballerina__graphql");
         Result<CentralDocs.Module> selected =
                 FromCentral.selectModule(docs, qualified("ballerina/graphql"), "nosuch");
         Assert.assertFalse(selected.isOk());

@@ -141,6 +141,19 @@ public final class FixtureCorpus {
         return RAW_CACHE.computeIfAbsent(slug, FixtureCorpus::readGzippedJson).deepCopy();
     }
 
+    /**
+     * A submodule's own docs page ({@code docs/<org>/<package>.<module>/<version>}), recorded at the version of
+     * the package fixture it belongs to — kept out of the top-level corpus, which holds packages only.
+     */
+    public static JsonElement loadRawModulePage(String slug) {
+        return loadRawFixture("modules/" + slug);
+    }
+
+    /** One package version's registry row ({@code registry/packages/<org>/<name>/<version>}), recorded alike. */
+    public static JsonElement loadRawRegistryRow(String slug) {
+        return loadRawFixture("registry/" + slug);
+    }
+
     private static JsonElement readGzippedJson(String slug) {
         Path path = FIXTURES_DIR.resolve(slug + ".json.gz");
         try (InputStream in = Files.newInputStream(path);
