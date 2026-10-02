@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.cache.CacheLocation;
 import io.ballerina.tools.discover.cache.DiskCache;
@@ -658,6 +659,72 @@ public class CacheTest {
         Assert.assertNull(DocsCache.NULL.readLatest(packageKey));
         Assert.assertEquals(DocsCache.NULL.listVersions(packageKey), List.of());
         Assert.assertEquals(DocsCache.NULL.describe(), "disabled");
+    }
+
+    // -----------------------------------------------------------------------
+    // Module entries an older build wrote
+    //
+    // Earlier builds read a module coordinate at its containing package's version and cached the answer under
+    // the module's own key. Neither entry may now answer `ballerinax/aws.auth` as if it were a package.
+    // -----------------------------------------------------------------------
+
+    private static final DocsCache.PackageKey AWS_AUTH_PACKAGE =
+            new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, "ballerinax", "aws.auth");
+    private static final DocsCache.DocsKey AWS_AUTH_DOCS =
+            new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "aws.auth", "1.0.2");
+
+    /** What Central's docs endpoint serves for a module path: the module alone, flagged as not the default. */
+    private static JsonElement awsAuthModulePage() {
+        JsonObject raw = FixtureCorpus.loadRawFixture(SLUG).getAsJsonObject();
+        JsonObject module = raw.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject();
+        module.addProperty("id", "aws.auth");
+        module.addProperty("version", "1.0.2");
+        module.addProperty("isDefaultModule", false);
+        return raw;
+    }
+
+    @Test
+    public void aLatestEntryWrittenForAModuleDoesNotReadTheModuleAsAPackage() {
+        DocsCache cache = cacheAt(freshRoot());
+        cache.writeLatest(AWS_AUTH_PACKAGE, new DocsCache.LatestEntry("1.0.2", 1_000));
+        String modulePage = awsAuthModulePage().toString();
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerinax/aws.auth/1.0.2")) {
+                return FakeTransport.ok(modulePage);
+            }
+            if (url.endsWith("/registry/packages/ballerinax/aws/1.0.2")) {
+                return FakeTransport.ok("{\"modules\":[{\"name\":\"aws\"},{\"name\":\"aws.auth\"}]}");
+            }
+            return url.endsWith("/registry/packages/ballerinax/aws")
+                    ? FakeTransport.ok("[\"1.0.2\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cache).clock(() -> 2_000).build();
+
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/aws.auth"), capture.streams(), http), 1);
+        Assert.assertEquals(capture.stdout(), "");
+        JsonObject failure = JsonParser.parseString(capture.stderr()).getAsJsonObject();
+        Assert.assertEquals(failure.get("kind").getAsString(), "package-not-found");
+        Assert.assertTrue(failure.get("suggestion").getAsString()
+                .contains("`bal discover ballerinax/aws --module auth`"), capture.stderr());
+        Assert.assertNull(cache.readDocs(AWS_AUTH_DOCS), "a module page must not be cached as a package's");
+    }
+
+    @Test
+    public void aModulePageCachedUnderAModuleKeyIsAMissNotAnAnswer() {
+        DocsCache cache = cacheAt(freshRoot());
+        cache.writeLatest(AWS_AUTH_PACKAGE, new DocsCache.LatestEntry("1.0.2", 1_000));
+        cache.writeDocs(AWS_AUTH_DOCS, awsAuthModulePage());
+        FakeTransport transport = FakeTransport.always(FakeTransport.status(503));
+        HttpOptions http = options(transport, cache).clock(() -> 2_000).maxAttempts(1).build();
+
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/aws.auth"), capture.streams(), http), 1);
+        Assert.assertEquals(capture.stdout(), "");
+        Assert.assertEquals(transport.urls(),
+                List.of(CentralClient.CENTRAL_BASE_URL + "docs/ballerinax/aws.auth/1.0.2"));
+        Assert.assertNull(cache.readDocs(AWS_AUTH_DOCS));
     }
 
     // -----------------------------------------------------------------------

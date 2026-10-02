@@ -248,10 +248,9 @@ public class ClientTest {
     // -----------------------------------------------------------------------
     // Modules of a package
     //
-    // The registry lists packages, so a module has no row of its own. These pin the walk that finds its
-    // version through the package containing it — without which `ballerinax/aws.auth`, the type of the only
-    // required field of `ballerinax/aws.s3`'s constructor, is unreadable unless the caller already knows a
-    // version to pin.
+    // The coordinate is always one literal package name. A dotted name the registry has no row for is probed
+    // against its prefixes only to say which package it is a module of — never to read the module in the
+    // package's place.
     // -----------------------------------------------------------------------
 
     private static final QualifiedName AWS_AUTH = QualifiedName.parse("ballerinax/aws.auth").value();
@@ -269,20 +268,9 @@ public class ClientTest {
     }
 
     @Test
-    public void aModuleResolvesAtTheVersionOfThePackageContainingIt() {
-        FakeTransport transport = registry(Map.of("ballerinax/aws", "[\"1.0.1\",\"1.0.0\"]"));
-        Result<CentralClient.ResolvedVersion> result =
-                CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build());
-        Assert.assertTrue(result.isOk());
-        Assert.assertEquals(result.value().version().text(), "1.0.1");
-        // Two calls: the module's own row, which does not exist, then the package's.
-        Assert.assertEquals(transport.calls(), 2);
-    }
-
-    @Test
     public void aDottedNameThatIsItsOwnPackageNeverProbesAParent() {
         // The common case by a wide margin — `googleapis.sheets`, `googleapis.gmail`, `aws.s3` are all
-        // packages. Falling back on a hit would put a second round trip on every one of them.
+        // packages, and each costs the one round trip any package does.
         QualifiedName sheets = QualifiedName.parse("ballerinax/googleapis.sheets").value();
         FakeTransport transport = registry(Map.of("ballerinax/googleapis.sheets", "[\"5.0.0\"]"));
         Result<CentralClient.ResolvedVersion> result =
@@ -292,22 +280,73 @@ public class ClientTest {
         Assert.assertEquals(transport.calls(), 1);
     }
 
+    /** One version's registry row, listing the modules it publishes. */
+    private static String modules(String... names) {
+        StringBuilder rows = new StringBuilder();
+        for (String name : names) {
+            rows.append(rows.isEmpty() ? "" : ",").append("{\"name\":\"").append(name).append("\"}");
+        }
+        return "{\"modules\":[" + rows + "]}";
+    }
+
+    private static String suggestion(Result<CentralClient.ResolvedVersion> result) {
+        Assert.assertFalse(result.isOk());
+        return ((Failure.PackageNotFound) result.failure()).suggestion();
+    }
+
     @Test
-    public void theWalkTriesEachShorterPrefixInTurn() {
-        // `a.b.c` is a module of `a.b` when that exists and of `a` when it does not; both are legal, so the
-        // walk cannot stop at the first prefix.
-        QualifiedName deep = QualifiedName.parse("ballerina/one.two.three").value();
-        FakeTransport transport = registry(Map.of("ballerina/one", "[\"3.1.0\"]"));
+    public void aModuleOfAPackageIsNotReadAsOneAndNamesTheCommandThatReadsIt() {
+        FakeTransport transport = registry(Map.of(
+                "ballerinax/aws", "[\"1.0.1\",\"1.0.0\"]",
+                "ballerinax/aws/1.0.1", modules("aws", "aws.auth")));
         Result<CentralClient.ResolvedVersion> result =
-                CentralClient.resolveLatestVersion(deep, fast(transport).build());
-        Assert.assertTrue(result.isOk());
-        Assert.assertEquals(result.value().version().text(), "3.1.0");
+                CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build());
+        Assert.assertEquals(((Failure.PackageNotFound) result.failure()).qualified(), "ballerinax/aws.auth");
+        String suggestion = suggestion(result);
+        Assert.assertTrue(suggestion.contains("the 'auth' module of the ballerinax/aws package"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal discover ballerinax/aws --module auth`"), suggestion);
+        // The module's own row, the package's, then the package version's module list — never its docs.
         Assert.assertEquals(transport.calls(), 3);
+        Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/docs/")),
+                transport.urls().toString());
+    }
+
+    @Test
+    public void theProbeTriesEachShorterPrefixAndKeepsTheWholeRemainderAsTheModule() {
+        // `a.b.c` is a module of `a.b` when that exists and of `a` when it does not; `--module` composes its
+        // value back onto the package name, so the remainder it is handed is `b.c`, dots and all.
+        QualifiedName deep = QualifiedName.parse("ballerina/one.two.three").value();
+        FakeTransport transport = registry(Map.of(
+                "ballerina/one", "[\"3.1.0\"]",
+                "ballerina/one/3.1.0", modules("one", "one.two.three")));
+        String suggestion = suggestion(CentralClient.resolveLatestVersion(deep, fast(transport).build()));
+        Assert.assertTrue(suggestion.contains("`bal discover ballerina/one --module two.three`"), suggestion);
+        Assert.assertEquals(transport.calls(), 4);
+    }
+
+    @Test
+    public void aModuleTheContainingPackageDoesNotPublishIsNotOfferedAsOne() {
+        QualifiedName nope = QualifiedName.parse("ballerinax/aws.nope").value();
+        FakeTransport transport = registry(Map.of(
+                "ballerinax/aws", "[\"1.0.1\"]",
+                "ballerinax/aws/1.0.1", modules("aws", "aws.auth")));
+        String suggestion = suggestion(CentralClient.resolveLatestVersion(nope, fast(transport).build()));
+        Assert.assertTrue(suggestion.contains("publishes no 'nope' module (its modules are aws, aws.auth)"),
+                suggestion);
+        Assert.assertFalse(suggestion.contains("--module"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal search <keyword>`"), suggestion);
+    }
+
+    @Test
+    public void aModuleListTheRegistryCannotServeStillOffersTheCommandWithoutClaimingTheModule() {
+        FakeTransport transport = registry(Map.of("ballerinax/aws", "[\"1.0.1\"]"));
+        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Assert.assertTrue(suggestion.contains("If 'auth' is one of its modules"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal discover ballerinax/aws --module auth`"), suggestion);
     }
 
     @Test
     public void aNameThatIsNeitherAPackageNorAModuleSaysWhatWasTried() {
-        // The caller's next move differs by which half is misspelled, and after the walk the reader knows.
         FakeTransport transport = registry(Map.of());
         Result<CentralClient.ResolvedVersion> result =
                 CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build());
@@ -315,12 +354,25 @@ public class ClientTest {
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
         Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
         Assert.assertTrue(failure.suggestion().contains("tried ballerinax/aws"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("`bal search <keyword>`"), failure.suggestion());
     }
 
     @Test
-    public void aModuleWhoseParentIsUnreachableDoesNotReportTheParentsFailure() {
+    public void aParentTheRegistryCannotAnswerForIsNotReportedAsMissing() {
+        FakeTransport transport = FakeTransport.routing(url -> url.endsWith("/registry/packages/ballerinax/aws")
+                ? FakeTransport.status(500)
+                : FakeTransport.status(404));
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).maxAttempts(1).build());
+        Assert.assertFalse(result.isOk());
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
+        Assert.assertFalse(failure.suggestion().contains("tried"), failure.suggestion());
+    }
+
+    @Test
+    public void aModuleWhoseOwnRowIsUnreachableDoesNotProbeAParent() {
         // A 500 on the module's own row is a transport fact, not "no such package", and must not be converted
-        // into one by a walk that never should have started.
+        // into one by a probe that never should have started.
         FakeTransport transport = FakeTransport.always(FakeTransport.status(500));
         Result<CentralClient.ResolvedVersion> result =
                 CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).maxAttempts(1).build());

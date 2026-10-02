@@ -51,40 +51,89 @@ public final class Coordinates {
         if (raw == null || !raw.isJsonObject()) {
             return false;
         }
-        JsonObject root = raw.getAsJsonObject();
-        String apiDocsVersion = Json.string(root, "apiDocsVersion");
-        if (apiDocsVersion == null || apiDocsVersion.isEmpty()) {
+        String apiDocsVersion = Json.string(raw.getAsJsonObject(), "apiDocsVersion");
+        if (apiDocsVersion == null || apiDocsVersion.isEmpty() || describesSubmodule(raw, qualified)) {
             return false;
         }
-
-        JsonElement docsData = root.get("docsData");
-        if (docsData == null || !docsData.isJsonObject()) {
-            return false;
-        }
-        JsonElement modules = docsData.getAsJsonObject().get("modules");
-        if (modules == null || !modules.isJsonArray()) {
-            return false;
-        }
-
-        for (JsonElement entry : modules.getAsJsonArray()) {
-            if (describes(entry, qualified, version)) {
+        for (JsonObject module : modules(raw)) {
+            if (describes(module, qualified, version)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean describes(JsonElement entry, QualifiedName qualified, Version version) {
-        if (entry == null || !entry.isJsonObject()) {
-            return false;
+    /**
+     * Is this a submodule's own page rather than a package's?
+     *
+     * <p>Central's docs endpoint answers for a module path as readily as for a package
+     * ({@code docs/ballerinax/aws.auth/1.0.2} is the {@code auth} module of {@code ballerinax/aws}), and flags it
+     * {@code isDefaultModule: false}; a package's page carries its own default module. Only an explicit
+     * {@code false} counts, so a payload that omits the flag is still read as the package it was asked for.
+     */
+    public static boolean describesSubmodule(JsonElement raw, QualifiedName qualified) {
+        for (JsonObject module : modules(raw)) {
+            JsonElement isDefault = module.get("isDefaultModule");
+            if (qualified.name().equals(Json.string(module, "id"))
+                    && qualified.org().equals(Json.string(module, "orgName"))
+                    && isDefault != null && isDefault.isJsonPrimitive()
+                    && isDefault.getAsJsonPrimitive().isBoolean() && !isDefault.getAsBoolean()) {
+                return true;
+            }
         }
-        JsonObject module = entry.getAsJsonObject();
+        return false;
+    }
+
+    private static java.util.List<JsonObject> modules(JsonElement raw) {
+        if (raw == null || !raw.isJsonObject()) {
+            return java.util.List.of();
+        }
+        JsonElement docsData = raw.getAsJsonObject().get("docsData");
+        if (docsData == null || !docsData.isJsonObject()) {
+            return java.util.List.of();
+        }
+        JsonElement modules = docsData.getAsJsonObject().get("modules");
+        if (modules == null || !modules.isJsonArray()) {
+            return java.util.List.of();
+        }
+        java.util.List<JsonObject> objects = new java.util.ArrayList<>();
+        for (JsonElement entry : modules.getAsJsonArray()) {
+            if (entry != null && entry.isJsonObject()) {
+                objects.add(entry.getAsJsonObject());
+            }
+        }
+        return objects;
+    }
+
+    private static boolean describes(JsonObject module, QualifiedName qualified, Version version) {
         String id = Json.string(module, "id");
         if (id == null || !qualified.org().equals(Json.string(module, "orgName"))) {
             return false;
         }
         boolean named = id.equals(qualified.name()) || id.startsWith(qualified.name() + ".");
         return named && version.text().equals(Json.string(module, "version"));
+    }
+
+    /**
+     * The module names one version's registry row lists — {@code aws} and {@code aws.auth} for
+     * {@code ballerinax/aws} — or an empty list when the row is not the shape expected.
+     */
+    static java.util.List<String> moduleNames(JsonElement raw) {
+        if (raw == null || !raw.isJsonObject()) {
+            return java.util.List.of();
+        }
+        JsonElement modules = raw.getAsJsonObject().get("modules");
+        if (modules == null || !modules.isJsonArray()) {
+            return java.util.List.of();
+        }
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (JsonElement entry : modules.getAsJsonArray()) {
+            String name = entry.isJsonObject() ? Json.string(entry.getAsJsonObject(), "name") : null;
+            if (name != null && !name.isEmpty()) {
+                names.add(name);
+            }
+        }
+        return java.util.List.copyOf(names);
     }
 
     /** The first entry of a versions array, or {@code null} if it is not a non-empty array of strings. */
