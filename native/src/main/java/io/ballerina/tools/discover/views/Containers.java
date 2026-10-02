@@ -556,7 +556,7 @@ public final class Containers {
         } else {
             return Optional.empty();
         }
-        return Optional.of("bal discover " + target + " service " + service.name());
+        return Optional.of("bal discover " + target + " service " + shellWord(service.name()));
     }
 
     /**
