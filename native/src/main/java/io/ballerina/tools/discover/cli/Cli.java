@@ -243,7 +243,8 @@ public final class Cli {
         List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.BucketList.Submodule(
                         submodule.name(), submodule.summary(),
-                        "bal discover " + loaded.qualified().qualified() + " --module " + submodule.name()))
+                        "bal discover " + loaded.qualified().qualified() + " --module "
+                                + Texts.shellWord(submodule.name())))
                 .toList();
         return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
     }
