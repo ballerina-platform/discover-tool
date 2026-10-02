@@ -34,9 +34,8 @@ import java.util.zip.ZipInputStream;
  * A package archive ({@code .bala}) — a zip whose {@code modules/<module-id>/} directories hold each module's
  * {@code .bal} files, beside the docs, resources and native jars this reader never needs.
  *
- * <p>Read as a stream, never held whole, and bounded on both axes, since its size is the publisher's choice: an
- * archive past {@link #MAX_ARCHIVE_BYTES} or a source file past {@link #MAX_SOURCE_BYTES} is no answer at all, the
- * same as an archive that could not be fetched.
+ * <p>Bounded on both axes, since its size is the publisher's choice: an archive past {@link #MAX_ARCHIVE_BYTES} or
+ * a source file past {@link #MAX_SOURCE_BYTES} is no answer at all, the same as an archive that could not be fetched.
  *
  * @since 0.1.0
  */
