@@ -760,6 +760,52 @@ public class CacheTest {
     }
 
     @Test
+    public void aPackagePagePublishedBeforeApiDocsVersionExistedIsServedFromTheCache() {
+        JsonObject page = FixtureCorpus.loadRawFixture(SLUG).getAsJsonObject();
+        page.remove("apiDocsVersion");
+        int[] docs = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.contains("/docs/")) {
+                docs[0]++;
+                return FakeTransport.ok(page.toString());
+            }
+            return FakeTransport.ok("[\"" + VERSION + "\"]");
+        });
+        HttpOptions http = options(transport, cacheAt(freshRoot())).build();
+
+        Capture cold = new Capture();
+        Assert.assertEquals(Cli.run(List.of(PKG), cold.streams(), http), 0, cold.stderr());
+        Capture warm = new Capture();
+        Assert.assertEquals(Cli.run(List.of(PKG), warm.streams(), http), 0, warm.stderr());
+        Assert.assertEquals(docs[0], 1, "Central is asked once");
+        Assert.assertEquals(warm.stdout(), cold.stdout());
+    }
+
+    @Test
+    public void aSubmodulePagePublishedBeforeApiDocsVersionExistedIsServedFromTheCache() {
+        String page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph-1.8.0").toString();
+        int[] docs = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerina/graphql.subgraph/1.8.0")) {
+                docs[0]++;
+                return FakeTransport.ok(page);
+            }
+            return url.endsWith("/registry/packages/ballerina/graphql")
+                    ? FakeTransport.ok("[\"1.8.0\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cacheAt(freshRoot())).build();
+        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+
+        Capture cold = new Capture();
+        Assert.assertEquals(Cli.run(argv, cold.streams(), http), 0, cold.stderr());
+        Capture warm = new Capture();
+        Assert.assertEquals(Cli.run(argv, warm.streams(), http), 0, warm.stderr());
+        Assert.assertEquals(docs[0], 1, "Central is asked once");
+        Assert.assertEquals(warm.stdout(), cold.stdout());
+    }
+
+    @Test
     public void refreshFetchesASubmodulePageAgain() {
         DocsCache cache = cacheAt(freshRoot());
         String page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").toString();
