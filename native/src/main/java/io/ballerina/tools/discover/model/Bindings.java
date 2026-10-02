@@ -42,7 +42,7 @@ import java.util.Set;
  *
  * <p>The targets come from the docs payload. Inclusions do not — Central publishes none for a service type — so
  * they come from the package's source when it can be read ({@link ObjectInclusions}); without it a service type
- * that is no listener's target cannot be placed, and is paired {@link Binding#UNCONFIRMED} rather than dropped.
+ * that is no listener's target cannot be placed, and is paired {@link Binding#SOURCE_UNAVAILABLE} rather than dropped.
  *
  * @since 0.1.0
  */
