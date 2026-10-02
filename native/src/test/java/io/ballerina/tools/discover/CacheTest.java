@@ -712,7 +712,7 @@ public class CacheTest {
     }
 
     @Test
-    public void aModulePageCachedUnderAModuleKeyIsAMissNotAnAnswer() {
+    public void aModulePageCachedUnderThePackageKeyIsAMissNotAnAnswer() {
         DocsCache cache = cacheAt(freshRoot());
         cache.writeLatest(AWS_AUTH_PACKAGE, new DocsCache.LatestEntry("1.0.2", 1_000));
         cache.writeDocs(AWS_AUTH_DOCS, awsAuthModulePage());
@@ -757,6 +757,32 @@ public class CacheTest {
                 .resolve("ballerina").resolve("graphql").resolve("subgraph").resolve("1.17.0.json")));
         Assert.assertFalse(Files.exists(v2.resolve("docs").resolve(CentralClient.REPOSITORY_ID)
                 .resolve("ballerina").resolve("graphql.subgraph")), "a module page is never a package's entry");
+    }
+
+    @Test
+    public void refreshFetchesASubmodulePageAgain() {
+        DocsCache cache = cacheAt(freshRoot());
+        String page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").toString();
+        int[] docs = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerina/graphql.subgraph/1.17.0")) {
+                docs[0]++;
+                return FakeTransport.ok(page);
+            }
+            return url.endsWith("/registry/packages/ballerina/graphql")
+                    ? FakeTransport.ok("[\"1.17.0\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cache).build();
+        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+
+        Assert.assertEquals(Cli.run(argv, new Capture().streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "--refresh"),
+                new Capture().streams(), http), 0);
+        Assert.assertEquals(docs[0], 2, "--refresh must not answer from the cached module page");
+        DocsCache.ModuleKey key = new DocsCache.ModuleKey(
+                CentralClient.REPOSITORY_ID, "ballerina", "graphql", "subgraph", "1.17.0");
+        Assert.assertNotNull(cache.readModuleDocs(key), "the refetched page is cached again");
     }
 
     // -----------------------------------------------------------------------

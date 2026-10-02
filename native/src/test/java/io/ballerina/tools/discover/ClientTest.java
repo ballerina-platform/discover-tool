@@ -183,8 +183,8 @@ public class ClientTest {
     @Test
     public void aNotFoundOnAVersionTheReaderResolvedBlamesTheNameRatherThanTheVersion() {
         // The reader resolved the version, so "omit the version" would name a step the caller never took. It is
-        // reachable through the module walk: a parent that exists supplies a version for a module that does not,
-        // and then only the name can be wrong.
+        // reachable when the registry lists a version Central has no docs page for, or a cached latest answer
+        // outlives the page it named.
         FakeTransport transport = FakeTransport.always(FakeTransport.status(404));
         Result<CentralDocs> result = CentralClient.fetchDocs(
                 GITHUB, resolved("6.0.0"), fast(transport).build());
