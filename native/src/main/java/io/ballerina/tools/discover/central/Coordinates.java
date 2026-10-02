@@ -64,6 +64,37 @@ public final class Coordinates {
     }
 
     /**
+     * Does this payload describe the {@code submodule} module page of this package version?
+     *
+     * <p>The mirror image of {@link #match} plus {@link #describesSubmodule}: the page answering
+     * {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact module, at that version, and flagged
+     * as NOT its package's default. The flag is what tells a submodule apart from a separately published package
+     * that happens to share the dotted name ({@code ballerinax/aws.s3} is a package, not a module of
+     * {@code ballerinax/aws}), so here an absent flag is not good enough.
+     */
+    public static boolean matchModule(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
+        if (raw == null || !raw.isJsonObject()) {
+            return false;
+        }
+        String apiDocsVersion = Json.string(raw.getAsJsonObject(), "apiDocsVersion");
+        if (apiDocsVersion == null || apiDocsVersion.isEmpty()) {
+            return false;
+        }
+        String id = qualified.name() + "." + submodule;
+        for (JsonObject module : modules(raw)) {
+            JsonElement isDefault = module.get("isDefaultModule");
+            if (id.equals(Json.string(module, "id"))
+                    && qualified.org().equals(Json.string(module, "orgName"))
+                    && version.text().equals(Json.string(module, "version"))
+                    && isDefault != null && isDefault.isJsonPrimitive()
+                    && isDefault.getAsJsonPrimitive().isBoolean() && !isDefault.getAsBoolean()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Is this a submodule's own page rather than a package's?
      *
      * <p>Central's docs endpoint answers for a module path as readily as for a package

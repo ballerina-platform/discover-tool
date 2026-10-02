@@ -495,6 +495,70 @@ public final class CentralClient {
     }
 
     /**
+     * One submodule's own docs page, at its package's version.
+     *
+     * <p>A package's page carries its default module alone; every other module of it has a page of its own at
+     * {@code docs/<org>/<package>.<submodule>/<version>}, which is what {@code --module} reads. It is cached
+     * under a {@link DocsCache.ModuleKey}, never a package's {@link DocsCache.DocsKey}: the page that is a miss
+     * for a package lookup ({@link Coordinates#describesSubmodule}) is the answer here, and the two must never
+     * share an entry.
+     *
+     * <p>A 404, or a page that is not a submodule of this package, is {@code package-not-found} for the dotted
+     * coordinate; {@link io.ballerina.tools.discover.Loader} turns that into the caller-facing failure, because
+     * only it can list what the package does publish.
+     */
+    public static Result<CentralDocs> fetchModuleDocs(
+            QualifiedName qualified, String submodule, ResolvedVersion resolved, HttpOptions options) {
+        Version version = resolved.version();
+        DocsCache cache = options.cache();
+        DocsCache.ModuleKey key = new DocsCache.ModuleKey(
+                REPOSITORY_ID, qualified.org(), qualified.name(), submodule, version.text());
+        String moduleName = qualified.name() + "." + submodule;
+        String label = qualified.org() + "/" + moduleName + ":" + version.text();
+
+        if (options.refresh()) {
+            cache.removeModuleDocs(key);
+        } else {
+            JsonElement cached = cache.readModuleDocs(key);
+            if (cached != null) {
+                Result<CentralDocs> parsed = Coordinates.matchModule(cached, qualified, submodule, version)
+                        ? Schema.parse(cached, label)
+                        : null;
+                if (parsed != null && parsed.isOk()) {
+                    return parsed;
+                }
+                cache.removeModuleDocs(key);
+            }
+        }
+
+        String url = CENTRAL_BASE_URL + "docs/" + encode(qualified.org())
+                + "/" + encode(moduleName) + "/" + encode(version.text());
+        Result<JsonElement> response = fetchJson(url, options);
+        if (!response.isOk()) {
+            if (response.failure() instanceof Failure.Upstream upstream
+                    && upstream.status() != null && upstream.status() == 404) {
+                return Result.err(noSuchModulePage(label, qualified, submodule));
+            }
+            return response.cast();
+        }
+        if (!Coordinates.matchModule(response.value(), qualified, submodule, version)) {
+            return Result.err(noSuchModulePage(label, qualified, submodule));
+        }
+        Result<CentralDocs> parsed = Schema.parse(response.value(), label);
+        if (!parsed.isOk()) {
+            return parsed.cast();
+        }
+        cache.writeModuleDocs(key, response.value());
+        return parsed;
+    }
+
+    private static Failure noSuchModulePage(String label, QualifiedName qualified, String submodule) {
+        return new Failure.PackageNotFound(label, qualified.qualified() + " publishes no '" + submodule
+                + "' module at this version. Run `bal discover " + Texts.shellWord(qualified.qualified())
+                + "` to list the submodules it does publish.");
+    }
+
+    /**
      * The docs endpoint answered 404: the org/name may well exist, this VERSION does not.
      *
      * <p>T10, closed in the failure rather than in the grammar. Which half the caller can act on depends on who

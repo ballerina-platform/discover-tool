@@ -730,9 +730,9 @@ public final class FromCentral {
     /**
      * The package's own default module — the one {@code import org/name;} puts in scope.
      *
-     * <p>Reading the first module instead is untested by construction, because every recorded fixture is
-     * single-module: a multi-module package would render whichever module Central happened to put first. It is
-     * also what makes the cache's coordinate check meaningful; verifying one module and then rendering another
+     * <p>Matched by id rather than by position: Central's page for a package carries its default module alone
+     * today, but a page carrying several would otherwise render whichever one Central happened to put first. It
+     * is also what makes the cache's coordinate check meaningful; verifying one module and then rendering another
      * verifies nothing.
      */
     public static Result<CentralDocs.Module> selectModule(CentralDocs docs, QualifiedName qualified) {
@@ -797,15 +797,24 @@ public final class FromCentral {
     }
 
     /**
-     * Every module in this package's own submodule family — org matches, id starts with {@code name.} — Central's
-     * raw records. The shared base {@link #noSuchSubmodule} and {@code Loader.submodulesOf} both filter down to
-     * their own shape from, so "which modules are this package's submodules" is computed in exactly one place.
+     * Every submodule of this package — org matches, id starts with {@code name.} — as the page's
+     * {@code relatedModules} names them. A page carries ONE module's declarations (a package's page its default
+     * module, a module page that module alone), so its {@code relatedModules} is the only place the rest of the
+     * package is listed; any page of the package lists the same set. The shared base {@link #noSuchSubmodule} and
+     * {@code Loader.submodulesOf} both filter down to their own shape from, so "which modules are this package's
+     * submodules" is computed in exactly one place.
      */
-    public static List<CentralDocs.Module> submodulesOf(CentralDocs docs, QualifiedName qualified) {
+    public static List<CentralDocs.RelatedModule> submodulesOf(CentralDocs docs, QualifiedName qualified) {
         String prefix = qualified.name() + ".";
-        return docs.modules().stream()
-                .filter(module -> module.orgName().equals(qualified.org()) && module.id().startsWith(prefix))
-                .toList();
+        Map<String, CentralDocs.RelatedModule> byId = new LinkedHashMap<>();
+        for (CentralDocs.Module module : docs.modules()) {
+            for (CentralDocs.RelatedModule related : module.relatedModules()) {
+                if (related.orgName().equals(qualified.org()) && related.id().startsWith(prefix)) {
+                    byId.putIfAbsent(related.id(), related);
+                }
+            }
+        }
+        return List.copyOf(byId.values());
     }
 
     public static Library fromCentral(CentralDocs.Module module) {

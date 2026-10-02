@@ -265,6 +265,12 @@ public class SourceInclusionsTest {
             }
 
             @Override
+            public Result<CentralDocs> fetchModuleDocs(QualifiedName qualified, String submodule,
+                    CentralClient.ResolvedVersion resolved, HttpOptions http) {
+                throw new AssertionError("not asked");
+            }
+
+            @Override
             public String id() {
                 return "counting";
             }
@@ -299,6 +305,19 @@ public class SourceInclusionsTest {
 
         @Override
         public void removeDocs(DocsKey key) {
+        }
+
+        @Override
+        public com.google.gson.JsonElement readModuleDocs(ModuleKey key) {
+            return null;
+        }
+
+        @Override
+        public void writeModuleDocs(ModuleKey key, com.google.gson.JsonElement payload) {
+        }
+
+        @Override
+        public void removeModuleDocs(ModuleKey key) {
         }
 
         @Override

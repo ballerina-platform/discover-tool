@@ -22,6 +22,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.HttpTransport;
@@ -35,7 +36,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The command's contract, under the package-first grammar: {@code bal discover <org/name> [bucket] [args...]}.
@@ -93,38 +96,31 @@ public class CliTest {
                 : FakeTransport.ok("[\"" + version + "\"]")));
     }
 
-    /** Central, replayed against an assembled multi-module payload rather than a recorded one. */
-    private static HttpOptions centralForDocs(JsonObject docs, String version) {
-        String text = docs.toString();
-        return options(FakeTransport.routing(url -> url.contains("/docs/")
-                ? FakeTransport.ok(text)
-                : FakeTransport.ok("[\"" + version + "\"]")));
-    }
+    private static final String GRAPHQL_VERSION = "1.17.0";
 
     /**
-     * A synthetic multi-module payload — every recorded fixture is single-module, so {@code --module} and the
-     * bare package's own submodule listing cannot be tested against the corpus by construction. kafka's own
-     * module is the template, cloned once per id, since it carries every array the schema requires; each clone
-     * gets its OWN summary and readme so a test can tell which one actually got loaded.
+     * Central, replayed for ballerina/graphql from recorded pages only: the package's page, which carries its
+     * default module alone and names the rest in {@code relatedModules}, and one page per submodule. Anything
+     * else is a 404, as Central answers a module the package does not publish.
      */
-    private static JsonObject multiModuleDocs(List<String> ids, String org) {
-        JsonObject raw = FixtureCorpus.loadRawFixture("ballerinax__kafka").getAsJsonObject();
-        JsonElement template = raw.getAsJsonObject("docsData").getAsJsonArray("modules").get(0);
+    private static FakeTransport graphqlCentral(Map<String, JsonElement> modulePages) {
+        Map<String, String> pages = new HashMap<>();
+        modulePages.forEach((module, page) -> pages.put(
+                "/docs/ballerina/graphql." + module + "/" + GRAPHQL_VERSION, page.toString()));
+        pages.put("/docs/ballerina/graphql/" + GRAPHQL_VERSION,
+                FixtureCorpus.loadRawFixture("ballerina__graphql").toString());
+        pages.put("/registry/packages/ballerina/graphql", "[\"" + GRAPHQL_VERSION + "\"]");
+        return FakeTransport.routing(url -> pages.entrySet().stream()
+                .filter(page -> url.endsWith(page.getKey()))
+                .findFirst()
+                .map(page -> FakeTransport.ok(page.getValue()))
+                .orElse(FakeTransport.status(404)));
+    }
 
-        JsonArray modules = new JsonArray();
-        for (String id : ids) {
-            JsonObject module = template.deepCopy().getAsJsonObject();
-            module.addProperty("id", id);
-            module.addProperty("orgName", org);
-            module.addProperty("summary", "load data from " + id);
-            module.addProperty("description", ("This is " + id + "'s own readme. ").repeat(20));
-            modules.add(module);
-        }
-        JsonObject docsData = new JsonObject();
-        docsData.add("modules", modules);
-        JsonObject wrapper = new JsonObject();
-        wrapper.add("docsData", docsData);
-        return wrapper;
+    private static FakeTransport graphqlCentral() {
+        return graphqlCentral(Map.of(
+                "dataloader", FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader"),
+                "subgraph", FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph")));
     }
 
     private static HttpOptions options(HttpTransport transport) {
@@ -607,37 +603,41 @@ public class CliTest {
     }
 
     // -----------------------------------------------------------------------
-    // --module — synthetic multi-module payloads only, see multiModuleDocs
+    // --module — recorded ballerina/graphql pages, see graphqlCentral
     // -----------------------------------------------------------------------
 
     @Test
-    public void theModuleFlagTargetsADifferentModulesOwnReadme() {
-        JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader"), "ballerina");
+    public void theModuleFlagReadsTheSubmodulesOwnPageAndNeverThePackages() {
+        FakeTransport transport = graphqlCentral();
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader"), capture.streams(),
+                options(transport));
+        Assert.assertEquals(exitCode, 0, capture.stderr());
+        Assert.assertEquals(transport.urls(), List.of(
+                CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
+                CentralClient.CENTRAL_BASE_URL + "docs/ballerina/graphql.dataloader/" + GRAPHQL_VERSION));
+        Assert.assertTrue(capture.stdout().contains("\"buckets\":[\"class\"]"), capture.stdout());
+    }
 
-        Capture withoutModule = new Capture();
-        Cli.run(List.of("ballerina/graphql", "readme"), withoutModule.streams(),
-                centralForDocs(docs, "1.0.0"), null, true);
-        Assert.assertTrue(withoutModule.stdout().contains("This is graphql's own readme."),
-                withoutModule.stdout());
-
-        Capture withModule = new Capture();
-        Cli.run(List.of("ballerina/graphql", "--module", "dataloader", "readme"), withModule.streams(),
-                centralForDocs(docs, "1.0.0"), null, true);
-        Assert.assertTrue(withModule.stdout().contains("This is graphql.dataloader's own readme."),
-                withModule.stdout());
+    @Test
+    public void theModuleFlagTargetsTheSubmodulesOwnReadme() {
+        JsonElement page = FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader");
+        page.getAsJsonObject().getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject()
+                .addProperty("description", "This is graphql.dataloader's own readme.");
+        Capture capture = new Capture();
+        Cli.run(List.of("ballerina/graphql", "--module", "dataloader", "readme"), capture.streams(),
+                options(graphqlCentral(Map.of("dataloader", page))), null, true);
+        Assert.assertTrue(capture.stdout().contains("This is graphql.dataloader's own readme."), capture.stdout());
     }
 
     @Test
     public void aValidModuleThatPublishesNoReadmeFailsLoudlyRatherThanAnEmptyBody() {
-        JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader"), "ballerina");
-        docs.getAsJsonObject("docsData").getAsJsonArray("modules")
-                .get(1).getAsJsonObject().addProperty("description", "   ");
-
+        // As Central really serves graphql's submodules: each page's readme is empty.
         for (List<String> narrowed : List.of(List.<String>of(), List.of("--filter", "kafka"), List.of("1"))) {
             List<String> argv = new ArrayList<>(List.of("ballerina/graphql", "--module", "dataloader", "readme"));
             argv.addAll(narrowed);
             Capture capture = new Capture();
-            int exitCode = Cli.run(argv, capture.streams(), centralForDocs(docs, "1.0.0"));
+            int exitCode = Cli.run(argv, capture.streams(), options(graphqlCentral()));
             Assert.assertEquals(exitCode, 1, argv + " -> " + capture.stdout());
             Assert.assertEquals(capture.stdout(), "");
             Assert.assertEquals(capture.field("kind"), "validation");
@@ -771,43 +771,42 @@ public class CliTest {
 
     @Test
     public void theBarePackageListsItsSubmodulesAlongsideItsOwnBucketsInText() {
-        JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader", "graphql.subgraph"), "ballerina");
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerina/graphql"), capture.streams(),
-                centralForDocs(docs, "1.0.0"), null, true);
+                options(graphqlCentral()), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\n\nSubmodules\n"), capture.stdout());
         Assert.assertTrue(capture.stdout().contains(
                 "\n  dataloader  bal discover ballerina/graphql --module dataloader  "
-                        + "load data from graphql.dataloader"),
+                        + "This module provides a way to load data from a data source with batching and caching"),
                 capture.stdout());
         Assert.assertTrue(capture.stdout().contains(
                 "\n  subgraph    bal discover ballerina/graphql --module subgraph    "
-                        + "load data from graphql.subgraph"),
+                        + "This module provides a way to create a subgraphs for a federated GraphQL service"),
                 capture.stdout());
         // The default module addresses itself through its own buckets, never through the submodule list.
-        Assert.assertFalse(capture.stdout().contains("load data from graphql\n"), capture.stdout());
+        Assert.assertFalse(capture.stdout().contains("--module graphql"), capture.stdout());
     }
 
     @Test
     public void theBarePackageListsItsSubmodulesAsJsonOffATerminal() {
-        JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader"), "ballerina");
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql"), capture.streams(), centralForDocs(docs, "1.0.0"));
+        int exitCode = Cli.run(List.of("ballerina/graphql"), capture.streams(), options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\"submodules\":["), capture.stdout());
         Assert.assertTrue(
                 capture.stdout().contains("\"command\":\"bal discover ballerina/graphql --module dataloader\""),
                 capture.stdout());
+        Assert.assertTrue(
+                capture.stdout().contains("\"command\":\"bal discover ballerina/graphql --module subgraph\""),
+                capture.stdout());
     }
 
     @Test
     public void theSelectedModuleNeverListsItselfAmongItsOwnOtherSubmodules() {
-        JsonObject docs = multiModuleDocs(
-                List.of("graphql", "graphql.dataloader", "graphql.subgraph"), "ballerina");
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader"), capture.streams(),
-                centralForDocs(docs, "1.0.0"));
+                options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertFalse(capture.stdout().contains("\"name\":\"dataloader\""), capture.stdout());
         Assert.assertTrue(capture.stdout().contains("\"name\":\"subgraph\""), capture.stdout());
@@ -815,25 +814,65 @@ public class CliTest {
 
     @Test
     public void aModuleFlagThatNamesNoSubmoduleFailsWithCandidates() {
-        JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader"), "ballerina");
+        FakeTransport transport = graphqlCentral();
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "nosuch"), capture.streams(),
-                centralForDocs(docs, "1.0.0"));
+                options(transport));
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
-        Assert.assertTrue(capture.failure().getAsJsonArray("candidates").toString().contains("dataloader"),
-                capture.stderr());
+        Assert.assertEquals(capture.failure().getAsJsonArray("candidates").toString(),
+                "[\"dataloader\",\"subgraph\"]", capture.stderr());
+        // The submodule's own page first; the package's only once that is missing, to name what it does publish.
+        Assert.assertEquals(transport.urls(), List.of(
+                CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
+                CentralClient.CENTRAL_BASE_URL + "docs/ballerina/graphql.nosuch/" + GRAPHQL_VERSION,
+                CentralClient.CENTRAL_BASE_URL + "docs/ballerina/graphql/" + GRAPHQL_VERSION));
+    }
+
+    @Test
+    public void aModuleFlagOnAPackageWithNoSubmodulesSaysSo() {
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerinax/kafka", "--module", "nope"), capture.streams(),
+                centralFor("ballerinax__kafka", "4.6.5"));
+        Assert.assertEquals(exitCode, 1);
+        Assert.assertEquals(capture.field("kind"), "symbol-not-found");
+        Assert.assertTrue(capture.field("suggestion").contains("publishes no submodules at all"), capture.stderr());
+    }
+
+    @Test
+    public void aModulePageCentralCannotServeIsATransportFailureNotAMissingModule() {
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.status(503)
+                : FakeTransport.ok("[\"" + GRAPHQL_VERSION + "\"]"));
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+                options(transport));
+        Assert.assertEquals(exitCode, 1);
+        Assert.assertEquals(capture.field("kind"), "upstream", capture.stderr());
+    }
+
+    @Test
+    public void aSeparatelyPublishedDottedPackageIsNotTakenForASubmodule() {
+        // `ballerinax/aws --module s3` names docs/ballerinax/aws.s3/<aws's version>, which can answer with the
+        // aws.s3 PACKAGE's page — its own default module, not a module of aws.
+        JsonObject page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").getAsJsonObject();
+        page.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject()
+                .addProperty("isDefaultModule", true);
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+                options(graphqlCentral(Map.of("subgraph", page))));
+        Assert.assertEquals(exitCode, 1, capture.stdout());
+        Assert.assertEquals(capture.field("kind"), "symbol-not-found");
     }
 
     @Test
     public void commandsPrintedUnderAModuleCarryItForward() {
         // The whole point of LoadedPackage.pkgArgument(): a caller drilling further from here must not silently
         // fall back to the default module.
-        JsonObject docs = multiModuleDocs(List.of("graphql", "graphql.dataloader"), "ballerina");
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader", "client"),
-                capture.streams(), centralForDocs(docs, "1.0.0"));
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader", "class"),
+                capture.streams(), options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("--module dataloader"), capture.stdout());
     }

@@ -20,7 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   quoted in every printed command
 - Group large resource listings by path segment, up to four levels below the top level
 - Add a drill-down from a listing to a single method's or resource's signature, together with the types it names
-- Add the `--module`/`-m` flag to target a submodule, across every bucket; a submodule named as the package (e.g.
+- Add the `--module`/`-m` flag to target a submodule, across every bucket, read from the submodule's own Ballerina
+  Central page; the bare package lists its submodules, and a submodule named as the package (e.g.
   `ballerinax/aws.auth`) fails with the `--module` command that reads it
 - Add the `--filter` flag to narrow a bucket listing by keyword
 - Cap every listing at 40 entries, with `--page` to page through any longer one

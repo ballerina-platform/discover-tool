@@ -72,12 +72,11 @@ public final class Schema {
     /**
      * The module.
      *
-     * <p>Three of Central's own module keys are deliberately NOT read: {@code types} and
-     * {@code resources} are empty in all nine fixtures, so their item shape is unknown and inventing one
-     * would put a guess inside the file whose whole job is to describe what Central actually sends;
-     * {@code relatedModules} is package metadata rather than a declaration. All three are watched by
-     * {@code KeySpaceTest}, which snapshots the payload's key space — the first package to populate one
-     * shows up there as a reviewable diff instead of being silently dropped.
+     * <p>Two of Central's own module keys are deliberately NOT read: {@code types} and {@code resources} are
+     * empty in every fixture, so their item shape is unknown and inventing one would put a guess inside the
+     * file whose whole job is to describe what Central actually sends. Both are watched by {@code KeySpaceTest},
+     * which snapshots the payload's key space — the first package to populate one shows up there as a
+     * reviewable diff instead of being silently dropped.
      */
     private static CentralDocs.Module module(Cursor cursor, JsonObject json, String path) {
         return new CentralDocs.Module(
@@ -114,7 +113,16 @@ public final class Schema {
                 cursor.bucket(json, path, "serviceTypes", Schema::objectDecl),
                 cursor.bucket(json, path, "annotations", Schema::annotation),
                 cursor.bucket(json, path, "variables", Schema::variableDecl),
-                cursor.bucket(json, path, "configurables", Schema::variableDecl));
+                cursor.bucket(json, path, "configurables", Schema::variableDecl),
+                cursor.bucket(json, path, "relatedModules", Schema::relatedModule));
+    }
+
+    private static CentralDocs.RelatedModule relatedModule(Cursor cursor, JsonObject json, String path) {
+        return new CentralDocs.RelatedModule(
+                cursor.requiredString(json, path, "id"),
+                cursor.requiredString(json, path, "orgName"),
+                cursor.optionalString(json, path, "summary"),
+                cursor.flag(json, path, "isDefaultModule"));
     }
 
     private static CentralDocs.TypeNode typeNode(Cursor cursor, JsonObject json, String path) {

@@ -243,6 +243,13 @@ public final class DiskCache implements DocsCache {
                 List.of(FORMAT, "docs", key.repository(), key.org(), key.name(), key.version() + ".json"));
     }
 
+    private Path moduleDocsPath(ModuleKey key) {
+        return entryPath(
+                List.of(key.repository(), key.org(), key.name(), key.module(), key.version()),
+                List.of(FORMAT, "modules", key.repository(), key.org(), key.name(), key.module(),
+                        key.version() + ".json"));
+    }
+
     private Path docsDir(PackageKey key) {
         return entryPath(
                 List.of(key.repository(), key.org(), key.name()),
@@ -335,16 +342,39 @@ public final class DiskCache implements DocsCache {
 
     @Override
     public JsonElement readDocs(DocsKey key) {
-        if (!usable) {
-            return null;
-        }
-        Path path = docsPath(key);
-        return path == null ? null : readJson(path);
+        return readPayload(docsPath(key));
     }
 
     @Override
     public void writeDocs(DocsKey key, JsonElement payload) {
-        Path path = docsPath(key);
+        writePayload(docsPath(key), payload);
+    }
+
+    @Override
+    public void removeDocs(DocsKey key) {
+        removePayload(docsPath(key));
+    }
+
+    @Override
+    public JsonElement readModuleDocs(ModuleKey key) {
+        return readPayload(moduleDocsPath(key));
+    }
+
+    @Override
+    public void writeModuleDocs(ModuleKey key, JsonElement payload) {
+        writePayload(moduleDocsPath(key), payload);
+    }
+
+    @Override
+    public void removeModuleDocs(ModuleKey key) {
+        removePayload(moduleDocsPath(key));
+    }
+
+    private JsonElement readPayload(Path path) {
+        return !usable || path == null ? null : readJson(path);
+    }
+
+    private void writePayload(Path path, JsonElement payload) {
         if (path == null) {
             return;
         }
@@ -357,13 +387,8 @@ public final class DiskCache implements DocsCache {
         writeAtomically(path, contents, 0700);
     }
 
-    @Override
-    public void removeDocs(DocsKey key) {
-        if (!usable) {
-            return;
-        }
-        Path path = docsPath(key);
-        if (path == null) {
+    private void removePayload(Path path) {
+        if (!usable || path == null) {
             return;
         }
         try {

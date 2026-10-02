@@ -325,6 +325,18 @@ public class ClientTest {
     }
 
     @Test
+    public void aRecordedRegistryRowConfirmsTheModuleTheCommandOffers() {
+        String row = FixtureCorpus.loadRawRegistryRow("ballerina__graphql").toString();
+        QualifiedName subgraph = QualifiedName.parse("ballerina/graphql.subgraph").value();
+        FakeTransport transport = registry(Map.of(
+                "ballerina/graphql", "[\"1.17.0\"]",
+                "ballerina/graphql/1.17.0", row));
+        String suggestion = suggestion(CentralClient.resolveLatestVersion(subgraph, fast(transport).build()));
+        Assert.assertEquals(suggestion, "'ballerina/graphql.subgraph' is not a package: it is the 'subgraph' module "
+                + "of the ballerina/graphql package. Read it with `bal discover ballerina/graphql --module subgraph`.");
+    }
+
+    @Test
     public void aModuleTheContainingPackageDoesNotPublishIsNotOfferedAsOne() {
         QualifiedName nope = QualifiedName.parse("ballerinax/aws.nope").value();
         FakeTransport transport = registry(Map.of(
