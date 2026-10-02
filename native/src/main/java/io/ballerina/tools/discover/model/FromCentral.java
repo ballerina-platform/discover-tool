@@ -737,7 +737,7 @@ public final class FromCentral {
      * verifies nothing.
      */
     public static Result<CentralDocs.Module> selectModule(CentralDocs docs, QualifiedName qualified) {
-        return selectModule(docs, qualified, null);
+        return selectModule(docs, qualified, null, null);
     }
 
     /**
@@ -754,15 +754,6 @@ public final class FromCentral {
      * Central names the pair ({@code kafka.other}, not a bare {@code other}).
      *
      * @param submodule the {@code --module} value, or {@code null} to select the package's own default module
-     */
-    public static Result<CentralDocs.Module> selectModule(
-            CentralDocs docs, QualifiedName qualified, String submodule) {
-        return selectModule(docs, qualified, submodule, null);
-    }
-
-    /**
-     * {@link #selectModule(CentralDocs, QualifiedName, String)}, naming the version a failure is about.
-     *
      * @param version the version {@code docs} was read at, or {@code null} when the caller has none to name
      */
     public static Result<CentralDocs.Module> selectModule(
