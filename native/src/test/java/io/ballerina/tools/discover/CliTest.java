@@ -236,6 +236,26 @@ public class CliTest {
     }
 
     @Test
+    public void aModuleCoordinateFailsWithTheCommandThatReadsItAndFetchesNoDocs() {
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/registry/packages/ballerinax/aws/1.0.2")) {
+                return FakeTransport.ok("{\"modules\":[{\"name\":\"aws\"},{\"name\":\"aws.auth\"}]}");
+            }
+            return url.endsWith("/registry/packages/ballerinax/aws")
+                    ? FakeTransport.ok("[\"1.0.2\"]")
+                    : FakeTransport.status(404);
+        });
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/aws.auth"), capture.streams(), options(transport)), 1);
+        Assert.assertEquals(capture.stdout(), "");
+        Assert.assertEquals(capture.field("kind"), "package-not-found");
+        Assert.assertEquals(capture.field("suggestion"), "'ballerinax/aws.auth' is not a package: it is the 'auth' "
+                + "module of the ballerinax/aws package. Read it with `bal discover ballerinax/aws --module auth`.");
+        Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/docs/")),
+                transport.urls().toString());
+    }
+
+    @Test
     public void shortHelpWorksWhereverItAppears() {
         for (List<String> argv : List.of(
                 List.of("-h"),

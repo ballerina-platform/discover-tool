@@ -24,6 +24,7 @@ import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
@@ -230,52 +231,32 @@ public final class CentralClient {
     // -----------------------------------------------------------------------
 
     /**
-     * The version to read a coordinate at, whether it names a package or a module of one.
+     * The version to read a package at.
      *
-     * <p>The registry lists PACKAGES. A module of a package has no row of its own, so
-     * {@code ballerinax/aws.auth} — the type of the only required field of the only record
-     * {@code ballerinax/aws.s3}'s constructor takes — resolved to nothing and the reader could only tell the
-     * caller to pin a version by hand. Measured over a seven-case eval sweep that instruction cost seven
-     * lookups across two runs and produced both of the sweep's dead-end exits, because the version it asks for
-     * is printed in a footer the caller has usually not seen.
+     * <p>The coordinate is always one literal, complete package name; a submodule is reached only through
+     * {@code --module}. A dotted name is still far more often a package than a module of one —
+     * {@code ballerinax/googleapis.sheets} is its own package — so the full name is the only thing asked about
+     * on the way to an answer, and costs one round trip like any other.
      *
-     * <p>Nothing about the document was ever missing: {@code docs/<org>/<module>/<version>} answers for a
-     * module perfectly well, at the version of the package that contains it. So the module's version is one
-     * question the registry CAN answer — asked about the parent — and this asks it rather than delegating it.
-     *
-     * <p>The full name is always tried first, because a dotted name is far more often a package than a module:
-     * {@code ballerinax/googleapis.sheets} is its own package and must not cost a second round trip. Only a
-     * {@code PackageNotFound} falls back, and then to each shorter prefix in turn — {@code a.b.c} is a module
-     * of {@code a.b} if that exists, and of {@code a} if it does not, both of which are legal. A wrong guess
-     * cannot survive: a version the module was not published at is a 404 from the docs endpoint.
+     * <p>Only when the registry has no row for a dotted name are its prefixes asked about, and then only to
+     * word the failure: {@code ballerinax/aws.auth} is the {@code auth} module of {@code ballerinax/aws}, and the
+     * caller is better served by the command that reads it than by a bare "not found". The module is never read
+     * in the package's place — that answer would carry a coordinate the caller cannot import, build against, or
+     * pass back to this tool.
      */
     public static Result<ResolvedVersion> resolveLatestVersion(QualifiedName qualified, HttpOptions options) {
         Result<ResolvedVersion> direct = resolvePublishedVersion(qualified, options);
-        if (direct.isOk() || !(direct.failure() instanceof Failure.PackageNotFound)) {
+        if (direct.isOk() || !(direct.failure() instanceof Failure.PackageNotFound)
+                || containingPackages(qualified).isEmpty()) {
             return direct;
         }
-
-        List<QualifiedName> parents = containingPackages(qualified);
-        for (QualifiedName parent : parents) {
-            Result<ResolvedVersion> viaParent = resolvePublishedVersion(parent, options);
-            if (viaParent.isOk()) {
-                // Recorded under the MODULE's own key, so a second lookup of it costs one call rather than
-                // re-walking the prefixes. The entry is as true as the parent's: a module carries its
-                // package's version, which is what makes reading it at that version correct in the first place.
-                options.cache().writeLatest(
-                        new DocsCache.PackageKey(REPOSITORY_ID, qualified.org(), qualified.name()),
-                        new DocsCache.LatestEntry(viaParent.value().version().text(), options.now()));
-                return viaParent;
-            }
-        }
-        return parents.isEmpty() ? direct : Result.err(noContainingPackage(qualified, parents));
+        return Result.err(notAPackage(qualified, options));
     }
 
     /**
      * The packages a dotted coordinate could be a module of, longest first.
      *
-     * <p>Empty for an undotted name, which is every ordinary package — so the common path adds no work and
-     * cannot reach the fallback at all.
+     * <p>Empty for an undotted name, which is every ordinary package — so the common path adds no work.
      */
     private static List<QualifiedName> containingPackages(QualifiedName qualified) {
         List<QualifiedName> parents = new ArrayList<>();
@@ -290,13 +271,26 @@ public final class CentralClient {
     }
 
     /**
-     * The dotted name resolved as neither a package nor a module of one.
+     * A dotted name the registry has no package for, explained by the package it is a module of when there is
+     * one.
      *
-     * <p>It names what was tried, because the caller's next move differs by which half is wrong: a misspelled
-     * module of a real package is a different fix from a misspelled package, and after the walk above the
-     * reader knows which it is looking at.
+     * <p>{@code a.b.c} can be a module of {@code a.b} or of {@code a}, so each prefix is asked in turn, and the
+     * first that exists is asked which modules it publishes — so the {@code --module} command is offered only
+     * for a module that is really there. A prefix the registry cannot answer for at all ends the probe with the
+     * plain failure: claiming nothing contains the module, when one of the packages that might was never
+     * actually checked, would send the caller to fix a spelling that may be right.
      */
-    private static Failure noContainingPackage(QualifiedName qualified, List<QualifiedName> parents) {
+    private static Failure notAPackage(QualifiedName qualified, HttpOptions options) {
+        List<QualifiedName> parents = containingPackages(qualified);
+        for (QualifiedName parent : parents) {
+            Result<ResolvedVersion> probed = resolvePublishedVersion(parent, options);
+            if (probed.isOk()) {
+                return moduleOf(qualified, parent, probed.value().version(), options);
+            }
+            if (!(probed.failure() instanceof Failure.PackageNotFound)) {
+                return notFound(qualified);
+            }
+        }
         StringBuilder tried = new StringBuilder();
         for (QualifiedName parent : parents) {
             tried.append(tried.isEmpty() ? "" : ", ").append(parent.qualified());
@@ -306,6 +300,30 @@ public final class CentralClient {
                 "Central publishes no package under this name, and none of the packages it could be a module "
                         + "of exists either (tried " + tried + "). Check the org/name spelling; "
                         + "`bal search <keyword>` lists what Central publishes.");
+    }
+
+    private static Failure moduleOf(
+            QualifiedName qualified, QualifiedName parent, Version version, HttpOptions options) {
+        String submodule = qualified.name().substring(parent.name().length() + 1);
+        String command = "`bal discover " + Texts.shellWord(parent.qualified()) + " --module "
+                + Texts.shellWord(submodule) + "`";
+        String url = CENTRAL_BASE_URL + "registry/packages/" + encode(parent.org()) + "/" + encode(parent.name())
+                + "/" + encode(version.text());
+        Result<JsonElement> response = fetchJson(url, options);
+        List<String> modules = response.isOk() ? Coordinates.moduleNames(response.value()) : List.of();
+        String suggestion;
+        if (modules.contains(qualified.name())) {
+            suggestion = "'" + qualified.qualified() + "' is not a package: it is the '" + submodule
+                    + "' module of the " + parent.qualified() + " package. Read it with " + command + ".";
+        } else if (modules.isEmpty()) {
+            suggestion = "'" + qualified.qualified() + "' is not a package, but " + parent.qualified()
+                    + " is. If '" + submodule + "' is one of its modules, read it with " + command + ".";
+        } else {
+            suggestion = "'" + qualified.qualified() + "' is not a package, and " + parent.qualified()
+                    + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
+                    + "). Check the name; `bal search <keyword>` lists what Central publishes.";
+        }
+        return new Failure.PackageNotFound(qualified.qualified(), suggestion);
     }
 
     /**
@@ -397,11 +415,8 @@ public final class CentralClient {
     /**
      * The registry had no row for this name.
      *
-     * <p>A dotted name used to get separate advice here — that it was probably a MODULE, and that the caller
-     * should pin a version by hand. {@link #resolveLatestVersion} now does that walk itself, so this failure
-     * only reaches a caller for a name that is not a module of anything either, and the message that says so
-     * is {@link #noContainingPackage}. Advice about a recovery the reader has already attempted would be worse
-     * than none: it reads as an untried option.
+     * <p>A dotted name gets its own, more specific advice from {@link #notAPackage} whenever the registry can
+     * say which package, if any, the name is a module of.
      */
     private static Failure notFound(QualifiedName qualified) {
         return new Failure.PackageNotFound(
@@ -456,14 +471,18 @@ public final class CentralClient {
         if (!response.isOk()) {
             // 404 here is specific: the org/name may well exist, this VERSION does not — and which half the
             // caller can act on depends on who chose the version. A version they passed is theirs to correct.
-            // One the reader resolved is not: telling them to "omit the version" names what they already did,
-            // and for a module resolved through its containing package the wrong half is the module name.
+            // One the reader resolved is not: telling them to "omit the version" names what they already did.
             if (response.failure() instanceof Failure.Upstream upstream
                     && upstream.status() != null && upstream.status() == 404) {
                 return Result.err(new Failure.PackageNotFound(label, missingVersion(
                         qualified, version, resolved.supplied(), options)));
             }
             return response.cast();
+        }
+        // A version for a module path can still arrive from a `latest` entry an older build of this reader wrote
+        // under the module's own key; the page itself says what it is.
+        if (Coordinates.describesSubmodule(response.value(), qualified)) {
+            return Result.err(notAPackage(qualified, options));
         }
         Result<CentralDocs> parsed = Schema.parse(response.value(), label);
         if (!parsed.isOk()) {
