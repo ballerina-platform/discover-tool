@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.cache.CacheLocation;
 import io.ballerina.tools.discover.cache.DiskCache;
@@ -658,6 +659,179 @@ public class CacheTest {
         Assert.assertNull(DocsCache.NULL.readLatest(packageKey));
         Assert.assertEquals(DocsCache.NULL.listVersions(packageKey), List.of());
         Assert.assertEquals(DocsCache.NULL.describe(), "disabled");
+    }
+
+    // -----------------------------------------------------------------------
+    // Module entries an older build wrote
+    //
+    // Earlier builds read a module coordinate at its containing package's version and cached the answer under
+    // the module's own key. Neither entry may now answer `ballerinax/aws.auth` as if it were a package.
+    // -----------------------------------------------------------------------
+
+    private static final DocsCache.PackageKey AWS_AUTH_PACKAGE =
+            new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, "ballerinax", "aws.auth");
+    private static final DocsCache.DocsKey AWS_AUTH_DOCS =
+            new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "aws.auth", "1.0.2");
+
+    /** What Central's docs endpoint serves for a module path: the module alone, flagged as not the default. */
+    private static JsonElement awsAuthModulePage() {
+        JsonObject raw = FixtureCorpus.loadRawFixture(SLUG).getAsJsonObject();
+        JsonObject module = raw.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject();
+        module.addProperty("id", "aws.auth");
+        module.addProperty("version", "1.0.2");
+        module.addProperty("isDefaultModule", false);
+        return raw;
+    }
+
+    @Test
+    public void aLatestEntryWrittenForAModuleDoesNotReadTheModuleAsAPackage() {
+        DocsCache cache = cacheAt(freshRoot());
+        cache.writeLatest(AWS_AUTH_PACKAGE, new DocsCache.LatestEntry("1.0.2", 1_000));
+        String modulePage = awsAuthModulePage().toString();
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerinax/aws.auth/1.0.2")) {
+                return FakeTransport.ok(modulePage);
+            }
+            if (url.endsWith("/registry/packages/ballerinax/aws/1.0.2")) {
+                return FakeTransport.ok("{\"modules\":[{\"name\":\"aws\"},{\"name\":\"aws.auth\"}]}");
+            }
+            return url.endsWith("/registry/packages/ballerinax/aws")
+                    ? FakeTransport.ok("[\"1.0.2\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cache).clock(() -> 2_000).build();
+
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/aws.auth"), capture.streams(), http), 1);
+        Assert.assertEquals(capture.stdout(), "");
+        JsonObject failure = JsonParser.parseString(capture.stderr()).getAsJsonObject();
+        Assert.assertEquals(failure.get("kind").getAsString(), "package-not-found");
+        Assert.assertTrue(failure.get("suggestion").getAsString()
+                .contains("`bal discover ballerinax/aws --module auth`"), capture.stderr());
+        Assert.assertNull(cache.readDocs(AWS_AUTH_DOCS), "a module page must not be cached as a package's");
+    }
+
+    @Test
+    public void aModulePageCachedUnderThePackageKeyIsAMissNotAnAnswer() {
+        DocsCache cache = cacheAt(freshRoot());
+        cache.writeLatest(AWS_AUTH_PACKAGE, new DocsCache.LatestEntry("1.0.2", 1_000));
+        cache.writeDocs(AWS_AUTH_DOCS, awsAuthModulePage());
+        FakeTransport transport = FakeTransport.always(FakeTransport.status(503));
+        HttpOptions http = options(transport, cache).clock(() -> 2_000).maxAttempts(1).build();
+
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/aws.auth"), capture.streams(), http), 1);
+        Assert.assertEquals(capture.stdout(), "");
+        Assert.assertEquals(transport.urls(),
+                List.of(CentralClient.CENTRAL_BASE_URL + "docs/ballerinax/aws.auth/1.0.2"));
+        Assert.assertNull(cache.readDocs(AWS_AUTH_DOCS));
+    }
+
+    @Test
+    public void aSubmodulePageIsCachedApartFromEveryPackageEntry() {
+        Path root = freshRoot();
+        DocsCache cache = cacheAt(root);
+        String page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").toString();
+        int[] docs = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerina/graphql.subgraph/1.17.0")) {
+                docs[0]++;
+                return FakeTransport.ok(page);
+            }
+            return url.endsWith("/registry/packages/ballerina/graphql")
+                    ? FakeTransport.ok("[\"1.17.0\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cache).build();
+        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+
+        Capture cold = new Capture();
+        Assert.assertEquals(Cli.run(argv, cold.streams(), http), 0, cold.stderr());
+        Capture warm = new Capture();
+        Assert.assertEquals(Cli.run(argv, warm.streams(), http), 0, warm.stderr());
+        Assert.assertEquals(docs[0], 1, "the second run must read the module page off disk");
+        Assert.assertEquals(warm.stdout(), cold.stdout());
+
+        Path v2 = root.resolve("v2");
+        Assert.assertTrue(Files.exists(v2.resolve("modules").resolve(CentralClient.REPOSITORY_ID)
+                .resolve("ballerina").resolve("graphql").resolve("subgraph").resolve("1.17.0.json")));
+        Assert.assertFalse(Files.exists(v2.resolve("docs").resolve(CentralClient.REPOSITORY_ID)
+                .resolve("ballerina").resolve("graphql.subgraph")), "a module page is never a package's entry");
+    }
+
+    @Test
+    public void aPackagePagePublishedBeforeApiDocsVersionExistedIsServedFromTheCache() {
+        JsonObject page = FixtureCorpus.loadRawFixture(SLUG).getAsJsonObject();
+        page.remove("apiDocsVersion");
+        int[] docs = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.contains("/docs/")) {
+                docs[0]++;
+                return FakeTransport.ok(page.toString());
+            }
+            return FakeTransport.ok("[\"" + VERSION + "\"]");
+        });
+        HttpOptions http = options(transport, cacheAt(freshRoot())).build();
+
+        Capture cold = new Capture();
+        Assert.assertEquals(Cli.run(List.of(PKG), cold.streams(), http), 0, cold.stderr());
+        Capture warm = new Capture();
+        Assert.assertEquals(Cli.run(List.of(PKG), warm.streams(), http), 0, warm.stderr());
+        Assert.assertEquals(docs[0], 1, "Central is asked once");
+        Assert.assertEquals(warm.stdout(), cold.stdout());
+    }
+
+    @Test
+    public void aSubmodulePagePublishedBeforeApiDocsVersionExistedIsServedFromTheCache() {
+        String page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph-1.8.0").toString();
+        int[] docs = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerina/graphql.subgraph/1.8.0")) {
+                docs[0]++;
+                return FakeTransport.ok(page);
+            }
+            return url.endsWith("/registry/packages/ballerina/graphql")
+                    ? FakeTransport.ok("[\"1.8.0\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cacheAt(freshRoot())).build();
+        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+
+        Capture cold = new Capture();
+        Assert.assertEquals(Cli.run(argv, cold.streams(), http), 0, cold.stderr());
+        Capture warm = new Capture();
+        Assert.assertEquals(Cli.run(argv, warm.streams(), http), 0, warm.stderr());
+        Assert.assertEquals(docs[0], 1, "Central is asked once");
+        Assert.assertEquals(warm.stdout(), cold.stdout());
+    }
+
+    @Test
+    public void refreshFetchesASubmodulePageAgain() {
+        DocsCache cache = cacheAt(freshRoot());
+        String page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").toString();
+        int[] docs = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerina/graphql.subgraph/1.17.0")) {
+                docs[0]++;
+                return FakeTransport.ok(page);
+            }
+            return url.endsWith("/registry/packages/ballerina/graphql")
+                    ? FakeTransport.ok("[\"1.17.0\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cache).build();
+        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+
+        DocsCache.ModuleKey key = new DocsCache.ModuleKey(
+                CentralClient.REPOSITORY_ID, "ballerina", "graphql", "subgraph", "1.17.0");
+
+        Assert.assertEquals(Cli.run(argv, new Capture().streams(), http), 0);
+        Assert.assertNotNull(cache.readModuleDocs(key), "the first run caches the module page");
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "--refresh"),
+                new Capture().streams(), http), 0);
+        Assert.assertEquals(docs[0], 2, "--refresh must not answer from the cached module page");
+        Assert.assertEquals(Cli.run(argv, new Capture().streams(), http), 0);
+        Assert.assertEquals(docs[0], 2, "the refetched page is cached again and answers the next run");
     }
 
     // -----------------------------------------------------------------------

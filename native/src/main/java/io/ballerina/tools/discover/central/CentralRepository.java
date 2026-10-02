@@ -30,7 +30,7 @@ import java.util.function.Supplier;
 /**
  * Ballerina Central, as a {@link PackageRepository}.
  *
- * <p>A thin adapter rather than a move: {@link CentralClient}'s retry loop, backoff, version-walk and cache-read
+ * <p>A thin adapter rather than a move: {@link CentralClient}'s retry loop, backoff, version resolution and cache-read
  * logic stay exactly where they are, as the static methods a test can already drive directly — this class only
  * gives that logic an instance the {@link io.ballerina.tools.discover.Loader} can hold as an interface reference
  * instead of a static import.
@@ -86,6 +86,12 @@ public final class CentralRepository implements PackageRepository {
         return resolved.stale()
                 ? Optional.empty()
                 : CentralClient.fetchModuleSources(qualified, resolved.version(), moduleId, options.withMaxAttempts(1));
+    }
+
+    @Override
+    public Result<CentralDocs> fetchModuleDocs(
+            QualifiedName qualified, String submodule, CentralClient.ResolvedVersion resolved, HttpOptions options) {
+        return CentralClient.fetchModuleDocs(qualified, submodule, resolved, options);
     }
 
     @Override

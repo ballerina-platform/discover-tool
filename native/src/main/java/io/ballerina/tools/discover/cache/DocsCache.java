@@ -66,6 +66,18 @@ public interface DocsCache {
     record DocsKey(String repository, String org, String name, String version) { }
 
     /**
+     * One submodule's own docs page, at its package's version — kept apart from every {@link DocsKey}, so a
+     * module page is never read back as a package's and a package lookup can never evict a module's page.
+     *
+     * @param repository which repository answered — see {@link DocsKey#repository()}
+     * @param org the package organization
+     * @param name the package name
+     * @param module the submodule, as {@code --module} takes it ({@code subgraph}, not {@code graphql.subgraph})
+     * @param version the package version
+     */
+    record ModuleKey(String repository, String org, String name, String module, String version) { }
+
+    /**
      * A package without a version, which is what the versions list is keyed by.
      *
      * @param repository which {@link io.ballerina.tools.discover.central.PackageRepository} answered — see
@@ -100,6 +112,13 @@ public interface DocsCache {
 
     /** @param derivation which version of the reader derived it — a new one never reads an older one's entry */
     void writeInclusions(DocsKey key, String module, String derivation, JsonElement inclusions);
+
+    /** A submodule's raw page, or {@code null} for any reason whatsoever. */
+    JsonElement readModuleDocs(ModuleKey key);
+
+    void writeModuleDocs(ModuleKey key, JsonElement payload);
+
+    void removeModuleDocs(ModuleKey key);
 
     /** The cached versions answer, or {@code null}. */
     LatestEntry readLatest(PackageKey key);
@@ -142,6 +161,19 @@ public interface DocsCache {
 
         @Override
         public void writeInclusions(DocsKey key, String module, String derivation, JsonElement inclusions) {
+        }
+
+        @Override
+        public JsonElement readModuleDocs(ModuleKey key) {
+            return null;
+        }
+
+        @Override
+        public void writeModuleDocs(ModuleKey key, JsonElement payload) {
+        }
+
+        @Override
+        public void removeModuleDocs(ModuleKey key) {
         }
 
         @Override

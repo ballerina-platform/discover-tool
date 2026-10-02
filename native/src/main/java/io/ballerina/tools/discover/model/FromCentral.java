@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.model;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 
 import java.util.ArrayList;
@@ -730,13 +731,13 @@ public final class FromCentral {
     /**
      * The package's own default module — the one {@code import org/name;} puts in scope.
      *
-     * <p>Reading the first module instead is untested by construction, because every recorded fixture is
-     * single-module: a multi-module package would render whichever module Central happened to put first. It is
-     * also what makes the cache's coordinate check meaningful; verifying one module and then rendering another
+     * <p>Matched by id rather than by position: Central's page for a package carries its default module alone
+     * today, but a page carrying several would otherwise render whichever one Central happened to put first. It
+     * is also what makes the cache's coordinate check meaningful; verifying one module and then rendering another
      * verifies nothing.
      */
     public static Result<CentralDocs.Module> selectModule(CentralDocs docs, QualifiedName qualified) {
-        return selectModule(docs, qualified, null);
+        return selectModule(docs, qualified, null, null);
     }
 
     /**
@@ -753,9 +754,10 @@ public final class FromCentral {
      * Central names the pair ({@code kafka.other}, not a bare {@code other}).
      *
      * @param submodule the {@code --module} value, or {@code null} to select the package's own default module
+     * @param version the version {@code docs} was read at, or {@code null} when the caller has none to name
      */
     public static Result<CentralDocs.Module> selectModule(
-            CentralDocs docs, QualifiedName qualified, String submodule) {
+            CentralDocs docs, QualifiedName qualified, String submodule, Version version) {
         String wanted = submodule == null ? qualified.name() : qualified.name() + "." + submodule;
         for (CentralDocs.Module module : docs.modules()) {
             if (module.orgName().equals(qualified.org()) && module.id().equals(wanted)) {
@@ -763,7 +765,7 @@ public final class FromCentral {
             }
         }
         if (submodule != null) {
-            return Result.err(noSuchSubmodule(docs, qualified, submodule));
+            return Result.err(noSuchSubmodule(docs, qualified, submodule, version));
         }
         String returned = docs.modules().stream()
                 .map(module -> module.orgName() + "/" + module.id())
@@ -781,31 +783,46 @@ public final class FromCentral {
      * OTHER module's bare submodule name (the part after {@code org/name.}), which is exactly what
      * {@code --module} itself takes.
      */
-    private static Failure noSuchSubmodule(CentralDocs docs, QualifiedName qualified, String submodule) {
+    private static Failure noSuchSubmodule(
+            CentralDocs docs, QualifiedName qualified, String submodule, Version version) {
         String prefix = qualified.name() + ".";
         List<String> candidates = submodulesOf(docs, qualified).stream()
                 .map(module -> module.id().substring(prefix.length()))
                 .toList();
-        return new Failure.SymbolNotFound(
-                qualified.qualified(),
-                List.of(submodule),
-                candidates,
-                candidates.isEmpty()
-                        ? "This package publishes no submodules at all. Drop --module."
-                        : "No submodule answers to that. The candidates are every submodule this package "
-                                + "publishes; pass one of them, or drop --module for the default one.");
+        String suggestion;
+        if (candidates.isEmpty()) {
+            suggestion = "This package publishes no submodules at all. Drop --module.";
+        } else if (candidates.contains(submodule)) {
+            suggestion = "Central's page for '" + submodule + "'" + (version == null ? "" : " at " + version.text())
+                    + " cannot be confirmed as a submodule of this package. Drop --module for the default module, "
+                    + "or pass another of the candidates.";
+        } else {
+            suggestion = "No submodule answers to that. The candidates are every submodule this package "
+                    + "publishes; pass one of them, or drop --module for the default one.";
+        }
+        return new Failure.SymbolNotFound(qualified.qualified(), List.of(submodule), candidates, suggestion);
     }
 
     /**
-     * Every module in this package's own submodule family — org matches, id starts with {@code name.} — Central's
-     * raw records. The shared base {@link #noSuchSubmodule} and {@code Loader.submodulesOf} both filter down to
-     * their own shape from, so "which modules are this package's submodules" is computed in exactly one place.
+     * Every submodule of this package — not the default module, org matches, id starts with {@code name.} — as
+     * the page's {@code relatedModules} names them. A page carries ONE module's declarations (a package's page its
+     * default module, a module page that module alone), so its {@code relatedModules} is the only place the rest
+     * of the package is listed; any page of the package lists the same set. The shared base
+     * {@link #noSuchSubmodule} and {@code Loader.submodulesOf} both build on this, so "which modules are this
+     * package's submodules" is computed in exactly one place.
      */
-    public static List<CentralDocs.Module> submodulesOf(CentralDocs docs, QualifiedName qualified) {
+    public static List<CentralDocs.RelatedModule> submodulesOf(CentralDocs docs, QualifiedName qualified) {
         String prefix = qualified.name() + ".";
-        return docs.modules().stream()
-                .filter(module -> module.orgName().equals(qualified.org()) && module.id().startsWith(prefix))
-                .toList();
+        Map<String, CentralDocs.RelatedModule> byId = new LinkedHashMap<>();
+        for (CentralDocs.Module module : docs.modules()) {
+            for (CentralDocs.RelatedModule related : module.relatedModules()) {
+                if (!related.isDefaultModule() && related.orgName().equals(qualified.org())
+                        && related.id().startsWith(prefix)) {
+                    byId.putIfAbsent(related.id(), related);
+                }
+            }
+        }
+        return List.copyOf(byId.values());
     }
 
     public static Library fromCentral(CentralDocs.Module module) {

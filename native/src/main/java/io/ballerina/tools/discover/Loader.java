@@ -66,8 +66,8 @@ public final class Loader {
      *     is the only one and the only element this phase ever populates, but the shape is a list because the
      *     RFC's multi-source repository interface (Central, a local "Local Central" cache, Artifactory) is
      *     several sources considered for ONE lookup, not one source picked ahead of time.
-     * @param module the {@code --module} value, or {@code null} for the package's own default module — never a
-     *     second fetch: the payload a repository already served for the package carries every module's data
+     * @param module the {@code --module} value, or {@code null} for the package's own default module — read from
+     *     the submodule's own page, since a package's page carries its default module alone
      */
     public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
             String module) {
@@ -174,6 +174,12 @@ public final class Loader {
      * <p>A locked {@code Dependencies.toml} version is the one exception: it names no repository, so every
      * repository is tried in order to serve THAT version, rather than resolve deciding which one wins.
      *
+     * <p>Under {@code --module} the version is still the PACKAGE's, resolved from its literal coordinate, and the
+     * page read is the submodule's own. Its {@code relatedModules} lists the package's other modules, so the
+     * success path never fetches the package's page as well. A submodule the repository has no page for is
+     * answered with the package's page instead, which carries no such module: selection then fails the way it
+     * does for any module a page lacks, naming the submodules the package does publish.
+     *
      * <p>Module selection happens exactly once, after some repository has actually answered — never inside the
      * per-repository retry. A repository that has nothing for this package is a routine fallback case, but a
      * repository that answered with a package that just doesn't contain the requested module is not: every
@@ -188,24 +194,34 @@ public final class Loader {
                 if (!resolved.isOk()) {
                     return resolved.cast();
                 }
-                Result<Fetched> fetched = tryEachRepository(options.repositories(), repository -> {
-                    Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved.value(), options.http());
-                    return docs.isOk()
-                            ? Result.ok(new Fetched(repository, resolved.value(), docs.value()))
-                            : docs.cast();
-                });
+                Result<Fetched> fetched = tryEachRepository(options.repositories(),
+                        repository -> fetch(repository, qualified, resolved.value(), options));
                 return fetched.isOk() ? build(qualified, fetched.value(), options) : fetched.cast();
             }
         }
         Result<Fetched> fetched = tryEachRepository(options.repositories(), repository -> {
             Result<CentralClient.ResolvedVersion> resolved = repository.resolveVersion(qualified, options.http());
-            if (!resolved.isOk()) {
-                return resolved.cast();
-            }
-            Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved.value(), options.http());
-            return docs.isOk() ? Result.ok(new Fetched(repository, resolved.value(), docs.value())) : docs.cast();
+            return resolved.isOk() ? fetch(repository, qualified, resolved.value(), options) : resolved.cast();
         });
         return fetched.isOk() ? build(qualified, fetched.value(), options) : fetched.cast();
+    }
+
+    private static Result<Fetched> fetch(PackageRepository repository, QualifiedName qualified,
+            CentralClient.ResolvedVersion resolved, LoadOptions options) {
+        String submodule = options.module();
+        Result<CentralDocs> docs = submodule == null
+                ? repository.fetchDocs(qualified, resolved, options.http())
+                : repository.fetchModuleDocs(qualified, submodule, resolved, options.http());
+        if (docs.isOk()) {
+            return Result.ok(new Fetched(repository, resolved, docs.value()));
+        }
+        if (submodule == null || !(docs.failure() instanceof Failure.PackageNotFound)) {
+            return docs.cast();
+        }
+        Result<CentralDocs> packagePage = repository.fetchDocs(qualified, resolved, options.http());
+        return packagePage.isOk()
+                ? Result.ok(new Fetched(repository, resolved, packagePage.value()))
+                : packagePage.cast();
     }
 
     /**
@@ -222,7 +238,7 @@ public final class Loader {
         String submodule = options.module();
         CentralDocs docs = fetched.docs();
         CentralClient.ResolvedVersion resolved = fetched.resolved();
-        Result<CentralDocs.Module> module = FromCentral.selectModule(docs, qualified, submodule);
+        Result<CentralDocs.Module> module = FromCentral.selectModule(docs, qualified, submodule, resolved.version());
         if (!module.isOk()) {
             return module.cast();
         }
@@ -254,11 +270,11 @@ public final class Loader {
     }
 
     /**
-     * Every OTHER module this package publishes, name and summary only — computed off the SAME payload a
-     * repository already served, never a second fetch, since Central's docs response for a package already
-     * carries every module's id and summary alongside the addressed one's full surface. Excludes the module
-     * already being addressed (the default module when {@code submodule} is {@code null}, otherwise the named
-     * submodule itself) so the currently-selected module never lists itself as one of the "other" ones.
+     * Every OTHER module this package publishes, name and summary only — computed off the SAME page a repository
+     * already served, never a second fetch, since every page of a package names all of its modules in
+     * {@code relatedModules}. Excludes the module already being addressed (the default module when
+     * {@code submodule} is {@code null}, otherwise the named submodule itself) so the currently-selected module
+     * never lists itself as one of the "other" ones.
      */
     private static List<LoadedPackage.Submodule> submodulesOf(
             CentralDocs docs, QualifiedName qualified, String submodule) {

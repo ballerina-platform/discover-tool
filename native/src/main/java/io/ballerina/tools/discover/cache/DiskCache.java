@@ -49,6 +49,8 @@ import java.util.stream.Stream;
  * <pre>
  *   &lt;root&gt;/v2/docs/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;/&lt;version&gt;.json      mode 0600, no TTL
  *   &lt;root&gt;/v2/latest/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;.json              {"version":"6.0.0","atMs":…}
+ *   &lt;root&gt;/v2/modules/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;/&lt;module&gt;/&lt;version&gt;.json
+ *                                                                          a submodule's page, mode 0600, no TTL
  * </pre>
  *
  * <p>{@code v2} is the on-disk format generation, bumped only when the stored bytes change meaning — bumped
@@ -243,6 +245,13 @@ public final class DiskCache implements DocsCache {
                 List.of(FORMAT, "docs", key.repository(), key.org(), key.name(), key.version() + ".json"));
     }
 
+    private Path moduleDocsPath(ModuleKey key) {
+        return entryPath(
+                List.of(key.repository(), key.org(), key.name(), key.module(), key.version()),
+                List.of(FORMAT, "modules", key.repository(), key.org(), key.name(), key.module(),
+                        key.version() + ".json"));
+    }
+
     private Path docsDir(PackageKey key) {
         return entryPath(
                 List.of(key.repository(), key.org(), key.name()),
@@ -335,16 +344,39 @@ public final class DiskCache implements DocsCache {
 
     @Override
     public JsonElement readDocs(DocsKey key) {
-        if (!usable) {
-            return null;
-        }
-        Path path = docsPath(key);
-        return path == null ? null : readJson(path);
+        return readPayload(docsPath(key));
     }
 
     @Override
     public void writeDocs(DocsKey key, JsonElement payload) {
-        Path path = docsPath(key);
+        writePayload(docsPath(key), payload);
+    }
+
+    @Override
+    public void removeDocs(DocsKey key) {
+        removePayload(docsPath(key));
+    }
+
+    @Override
+    public JsonElement readModuleDocs(ModuleKey key) {
+        return readPayload(moduleDocsPath(key));
+    }
+
+    @Override
+    public void writeModuleDocs(ModuleKey key, JsonElement payload) {
+        writePayload(moduleDocsPath(key), payload);
+    }
+
+    @Override
+    public void removeModuleDocs(ModuleKey key) {
+        removePayload(moduleDocsPath(key));
+    }
+
+    private JsonElement readPayload(Path path) {
+        return !usable || path == null ? null : readJson(path);
+    }
+
+    private void writePayload(Path path, JsonElement payload) {
         if (path == null) {
             return;
         }
@@ -357,13 +389,8 @@ public final class DiskCache implements DocsCache {
         writeAtomically(path, contents, 0700);
     }
 
-    @Override
-    public void removeDocs(DocsKey key) {
-        if (!usable) {
-            return;
-        }
-        Path path = docsPath(key);
-        if (path == null) {
+    private void removePayload(Path path) {
+        if (!usable || path == null) {
             return;
         }
         try {

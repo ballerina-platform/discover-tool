@@ -129,13 +129,12 @@ public record ModuleRef(String orgName, String moduleName, String version) {
     }
 
     /**
-     * What this CLI's {@code <org/name>} argument takes.
+     * The module's {@code org/moduleName}, unquoted.
      *
-     * <p>Unquoted, and deliberately different from {@link #importPath()}: {@code QualifiedName} rejects the
-     * apostrophe, while Central's docs endpoint answers for a module path directly. Note that this is not
-     * always a PACKAGE name — {@code ballerinax/aws.auth} is a module of the {@code ballerinax/aws} package —
-     * which is why a command built from it needs {@link #pinnedVersion()} to resolve: version resolution goes
-     * through the registry, where only real packages exist, and an explicit version skips it.
+     * <p>Deliberately different from {@link #importPath()}: {@code QualifiedName} rejects the apostrophe. This is
+     * a MODULE path, not always a package name — {@code ballerinax/aws.auth} is the {@code auth} module of the
+     * {@code ballerinax/aws} package — so it is not, on its own, an {@code <org>/<package>} argument this CLI
+     * accepts: that argument always names a package, and a submodule is reached through {@code --module}.
      */
     public String coordinate() {
         return orgName + "/" + moduleName;

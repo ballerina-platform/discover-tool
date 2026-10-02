@@ -1,5 +1,7 @@
 # Ballerina Discover Tool
 
+## Overview
+
 `bal discover` reads a Ballerina package off **Ballerina Central** and answers what its API actually is:
 the clients, services, classes and functions it declares, how each is called, and the exact signature of
 any one of them. It exists so an AI agent (or a human) can learn a package's real API instead of guessing it
@@ -17,6 +19,10 @@ bal discover <org>/<package> [bucket] [selector ...] [flags]
 
 The package comes first and every further positional drills one level down. With no bucket, the answer is
 the list of buckets the package has.
+
+`<org>/<package>` always names a package, never a module of one: `bal discover ballerinax/aws.auth` fails with
+the command that reads that module, `bal discover ballerinax/aws --module auth`. To find a package in the first
+place, use `bal search <keyword>`; `bal discover` only drills into one you already know.
 
 | Bucket    | What it holds                                                                                            |
 | --------- | -------------------------------------------------------------------------------------------------------- |
@@ -38,13 +44,13 @@ left out.
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
 | `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
-| `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`.                 |
+| `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again.                   |
 
 ## Walkthrough
 
-The output below is real, produced against the Central payloads recorded under
-`native/src/test/resources/fixtures/`; live Central may have moved on since they were recorded.
+The output below is real, produced against recorded Central payloads; live Central may have moved on since
+they were recorded.
 
 What a package has:
 
@@ -542,13 +548,11 @@ and caching is off when none of them is usable.
 
 ## Installing it
 
-Once released, install it from Ballerina Central:
+Install it from Ballerina Central:
 
 ```bash
 bal tool pull discover
 ```
-
-Until then, build and install it locally; see [Install a local build](#install-a-local-build).
 
 ## Building from the source
 
@@ -602,7 +606,7 @@ checked against.
 
 ### Install a local build
 
-This is the same packaging a Central publish uses:
+Until it is released, build and install it locally. This is the same packaging a Central publish uses:
 
 ```bash
 ./gradlew :bal-tool:build -PpublishToLocalCentral=true          # pack the bala, push it to the local repository

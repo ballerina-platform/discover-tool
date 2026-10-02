@@ -31,11 +31,16 @@ import io.ballerina.tools.discover.Version;
  * older layout, a hand-copied file, a rename that went wrong. Any of those would otherwise serve one package's
  * signatures under another package's name, which is the single worst thing this reader could do.
  *
- * <p>It runs on the RAW JSON rather than the schema's output because the schema strips exactly the two fields
- * it needs: a module has no {@code version} in the IR and the root has no {@code apiDocsVersion}. Both are on
- * the wire — verified present in all nine fixtures. Adding them to the schema instead would make them required
- * reads and turn a cosmetic upstream change into a failed lookup, which is the trade the schema deliberately
- * does not make.
+ * <p>It runs on the RAW JSON rather than the schema's output because the schema strips the fields it needs: a
+ * module has no {@code version} or {@code isDefaultModule} in the IR. Adding them to the schema instead would make
+ * them required reads and turn a cosmetic upstream change into a failed lookup, which is the trade the schema
+ * deliberately does not make.
+ *
+ * <p>The cache-side and live-side rules ask the same of a page. {@code apiDocsVersion} is not part of either:
+ * Central's pages from before it existed ({@code ballerina/graphql} 1.8.0) carry only {@code docsData} and
+ * {@code searchData}, and requiring it of a cached entry made every such page a miss that was refetched, written
+ * and deleted again on each run. A foreign or partial file is still rejected — by these coordinate checks, by the
+ * parse that follows, and by writes that are atomic in the first place.
  *
  * <p>Module matching uses the REQUESTED name, for the same reason module selection does: a check that verifies
  * one module while the renderer reads another verifies nothing.
@@ -51,40 +56,134 @@ public final class Coordinates {
         if (raw == null || !raw.isJsonObject()) {
             return false;
         }
-        JsonObject root = raw.getAsJsonObject();
-        String apiDocsVersion = Json.string(root, "apiDocsVersion");
-        if (apiDocsVersion == null || apiDocsVersion.isEmpty()) {
+        if (describesSubmodule(raw, qualified)) {
             return false;
         }
-
-        JsonElement docsData = root.get("docsData");
-        if (docsData == null || !docsData.isJsonObject()) {
-            return false;
-        }
-        JsonElement modules = docsData.getAsJsonObject().get("modules");
-        if (modules == null || !modules.isJsonArray()) {
-            return false;
-        }
-
-        for (JsonElement entry : modules.getAsJsonArray()) {
-            if (describes(entry, qualified, version)) {
+        for (JsonObject module : modules(raw)) {
+            if (describes(module, qualified, version)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean describes(JsonElement entry, QualifiedName qualified, Version version) {
-        if (entry == null || !entry.isJsonObject()) {
+    /**
+     * Does this payload describe the {@code submodule} module page of this package version?
+     *
+     * <p>The mirror image of {@link #match} plus {@link #describesSubmodule}, for a cached entry and a page off the
+     * wire alike: the page answering {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact
+     * module, at that version, flagged as NOT its package's default, and naming THIS package's default module
+     * among its {@code relatedModules}. The flag tells a submodule apart from a separately published package that
+     * shares the dotted name ({@code ballerinax/aws.s3} is a package, not a module of {@code ballerinax/aws}), so
+     * here an absent flag is not good enough. The related default module tells it apart from a submodule of a
+     * DIFFERENT package that shares the prefix: with {@code org/a.b} a package publishing {@code c},
+     * {@code org/a --module b.c} reaches {@code a.b}'s page, whose default module is {@code a.b}, not {@code a}.
+     */
+    public static boolean isModulePage(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
+        String id = qualified.name() + "." + submodule;
+        for (JsonObject module : modules(raw)) {
+            if (id.equals(Json.string(module, "id"))
+                    && qualified.org().equals(Json.string(module, "orgName"))
+                    && version.text().equals(Json.string(module, "version"))
+                    && flagged(module, "isDefaultModule", false)
+                    && namesDefaultModule(module, qualified)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean namesDefaultModule(JsonObject module, QualifiedName qualified) {
+        JsonElement related = module.get("relatedModules");
+        if (related == null || !related.isJsonArray()) {
             return false;
         }
-        JsonObject module = entry.getAsJsonObject();
+        for (JsonElement entry : related.getAsJsonArray()) {
+            if (entry.isJsonObject()
+                    && qualified.name().equals(Json.string(entry.getAsJsonObject(), "id"))
+                    && qualified.org().equals(Json.string(entry.getAsJsonObject(), "orgName"))
+                    && flagged(entry.getAsJsonObject(), "isDefaultModule", true)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Is the value exactly this boolean? Absent and non-boolean values are neither. */
+    private static boolean flagged(JsonObject owner, String key, boolean expected) {
+        JsonElement value = owner.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean()
+                && value.getAsBoolean() == expected;
+    }
+
+    /**
+     * Is this a submodule's own page rather than a package's?
+     *
+     * <p>Central's docs endpoint answers for a module path as readily as for a package
+     * ({@code docs/ballerinax/aws.auth/1.0.2} is the {@code auth} module of {@code ballerinax/aws}), and flags it
+     * {@code isDefaultModule: false}; a package's page carries its own default module. Only an explicit
+     * {@code false} counts, so a payload that omits the flag is still read as the package it was asked for.
+     */
+    public static boolean describesSubmodule(JsonElement raw, QualifiedName qualified) {
+        for (JsonObject module : modules(raw)) {
+            if (qualified.name().equals(Json.string(module, "id"))
+                    && qualified.org().equals(Json.string(module, "orgName"))
+                    && flagged(module, "isDefaultModule", false)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static java.util.List<JsonObject> modules(JsonElement raw) {
+        if (raw == null || !raw.isJsonObject()) {
+            return java.util.List.of();
+        }
+        JsonElement docsData = raw.getAsJsonObject().get("docsData");
+        if (docsData == null || !docsData.isJsonObject()) {
+            return java.util.List.of();
+        }
+        JsonElement modules = docsData.getAsJsonObject().get("modules");
+        if (modules == null || !modules.isJsonArray()) {
+            return java.util.List.of();
+        }
+        java.util.List<JsonObject> objects = new java.util.ArrayList<>();
+        for (JsonElement entry : modules.getAsJsonArray()) {
+            if (entry != null && entry.isJsonObject()) {
+                objects.add(entry.getAsJsonObject());
+            }
+        }
+        return objects;
+    }
+
+    private static boolean describes(JsonObject module, QualifiedName qualified, Version version) {
         String id = Json.string(module, "id");
         if (id == null || !qualified.org().equals(Json.string(module, "orgName"))) {
             return false;
         }
-        boolean named = id.equals(qualified.name()) || id.startsWith(qualified.name() + ".");
-        return named && version.text().equals(Json.string(module, "version"));
+        return id.equals(qualified.name()) && version.text().equals(Json.string(module, "version"));
+    }
+
+    /**
+     * The module names one version's registry row lists — {@code aws} and {@code aws.auth} for
+     * {@code ballerinax/aws} — or an empty list when the row is not the shape expected.
+     */
+    static java.util.List<String> moduleNames(JsonElement raw) {
+        if (raw == null || !raw.isJsonObject()) {
+            return java.util.List.of();
+        }
+        JsonElement modules = raw.getAsJsonObject().get("modules");
+        if (modules == null || !modules.isJsonArray()) {
+            return java.util.List.of();
+        }
+        java.util.List<String> names = new java.util.ArrayList<>();
+        for (JsonElement entry : modules.getAsJsonArray()) {
+            String name = entry.isJsonObject() ? Json.string(entry.getAsJsonObject(), "name") : null;
+            if (name != null && !name.isEmpty()) {
+                names.add(name);
+            }
+        }
+        return java.util.List.copyOf(names);
     }
 
     /** The first entry of a versions array, or {@code null} if it is not a non-empty array of strings. */
