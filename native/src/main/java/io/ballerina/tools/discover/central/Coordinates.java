@@ -31,11 +31,16 @@ import io.ballerina.tools.discover.Version;
  * older layout, a hand-copied file, a rename that went wrong. Any of those would otherwise serve one package's
  * signatures under another package's name, which is the single worst thing this reader could do.
  *
- * <p>It runs on the RAW JSON rather than the schema's output because the schema strips exactly the two fields
- * it needs: a module has no {@code version} in the IR and the root has no {@code apiDocsVersion}. Both are on
- * the wire — verified present in all nine fixtures. Adding them to the schema instead would make them required
- * reads and turn a cosmetic upstream change into a failed lookup, which is the trade the schema deliberately
- * does not make.
+ * <p>It runs on the RAW JSON rather than the schema's output because the schema strips the fields it needs: a
+ * module has no {@code version} or {@code isDefaultModule} in the IR. Adding them to the schema instead would make
+ * them required reads and turn a cosmetic upstream change into a failed lookup, which is the trade the schema
+ * deliberately does not make.
+ *
+ * <p>The cache-side and live-side rules ask the same of a page. {@code apiDocsVersion} is not part of either:
+ * Central's pages from before it existed ({@code ballerina/graphql} 1.8.0) carry only {@code docsData} and
+ * {@code searchData}, and requiring it of a cached entry made every such page a miss that was refetched, written
+ * and deleted again on each run. A foreign or partial file is still rejected — by these coordinate checks, by the
+ * parse that follows, and by writes that are atomic in the first place.
  *
  * <p>Module matching uses the REQUESTED name, for the same reason module selection does: a check that verifies
  * one module while the renderer reads another verifies nothing.
@@ -51,8 +56,7 @@ public final class Coordinates {
         if (raw == null || !raw.isJsonObject()) {
             return false;
         }
-        String apiDocsVersion = Json.string(raw.getAsJsonObject(), "apiDocsVersion");
-        if (apiDocsVersion == null || apiDocsVersion.isEmpty() || describesSubmodule(raw, qualified)) {
+        if (describesSubmodule(raw, qualified)) {
             return false;
         }
         for (JsonObject module : modules(raw)) {
@@ -64,31 +68,12 @@ public final class Coordinates {
     }
 
     /**
-     * May a cached payload stand in for the {@code submodule} module page of this package version?
-     *
-     * <p>The cache-side rule, exactly as {@link #match} is for a package's page: a stored entry must carry an
-     * {@code apiDocsVersion} as well as {@link #isModulePage}'s coordinates, so a partially written or foreign file
-     * is a miss.
-     */
-    public static boolean matchModule(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
-        if (raw == null || !raw.isJsonObject()) {
-            return false;
-        }
-        String apiDocsVersion = Json.string(raw.getAsJsonObject(), "apiDocsVersion");
-        return apiDocsVersion != null && !apiDocsVersion.isEmpty()
-                && isModulePage(raw, qualified, submodule, version);
-    }
-
-    /**
      * Does this payload describe the {@code submodule} module page of this package version?
      *
-     * <p>The live-side rule. Like a package's page off the wire, which is accepted unless it is a submodule's
-     * ({@link #describesSubmodule}), it asks nothing of {@code apiDocsVersion}: pages Central published before it
-     * existed ({@code ballerina/graphql.subgraph} 1.8.0) carry only {@code docsData} and {@code searchData}.
-     *
-     * <p>The page answering
-     * {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact module, at that version, flagged as
-     * NOT its package's default, and naming THIS package's default module among its {@code relatedModules}. The
+     * <p>The mirror image of {@link #match} plus {@link #describesSubmodule}, for a cached entry and a page off the
+     * wire alike: the page answering {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact
+     * module, at that version, flagged as NOT its package's default, and naming THIS package's default module
+     * among its {@code relatedModules}. The
      * flag tells a submodule apart from a separately published package that shares the dotted name
      * ({@code ballerinax/aws.s3} is a package, not a module of {@code ballerinax/aws}), so here an absent flag is
      * not good enough. The related default module tells it apart from a submodule of a DIFFERENT package that

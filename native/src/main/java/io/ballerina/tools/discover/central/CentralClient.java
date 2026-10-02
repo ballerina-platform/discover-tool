@@ -521,7 +521,7 @@ public final class CentralClient {
         } else {
             JsonElement cached = cache.readModuleDocs(key);
             if (cached != null) {
-                Result<CentralDocs> parsed = Coordinates.matchModule(cached, qualified, submodule, version)
+                Result<CentralDocs> parsed = Coordinates.isModulePage(cached, qualified, submodule, version)
                         ? Schema.parse(cached, label)
                         : null;
                 if (parsed != null && parsed.isOk()) {
