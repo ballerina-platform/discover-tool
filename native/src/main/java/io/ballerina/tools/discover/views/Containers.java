@@ -384,7 +384,7 @@ public final class Containers {
         Optional<Service> foreign = foreignPairing(container);
         if (foreign.isPresent()) {
             return "binds to " + names + "; declared in " + foreign.get().declaredIn().map(ModuleRef::coordinate)
-                    .orElse("") + " — " + foreignCommand(loaded, foreign.get());
+                    .orElse("") + foreignCommand(loaded, foreign.get()).map(command -> " — " + command).orElse("");
         }
         String unconfirmed = unconfirmedReason(container);
         return unconfirmed == null
@@ -542,13 +542,14 @@ public final class Containers {
     /**
      * The command that opens one container — in ANOTHER package for a service type a listener here accepts but
      * another module declares ({@code postgresql:CdcListener}'s {@code cdc:Service}), since that is where its
-     * contract is.
+     * contract is, when {@link #foreignCommand} can name that package; otherwise the local stub that says where
+     * the type is declared.
      */
     private static String openCommand(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, Options options) {
-        Optional<Service> foreign = foreignPairing(container);
+        Optional<String> foreign = foreignPairing(container).flatMap(service -> foreignCommand(loaded, service));
         if (foreign.isPresent()) {
-            return foreignCommand(loaded, foreign.get());
+            return foreign.get();
         }
         return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + container.name()
                 + (namedByFilter(container, options) ? "" : filterArgument(options));
@@ -559,19 +560,24 @@ public final class Containers {
     }
 
     /**
-     * The command that opens another module's service type in its own package. Unpinned, as every command this
-     * tool prints is. A module of THIS package — a sibling of the one being read — is reached through
-     * {@code --module}, since the package boundary is known; another package's dotted module path is passed as
-     * written, and its version lookup walks up to the package that contains it.
+     * The command that opens another module's service type in its own package, or empty when that package is not
+     * known. Unpinned, as every command this tool prints is. A module of THIS package — a sibling of the one being
+     * read — is reached through {@code --module}; an undotted module path is its package's default module, so it
+     * is the package coordinate as written. Another package's dotted module path names no package boundary, and a
+     * command guessing one would not be ready to run.
      */
-    private static String foreignCommand(LoadedPackage loaded, Service service) {
+    private static Optional<String> foreignCommand(LoadedPackage loaded, Service service) {
         ModuleRef module = service.declaredIn().orElseThrow();
         QualifiedName pkg = loaded.qualified();
-        String target = module.coordinate();
+        String target;
         if (module.orgName().equals(pkg.org()) && module.moduleName().startsWith(pkg.name() + ".")) {
             target = pkg.qualified() + " --module " + module.moduleName().substring(pkg.name().length() + 1);
+        } else if (!module.moduleName().contains(".")) {
+            target = module.coordinate();
+        } else {
+            return Optional.empty();
         }
-        return "bal discover " + target + " service " + service.name();
+        return Optional.of("bal discover " + target + " service " + service.name());
     }
 
     /**
