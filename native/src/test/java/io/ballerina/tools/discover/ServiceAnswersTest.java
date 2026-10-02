@@ -180,6 +180,13 @@ public class ServiceAnswersTest {
     }
 
     @Test
+    public void aForeignServiceTypeNeedingQuotesIsQuotedInItsCommand() {
+        LoadedPackage loaded = attaching(Node.external("test", "pkg.b", "'Service"), "a", "a", "b");
+        Assert.assertEquals(roster(loaded).containers().get(0).command(),
+                "bal discover test/pkg --module b service \"'Service\"");
+    }
+
+    @Test
     public void theDefaultModuleIsReachedFromASubmoduleWithoutModule() {
         LoadedPackage loaded = attachingIn("pkg.core", Node.external("test", "pkg.core", "Service"), "events");
         Assert.assertEquals(roster(loaded).containers().get(0).command(),
