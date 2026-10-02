@@ -521,7 +521,7 @@ public final class Containers {
         if (foreign.isPresent()) {
             return foreign.get();
         }
-        return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + container.name()
+        return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + Texts.shellWord(container.name())
                 + (namedByFilter(container, options) ? "" : filterArgument(options));
     }
 
