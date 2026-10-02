@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -164,7 +165,7 @@ public class ServiceAnswersTest {
 
     @Test
     public void aSiblingModulesServiceTypeIsReachedThroughModule() {
-        LoadedPackage loaded = attaching(Node.external("test", "pkg.events", "Service"));
+        LoadedPackage loaded = attaching(Node.external("test", "pkg.events", "Service"), null, "events");
         Assert.assertEquals(roster(loaded).containers().get(0).command(),
                 "bal discover test/pkg --module events service Service");
         Assert.assertTrue(open(loaded, "events:Service").get("note").getAsString()
@@ -172,8 +173,24 @@ public class ServiceAnswersTest {
     }
 
     @Test
+    public void theDefaultModuleIsReachedFromASubmoduleWithoutModule() {
+        LoadedPackage loaded = attaching("pkg.core", Node.external("test", "pkg.core", "Service"), "events");
+        Assert.assertEquals(roster(loaded).containers().get(0).command(),
+                "bal discover test/pkg.core service Service");
+    }
+
+    @Test
+    public void aPackageWhoseNameMerelyExtendsThisOneIsOpenedThroughItsLocalStub() {
+        LoadedPackage loaded = attaching(Node.external("test", "pkg.driver", "Service"), null, "events");
+        Assert.assertEquals(roster(loaded).containers().get(0).command(),
+                "bal discover test/pkg service driver:Service");
+        String note = open(loaded, "driver:Service").get("note").getAsString();
+        Assert.assertTrue(note.endsWith("declared in test/pkg.driver"), note);
+    }
+
+    @Test
     public void anotherPackagesSubmoduleIsOpenedThroughItsLocalStub() {
-        LoadedPackage loaded = attaching(Node.external("other", "lib.events", "Service"));
+        LoadedPackage loaded = attaching(Node.external("other", "lib.events", "Service"), null);
         String command = roster(loaded).containers().get(0).command();
         Assert.assertEquals(command, "bal discover test/pkg service events:Service");
 
@@ -184,10 +201,17 @@ public class ServiceAnswersTest {
         Assert.assertFalse(note.contains("bal discover"), note);
     }
 
-    private static LoadedPackage attaching(Node serviceType) {
-        Payload payload = Payload.pkg().with("listeners", Decl.listenerAttaching(serviceType, "Listener"));
-        return new LoadedPackage(QualifiedName.parse("test/pkg").value(), FixtureCorpus.FIXTURE_VERSION,
-                Pipeline.build(payload.module()), Optional.empty(), null, List.of(), null);
+    private static LoadedPackage attaching(Node serviceType, String module, String... submodules) {
+        return attaching("pkg", serviceType, module, submodules);
+    }
+
+    /** {@code test/<name>}, read at {@code module} (the default when {@code null}), publishing {@code submodules}. */
+    private static LoadedPackage attaching(String name, Node serviceType, String module, String... submodules) {
+        Payload payload = Payload.pkg("test", module == null ? name : name + "." + module)
+                .with("listeners", Decl.listenerAttaching(serviceType, "Listener"));
+        return new LoadedPackage(QualifiedName.parse("test/" + name).value(), FixtureCorpus.FIXTURE_VERSION,
+                Pipeline.build(payload.module()), Optional.empty(), module,
+                Arrays.stream(submodules).map(submodule -> new LoadedPackage.Submodule(submodule, "")).toList(), null);
     }
 
     private static DiscoverResult.ContainerRoster roster(LoadedPackage loaded) {
