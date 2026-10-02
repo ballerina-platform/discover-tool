@@ -129,6 +129,7 @@ public final class JdkHttpTransport implements HttpTransport {
     private static final class CappedBody implements HttpResponse.BodySubscriber<InputStream> {
 
         private static final int UNDECLARED_INITIAL_BYTES = 64 * 1024;
+        private static final int MAX_INITIAL_BYTES = 4 * 1024 * 1024;
 
         private final CompletableFuture<InputStream> body = new CompletableFuture<>();
         private final Collected buffer;
@@ -139,7 +140,7 @@ public final class JdkHttpTransport implements HttpTransport {
         CappedBody(long limit, long declared) {
             this.limit = limit;
             long expected = declared >= 0 ? declared : UNDECLARED_INITIAL_BYTES;
-            this.buffer = new Collected((int) Math.min(Math.min(expected, limit), Integer.MAX_VALUE - 8));
+            this.buffer = new Collected((int) Math.min(Math.min(expected, limit), MAX_INITIAL_BYTES));
         }
 
         @Override
