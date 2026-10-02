@@ -43,17 +43,18 @@ public class JdkHttpTransportTest {
     private static final int LIMIT = 1024;
 
     /**
-     * {@code bytes} of body under a declared length ({@code 0} for chunked), the response then held open until the
-     * download returns — so a client that waited on the declared body would run into the deadline.
+     * {@code bytes} of body under {@code status} and a declared length ({@code 0} for chunked). A declared length
+     * past {@code bytes} holds the response open until the download returns, so a client that waited on the
+     * declared body would run into the deadline.
      */
-    private static Optional<InputStream> download(long declaredLength, int bytes, long timeoutMs)
+    private static Optional<InputStream> download(int status, long declaredLength, int bytes, long timeoutMs)
             throws IOException {
         CountDownLatch released = new CountDownLatch(1);
         ExecutorService handlers = Executors.newCachedThreadPool();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.setExecutor(handlers);
         server.createContext("/package.bala", exchange -> {
-            exchange.sendResponseHeaders(200, declaredLength);
+            exchange.sendResponseHeaders(status, declaredLength);
             try (OutputStream body = exchange.getResponseBody()) {
                 body.write(new byte[bytes]);
                 body.flush();
@@ -61,7 +62,7 @@ public class JdkHttpTransportTest {
                     released.await(30, TimeUnit.SECONDS);
                 }
             } catch (IOException | InterruptedException closed) {
-                // The client refused the body, which is what these tests expect.
+                // The client closed the connection without reading the rest, as a refused body does.
             }
         });
         server.start();
@@ -76,13 +77,13 @@ public class JdkHttpTransportTest {
     }
 
     private static Optional<InputStream> download(long declaredLength, int bytes) throws IOException {
-        return download(declaredLength, bytes, 5000);
+        return download(200, declaredLength, bytes, 5000);
     }
 
     @Test
     public void aDeclaredLengthPastTheLimitIsNoAnswerWithoutReadingTheBody() throws IOException {
         long started = System.nanoTime();
-        Assert.assertTrue(download(LIMIT * 64L, 16, 5000).isEmpty());
+        Assert.assertTrue(download(200, LIMIT * 64L, 16, 30_000).isEmpty());
         long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
         Assert.assertTrue(elapsedMs < 2000, "took " + elapsedMs + " ms; the declared length alone should refuse it");
     }
@@ -99,5 +100,19 @@ public class JdkHttpTransportTest {
         try (InputStream stream = body.get()) {
             Assert.assertEquals(stream.readAllBytes().length, LIMIT);
         }
+    }
+
+    @Test
+    public void aDeclaredLengthAtTheLimitIsTheAnswer() throws IOException {
+        Optional<InputStream> body = download(LIMIT, LIMIT);
+        Assert.assertTrue(body.isPresent());
+        try (InputStream stream = body.get()) {
+            Assert.assertEquals(stream.readAllBytes().length, LIMIT);
+        }
+    }
+
+    @Test
+    public void anErrorStatusIsNoAnswer() throws IOException {
+        Assert.assertTrue(download(404, 16, 16, 5000).isEmpty());
     }
 }
