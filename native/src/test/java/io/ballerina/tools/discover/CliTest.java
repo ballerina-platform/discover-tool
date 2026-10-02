@@ -864,6 +864,27 @@ public class CliTest {
                 options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 1, capture.stdout());
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
+        Assert.assertTrue(capture.field("suggestion")
+                .contains("could not be confirmed as a submodule of this package"), capture.stderr());
+    }
+
+    @Test
+    public void aSubmoduleOfAnotherPackageSharingThePrefixIsNotTakenForThisPackages() {
+        // With org/a.b a package publishing c, `org/a --module b.c` reaches a.b's page: a non-default module whose
+        // package's default is a.b, not a.
+        JsonObject page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").getAsJsonObject();
+        JsonObject module = page.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject();
+        for (JsonElement related : module.getAsJsonArray("relatedModules")) {
+            JsonObject entry = related.getAsJsonObject();
+            if (entry.get("id").getAsString().equals("graphql")) {
+                entry.addProperty("id", "graphql.other");
+            }
+        }
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+                options(graphqlCentral(Map.of("subgraph", page))));
+        Assert.assertEquals(exitCode, 1, capture.stdout());
+        Assert.assertEquals(capture.field("kind"), "symbol-not-found");
     }
 
     @Test

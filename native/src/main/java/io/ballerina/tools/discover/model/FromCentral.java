@@ -786,30 +786,35 @@ public final class FromCentral {
         List<String> candidates = submodulesOf(docs, qualified).stream()
                 .map(module -> module.id().substring(prefix.length()))
                 .toList();
-        return new Failure.SymbolNotFound(
-                qualified.qualified(),
-                List.of(submodule),
-                candidates,
-                candidates.isEmpty()
-                        ? "This package publishes no submodules at all. Drop --module."
-                        : "No submodule answers to that. The candidates are every submodule this package "
-                                + "publishes; pass one of them, or drop --module for the default one.");
+        String suggestion;
+        if (candidates.isEmpty()) {
+            suggestion = "This package publishes no submodules at all. Drop --module.";
+        } else if (candidates.contains(submodule)) {
+            suggestion = "This package lists '" + submodule + "' as a submodule, but Central's page for it could "
+                    + "not be confirmed as a submodule of this package. Try again with --refresh; the other "
+                    + "candidates are every submodule this package publishes.";
+        } else {
+            suggestion = "No submodule answers to that. The candidates are every submodule this package "
+                    + "publishes; pass one of them, or drop --module for the default one.";
+        }
+        return new Failure.SymbolNotFound(qualified.qualified(), List.of(submodule), candidates, suggestion);
     }
 
     /**
-     * Every submodule of this package — org matches, id starts with {@code name.} — as the page's
-     * {@code relatedModules} names them. A page carries ONE module's declarations (a package's page its default
-     * module, a module page that module alone), so its {@code relatedModules} is the only place the rest of the
-     * package is listed; any page of the package lists the same set. The shared base {@link #noSuchSubmodule} and
-     * {@code Loader.submodulesOf} both filter down to their own shape from, so "which modules are this package's
-     * submodules" is computed in exactly one place.
+     * Every submodule of this package — not the default module, org matches, id starts with {@code name.} — as
+     * the page's {@code relatedModules} names them. A page carries ONE module's declarations (a package's page its
+     * default module, a module page that module alone), so its {@code relatedModules} is the only place the rest
+     * of the package is listed; any page of the package lists the same set. The shared base
+     * {@link #noSuchSubmodule} and {@code Loader.submodulesOf} both filter down to their own shape from, so
+     * "which modules are this package's submodules" is computed in exactly one place.
      */
     public static List<CentralDocs.RelatedModule> submodulesOf(CentralDocs docs, QualifiedName qualified) {
         String prefix = qualified.name() + ".";
         Map<String, CentralDocs.RelatedModule> byId = new LinkedHashMap<>();
         for (CentralDocs.Module module : docs.modules()) {
             for (CentralDocs.RelatedModule related : module.relatedModules()) {
-                if (related.orgName().equals(qualified.org()) && related.id().startsWith(prefix)) {
+                if (!related.isDefaultModule() && related.orgName().equals(qualified.org())
+                        && related.id().startsWith(prefix)) {
                     byId.putIfAbsent(related.id(), related);
                 }
             }
