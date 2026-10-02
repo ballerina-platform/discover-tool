@@ -75,19 +75,45 @@ public final class Bindings {
         }
     }
 
-    /** Whether a service type binds to a listener, and how sure that answer is. */
+    /**
+     * Whether a service type binds to a listener, and how sure that answer is. An unsettled binding carries why,
+     * as a {@link #reason()} for prose and a {@link #label()} for a roster to group under; a settled one carries
+     * {@code null} for both.
+     */
     public enum Binding {
         /** It is the listener's attach target, or includes one. */
-        CONFIRMED,
+        CONFIRMED(null, null),
         /** Unsettled: the listener publishes no {@code attach()} to read the target from. */
-        NO_ATTACH_EVIDENCE,
+        NO_ATTACH_EVIDENCE("the listener publishes no attach() signature to read its service type from",
+                "listener publishes no attach()"),
         /** Unsettled: the package source, which shows the type's inclusions, was unavailable. */
-        SOURCE_UNAVAILABLE,
+        SOURCE_UNAVAILABLE("the package source, which shows which service types include the listener's attach() "
+                + "type, was unavailable", "package source unavailable"),
         /** It does not bind. */
-        NONE;
+        NONE(null, null);
+
+        private final String reason;
+        private final String label;
+
+        Binding(String reason, String label) {
+            this.reason = reason;
+            this.label = label;
+        }
 
         public boolean isConfirmed() {
             return this == CONFIRMED;
+        }
+
+        public boolean isUnsettled() {
+            return reason != null;
+        }
+
+        public String reason() {
+            return reason;
+        }
+
+        public String label() {
+            return label;
         }
     }
 

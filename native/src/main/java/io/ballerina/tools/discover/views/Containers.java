@@ -23,6 +23,7 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
+import io.ballerina.tools.discover.model.Bindings;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Param;
@@ -386,45 +387,14 @@ public final class Containers {
             return "binds to " + names + "; declared in " + foreign.get().declaredIn().map(ModuleRef::coordinate)
                     .orElse("") + foreignCommand(loaded, foreign.get()).map(command -> " — " + command).orElse("");
         }
-        String unconfirmed = unconfirmedReason(container);
-        return unconfirmed == null
-                ? "binds to " + names
-                : "may bind to " + names + " — not confirmed: " + unconfirmed;
+        return unsettled(container)
+                .map(binding -> "may bind to " + names + " — not confirmed: " + binding.reason())
+                .orElse("binds to " + names);
     }
 
-    /** Why a container's pairing is not confirmed, or {@code null} when every one of them is. */
-    private static String unconfirmedReason(Surface.Container container) {
-        for (Service pairing : container.pairings()) {
-            switch (pairing.binding()) {
-                case SOURCE_UNAVAILABLE -> {
-                    return "the package source, which shows which service types include the listener's attach() "
-                            + "type, was unavailable";
-                }
-                case NO_ATTACH_EVIDENCE -> {
-                    return "the listener publishes no attach() signature to read its service type from";
-                }
-                case CONFIRMED, NONE -> {
-                }
-            }
-        }
-        return null;
-    }
-
-    /** {@link #unconfirmedReason}, as the short label a roster groups such service types under. */
-    private static String unconfirmedLabel(Surface.Container container) {
-        for (Service pairing : container.pairings()) {
-            switch (pairing.binding()) {
-                case SOURCE_UNAVAILABLE -> {
-                    return "package source unavailable";
-                }
-                case NO_ATTACH_EVIDENCE -> {
-                    return "listener publishes no attach()";
-                }
-                case CONFIRMED, NONE -> {
-                }
-            }
-        }
-        return null;
+    /** The first of a container's pairings whose binding is unsettled, if any is. */
+    private static Optional<Bindings.Binding> unsettled(Surface.Container container) {
+        return container.pairings().stream().map(Service::binding).filter(Bindings.Binding::isUnsettled).findFirst();
     }
 
     /**
@@ -523,7 +493,7 @@ public final class Containers {
                         (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
                         (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
                         listenerNames(container),
-                        unconfirmedLabel(container),
+                        unsettled(container).map(Bindings.Binding::label).orElse(null),
                         openCommand(loaded, scope, container, options)))
                 .toList();
         List<DiscoverResult.ContainerRoster.NotAttachable> notAttachable =
