@@ -103,14 +103,14 @@ public final class JdkHttpTransport implements HttpTransport {
         } catch (IllegalArgumentException malformed) {
             return Optional.empty();
         }
-        CompletableFuture<HttpResponse<byte[]>> download = client.sendAsync(request, info ->
-                info.statusCode() >= 200 && info.statusCode() < 300
-                        && info.headers().firstValueAsLong("content-length").orElse(0) <= archiveLimit
-                        ? new CappedBody(archiveLimit)
-                        : new NoBody());
+        CompletableFuture<HttpResponse<InputStream>> download = client.sendAsync(request, info -> {
+            long declared = info.headers().firstValueAsLong("content-length").orElse(-1);
+            return info.statusCode() >= 200 && info.statusCode() < 300 && declared <= archiveLimit
+                    ? new CappedBody(archiveLimit, declared)
+                    : new NoBody();
+        });
         try {
-            return Optional.ofNullable(download.get(timeoutMs, TimeUnit.MILLISECONDS).body())
-                    .map(ByteArrayInputStream::new);
+            return Optional.ofNullable(download.get(timeoutMs, TimeUnit.MILLISECONDS).body());
         } catch (TimeoutException | ExecutionException failed) {
             return Optional.empty();
         } catch (InterruptedException interrupted) {
@@ -126,15 +126,20 @@ public final class JdkHttpTransport implements HttpTransport {
      * complete body is what lets the caller's deadline bound the transfer: a stream handed out early would leave a
      * stalled server holding a {@code read()} no timeout reaches.
      */
-    private static final class CappedBody implements HttpResponse.BodySubscriber<byte[]> {
+    private static final class CappedBody implements HttpResponse.BodySubscriber<InputStream> {
 
-        private final CompletableFuture<byte[]> body = new CompletableFuture<>();
-        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        private static final int UNDECLARED_INITIAL_BYTES = 64 * 1024;
+
+        private final CompletableFuture<InputStream> body = new CompletableFuture<>();
+        private final Collected buffer;
         private final long limit;
         private Flow.Subscription subscription;
 
-        CappedBody(long limit) {
+        /** {@code declared} is the response's {@code Content-Length}, or negative when it has none. */
+        CappedBody(long limit, long declared) {
             this.limit = limit;
+            long expected = declared >= 0 ? declared : UNDECLARED_INITIAL_BYTES;
+            this.buffer = new Collected((int) Math.min(Math.min(expected, limit), Integer.MAX_VALUE - 8));
         }
 
         @Override
@@ -156,13 +161,9 @@ public final class JdkHttpTransport implements HttpTransport {
                     body.complete(null);
                     return;
                 }
-                if (item.hasArray()) {
-                    buffer.write(item.array(), item.arrayOffset() + item.position(), item.remaining());
-                } else {
-                    byte[] chunk = new byte[item.remaining()];
-                    item.get(chunk);
-                    buffer.write(chunk, 0, chunk.length);
-                }
+                byte[] chunk = new byte[item.remaining()];
+                item.get(chunk);
+                buffer.write(chunk, 0, chunk.length);
             }
         }
 
@@ -173,17 +174,29 @@ public final class JdkHttpTransport implements HttpTransport {
 
         @Override
         public void onComplete() {
-            body.complete(buffer.toByteArray());
+            body.complete(buffer.asInputStream());
         }
 
         @Override
-        public CompletionStage<byte[]> getBody() {
+        public CompletionStage<InputStream> getBody() {
             return body;
         }
     }
 
+    /** A buffer read back in place, rather than through the full copy {@link #toByteArray()} makes. */
+    private static final class Collected extends ByteArrayOutputStream {
+
+        Collected(int initialBytes) {
+            super(initialBytes);
+        }
+
+        InputStream asInputStream() {
+            return new ByteArrayInputStream(buf, 0, count);
+        }
+    }
+
     /** A body refused unread: an error status, or a {@code Content-Length} already past the limit. */
-    private static final class NoBody implements HttpResponse.BodySubscriber<byte[]> {
+    private static final class NoBody implements HttpResponse.BodySubscriber<InputStream> {
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
@@ -203,7 +216,7 @@ public final class JdkHttpTransport implements HttpTransport {
         }
 
         @Override
-        public CompletionStage<byte[]> getBody() {
+        public CompletionStage<InputStream> getBody() {
             return CompletableFuture.completedFuture(null);
         }
     }
