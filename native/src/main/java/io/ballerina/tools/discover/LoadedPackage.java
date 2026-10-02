@@ -73,7 +73,7 @@ public record LoadedPackage(
      * this tool prints builds on, so drilling further never silently falls back to the default module.
      */
     public String pkgArgument() {
-        return module == null ? qualified.qualified() : qualified.qualified() + " --module " + module;
+        return module == null ? qualified.qualified() : qualified.qualified() + " --module " + Texts.shellWord(module);
     }
 
     /** The same package with a different IR, which is what a test that removes every client needs. */
