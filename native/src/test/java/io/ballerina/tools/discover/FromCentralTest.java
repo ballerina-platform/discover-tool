@@ -87,8 +87,8 @@ public class FromCentralTest {
     }
 
     @Test
-    public void aSubmoduleIsReachedThroughItsDottedId() {
-        // The way Central names it.
+    public void aDottedPackageNameSelectsItsModuleByExactId() {
+        // `googleapis.gmail` is one literal package name, not a `gmail` module of some `googleapis` package.
         CentralDocs docs = multiModule(List.of("googleapis", "googleapis.gmail"), "ballerinax");
         Result<CentralDocs.Module> selected =
                 FromCentral.selectModule(docs, qualified("ballerinax/googleapis.gmail"));

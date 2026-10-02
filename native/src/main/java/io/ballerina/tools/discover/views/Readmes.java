@@ -41,8 +41,7 @@ public final class Readmes {
      * The resolved module's own guide, trimmed, or empty when it publishes none.
      *
      * <p>Reads only the one module {@link io.ballerina.tools.discover.Loader} already resolved — a package's
-     * OTHER modules are a {@code --module} question, answered from
-     * their own pages, not this one's.
+     * OTHER modules are a {@code --module} question, answered from their own pages, not this one's.
      */
     public static Optional<String> of(CentralDocs.Module module) {
         String markdown = module.description().orElse("").trim();

@@ -119,8 +119,25 @@ public final class FixtureCorpus {
     private FixtureCorpus() {
     }
 
+    /**
+     * Every recorded PACKAGE page — the corpus every view, snapshot and the key-space snapshot runs over.
+     *
+     * <p>Top level only, deliberately: {@code fixtures/modules/} holds submodule pages and
+     * {@code fixtures/registry/} registry version rows, neither of which is a package a view renders or a
+     * snapshot names. Module pages are schema-checked on their own by {@code KeySpaceTest}; registry rows are
+     * not docs payloads at all.
+     */
     public static List<String> listFixtures() {
-        try (Stream<Path> files = Files.list(FIXTURES_DIR)) {
+        return slugsIn(FIXTURES_DIR);
+    }
+
+    /** Every recorded submodule page, as {@link #loadRawModulePage} takes it. */
+    public static List<String> listModulePages() {
+        return slugsIn(FIXTURES_DIR.resolve("modules"));
+    }
+
+    private static List<String> slugsIn(Path directory) {
+        try (Stream<Path> files = Files.list(directory)) {
             return files.map(path -> path.getFileName().toString())
                     .filter(file -> file.endsWith(".json.gz"))
                     .map(file -> file.substring(0, file.length() - ".json.gz".length()))

@@ -49,6 +49,8 @@ import java.util.stream.Stream;
  * <pre>
  *   &lt;root&gt;/v2/docs/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;/&lt;version&gt;.json      mode 0600, no TTL
  *   &lt;root&gt;/v2/latest/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;.json              {"version":"6.0.0","atMs":…}
+ *   &lt;root&gt;/v2/modules/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;/&lt;module&gt;/&lt;version&gt;.json
+ *                                                                          a submodule's page, mode 0600, no TTL
  * </pre>
  *
  * <p>{@code v2} is the on-disk format generation, bumped only when the stored bytes change meaning — bumped

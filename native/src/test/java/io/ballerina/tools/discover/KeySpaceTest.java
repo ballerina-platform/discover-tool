@@ -66,6 +66,15 @@ public class KeySpaceTest {
         Assert.assertTrue(parsed.isOk(), parsed.isOk() ? "" : parsed.failure().describe());
     }
 
+    @Test
+    public void everyRecordedModulePageStillSatisfiesTheSchema() {
+        Assert.assertFalse(FixtureCorpus.listModulePages().isEmpty());
+        for (String slug : FixtureCorpus.listModulePages()) {
+            Result<CentralDocs> parsed = Schema.parse(FixtureCorpus.loadRawModulePage(slug), slug);
+            Assert.assertTrue(parsed.isOk(), slug + ": " + (parsed.isOk() ? "" : parsed.failure().describe()));
+        }
+    }
+
     /**
      * Central spells a rest field's absent name two ways, and both have to parse.
      *
