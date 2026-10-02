@@ -8,26 +8,28 @@ It exists so an AI agent (or a human) can learn a library or connector's actual 
 from what Central publishes, deterministically and offline-cacheable, rather than reconstructing them
 from documentation prose.
 
-## Commands
+## Usage
 
 ```bash
-bal discover --help                      # what the tool is, what it can be asked, and how to walk it
-bal discover find     <keywords...>       # packages matching free-text keywords
-bal discover overview <org/name>          # a map of the package
-bal discover client   <org/name> [...]    # clients, addressed by name or by resource path
-bal discover class    <org/name> [...]    # classes and object types, addressed with `.`
-bal discover funcs    <org/name> [...]    # module-level functions, addressed with no receiver
-bal discover type     <org/name> <Name>   # one declaration, whole
-bal discover guide    <org/name> [<n>]    # the package's own readme, addressable one chunk at a time
-bal discover api      <org/name>          # the whole package as one Ballerina document
+bal discover --help                                  # what the tool is, what it can be asked, and how to walk it
+bal discover <org>/<package>                         # the buckets the package has
+bal discover <org>/<package> client [...]            # objects reached with `->`: remote methods and resource functions
+bal discover <org>/<package> service [...]           # service object types, each paired with its listener
+bal discover <org>/<package> class [...]             # plain objects reached with `.`
+bal discover <org>/<package> funcs [...]             # module-level functions
+bal discover <org>/<package> readme [<n>|"<title>"]  # the module's README, or one code-carrying section of it
 ```
+
+Flags: `--output json|text`, `--filter <keyword>`, `--page <n>`, `-m`/`--module <name>`, `--refresh`.
+To find a package in the first place, use `bal search <keyword>`.
 
 ## Example
 
 ```bash
-bal discover overview ballerinax/kafka
-bal discover client ballerinax/github Client repos
-bal discover type ballerina/http ClientRequestError -r
+bal discover ballerinax/kafka
+bal discover ballerinax/github client gists
+bal discover ballerinax/kafka client Producer send
+bal discover ballerinax/kafka readme --filter producer
 ```
 
 See the [project repository](https://github.com/ballerina-platform/discover-tool) for the full

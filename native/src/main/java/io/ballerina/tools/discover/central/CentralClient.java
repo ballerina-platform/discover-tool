@@ -305,7 +305,7 @@ public final class CentralClient {
                 qualified.qualified(),
                 "Central publishes no package under this name, and none of the packages it could be a module "
                         + "of exists either (tried " + tried + "). Check the org/name spelling; "
-                        + "`bal discover find " + qualified.name() + "` lists what Central publishes.");
+                        + "`bal search <keyword>` lists what Central publishes.");
     }
 
     /**
@@ -406,7 +406,7 @@ public final class CentralClient {
     private static Failure notFound(QualifiedName qualified) {
         return new Failure.PackageNotFound(
                 qualified.qualified(),
-                "Check the org/name spelling; `bal discover find <name>` lists what Central publishes.");
+                "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
     }
 
     // -----------------------------------------------------------------------
@@ -488,8 +488,8 @@ public final class CentralClient {
             QualifiedName qualified, Version version, boolean supplied, HttpOptions options) {
         if (!supplied) {
             return "Central published no '" + qualified.qualified() + "' at " + version.text()
-                    + ", the version resolved for it. Check the name — `bal discover find "
-                    + qualified.name() + "` lists what Central publishes.";
+                    + ", the version resolved for it. Check the name — `bal search <keyword>` lists what Central "
+                    + "publishes.";
         }
         String published = publishedVersions(qualified, options);
         return "Your project locks '" + qualified.qualified() + "' at " + version.text()
