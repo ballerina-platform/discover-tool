@@ -39,7 +39,8 @@ public interface HttpTransport {
     /**
      * One binary GET — a package archive rather than a JSON document — as a stream the caller closes, with no
      * retries: every caller treats a missing answer as "fall back to what the docs payload says", so the reason is
-     * not worth carrying. {@code timeoutMs} bounds the whole transfer, body included: a read past it fails.
+     * not worth carrying. {@code timeoutMs} bounds the whole transfer, body included: a body not complete by then
+     * is no answer.
      */
     default Optional<InputStream> openStream(String url, long timeoutMs) {
         return Optional.empty();

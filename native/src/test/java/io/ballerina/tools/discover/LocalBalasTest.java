@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover;
 
 import com.google.gson.JsonObject;
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.Bala;
@@ -47,6 +48,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -232,29 +237,80 @@ public class LocalBalasTest {
 
     @Test
     public void aSlowBodyIsCutOffAtTheTimeout() throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/slow.bala", exchange -> {
+        CountDownLatch released = new CountDownLatch(1);
+        assertCutOff(released, exchange -> {
             exchange.sendResponseHeaders(200, 0);
             try (OutputStream body = exchange.getResponseBody()) {
-                for (int index = 0; index < 50; index++) {
+                for (int index = 0; index < 50 && !released.await(100, TimeUnit.MILLISECONDS); index++) {
                     body.write(new byte[16]);
                     body.flush();
-                    Thread.sleep(100);
                 }
             } catch (IOException | InterruptedException closed) {
                 // The client gave up, which is what this test is waiting for.
             }
         });
+    }
+
+    @Test
+    public void aBodyThatStallsAfterItsHeadersIsCutOffAtTheTimeout() throws IOException {
+        CountDownLatch released = new CountDownLatch(1);
+        assertCutOff(released, exchange -> {
+            exchange.sendResponseHeaders(200, 0);
+            try (OutputStream body = exchange.getResponseBody()) {
+                body.write(new byte[16]);
+                body.flush();
+                released.await(30, TimeUnit.SECONDS);
+            } catch (IOException | InterruptedException closed) {
+                // The client gave up, which is what this test is waiting for.
+            }
+        });
+    }
+
+    @Test
+    public void aWholeBodyInTimeIsTheAnswerAndAnErrorStatusIsNone() throws IOException {
+        byte[] bala = bala();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/http.bala", exchange -> {
+            exchange.sendResponseHeaders(200, bala.length);
+            try (OutputStream body = exchange.getResponseBody()) {
+                body.write(bala);
+            }
+        });
+        server.createContext("/missing.bala", exchange -> {
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            String base = "http://127.0.0.1:" + server.getAddress().getPort();
+            Optional<InputStream> found = new JdkHttpTransport().openStream(base + "/http.bala", 5000);
+            Assert.assertTrue(found.isPresent());
+            try (InputStream stream = found.get()) {
+                Assert.assertEquals(stream.readAllBytes(), bala);
+            }
+            Assert.assertTrue(new JdkHttpTransport().openStream(base + "/missing.bala", 5000).isEmpty());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static void assertCutOff(CountDownLatch released, HttpHandler handler) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        ExecutorService handlers = Executors.newCachedThreadPool();
+        server.setExecutor(handlers);
+        server.createContext("/slow.bala", handler);
         server.start();
         try {
             String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/slow.bala";
-            Optional<InputStream> body = new JdkHttpTransport().openStream(url, 500);
-            Assert.assertTrue(body.isPresent());
-            try (InputStream stream = body.get()) {
-                Assert.expectThrows(IOException.class, stream::readAllBytes);
-            }
+            long started = System.nanoTime();
+            Optional<InputStream> body = new JdkHttpTransport().openStream(url, 300);
+            long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
+            Assert.assertTrue(body.isEmpty(), "a body not complete by the deadline is no answer");
+            Assert.assertTrue(elapsedMs < 2000, "took " + elapsedMs + " ms against a 300 ms deadline");
         } finally {
+            released.countDown();
             server.stop(0);
+            handlers.shutdownNow();
         }
     }
 }

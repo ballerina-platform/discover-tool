@@ -18,7 +18,8 @@
 
 package io.ballerina.tools.discover.central;
 
-import java.io.FilterInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -26,8 +27,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
+import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * The real transport, on the JDK's own client.
@@ -78,56 +87,86 @@ public final class JdkHttpTransport implements HttpTransport {
 
     @Override
     public Optional<InputStream> openStream(String url, long timeoutMs) {
-        long deadline = System.nanoTime() + Duration.ofMillis(timeoutMs).toNanos();
+        HttpRequest request;
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+            request = HttpRequest.newBuilder(URI.create(url))
                     .GET()
                     .timeout(Duration.ofMillis(timeoutMs))
                     .build();
-            HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            int status = response.statusCode();
-            if (status < 200 || status >= 300) {
-                response.body().close();
-                return Optional.empty();
-            }
-            return Optional.of(new DeadlineStream(response.body(), deadline));
-        } catch (IOException | IllegalArgumentException failed) {
+        } catch (IllegalArgumentException malformed) {
+            return Optional.empty();
+        }
+        CompletableFuture<HttpResponse<byte[]>> download = client.sendAsync(request, info ->
+                info.statusCode() >= 200 && info.statusCode() < 300
+                        ? new CappedBody(Bala.MAX_ARCHIVE_BYTES)
+                        : HttpResponse.BodySubscribers.replacing(null));
+        try {
+            return Optional.ofNullable(download.get(timeoutMs, TimeUnit.MILLISECONDS).body())
+                    .map(ByteArrayInputStream::new);
+        } catch (TimeoutException | ExecutionException failed) {
             return Optional.empty();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return Optional.empty();
+        } finally {
+            download.cancel(true);
         }
     }
 
     /**
-     * A response body that stops answering at a deadline. The request timeout covers only the wait for headers; a
-     * server trickling a large body would otherwise hold the command for as long as it liked.
+     * A body collected whole, up to {@code limit} bytes; a body past the limit is {@code null}. Waiting on a
+     * complete body is what lets the caller's deadline bound the transfer: a stream handed out early would leave a
+     * stalled server holding a {@code read()} no timeout reaches.
      */
-    private static final class DeadlineStream extends FilterInputStream {
+    private static final class CappedBody implements HttpResponse.BodySubscriber<byte[]> {
 
-        private final long deadline;
+        private final CompletableFuture<byte[]> body = new CompletableFuture<>();
+        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        private final long limit;
+        private Flow.Subscription subscription;
 
-        DeadlineStream(InputStream body, long deadline) {
-            super(body);
-            this.deadline = deadline;
+        CappedBody(long limit) {
+            this.limit = limit;
         }
 
-        private void check() throws IOException {
-            if (System.nanoTime() - deadline > 0) {
-                throw new IOException("download timed out");
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+            subscription.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> items) {
+            for (ByteBuffer item : items) {
+                if (body.isDone()) {
+                    return;
+                }
+                if (buffer.size() + (long) item.remaining() > limit) {
+                    if (subscription != null) {
+                        subscription.cancel();
+                    }
+                    body.complete(null);
+                    return;
+                }
+                byte[] chunk = new byte[item.remaining()];
+                item.get(chunk);
+                buffer.write(chunk, 0, chunk.length);
             }
         }
 
         @Override
-        public int read() throws IOException {
-            check();
-            return super.read();
+        public void onError(Throwable failure) {
+            body.completeExceptionally(failure);
         }
 
         @Override
-        public int read(byte[] buffer, int offset, int length) throws IOException {
-            check();
-            return super.read(buffer, offset, length);
+        public void onComplete() {
+            body.complete(buffer.toByteArray());
+        }
+
+        @Override
+        public CompletionStage<byte[]> getBody() {
+            return body;
         }
     }
 
