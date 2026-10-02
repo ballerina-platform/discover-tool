@@ -50,12 +50,19 @@ import java.util.concurrent.TimeoutException;
 public final class JdkHttpTransport implements HttpTransport {
 
     private final HttpClient client;
+    private final long archiveLimit;
 
     public JdkHttpTransport() {
+        this(Bala.MAX_ARCHIVE_BYTES);
+    }
+
+    /** A transport refusing any download past {@code archiveLimit} bytes. */
+    JdkHttpTransport(long archiveLimit) {
         this.client = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
+        this.archiveLimit = archiveLimit;
     }
 
     @Override
@@ -98,8 +105,9 @@ public final class JdkHttpTransport implements HttpTransport {
         }
         CompletableFuture<HttpResponse<byte[]>> download = client.sendAsync(request, info ->
                 info.statusCode() >= 200 && info.statusCode() < 300
-                        ? new CappedBody(Bala.MAX_ARCHIVE_BYTES)
-                        : HttpResponse.BodySubscribers.replacing(null));
+                        && info.headers().firstValueAsLong("content-length").orElse(0) <= archiveLimit
+                        ? new CappedBody(archiveLimit)
+                        : new NoBody());
         try {
             return Optional.ofNullable(download.get(timeoutMs, TimeUnit.MILLISECONDS).body())
                     .map(ByteArrayInputStream::new);
@@ -148,9 +156,13 @@ public final class JdkHttpTransport implements HttpTransport {
                     body.complete(null);
                     return;
                 }
-                byte[] chunk = new byte[item.remaining()];
-                item.get(chunk);
-                buffer.write(chunk, 0, chunk.length);
+                if (item.hasArray()) {
+                    buffer.write(item.array(), item.arrayOffset() + item.position(), item.remaining());
+                } else {
+                    byte[] chunk = new byte[item.remaining()];
+                    item.get(chunk);
+                    buffer.write(chunk, 0, chunk.length);
+                }
             }
         }
 
@@ -167,6 +179,32 @@ public final class JdkHttpTransport implements HttpTransport {
         @Override
         public CompletionStage<byte[]> getBody() {
             return body;
+        }
+    }
+
+    /** A body refused unread: an error status, or a {@code Content-Length} already past the limit. */
+    private static final class NoBody implements HttpResponse.BodySubscriber<byte[]> {
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            subscription.cancel();
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> items) {
+        }
+
+        @Override
+        public void onError(Throwable failure) {
+        }
+
+        @Override
+        public void onComplete() {
+        }
+
+        @Override
+        public CompletionStage<byte[]> getBody() {
+            return CompletableFuture.completedFuture(null);
         }
     }
 
