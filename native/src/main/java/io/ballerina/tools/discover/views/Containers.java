@@ -531,17 +531,26 @@ public final class Containers {
 
     /**
      * The command that opens another module's service type in its own package, or empty when that package is not
-     * known. Unpinned, as every command this tool prints is. A module of THIS package — a sibling of the one being
-     * read — is reached through {@code --module}; an undotted module path is its package's default module, so it
-     * is the package coordinate as written. Another package's dotted module path names no package boundary, and a
-     * command guessing one would not be ready to run.
+     * known. Unpinned, as every command this tool prints is. A module of THIS package — its default module, or a
+     * submodule its payload lists, read from a sibling — is reached through {@code --module} or none; a name that
+     * merely starts with this package's is not enough, since {@code postgresql.driver} is a package of its own.
+     * An undotted module path is its package's default module, so it is the package coordinate as written.
+     * Another package's dotted module path names no package boundary, and a command guessing one would not be
+     * ready to run.
      */
     private static Optional<String> foreignCommand(LoadedPackage loaded, Service service) {
         ModuleRef module = service.declaredIn().orElseThrow();
         QualifiedName pkg = loaded.qualified();
+        boolean sameOrg = module.orgName().equals(pkg.org());
+        String sibling = sameOrg && module.moduleName().startsWith(pkg.name() + ".")
+                ? module.moduleName().substring(pkg.name().length() + 1)
+                : null;
         String target;
-        if (module.orgName().equals(pkg.org()) && module.moduleName().startsWith(pkg.name() + ".")) {
-            target = pkg.qualified() + " --module " + module.moduleName().substring(pkg.name().length() + 1);
+        if (sameOrg && module.moduleName().equals(pkg.name())) {
+            target = pkg.qualified();
+        } else if (sibling != null
+                && loaded.submodules().stream().anyMatch(submodule -> submodule.name().equals(sibling))) {
+            target = pkg.qualified() + " --module " + sibling;
         } else if (!module.moduleName().contains(".")) {
             target = module.coordinate();
         } else {
