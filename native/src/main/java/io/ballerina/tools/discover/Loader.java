@@ -238,7 +238,7 @@ public final class Loader {
         String submodule = options.module();
         CentralDocs docs = fetched.docs();
         CentralClient.ResolvedVersion resolved = fetched.resolved();
-        Result<CentralDocs.Module> module = FromCentral.selectModule(docs, qualified, submodule);
+        Result<CentralDocs.Module> module = FromCentral.selectModule(docs, qualified, submodule, resolved.version());
         if (!module.isOk()) {
             return module.cast();
         }

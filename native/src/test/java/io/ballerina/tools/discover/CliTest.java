@@ -98,6 +98,10 @@ public class CliTest {
 
     private static final String GRAPHQL_VERSION = "1.17.0";
 
+    private static final String SUBGRAPH_UNCONFIRMED = "Central's page for 'subgraph' at " + GRAPHQL_VERSION
+            + " cannot be confirmed as a submodule of this package. Drop --module for the default module, or pass "
+            + "another of the candidates.";
+
     /**
      * Central, replayed for ballerina/graphql from recorded pages only: the package's page, which carries its
      * default module alone and names the rest in {@code relatedModules}, and one page per submodule. Anything
@@ -864,14 +868,11 @@ public class CliTest {
                 options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 1, capture.stdout());
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
-        Assert.assertTrue(capture.field("suggestion")
-                .contains("could not be confirmed as a submodule of this package"), capture.stderr());
+        Assert.assertEquals(capture.field("suggestion"), SUBGRAPH_UNCONFIRMED, capture.stderr());
     }
 
     @Test
     public void aSubmoduleOfAnotherPackageSharingThePrefixIsNotTakenForThisPackages() {
-        // With org/a.b a package publishing c, `org/a --module b.c` reaches a.b's page: a non-default module whose
-        // package's default is a.b, not a.
         JsonObject page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").getAsJsonObject();
         JsonObject module = page.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject();
         for (JsonElement related : module.getAsJsonArray("relatedModules")) {
@@ -885,6 +886,27 @@ public class CliTest {
                 options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 1, capture.stdout());
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
+        Assert.assertEquals(capture.field("suggestion"), SUBGRAPH_UNCONFIRMED, capture.stderr());
+    }
+
+    @Test
+    public void aModulePagePublishedBeforeApiDocsVersionExistedIsStillRead() {
+        // graphql 1.8.0's pages carry only docsData and searchData, as a Dependencies.toml lock can still ask for.
+        JsonElement page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph-1.8.0");
+        Assert.assertFalse(page.getAsJsonObject().has("apiDocsVersion"));
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/ballerina/graphql.subgraph/1.8.0")) {
+                return FakeTransport.ok(page.toString());
+            }
+            return url.endsWith("/registry/packages/ballerina/graphql")
+                    ? FakeTransport.ok("[\"1.8.0\"]")
+                    : FakeTransport.status(404);
+        });
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+                options(transport));
+        Assert.assertEquals(exitCode, 0, capture.stderr());
+        Assert.assertTrue(capture.stdout().startsWith("{\"buckets\":"), capture.stdout());
     }
 
     @Test

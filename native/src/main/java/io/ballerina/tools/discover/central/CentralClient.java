@@ -541,7 +541,7 @@ public final class CentralClient {
             }
             return response.cast();
         }
-        if (!Coordinates.matchModule(response.value(), qualified, submodule, version)) {
+        if (!Coordinates.isModulePage(response.value(), qualified, submodule, version)) {
             return Result.err(noSuchModulePage(label, qualified, submodule));
         }
         Result<CentralDocs> parsed = Schema.parse(response.value(), label);

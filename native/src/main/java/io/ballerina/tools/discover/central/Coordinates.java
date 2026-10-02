@@ -64,9 +64,29 @@ public final class Coordinates {
     }
 
     /**
+     * May a cached payload stand in for the {@code submodule} module page of this package version?
+     *
+     * <p>The cache-side rule, exactly as {@link #match} is for a package's page: a stored entry must carry an
+     * {@code apiDocsVersion} as well as {@link #isModulePage}'s coordinates, so a partially written or foreign file
+     * is a miss.
+     */
+    public static boolean matchModule(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
+        if (raw == null || !raw.isJsonObject()) {
+            return false;
+        }
+        String apiDocsVersion = Json.string(raw.getAsJsonObject(), "apiDocsVersion");
+        return apiDocsVersion != null && !apiDocsVersion.isEmpty()
+                && isModulePage(raw, qualified, submodule, version);
+    }
+
+    /**
      * Does this payload describe the {@code submodule} module page of this package version?
      *
-     * <p>The mirror image of {@link #match} plus {@link #describesSubmodule}: the page answering
+     * <p>The live-side rule. Like a package's page off the wire, which is accepted unless it is a submodule's
+     * ({@link #describesSubmodule}), it asks nothing of {@code apiDocsVersion}: pages Central published before it
+     * existed ({@code ballerina/graphql.subgraph} 1.8.0) carry only {@code docsData} and {@code searchData}.
+     *
+     * <p>The page answering
      * {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact module, at that version, flagged as
      * NOT its package's default, and naming THIS package's default module among its {@code relatedModules}. The
      * flag tells a submodule apart from a separately published package that shares the dotted name
@@ -75,14 +95,7 @@ public final class Coordinates {
      * shares the prefix: with {@code org/a.b} a package publishing {@code c}, {@code org/a --module b.c} reaches
      * {@code a.b}'s page, whose default module is {@code a.b}, not {@code a}.
      */
-    public static boolean matchModule(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
-        if (raw == null || !raw.isJsonObject()) {
-            return false;
-        }
-        String apiDocsVersion = Json.string(raw.getAsJsonObject(), "apiDocsVersion");
-        if (apiDocsVersion == null || apiDocsVersion.isEmpty()) {
-            return false;
-        }
+    public static boolean isModulePage(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
         String id = qualified.name() + "." + submodule;
         for (JsonObject module : modules(raw)) {
             if (id.equals(Json.string(module, "id"))
