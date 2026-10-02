@@ -546,7 +546,7 @@ and caching is off when none of them is usable.
 
 ## Installing it
 
-Once released, install it from Ballerina Central:
+Install it from Ballerina Central:
 
 ```bash
 bal tool pull discover
