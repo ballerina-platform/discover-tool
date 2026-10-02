@@ -891,7 +891,8 @@ public class CliTest {
 
     @Test
     public void aModulePagePublishedBeforeApiDocsVersionExistedIsStillRead() {
-        // graphql 1.8.0's pages carry only docsData and searchData, as a Dependencies.toml lock can still ask for.
+        // graphql 1.8.0's pages carry only docsData and searchData, and a Dependencies.toml lock can still name
+        // that version.
         JsonElement page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph-1.8.0");
         Assert.assertFalse(page.getAsJsonObject().has("apiDocsVersion"));
         FakeTransport transport = FakeTransport.routing(url -> {

@@ -135,7 +135,7 @@ public class FromCentralTest {
         CentralDocs page = Schema.parse(FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader"), "page")
                 .value();
         Result<CentralDocs.Module> selected =
-                FromCentral.selectModule(page, qualified("ballerina/graphql"), "dataloader");
+                FromCentral.selectModule(page, qualified("ballerina/graphql"), "dataloader", null);
         Assert.assertTrue(selected.isOk());
         Assert.assertEquals(selected.value().id(), "graphql.dataloader");
     }
@@ -153,7 +153,7 @@ public class FromCentralTest {
     public void aModuleFlagThatNamesNoSubmoduleFailsWithEveryBareSubmoduleName() {
         CentralDocs docs = FixtureCorpus.loadFixture("ballerina__graphql");
         Result<CentralDocs.Module> selected =
-                FromCentral.selectModule(docs, qualified("ballerina/graphql"), "nosuch");
+                FromCentral.selectModule(docs, qualified("ballerina/graphql"), "nosuch", null);
         Assert.assertFalse(selected.isOk());
         Failure.SymbolNotFound failure = (Failure.SymbolNotFound) selected.failure();
         Assert.assertEquals(failure.requested(), List.of("nosuch"));
