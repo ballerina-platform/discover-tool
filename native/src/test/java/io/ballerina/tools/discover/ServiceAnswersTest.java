@@ -28,6 +28,7 @@ import io.ballerina.tools.discover.constructs.Node;
 import io.ballerina.tools.discover.constructs.Payload;
 import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.render.DiscoverResult;
+import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import org.testng.Assert;
@@ -147,24 +148,57 @@ public class ServiceAnswersTest {
     }
 
     @Test
-    public void anotherModulesServiceTypeAnswersToItsBareName() {
-        JsonObject answer = json(central("ballerinax__postgresql", false), "ballerinax/postgresql", "service",
-                "Service");
+    public void anotherPackagesDefaultModuleIsOpenedInThatPackage() {
+        HttpOptions http = central("ballerinax__postgresql", false);
+        JsonObject answer = json(http, "ballerinax/postgresql", "service", "Service");
         Assert.assertEquals(answer.get("container").getAsString(), "cdc:Service");
-        Assert.assertTrue(answer.get("note").getAsString().contains("bal discover ballerinax/cdc service Service"));
+        Assert.assertTrue(answer.get("note").getAsString()
+                .contains("declared in ballerinax/cdc — bal discover ballerinax/cdc service Service"));
+        JsonObject roster = json(http, "ballerinax/postgresql", "service");
+        Assert.assertTrue(roster.getAsJsonArray("containers").asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .anyMatch(container -> "cdc:Service".equals(container.get("name").getAsString())
+                        && "bal discover ballerinax/cdc service Service".equals(
+                                container.get("command").getAsString())), roster.toString());
     }
 
     @Test
     public void aSiblingModulesServiceTypeIsReachedThroughModule() {
-        Payload payload = Payload.pkg().with("listeners", Decl.listenerAttaching(
-                Node.external("test", "pkg.events", "Service"), "Listener"));
-        LoadedPackage loaded = new LoadedPackage(QualifiedName.parse("test/pkg").value(),
-                FixtureCorpus.FIXTURE_VERSION, Pipeline.build(payload.module()), Optional.empty(), null, List.of(),
-                null);
-        Result<DiscoverResult> answer =
-                Containers.render(loaded, Surface.Scope.SERVICE, new Containers.Options(List.of(), null, 1));
-        DiscoverResult.ContainerRoster roster = (DiscoverResult.ContainerRoster) answer.value();
-        Assert.assertEquals(roster.containers().get(0).command(),
+        LoadedPackage loaded = attaching(Node.external("test", "pkg.events", "Service"));
+        Assert.assertEquals(roster(loaded).containers().get(0).command(),
                 "bal discover test/pkg --module events service Service");
+        Assert.assertTrue(open(loaded, "events:Service").get("note").getAsString()
+                .contains("declared in test/pkg.events — bal discover test/pkg --module events service Service"));
+    }
+
+    @Test
+    public void anotherPackagesSubmoduleIsOpenedThroughItsLocalStub() {
+        LoadedPackage loaded = attaching(Node.external("other", "lib.events", "Service"));
+        String command = roster(loaded).containers().get(0).command();
+        Assert.assertEquals(command, "bal discover test/pkg service events:Service");
+
+        JsonObject answer = open(loaded, command.substring(command.lastIndexOf(' ') + 1));
+        Assert.assertEquals(answer.get("container").getAsString(), "events:Service");
+        String note = answer.get("note").getAsString();
+        Assert.assertTrue(note.endsWith("declared in other/lib.events"), note);
+        Assert.assertFalse(note.contains("bal discover"), note);
+    }
+
+    private static LoadedPackage attaching(Node serviceType) {
+        Payload payload = Payload.pkg().with("listeners", Decl.listenerAttaching(serviceType, "Listener"));
+        return new LoadedPackage(QualifiedName.parse("test/pkg").value(), FixtureCorpus.FIXTURE_VERSION,
+                Pipeline.build(payload.module()), Optional.empty(), null, List.of(), null);
+    }
+
+    private static DiscoverResult.ContainerRoster roster(LoadedPackage loaded) {
+        return (DiscoverResult.ContainerRoster) Containers.render(loaded, Surface.Scope.SERVICE,
+                new Containers.Options(List.of(), null, 1)).value();
+    }
+
+    private static JsonObject open(LoadedPackage loaded, String selector) {
+        Result<DiscoverResult> answer = Containers.render(loaded, Surface.Scope.SERVICE,
+                new Containers.Options(List.of(selector), null, 1));
+        Assert.assertTrue(answer.isOk(), selector);
+        return JsonParser.parseString(JsonRenderer.render(answer.value())).getAsJsonObject();
     }
 }
