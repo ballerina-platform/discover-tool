@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.model;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 
 import java.util.ArrayList;
@@ -756,6 +757,16 @@ public final class FromCentral {
      */
     public static Result<CentralDocs.Module> selectModule(
             CentralDocs docs, QualifiedName qualified, String submodule) {
+        return selectModule(docs, qualified, submodule, null);
+    }
+
+    /**
+     * {@link #selectModule(CentralDocs, QualifiedName, String)}, naming the version a failure is about.
+     *
+     * @param version the version {@code docs} was read at, or {@code null} when the caller has none to name
+     */
+    public static Result<CentralDocs.Module> selectModule(
+            CentralDocs docs, QualifiedName qualified, String submodule, Version version) {
         String wanted = submodule == null ? qualified.name() : qualified.name() + "." + submodule;
         for (CentralDocs.Module module : docs.modules()) {
             if (module.orgName().equals(qualified.org()) && module.id().equals(wanted)) {
@@ -763,7 +774,7 @@ public final class FromCentral {
             }
         }
         if (submodule != null) {
-            return Result.err(noSuchSubmodule(docs, qualified, submodule));
+            return Result.err(noSuchSubmodule(docs, qualified, submodule, version));
         }
         String returned = docs.modules().stream()
                 .map(module -> module.orgName() + "/" + module.id())
@@ -781,7 +792,8 @@ public final class FromCentral {
      * OTHER module's bare submodule name (the part after {@code org/name.}), which is exactly what
      * {@code --module} itself takes.
      */
-    private static Failure noSuchSubmodule(CentralDocs docs, QualifiedName qualified, String submodule) {
+    private static Failure noSuchSubmodule(
+            CentralDocs docs, QualifiedName qualified, String submodule, Version version) {
         String prefix = qualified.name() + ".";
         List<String> candidates = submodulesOf(docs, qualified).stream()
                 .map(module -> module.id().substring(prefix.length()))
@@ -790,9 +802,9 @@ public final class FromCentral {
         if (candidates.isEmpty()) {
             suggestion = "This package publishes no submodules at all. Drop --module.";
         } else if (candidates.contains(submodule)) {
-            suggestion = "This package lists '" + submodule + "' as a submodule, but Central's page for it could "
-                    + "not be confirmed as a submodule of this package. Try again with --refresh; the other "
-                    + "candidates are every submodule this package publishes.";
+            suggestion = "Central's page for '" + submodule + "'" + (version == null ? "" : " at " + version.text())
+                    + " cannot be confirmed as a submodule of this package. Drop --module for the default module, "
+                    + "or pass another of the candidates.";
         } else {
             suggestion = "No submodule answers to that. The candidates are every submodule this package "
                     + "publishes; pass one of them, or drop --module for the default one.";
@@ -805,8 +817,8 @@ public final class FromCentral {
      * the page's {@code relatedModules} names them. A page carries ONE module's declarations (a package's page its
      * default module, a module page that module alone), so its {@code relatedModules} is the only place the rest
      * of the package is listed; any page of the package lists the same set. The shared base
-     * {@link #noSuchSubmodule} and {@code Loader.submodulesOf} both filter down to their own shape from, so
-     * "which modules are this package's submodules" is computed in exactly one place.
+     * {@link #noSuchSubmodule} and {@code Loader.submodulesOf} both build on this, so "which modules are this
+     * package's submodules" is computed in exactly one place.
      */
     public static List<CentralDocs.RelatedModule> submodulesOf(CentralDocs docs, QualifiedName qualified) {
         String prefix = qualified.name() + ".";
