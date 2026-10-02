@@ -18,6 +18,8 @@
 
 package io.ballerina.tools.discover.render;
 
+import io.ballerina.tools.discover.Texts;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -114,8 +116,8 @@ public final class TextRenderer {
         }
         layout.warning(bucketList.warning());
         if (where.pkg() != null && !bucketList.buckets().isEmpty()) {
-            layout.next("bal discover " + where.pkg()
-                    + (where.module() == null ? "" : " --module " + where.module()) + " <bucket>");
+            layout.next("bal discover " + Texts.shellWord(where.pkg())
+                    + (where.module() == null ? "" : " --module " + Texts.shellWord(where.module())) + " <bucket>");
         }
     }
 
