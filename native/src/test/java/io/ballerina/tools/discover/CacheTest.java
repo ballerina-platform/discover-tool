@@ -776,13 +776,16 @@ public class CacheTest {
         HttpOptions http = options(transport, cache).build();
         List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
 
+        DocsCache.ModuleKey key = new DocsCache.ModuleKey(
+                CentralClient.REPOSITORY_ID, "ballerina", "graphql", "subgraph", "1.17.0");
+
         Assert.assertEquals(Cli.run(argv, new Capture().streams(), http), 0);
+        Assert.assertNotNull(cache.readModuleDocs(key), "the first run caches the module page");
         Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "--refresh"),
                 new Capture().streams(), http), 0);
         Assert.assertEquals(docs[0], 2, "--refresh must not answer from the cached module page");
-        DocsCache.ModuleKey key = new DocsCache.ModuleKey(
-                CentralClient.REPOSITORY_ID, "ballerina", "graphql", "subgraph", "1.17.0");
-        Assert.assertNotNull(cache.readModuleDocs(key), "the refetched page is cached again");
+        Assert.assertEquals(Cli.run(argv, new Capture().streams(), http), 0);
+        Assert.assertEquals(docs[0], 2, "the refetched page is cached again and answers the next run");
     }
 
     // -----------------------------------------------------------------------
