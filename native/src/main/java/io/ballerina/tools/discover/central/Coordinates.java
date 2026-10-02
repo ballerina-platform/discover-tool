@@ -73,12 +73,11 @@ public final class Coordinates {
      * <p>The mirror image of {@link #match} plus {@link #describesSubmodule}, for a cached entry and a page off the
      * wire alike: the page answering {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact
      * module, at that version, flagged as NOT its package's default, and naming THIS package's default module
-     * among its {@code relatedModules}. The
-     * flag tells a submodule apart from a separately published package that shares the dotted name
-     * ({@code ballerinax/aws.s3} is a package, not a module of {@code ballerinax/aws}), so here an absent flag is
-     * not good enough. The related default module tells it apart from a submodule of a DIFFERENT package that
-     * shares the prefix: with {@code org/a.b} a package publishing {@code c}, {@code org/a --module b.c} reaches
-     * {@code a.b}'s page, whose default module is {@code a.b}, not {@code a}.
+     * among its {@code relatedModules}. The flag tells a submodule apart from a separately published package that
+     * shares the dotted name ({@code ballerinax/aws.s3} is a package, not a module of {@code ballerinax/aws}), so
+     * here an absent flag is not good enough. The related default module tells it apart from a submodule of a
+     * DIFFERENT package that shares the prefix: with {@code org/a.b} a package publishing {@code c},
+     * {@code org/a --module b.c} reaches {@code a.b}'s page, whose default module is {@code a.b}, not {@code a}.
      */
     public static boolean isModulePage(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
         String id = qualified.name() + "." + submodule;
