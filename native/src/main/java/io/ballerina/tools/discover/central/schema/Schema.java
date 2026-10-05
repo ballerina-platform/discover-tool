@@ -114,15 +114,46 @@ public final class Schema {
                 cursor.bucket(json, path, "annotations", Schema::annotation),
                 cursor.bucket(json, path, "variables", Schema::variableDecl),
                 cursor.bucket(json, path, "configurables", Schema::variableDecl),
-                cursor.bucket(json, path, "relatedModules", Schema::relatedModule));
+                relatedModules(json));
     }
 
-    private static CentralDocs.RelatedModule relatedModule(Cursor cursor, JsonObject json, String path) {
-        return new CentralDocs.RelatedModule(
-                cursor.requiredString(json, path, "id"),
-                cursor.requiredString(json, path, "orgName"),
-                cursor.optionalString(json, path, "summary"),
-                cursor.flag(json, path, "isDefaultModule"));
+    /**
+     * The module's {@code relatedModules}, read leniently and never reported as drift.
+     *
+     * <p>Every page carries them, so a strict read would turn one reshaped entry into a failed lookup for every
+     * bucket — {@code client} included — and a failed parse is never cached, so every run would pay it again. They
+     * only list the package's other modules, so an entry without a string {@code id} and {@code orgName} is
+     * skipped, a summary that is not a string is dropped, and a flag that is not a boolean reads as unset: drift
+     * here can only shorten the submodule list.
+     */
+    private static List<CentralDocs.RelatedModule> relatedModules(JsonObject json) {
+        JsonElement related = json.get("relatedModules");
+        if (related == null || !related.isJsonArray()) {
+            return List.of();
+        }
+        List<CentralDocs.RelatedModule> modules = new ArrayList<>();
+        for (JsonElement entry : related.getAsJsonArray()) {
+            if (!entry.isJsonObject()) {
+                continue;
+            }
+            JsonObject module = entry.getAsJsonObject();
+            String id = string(module, "id");
+            String orgName = string(module, "orgName");
+            if (id != null && orgName != null) {
+                JsonElement isDefault = module.get("isDefaultModule");
+                modules.add(new CentralDocs.RelatedModule(id, orgName, Optional.ofNullable(string(module, "summary")),
+                        isDefault != null && isDefault.isJsonPrimitive()
+                                && isDefault.getAsJsonPrimitive().isBoolean() && isDefault.getAsBoolean()));
+            }
+        }
+        return List.copyOf(modules);
+    }
+
+    private static String string(JsonObject owner, String key) {
+        JsonElement value = owner.get(key);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+                ? value.getAsString()
+                : null;
     }
 
     private static CentralDocs.TypeNode typeNode(Cursor cursor, JsonObject json, String path) {
