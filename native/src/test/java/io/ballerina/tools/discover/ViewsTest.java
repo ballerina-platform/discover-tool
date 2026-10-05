@@ -26,7 +26,6 @@ import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
-import io.ballerina.tools.discover.views.TypeView;
 import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -748,78 +747,98 @@ public class ViewsTest {
     // The code register
     // -----------------------------------------------------------------------
 
+    private static DiscoverResult type(String slug, String... names) {
+        return result(Types.render(FixtureCorpus.loadedFixture(slug), new Types.Options(List.of(names), null, 1)),
+                "type " + List.of(names));
+    }
+
     @Test
-    public void theSubtypeChainIsWhatTheErrorDeclarationsAreFor() {
-        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        Result<String> view = TypeView.render(http, new TypeView.Options(
-                List.of("Error", "ClientRequestError", "SslError"), false));
-        Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
-        String document = view.value();
+    public void anErrorIsADeclarationOfKindErrorPrintedWithItsSubtypeChain() {
         // Unlearnable before the detail patch: all 56 rendered as `type X error;`.
-        Assert.assertTrue(document.contains(
-                "\npublic type ClientRequestError distinct (ApplicationResponseError & error<Detail>);\n"));
-        Assert.assertTrue(document.contains("\npublic type SslError distinct ClientError;\n"));
-        Assert.assertTrue(document.contains("\npublic type Error distinct error;\n"));
-        // The rule came here with the declarations, from an `overview` section that no longer exists;
-        // without the move it would simply have been deleted.
-        Assert.assertTrue(document.contains("// The subtype chain is what `is` tests against"), document);
-        // And it is not printed for a lookup that resolved no error, or it is noise on every other one.
-        Result<String> plain = TypeView.render(http, new TypeView.Options(List.of("Response"), false));
-        Assert.assertTrue(plain.isOk());
-        Assert.assertFalse(plain.value().contains("The subtype chain"), plain.value());
+        DiscoverResult.TypeDeclaration request =
+                as(DiscoverResult.TypeDeclaration.class, type("ballerina__http", "ClientRequestError"));
+        Assert.assertEquals(request.kind(), "error");
+        Assert.assertTrue(request.declaration().endsWith("public type ClientRequestError distinct "
+                + "(ApplicationResponseError & error<Detail>);"), request.declaration());
+        Assert.assertTrue(as(DiscoverResult.TypeDeclaration.class, type("ballerina__http", "SslError"))
+                .declaration().endsWith("public type SslError distinct ClientError;"));
+        Assert.assertEquals(as(DiscoverResult.TypeDeclaration.class, type("ballerina__http", "Error"))
+                .kind(), "error");
+        Assert.assertFalse(type("ballerina__http", "Response") instanceof DiscoverResult.TypeDeclaration,
+                "a class is routed to its bucket, never reported as a declaration");
     }
 
     @Test
-    public void typeSearchesTheRosterAndNamesWhatItWillNotPrint() {
-        // A bare `type <pkg>` must not become a second `api`, so it needs a name or a query. With a query the
-        // code register's own two-tier rule applies: surface matches are declarations, documentation-only ones are
-        // a `//` line of names, and over budget nothing is rendered and every match is named — which keeps "exit 0
-        // means stdout is complete" true where a truncated set of records would not.
-        Result<String> narrow = TypeView.render(FixtureCorpus.loadedFixture("ballerinax__kafka"),
-                new TypeView.Options(List.of(), "TopicPartition", false));
-        Assert.assertTrue(narrow.isOk(), narrow.isOk() ? "" : narrow.failure().describe());
-        Assert.assertTrue(narrow.value().contains("// Search: \"TopicPartition\" —"), narrow.value());
-        Assert.assertTrue(narrow.value().contains("public type TopicPartition record"), narrow.value());
+    public void typeFilterNarrowsTheRosterAndPagesWhatIsTooLongToShow() {
+        DiscoverResult.TypeRoster narrow = as(DiscoverResult.TypeRoster.class, result(
+                Types.render(FixtureCorpus.loadedFixture("ballerinax__kafka"),
+                        new Types.Options(List.of(), "TopicPartition", 1)), "type --filter"));
+        Assert.assertTrue(narrow.sections().stream().flatMap(section -> section.entries().stream())
+                .anyMatch(entry -> entry.name().equals("TopicPartition")), narrow.toString());
 
-        Result<String> wide = TypeView.render(FixtureCorpus.loadedFixture("ballerinax__github"),
-                new TypeView.Options(List.of(), "repo", false));
-        Assert.assertTrue(wide.isOk(), wide.isOk() ? "" : wide.failure().describe());
-        Assert.assertTrue(wide.value().contains("over the " + Texts.count(TypeView.MAX_SEARCH_BYTES)
-                + "-byte budget"), wide.value());
-        Assert.assertTrue(wide.value().contains("// Matched: "), wide.value());
-        Assert.assertFalse(wide.value().contains("public type "), "nothing is rendered over budget");
+        DiscoverResult.TypeRoster wide = as(DiscoverResult.TypeRoster.class, result(
+                Types.render(FixtureCorpus.loadedFixture("ballerinax__github"),
+                        new Types.Options(List.of(), "repo", 1)), "type --filter repo"));
+        Assert.assertEquals(wide.shown(), Containers.MAX_ENTRIES);
+        Assert.assertTrue(wide.total() > Containers.MAX_ENTRIES, "github has far more than one page of repo types");
+        Assert.assertNotNull(wide.paging());
+        Assert.assertEquals(wide.next(), "bal discover ballerinax/github type --filter repo --page 2");
     }
 
     @Test
-    public void aFooterNamesACollisionRatherThanClaimingTheLocalNameIsForeign() {
-        // SHEETS-03. `ProxyConfig` sat in a list headed "not included above" in an output that declares a
-        // `ProxyConfig` twelve lines earlier — two records, same name, same arity, different fields. The foreign
-        // entry has to stay, because the field line needs that import; what was missing is which is which. sheets
-        // has TWO such names, not the one the audit found.
-        Result<String> view = TypeView.render(
-                FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"),
-                new TypeView.Options(List.of("ConnectionConfig"), true));
-        Assert.assertTrue(view.isOk());
-        Assert.assertTrue(view.value().contains("public type ProxyConfig record {|"), view.value());
-        Assert.assertTrue(view.value().contains(
-                "//   note: OAuth2RefreshTokenGrantConfig, ProxyConfig above are this package's own "
-                        + "declarations of those names, not http's"), view.value());
+    public void aLeafNamesALocalDeclarationAndAForeignOneApartWhenTheyShareAName() {
+        // SHEETS-03. `ProxyConfig` is declared here AND by ballerina/http, two records with the same name and
+        // different fields. The foreign row stays, because the field line needs that import, and it carries its
+        // module, which is what tells the two apart.
+        DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerinax__googleapis.sheets", "ConnectionConfig"));
+        Assert.assertTrue(config.types().stream().anyMatch(each -> each.name().equals("ClientHttp1Settings")
+                && each.declaration().contains("ProxyConfig? proxy = ();")), config.types().toString());
+        Assert.assertTrue(config.foreign().stream().anyMatch(each -> each.name().equals("ProxyConfig")
+                && each.module().equals("ballerina/http")), config.foreign().toString());
     }
 
     @Test
-    public void aClientIsAddressableByNameLikeAnyOtherDeclaration() {
-        // SAP-09. `type ballerinax/sap Client` failed, asserting the package had no such declaration, and steered
-        // the reader to `ClientError` — in a package where the client is 1 of 4 things Central publishes. The name
-        // index was built from TypeDefs, and a client was not one.
-        LoadedPackage sap = FixtureCorpus.loadedFixture("ballerinax__sap");
-        Result<String> view = TypeView.render(sap, new TypeView.Options(List.of("Client"), false));
-        Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
-        Assert.assertTrue(view.value().contains("public isolated client class Client {"), view.value());
-        // Byte-identical to the same declaration inside the api document, which is the whole `type` contract — and
-        // the reason the separate client renderer is gone rather than kept in step by hand.
-        String api = FixtureCorpus.renderFixture("ballerinax__sap");
-        String declaration = view.value().substring(view.value().indexOf("# The `sap`"));
-        Assert.assertTrue(api.contains(declaration.strip()), declaration);
+    public void aForeignTypeCarriesTheModuleAndVersionItWasGeneratedAgainst() {
+        DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerinax__github", "ConnectionConfig"));
+        DiscoverResult.Foreign bearer = config.foreign().stream()
+                .filter(each -> each.name().equals("BearerTokenConfig")).findFirst().orElseThrow();
+        Assert.assertEquals(bearer.module(), "ballerina/http");
+        Assert.assertEquals(bearer.version(), "2.15.5");
+        Assert.assertEquals(bearer.command(), "bal discover ballerina/http type BearerTokenConfig");
+    }
+
+    @Test
+    public void aPredeclaredLanglibIsNeitherAnImportNorAnEdge() {
+        // GMAIL-01. `int:Signed32` needs no import, and the command for it would answer nothing.
+        DiscoverResult.TypeDeclaration profile = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerinax__googleapis.gmail", "Profile"));
+        Assert.assertTrue(profile.declaration().contains("int:Signed32 messagesTotal?;\n"), profile.declaration());
+        Assert.assertTrue(profile.foreign().stream().noneMatch(each -> each.module().contains("lang.int")),
+                profile.foreign().toString());
+    }
+
+    @Test
+    public void aClientIsRoutedToTheClientBucketAndAKindNoteSaysSo() {
+        // SAP-09. The name index must hold a client, since it is 1 of the 4 things that package publishes.
+        DiscoverResult routed = type("ballerinax__sap", "Client");
+        String note = routed instanceof DiscoverResult.MethodList methods ? methods.note()
+                : routed instanceof DiscoverResult.MixedListing mixed ? mixed.note() : null;
+        Assert.assertNotNull(note, routed.toString());
+        Assert.assertTrue(note.contains("'Client' is addressed by client"), note);
+        Assert.assertTrue(note.contains("bal discover ballerinax/sap client Client"), note);
+    }
+
+    @Test
+    public void typeTakesOneNameAndNoFilterBesideIt() {
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        Result<DiscoverResult> two = Types.render(http, new Types.Options(List.of("Error", "Response"), null, 1));
+        Assert.assertFalse(two.isOk());
+        Assert.assertTrue(two.failure() instanceof Failure.Validation, two.failure().describe());
+        Result<DiscoverResult> named = Types.render(http, new Types.Options(List.of("Error"), "x", 1));
+        Assert.assertFalse(named.isOk());
+        Assert.assertTrue(named.failure() instanceof Failure.Validation, named.failure().describe());
     }
 
     @Test
@@ -845,8 +864,8 @@ public class ViewsTest {
         Assert.assertTrue(api.contains("// maxActiveConnections = -1    # int"), "with its default and type");
         Assert.assertTrue(api.contains("[ballerina.http]"), "and the Config.toml table name");
         Assert.assertFalse(FixtureCorpus.renderFixture("ballerinax__slack").contains("--- Configurables ---"));
-        Result<String> byName = TypeView.render(FixtureCorpus.loadedFixture("ballerina__http"),
-                new TypeView.Options(List.of("maxActiveConnections"), false));
+        Result<DiscoverResult> byName = Types.render(FixtureCorpus.loadedFixture("ballerina__http"),
+                new Types.Options(List.of("maxActiveConnections"), null, 1));
         Assert.assertFalse(byName.isOk(), "a configurable is not a declaration `type` can resolve");
         // Eight of http's parameter defaults name a configurable, and their "not exported by this package" note
         // is TRUE.

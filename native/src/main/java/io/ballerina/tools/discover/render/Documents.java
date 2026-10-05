@@ -45,18 +45,6 @@ public final class Documents {
     }
 
     /**
-     * The opening comment of a code-register document: what was resolved, then what is wrong with it.
-     *
-     * <p>A version nobody verified says so in the document itself, where a comment is the only thing a
-     * Ballerina file can carry.
-     *
-     * @param warning {@code null} when there is nothing to warn about, and then no second line is written
-     */
-    public static String headerComment(String identity, String warning) {
-        return warning == null ? "// " + identity : "// " + identity + "\n// Warning: " + warning;
-    }
-
-    /**
      * Section order is the output's contract with the caller: types, clients, functions, listeners,
      * annotations. Reordering it was proposed and rejected — it moves every declaration in all nine
      * snapshots and does not solve the motivating case, since {@code ballerinax/github}'s client section is

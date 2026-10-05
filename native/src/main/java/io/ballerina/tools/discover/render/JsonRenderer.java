@@ -480,12 +480,6 @@ public final class JsonRenderer {
         }
     }
 
-    private static void addIfNotEmpty(JsonObject json, String field, List<String> values) {
-        if (!values.isEmpty()) {
-            json.add(field, strings(values));
-        }
-    }
-
     private static void addPaging(JsonObject json, DiscoverResult.Paging paging) {
         if (paging != null) {
             json.addProperty("page", paging.page());

@@ -18,10 +18,8 @@
 
 package io.ballerina.tools.discover.views;
 
-import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
-import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Param;
 import io.ballerina.tools.discover.model.RecordField;
 import io.ballerina.tools.discover.model.TypeDef;
@@ -33,48 +31,35 @@ import io.ballerina.tools.discover.symbols.Declarations;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * {@code -r} — the transitive type closure, from a declaration or from a signature.
+ * The transitive type closure a leaf inlines, from a declaration or from a signature.
  *
- * <p>This was {@code --deps} on {@code type} and nothing else, which made the one flow it exists for cost two
- * calls: find the operation, then read its return type. It now starts from a CALLABLE as well, and the difference
- * is bigger than one saved round trip. The real closure for github's cache DELETE includes
- * {@code ActionsDeleteActionsCacheByKeyQueries} — the included-record parameter whose FIELDS are the call's named
- * arguments — which is the fact an agent needs to write the call at all and which no signature line spells out.
+ * <p>Starting from a CALLABLE as well as from a declaration is what makes the common flow one call rather than two:
+ * the real closure for github's cache DELETE includes {@code ActionsDeleteActionsCacheByKeyQueries} — the
+ * included-record parameter whose FIELDS are the call's named arguments — which is the fact an agent needs to
+ * write the call at all and which no signature line spells out.
  *
- * <p><b>BREADTH-FIRST, AND BOUNDED.</b> The walk used to be depth-first and unbounded:
- * {@code type ballerina/http ClientConfiguration --deps} is 38 declarations, 505 lines, 24,183 bytes, handed back
- * whole. Breadth-first because a shallow field is likelier to be needed than a four-levels-deep one, so a budget
- * that truncates should truncate the far end. Every dropped name is NAMED rather than silently missing, which is
- * what keeps a truncated closure actionable: each one is a legal argument to {@code type}.
+ * <p><b>BREADTH-FIRST, AND BOUNDED.</b> {@code ballerina/http}'s {@code ClientConfiguration} is 38 declarations
+ * and 24,183 bytes unbounded. Breadth-first because a shallow field is likelier to be needed than a four-levels-deep
+ * one, so a budget that truncates should truncate the far end. Every dropped name is NAMED rather than silently
+ * missing, which keeps a truncated closure actionable: each one is a legal argument to {@code type}.
  *
  * <p><b>The roots are never dropped.</b> They are what was asked for, so they are charged before the budget is
  * consulted; a budget that could refuse the question is worse than a large answer.
  *
- * <p>Cross-package edges still stop at the package boundary and are NAMED rather than followed.
- * {@code ballerina/http:ConnectionConfig} has a local closure of one and fifteen external edges, so crossing would
- * hide a cold fetch per edge inside an answer the caller expects to be warm.
+ * <p>Cross-package edges stop at the package boundary: {@code ballerina/http:ConnectionConfig} has a local closure
+ * of one and fifteen external edges, so crossing would hide a cold fetch per edge inside an answer the caller
+ * expects to be warm. {@link Types} names them instead.
  *
  * @since 0.1.0
  */
 public final class Closure {
-
-    /**
-     * How many bytes of declarations a closure may print.
-     *
-     * <p>Sized against the measurement that motivated the bound rather than picked: {@code ClientConfiguration}'s
-     * unbounded closure is 24,183 bytes, and 20,000 is the same figure the container listings use, so a caller
-     * has one number to hold rather than three.
-     */
-    public static final int MAX_BYTES = 20_000;
 
     /**
      * How many bytes a LEAF's closure may print — the declarations inlined under one fully-resolved result,
@@ -89,18 +74,8 @@ public final class Closure {
     /** Identifiers inside a rendered type expression. Builtins fall out by not being declarations. */
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
-    private static final Pattern ALIAS_CHAR = Pattern.compile("[A-Za-z0-9_'.]");
-
     private Closure() {
     }
-
-    /**
-     * One reference to a declaration in another package, as written.
-     *
-     * @param prefix the module alias it was written under
-     * @param name the declaration's name
-     */
-    public record ExternalRef(String prefix, String name) { }
 
     /**
      * A closure: the declarations to print, in walk order, and the ones the budget left out.
@@ -212,7 +187,7 @@ public final class Closure {
     }
 
     private static void addLocalNames(TypeRef type, Declarations index, List<String> into) {
-        for (String token : partition(type.name()).local()) {
+        for (String token : localTokens(type.name())) {
             if (index.get(token) != null && !into.contains(token)) {
                 into.add(token);
             }
@@ -236,7 +211,7 @@ public final class Closure {
         }
         List<String> names = new ArrayList<>();
         for (TypeRef expression : expressionsOf(typeDef)) {
-            for (String token : partition(expression.name()).local()) {
+            for (String token : localTokens(expression.name())) {
                 if (index.get(token) != null && !names.contains(token)) {
                     names.add(token);
                 }
@@ -282,24 +257,14 @@ public final class Closure {
     }
 
     /**
-     * An expression's identifiers, split into same-package names and foreign ones.
+     * The same-package declarations an expression names.
      *
-     * @param local the identifiers that name a declaration in this package
-     * @param external the identifiers that name a declaration in another package
+     * <p>A token preceded by {@code :} is another module's, and a token followed by {@code :} is the module alias
+     * itself, so neither is local. Everything else is looked up by the caller, so builtins ({@code string},
+     * {@code map}, {@code anydata}) fall out for free by not being declarations.
      */
-    public record Partition(List<String> local, List<ExternalRef> external) { }
-
-    /**
-     * Split an expression's identifiers into same-package names and foreign ones.
-     *
-     * <p>A token preceded by {@code :} is foreign and a token followed by {@code :} is the module alias itself,
-     * which is how {@code http:Response} yields one external reference and no local one. Everything else is
-     * looked up by the caller, so builtins ({@code string}, {@code map}, {@code anydata}) fall out for free by not
-     * being declarations.
-     */
-    public static Partition partition(String expression) {
+    private static List<String> localTokens(String expression) {
         List<String> local = new ArrayList<>();
-        List<ExternalRef> external = new ArrayList<>();
         Matcher matcher = IDENTIFIER.matcher(expression);
         while (matcher.find()) {
             String token = matcher.group();
@@ -308,157 +273,10 @@ public final class Closure {
             char after = start + token.length() < expression.length()
                     ? expression.charAt(start + token.length())
                     : '\0';
-            if (after == ':') {
-                continue;
-            }
-            if (before == ':') {
-                int aliasEnd = start - 1;
-                int aliasStart = aliasEnd;
-                while (aliasStart > 0
-                        && ALIAS_CHAR.matcher(String.valueOf(expression.charAt(aliasStart - 1))).matches()) {
-                    aliasStart--;
-                }
-                external.add(new ExternalRef(expression.substring(aliasStart, aliasEnd), token));
-                continue;
-            }
-            local.add(token);
-        }
-        return new Partition(List.copyOf(local), List.copyOf(external));
-    }
-
-    // -----------------------------------------------------------------------
-    // The cross-package footer
-    // -----------------------------------------------------------------------
-
-    /** Every foreign name the printed declarations mention, keyed so each is named once. */
-    public static List<ExternalRef> externalRefs(List<String> names, Declarations index) {
-        Map<String, ExternalRef> external = new LinkedHashMap<>();
-        for (String name : names) {
-            TypeDef typeDef = index.get(name);
-            if (typeDef == null) {
-                continue;
-            }
-            for (TypeRef expression : expressionsOf(typeDef)) {
-                for (ExternalRef reference : partition(expression.name()).external()) {
-                    external.put(reference.prefix() + ":" + reference.name(), reference);
-                }
+            if (after != ':' && before != ':') {
+                local.add(token);
             }
         }
-        return List.copyOf(external.values());
-    }
-
-    /**
-     * Names from other packages, and the command that reads them.
-     *
-     * <p>A foreign reference is three facts — the import path, the CLI coordinate, and whether an
-     * import is needed at all. A {@code //} comment rather than prose because every document that carries this is
-     * the code register, where a comment annotates real declarations instead of impersonating them.
-     *
-     * <p>The version is PRINTED and no longer passed as an argument. It is printed because these signatures were
-     * generated against it and Central's latest may be a different one; it is not an argument because version
-     * resolution is internal now, and a project's {@code Dependencies.toml} already pins the far side of the edge
-     * — measured, {@code maintenance_api} imports 8 packages directly and locks 36.
-     */
-    public static String externalFooter(
-            List<ExternalRef> references, LoadedPackage loaded, Set<String> printed) {
-        if (references.isEmpty()) {
-            return null;
-        }
-        Map<String, ModuleRef> modules = modulesByPrefix(loaded);
-        Map<String, List<String>> byPrefix = new LinkedHashMap<>();
-        for (ExternalRef reference : references) {
-            ModuleRef module = modules.get(reference.prefix());
-            // A pre-declared module is not an edge to cross: nothing to import, and the follow-up command for it
-            // is a measured dead end (`type ballerina/lang.int Signed32` answers `// Unknown type: Signed32`).
-            if (module != null && module.isPredeclared()) {
-                continue;
-            }
-            byPrefix.computeIfAbsent(reference.prefix(), key -> new ArrayList<>()).add(reference.name());
-        }
-        if (byPrefix.isEmpty()) {
-            return null;
-        }
-
-        List<String> prefixes = new ArrayList<>(byPrefix.keySet());
-        prefixes.sort(Texts.LOCALE_ORDER);
-
-        List<String> lines = new ArrayList<>();
-        lines.add("// Declared in other modules, not included above:");
-        lines.add("// Run one of these verbatim. The version beside each name is what these signatures were "
-                + "generated against.");
-        for (String prefix : prefixes) {
-            List<String> names = new ArrayList<>(new LinkedHashSet<>(byPrefix.get(prefix)));
-            names.sort(String::compareTo);
-            lines.addAll(edgeLines(prefix, names, modules.get(prefix)));
-            // SHEETS-03. `ProxyConfig` appeared in a list headed "not included above" in an output that declares
-            // a `ProxyConfig` twelve lines earlier — two different records with the same name, the same arity and
-            // different fields. Dropping the foreign one would lose the import the field line needs; saying which
-            // is which is the fix, since the collision is the whole risk.
-            List<String> collisions = names.stream().filter(printed::contains).toList();
-            if (!collisions.isEmpty()) {
-                boolean one = collisions.size() == 1;
-                lines.add("//   note: " + String.join(", ", collisions)
-                        + (one ? " above is this package's own declaration of that name"
-                               : " above are this package's own declarations of those names")
-                        + ", not " + prefix + "'s");
-            }
-        }
-        return String.join("\n", lines);
-    }
-
-    /**
-     * One edge: where the names live, and the command that reads them.
-     *
-     * <p>With no module resolved there is no command to offer, and the line says so instead of printing the alias
-     * where a coordinate belongs — which is how {@code bal discover type http Response} came to be printed, a
-     * command that fails.
-     */
-    private static List<String> edgeLines(String prefix, List<String> names, ModuleRef module) {
-        String joined = String.join(", ", names);
-        if (module == null) {
-            return List.of("//   " + joined + "  <-  " + prefix
-                    + "  (module unknown: Central published no coordinate for this reference)");
-        }
-        String version = module.pinnedVersion().map(pinned -> " " + pinned).orElse("");
-        return List.of(
-                "//   " + joined + "  <-  " + module.coordinate() + version,
-                "//   bal discover type " + module.coordinate() + " " + String.join(" ", names) + " -r");
-    }
-
-    /**
-     * Alias → module, recovered from the links the same payload published elsewhere.
-     *
-     * <p>The alias is all Central gives at a USE site, so the module it stands for comes from the declarations.
-     * Keyed on the module's own prefix so the footer's {@code <-} mapping cannot disagree with the prefix the
-     * signatures were printed with.
-     */
-    private static Map<String, ModuleRef> modulesByPrefix(LoadedPackage loaded) {
-        Map<String, ModuleRef> modules = new LinkedHashMap<>();
-        for (TypeDef typeDef : loaded.library().addressable()) {
-            for (TypeRef expression : expressionsOf(typeDef)) {
-                for (TypeRef.Link link : expression.links()) {
-                    if (link instanceof TypeRef.Link.External ext) {
-                        modules.put(ext.module().prefix(), ext.module());
-                    }
-                }
-            }
-        }
-        return modules;
-    }
-
-    /**
-     * The omission list, as the code register writes it.
-     *
-     * <p>Named rather than counted, because a name is a legal {@code type} argument and a count is not. The
-     * marker is {@code //} — the tool's own voice — where {@code #} would be the package's doc comment.
-     */
-    public static String omissionComment(List<String> omitted) {
-        if (omitted.isEmpty()) {
-            return null;
-        }
-        return "// " + Texts.count(omitted.size()) + " more type" + (omitted.size() == 1 ? "" : "s")
-                + " reached at the " + Texts.count(MAX_BYTES) + "-byte budget and not printed: "
-                + String.join(", ", omitted) + "\n"
-                + "// Ask for any of them directly — each is a name `bal discover type` takes.";
+        return List.copyOf(local);
     }
 }
