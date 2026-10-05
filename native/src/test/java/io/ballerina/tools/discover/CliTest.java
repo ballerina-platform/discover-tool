@@ -383,7 +383,7 @@ public class CliTest {
         Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka · funcs\n"
                         + "This package declares nothing in funcs.\n\n"
                         + "Elsewhere\n"
-                        + "  client   3  bal discover ballerinax/kafka client\n"),
+                        + "  client    3  bal discover ballerinax/kafka client\n"),
                 text.stdout());
     }
 
@@ -623,7 +623,7 @@ public class CliTest {
         Assert.assertEquals(transport.urls(), List.of(
                 CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
                 CentralClient.CENTRAL_BASE_URL + "docs/ballerina/graphql.dataloader/" + GRAPHQL_VERSION));
-        Assert.assertTrue(capture.stdout().contains("\"buckets\":[\"class\"]"), capture.stdout());
+        Assert.assertTrue(capture.stdout().contains("\"buckets\":[\"class\",\"type\"]"), capture.stdout());
     }
 
     @Test
@@ -993,11 +993,12 @@ public class CliTest {
 
     private static final String KAFKA_BUCKETS = String.join("\n",
             "ballerinax/kafka",
-            "4 buckets",
+            "5 buckets",
             "",
             "  client",
             "  service",
             "  class",
+            "  type",
             "  readme",
             "",
             "Next: bal discover ballerinax/kafka <bucket>",

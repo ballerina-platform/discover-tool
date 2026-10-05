@@ -55,6 +55,8 @@ public final class JsonRenderer {
             case DiscoverResult.NoMatch noMatch -> noMatch(noMatch);
             case DiscoverResult.Owners owners -> owners(owners);
             case DiscoverResult.EmptyBucket empty -> emptyBucket(empty);
+            case DiscoverResult.TypeRoster roster -> typeRoster(roster);
+            case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(declaration);
         };
     }
 
@@ -396,6 +398,63 @@ public final class JsonRenderer {
         json.add("elsewhere", elsewhere);
         addIfPresent(json, "warning", empty.warning());
         return json;
+    }
+
+    private static JsonObject typeRoster(DiscoverResult.TypeRoster roster) {
+        JsonObject json = new JsonObject();
+        JsonObject sections = new JsonObject();
+        roster.sections().forEach(section -> sections.add(section.kind(), methods(section.entries())));
+        json.add("sections", sections);
+        JsonObject counts = new JsonObject();
+        roster.counts().forEach((kind, count) -> addIfPositive(counts, kind, count));
+        json.add("counts", counts);
+        json.addProperty("shown", roster.shown());
+        json.addProperty("total", roster.total());
+        addPaging(json, roster.paging());
+        addIfPresent(json, "next", roster.next());
+        addDocumented(json, roster.documented());
+        addNotices(json, roster.warning(), roster.note());
+        return json;
+    }
+
+    private static JsonObject typeDeclaration(DiscoverResult.TypeDeclaration declaration) {
+        JsonObject json = new JsonObject();
+        json.addProperty("name", declaration.name());
+        json.addProperty("kind", declaration.kind());
+        json.addProperty("declaration", declaration.declaration());
+        json.add("types", types(declaration.types()));
+        if (!declaration.omitted().isEmpty()) {
+            json.add("omitted", methods(declaration.omitted()));
+        }
+        if (!declaration.foreign().isEmpty()) {
+            json.add("foreign", foreign(declaration.foreign()));
+        }
+        addNotices(json, declaration.warning(), declaration.note());
+        return json;
+    }
+
+    private static JsonArray types(List<DiscoverResult.Signature.Type> types) {
+        JsonArray array = new JsonArray();
+        for (DiscoverResult.Signature.Type type : types) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", type.name());
+            entry.addProperty("declaration", type.declaration());
+            array.add(entry);
+        }
+        return array;
+    }
+
+    private static JsonArray foreign(List<DiscoverResult.Foreign> foreign) {
+        JsonArray array = new JsonArray();
+        for (DiscoverResult.Foreign type : foreign) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", type.name());
+            entry.addProperty("module", type.module());
+            addIfPresent(entry, "version", type.version());
+            addIfPresent(entry, "command", type.command());
+            array.add(entry);
+        }
+        return array;
     }
 
     private static JsonArray strings(List<String> values) {

@@ -458,6 +458,59 @@ public sealed interface DiscoverResult {
     }
 
     /**
+     * One declaration from another package that a declaration names.
+     *
+     * @param name the declaration's name
+     * @param module the module that declares it, {@code org/module}
+     * @param version the version the answer was generated against, or {@code null} when Central published none
+     * @param command the command that opens it in its own package, or {@code null} when that package is not known
+     */
+    record Foreign(String name, String module, String version, String command) { }
+
+    /**
+     * The {@code type} bucket's roster: every declaration that is not a class, client or service type, grouped by
+     * kind, paged as one sequence in section order.
+     *
+     * @param sections the kinds with an entry on this page, in a fixed order
+     * @param counts how many of each kind the whole listing holds, every page included, keyed by kind
+     * @param shown how many entries across all sections are in this response
+     * @param total how many exist across all sections
+     * @param paging which page this is, or {@code null} when the whole listing fit on one
+     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
+     * @param documented entries a {@code --filter} matched only in their documentation, paged as the last section
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     * @param note the routing advisory when another bucket sent the caller here, or {@code null}
+     */
+    record TypeRoster(
+            List<Section> sections, Map<String, Integer> counts, int shown, int total, Paging paging, String next,
+            Documented documented, String warning, String note) implements DiscoverResult {
+
+        /**
+         * @param kind {@code records}, {@code enums}, {@code errors}, {@code aliases}, {@code constants},
+         *     {@code variables} or {@code annotations}
+         * @param entries the declarations of that kind on this page, alphabetical
+         */
+        public record Section(String kind, List<Method> entries) { }
+    }
+
+    /**
+     * One declaration of the {@code type} bucket, whole, with the declarations it names.
+     *
+     * @param name the declared name
+     * @param kind {@code record}, {@code enum}, {@code error}, {@code alias}, {@code constant}, {@code variable}
+     *     or {@code annotation}
+     * @param declaration the declaration, verbatim
+     * @param types the declarations it names, one level deep, within the closure budget
+     * @param omitted the names the closure budget left out of {@code types}, each with the command that opens it
+     * @param foreign the declarations it names that another package declares
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     * @param note the routing advisory when another bucket sent the caller here, or {@code null}
+     */
+    record TypeDeclaration(
+            String name, String kind, String declaration, List<Signature.Type> types, List<Method> omitted,
+            List<Foreign> foreign, String warning, String note) implements DiscoverResult { }
+
+    /**
      * A bucket this package declares nothing in, and the buckets that do hold its callable surface.
      *
      * @param bucket the bucket asked for

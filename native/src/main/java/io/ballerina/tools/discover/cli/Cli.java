@@ -31,6 +31,7 @@ import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
+import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
 
 import java.util.ArrayList;
@@ -179,6 +180,9 @@ public final class Cli {
             return Readme.render(loaded, new Readme.Options(
                     selectors.isEmpty() ? null : String.join(" ", selectors), filter, page));
         }
+        if ("type".equals(bucket)) {
+            return Types.render(loaded, new Types.Options(selectors, filter, page));
+        }
         Containers.Options options = new Containers.Options(selectors, filter, page);
         return switch (bucket) {
             case "client" -> Containers.render(loaded, Surface.Scope.CLIENT, options);
@@ -235,8 +239,11 @@ public final class Cli {
                 buckets.add(scope.verb());
             }
         }
-        // Not a Surface.Scope — it is not part of the callable surface at all — so it is appended here rather
-        // than found by the loop above, last, matching the RFC's own worked examples.
+        // Neither is a Surface.Scope — they are not part of the callable surface — so they are appended here
+        // rather than found by the loop above: `type`, then `readme` last, matching the RFC's worked examples.
+        if (Types.count(loaded) > 0) {
+            buckets.add("type");
+        }
         if (loaded.readme().isPresent()) {
             buckets.add("readme");
         }

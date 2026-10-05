@@ -27,6 +27,7 @@ import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
+import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -102,6 +103,14 @@ public class RegisterTest {
                 }
             }
         }
+        add(answers, "type", Types.render(context, new Types.Options(List.of(), null, 1)));
+        add(answers, "type --filter config", Types.render(context, new Types.Options(List.of(), "config", 1)));
+        if (answers.get(answers.size() - 2).result() instanceof DiscoverResult.TypeRoster roster) {
+            for (DiscoverResult.TypeRoster.Section section : roster.sections()) {
+                String name = section.entries().get(0).name();
+                add(answers, "type " + name, Types.render(context, new Types.Options(List.of(name), null, 1)));
+            }
+        }
         return answers;
     }
 
@@ -162,7 +171,8 @@ public class RegisterTest {
             Assert.assertFalse(Pattern.compile("^\\|.*\\|$", Pattern.MULTILINE).matcher(text).find(),
                     label + ": a Markdown table");
             Assert.assertFalse(Pattern.compile("^#{1,6} ", Pattern.MULTILINE).matcher(text).find()
-                            && !(answer.result() instanceof DiscoverResult.Signature),
+                            && !(answer.result() instanceof DiscoverResult.Signature
+                                    || answer.result() instanceof DiscoverResult.TypeDeclaration),
                     label + ": a Markdown heading");
             Assert.assertFalse(text.contains("\n\n\n"), label + ": a block was emitted empty");
             Assert.assertFalse(text.endsWith("\n"), label + ": the CLI adds the one trailing newline");

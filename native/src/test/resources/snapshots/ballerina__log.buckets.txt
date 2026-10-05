@@ -5,6 +5,7 @@ This package declares nothing in client.
 Elsewhere
   class   3  bal discover ballerina/log class
   funcs  11  bal discover ballerina/log funcs
+  type   22  bal discover ballerina/log type
 == service ==
 ballerina/log · service
 This package declares nothing in service.
@@ -12,6 +13,7 @@ This package declares nothing in service.
 Elsewhere
   class   3  bal discover ballerina/log class
   funcs  11  bal discover ballerina/log funcs
+  type   22  bal discover ballerina/log type
 == class ==
 ballerina/log · class
 3 classes
@@ -38,3 +40,42 @@ ballerina/log · funcs
   toMaskedString
 
 Next: bal discover ballerina/log funcs <name>
+== type ==
+ballerina/log · type
+8 records, 6 enums, 1 error, 5 aliases, 1 constant, 1 annotation
+
+Records
+  AnydataKeyValues
+  Config
+  FileOutputDestination
+  KeyValues
+  Replacement
+  RotationConfig
+  SensitiveConfig
+  StandardDestination
+
+Enums
+  DestinationType
+  FileOutputMode
+  FileWriteOption
+  Level
+  LogFormat
+  RotationPolicy
+
+Errors
+  Error
+
+Aliases
+  MaskingStrategy
+  OutputDestination
+  ReplacementFunction
+  Value
+  Valuer
+
+Constants
+  EXCLUDE
+
+Annotations
+  Sensitive
+
+Next: bal discover ballerina/log type <name>

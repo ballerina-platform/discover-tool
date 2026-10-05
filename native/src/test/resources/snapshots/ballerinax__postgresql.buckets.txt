@@ -75,3 +75,49 @@ Elsewhere
   client     1  bal discover ballerinax/postgresql client
   service    1  bal discover ballerinax/postgresql service
   class    125  bal discover ballerinax/postgresql class
+  type      36  bal discover ballerinax/postgresql type
+== type ==
+ballerinax/postgresql · type
+32 records, 4 enums
+
+Records
+  Box
+  CertKey
+  Circle
+  CustomValueRecord
+  CustomValues
+  DateRange
+  DateRecordRange
+  Enum
+  EnumRecord
+  ExtendedSnapshotConfiguration
+  IntegerRange
+  Interval
+  Line
+  LineSegment
+  LongRange
+  NumericRange
+  Options
+  Path
+  Point
+  Polygon
+  PostgresDatabaseConnection
+  PostgresListenerConfiguration
+  PostgreSqlOptions
+  PublicationConfiguration
+  Range
+  ReplicationConfiguration
+  SecureSocket
+  StreamingConfiguration
+  TimestampCivilRange
+  TimestampRange
+  TimestamptzCivilRange
+  TimestamptzRange
+
+Enums
+  LsnFlushMode
+  PostgreSQLLogicalDecodingPlugin
+  PublicationAutocreateMode
+  SSLMode
+
+Next: bal discover ballerinax/postgresql type <name>

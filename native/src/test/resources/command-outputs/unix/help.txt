@@ -11,9 +11,10 @@ Typical session:
   2. A bucket, listed or one:     bal discover ballerinax/github client
                                   bal discover ballerinax/github client Client
   3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
+  4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
 
-Buckets, addressed as the second positional: client, service, class, funcs, readme.
-No bucket lists which of them this package has.
+Buckets, addressed as the second positional: client, service, class, funcs, type,
+readme. No bucket lists which of them this package has.
 
   --refresh              Ignore any cached copy and rewrite it. Worth passing only
                          when a name should exist and does not.

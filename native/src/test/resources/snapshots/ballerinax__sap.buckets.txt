@@ -22,15 +22,28 @@ This package declares nothing in service.
 
 Elsewhere
   client  1  bal discover ballerinax/sap client
+  type    3  bal discover ballerinax/sap type
 == class ==
 ballerinax/sap · class
 This package declares nothing in class.
 
 Elsewhere
   client  1  bal discover ballerinax/sap client
+  type    3  bal discover ballerinax/sap type
 == funcs ==
 ballerinax/sap · funcs
 This package declares nothing in funcs.
 
 Elsewhere
   client  1  bal discover ballerinax/sap client
+  type    3  bal discover ballerinax/sap type
+== type ==
+ballerinax/sap · type
+3 aliases
+
+Aliases
+  ClientError
+  CSRFTokenFetchFailure
+  TargetType
+
+Next: bal discover ballerinax/sap type <name>

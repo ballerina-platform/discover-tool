@@ -46,16 +46,68 @@ ballerinax/github · service
 This package declares nothing in service.
 
 Elsewhere
-  client  1  bal discover ballerinax/github client
+  client     1  bal discover ballerinax/github client
+  type    1227  bal discover ballerinax/github type
 == class ==
 ballerinax/github · class
 This package declares nothing in class.
 
 Elsewhere
-  client  1  bal discover ballerinax/github client
+  client     1  bal discover ballerinax/github client
+  type    1227  bal discover ballerinax/github type
 == funcs ==
 ballerinax/github · funcs
 This package declares nothing in funcs.
 
 Elsewhere
-  client  1  bal discover ballerinax/github client
+  client     1  bal discover ballerinax/github client
+  type    1227  bal discover ballerinax/github type
+== type ==
+ballerinax/github · type
+1101 records, 126 aliases
+
+Records
+  AccessSelectedUsersBody
+  AccessSelectedUsersBody1
+  ActionsBillingUsage
+  ActionsBillingUsageMinutesUsedBreakdown
+  ActionsCacheList
+  ActionsCacheListActionsCaches
+  ActionsCacheUsageByRepository
+  ActionsCacheUsageByRepositoryResponse
+  ActionsCacheUsageOrgEnterprise
+  ActionsDeleteActionsCacheByKeyQueries
+  ActionsGetActionsCacheListQueries
+  ActionsGetActionsCacheUsageByRepoForOrgQueries
+  ActionsGetDefaultWorkflowPermissions
+  ActionsGetWorkflowRunAttemptQueries
+  ActionsGetWorkflowRunQueries
+  ActionsListArtifactsForRepoQueries
+  ActionsListEnvironmentSecretsQueries
+  ActionsListEnvironmentVariablesQueries
+  ActionsListJobsForWorkflowRunAttemptQueries
+  ActionsListJobsForWorkflowRunQueries
+  ActionsListOrgSecretsQueries
+  ActionsListOrgVariablesQueries
+  ActionsListRepoOrganizationSecretsQueries
+  ActionsListRepoOrganizationVariablesQueries
+  ActionsListRepoSecretsQueries
+  ActionsListRepoVariablesQueries
+  ActionsListRepoWorkflowsQueries
+  ActionsListSelectedReposForOrgSecretQueries
+  ActionsListSelectedReposForOrgVariableQueries
+  ActionsListSelectedRepositoriesEnabledGithubActionsOrganizationQueries
+  ActionsListSelfHostedRunnersForOrgQueries
+  ActionsListSelfHostedRunnersForRepoQueries
+  ActionsListWorkflowRunArtifactsQueries
+  ActionsListWorkflowRunsForRepoQueries
+  ActionsListWorkflowRunsQueries
+  ActionsOIDCSubjectCustomizationForARepository
+  ActionsOrganizationPermissions
+  ActionsPermissionsBody
+  ActionsPermissionsBody1
+  ActionsPublicKey
+
+... 1187 more (page 1 of 31)
+Next: bal discover ballerinax/github type <name>
+Next: bal discover ballerinax/github type --page 2

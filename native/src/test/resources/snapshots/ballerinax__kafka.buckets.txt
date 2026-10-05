@@ -27,6 +27,64 @@ ballerinax/kafka · funcs
 This package declares nothing in funcs.
 
 Elsewhere
-  client   3  bal discover ballerinax/kafka client
-  service  1  bal discover ballerinax/kafka service
-  class    4  bal discover ballerinax/kafka class
+  client    3  bal discover ballerinax/kafka client
+  service   1  bal discover ballerinax/kafka service
+  class     4  bal discover ballerinax/kafka class
+  type     58  bal discover ballerinax/kafka type
+== type ==
+ballerinax/kafka · type
+14 records, 3 enums, 3 errors, 8 aliases, 29 constants, 1 annotation
+
+Records
+  AnydataConsumerRecord
+  AnydataProducerRecord
+  AuthenticationConfiguration
+  BytesConsumerRecord
+  BytesProducerRecord
+  CertKey
+  ConsumerConfiguration
+  KafkaPayload
+  OffsetAndTimestamp
+  PartitionOffset
+  ProducerConfiguration
+  RecordMetadata
+  SecureSocket
+  TopicPartition
+
+Enums
+  DeserializerType
+  Protocol
+  SerializerType
+
+Errors
+  Error
+  PayloadBindingError
+  PayloadValidationError
+
+Aliases
+  AuthenticationMechanism
+  CompressionType
+  IsolationLevel
+  OffsetResetMethod
+  ProducerAcks
+  SecurityProtocol
+  TopicPartitionOffset
+  TopicPartitionTimestamp
+
+Constants
+  ACKS_ALL
+  ACKS_NONE
+  ACKS_SINGLE
+  AUTH_SASL_PLAIN
+  AUTH_SASL_SCRAM_SHA_256
+  AUTH_SASL_SCRAM_SHA_512
+  COMPRESSION_GZIP
+  COMPRESSION_LZ4
+  COMPRESSION_NONE
+  COMPRESSION_SNAPPY
+  COMPRESSION_ZSTD
+  DEFAULT_URL
+
+... 18 more (page 1 of 2)
+Next: bal discover ballerinax/kafka type <name>
+Next: bal discover ballerinax/kafka type --page 2
