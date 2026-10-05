@@ -222,13 +222,16 @@ public final class Loader {
 
     private static Result<Fetched> fetchSubmodule(QualifiedName qualified, LoadOptions options,
             Function<PackageRepository, Result<CentralClient.ResolvedVersion>> resolve) {
-        List<Resolved> withoutPage = new ArrayList<>();
+        List<Candidate> withoutPage = new ArrayList<>();
         Result<Fetched> last = null;
         Result<Fetched> otherFailure = null;
         for (PackageRepository repository : options.repositories()) {
             Result<CentralClient.ResolvedVersion> resolved = resolve.apply(repository);
             if (!resolved.isOk()) {
                 last = resolved.cast();
+                if (!(resolved.failure() instanceof Failure.PackageNotFound)) {
+                    otherFailure = last;
+                }
                 continue;
             }
             Result<CentralDocs> page =
@@ -238,26 +241,32 @@ public final class Loader {
             }
             last = page.cast();
             if (page.failure() instanceof Failure.PackageNotFound) {
-                withoutPage.add(new Resolved(repository, resolved.value()));
+                withoutPage.add(new Candidate(repository, resolved.value()));
             } else {
                 otherFailure = last;
             }
         }
-        if (otherFailure != null || withoutPage.isEmpty()) {
-            return otherFailure != null ? otherFailure : last;
+        if (otherFailure != null) {
+            return otherFailure;
         }
-        Result<Fetched> packagePage = null;
-        for (Resolved candidate : withoutPage) {
+        if (withoutPage.isEmpty()) {
+            return last;
+        }
+        Result<Fetched> notFound = null;
+        Result<Fetched> failed = null;
+        for (Candidate candidate : withoutPage) {
             Result<CentralDocs> docs =
                     candidate.repository().fetchDocs(qualified, candidate.resolved(), options.http());
-            packagePage = docs.isOk()
-                    ? Result.ok(new Fetched(candidate.repository(), candidate.resolved(), docs.value()))
-                    : docs.cast();
-            if (packagePage.isOk()) {
-                break;
+            if (docs.isOk()) {
+                return Result.ok(new Fetched(candidate.repository(), candidate.resolved(), docs.value()));
+            }
+            if (docs.failure() instanceof Failure.PackageNotFound) {
+                notFound = docs.cast();
+            } else {
+                failed = docs.cast();
             }
         }
-        return packagePage;
+        return failed != null ? failed : notFound;
     }
 
     /**
@@ -266,7 +275,7 @@ public final class Loader {
      * @param repository the repository
      * @param resolved the package version it resolved
      */
-    private record Resolved(PackageRepository repository, CentralClient.ResolvedVersion resolved) { }
+    private record Candidate(PackageRepository repository, CentralClient.ResolvedVersion resolved) { }
 
     /**
      * What one repository served, kept together so anything read later — the package source — comes from the
