@@ -984,7 +984,7 @@ public final class Containers {
                 : Types.omittedOf(loaded, closure);
         List<DiscoverResult.Foreign> foreign = closure == null
                 ? List.of()
-                : Types.foreignOf(loaded, closure.names().stream().map(index::get).toList());
+                : Types.foreignOf(loaded, closure, index, List.of());
 
         String kind = switch (fn) {
             case Fn.Resource ignored -> "resource";
@@ -1002,8 +1002,9 @@ public final class Containers {
                 fn instanceof Fn.Resource resource ? resource.accessor() : null,
                 fn instanceof Fn.Resource ? pathName(entry.path()) : null,
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
-                types, omitted, closure == null ? 0 : closure.omitted().size(), foreign, documentedOn(window, documented, 0), window.paging(), window.next(command),
-                loaded.warning(), mergeNotes(note, pathNote(container, selectors))));
+                types, omitted, closure == null ? 0 : closure.omitted().size(),
+                closure == null ? null : Types.omittedNext(loaded, closure), foreign,
+                documentedOn(window, documented, 0), window.paging(), window.next(command), loaded.warning(), mergeNotes(note, pathNote(container, selectors))));
     }
 
     /**

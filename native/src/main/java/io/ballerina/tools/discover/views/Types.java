@@ -38,6 +38,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -127,6 +128,7 @@ public final class Types {
     private static List<Entry> entries(Library library) {
         List<Entry> entries = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
+        Set<String> seenAnnotations = new LinkedHashSet<>();
         for (TypeDef typeDef : library.addressable()) {
             String kind = kindOf(typeDef);
             if (kind != null && seen.add(typeDef.name())) {
@@ -134,7 +136,7 @@ public final class Types {
             }
         }
         for (Library.AnnotationDef annotation : library.annotations()) {
-            if (seen.add(annotation.name())) {
+            if (seenAnnotations.add(annotation.name())) {
                 entries.add(new Entry("annotations", annotation.name(),
                         annotation.name() + " " + annotation.type().map(TypeRef::name).orElse("") + " "
                                 + annotation.attachmentPoints(),
@@ -241,21 +243,37 @@ public final class Types {
             return routed(loaded, object);
         }
         if (typeDef == null) {
-            Library.AnnotationDef annotation = library.annotations().stream()
-                    .filter(candidate -> candidate.name().equals(name)).findFirst().orElseThrow();
-            return Result.ok(new DiscoverResult.TypeDeclaration(name, "annotation",
-                    Documents.renderAnnotation(annotation), List.of(), List.of(), 0, List.of(), loaded.warning(),
-                    note));
+            return Result.ok(annotationLeaf(loaded, index, name, note));
         }
 
         Closure.Result closure = Closure.leaf(List.of(name), index);
+        String shadowed = annotationNamed(library, name)
+                .map(annotation -> "'" + name + "' is also an annotation: "
+                        + Documents.renderAnnotation(annotation).replace("\n", " "))
+                .orElse(null);
         List<DiscoverResult.Signature.Type> types = closure.types(index).stream()
                 .filter(type -> !type.name().equals(name))
                 .toList();
-        List<TypeDef> printed = closure.names().stream().map(index::get).toList();
         return Result.ok(new DiscoverResult.TypeDeclaration(name, singular(typeDef),
                 TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure), closure.omitted().size(),
-                foreignOf(loaded, printed), loaded.warning(), note));
+                omittedNext(loaded, closure), foreignOf(loaded, closure, index, List.of()), loaded.warning(),
+                note == null ? shadowed : shadowed == null ? note : note + " " + shadowed));
+    }
+
+    /** An annotation inlines the record its attachment must carry, like a signature inlines its parameters. */
+    private static DiscoverResult annotationLeaf(LoadedPackage loaded, Declarations index, String name, String note) {
+        Library.AnnotationDef annotation = annotationNamed(loaded.library(), name).orElseThrow();
+        List<String> roots = annotation.type().map(type -> Closure.rootsOf(type, index)).orElse(List.of());
+        Closure.Result closure = Closure.leaf(roots, index);
+        return new DiscoverResult.TypeDeclaration(name, "annotation", Documents.renderAnnotation(annotation),
+                closure.types(index), omittedOf(loaded, closure), closure.omitted().size(),
+                omittedNext(loaded, closure),
+                foreignOf(loaded, closure, index, annotation.type().map(List::of).orElse(List.of())),
+                loaded.warning(), note);
+    }
+
+    private static Optional<Library.AnnotationDef> annotationNamed(Library library, String name) {
+        return library.annotations().stream().filter(candidate -> candidate.name().equals(name)).findFirst();
     }
 
     private static String singular(TypeDef typeDef) {
@@ -303,6 +321,11 @@ public final class Types {
                 .toList();
     }
 
+    /** What reaches the names past the ceiling: the whole roster, which pages and takes {@code --filter}. */
+    static String omittedNext(LoadedPackage loaded, Closure.Result closure) {
+        return closure.omitted().size() > Containers.MAX_ENTRIES ? baseCommand(loaded) : null;
+    }
+
     /** The command that opens a name this package declares: its own bucket when it is a container. */
     private static String commandFor(LoadedPackage loaded, String name) {
         for (Surface.Scope scope : Surface.Scope.values()) {
@@ -314,24 +337,28 @@ public final class Types {
     }
 
     /**
-     * Every declaration another package owns that the printed declarations name, once each. A pre-declared module
-     * is not an edge to cross: nothing to import, and its follow-up command is a measured dead end.
+     * Every declaration another package owns that the printed declarations, and any {@code extra} expressions the
+     * caller itself names, mention, once each. A pre-declared module is not an edge to cross: nothing to import,
+     * and its follow-up command is a measured dead end.
      */
-    static List<DiscoverResult.Foreign> foreignOf(LoadedPackage loaded, List<TypeDef> printed) {
+    static List<DiscoverResult.Foreign> foreignOf(
+            LoadedPackage loaded, Closure.Result closure, Declarations index, List<TypeRef> extra) {
+        List<TypeRef> expressions = new ArrayList<>(extra);
+        for (String printed : closure.names()) {
+            expressions.addAll(Closure.expressionsOf(index.get(printed)));
+        }
         Map<String, DiscoverResult.Foreign> foreign = new LinkedHashMap<>();
-        for (TypeDef typeDef : printed) {
-            for (TypeRef expression : Closure.expressionsOf(typeDef)) {
-                for (TypeRef.Link link : expression.links()) {
-                    if (link instanceof TypeRef.Link.External external && !external.module().isPredeclared()) {
-                        ModuleRef module = external.module();
-                        foreign.computeIfAbsent(module.coordinate() + ":" + external.recordName(), key ->
-                                new DiscoverResult.Foreign(external.recordName(), module.coordinate(),
-                                        module.pinnedVersion().orElse(null),
-                                        loaded.argumentFor(module)
-                                                .map(target -> "bal discover " + target + " type "
-                                                        + Texts.shellWord(external.recordName()))
-                                                .orElse(null)));
-                    }
+        for (TypeRef expression : expressions) {
+            for (TypeRef.Link link : expression.links()) {
+                if (link instanceof TypeRef.Link.External external && !external.module().isPredeclared()) {
+                    ModuleRef module = external.module();
+                    foreign.computeIfAbsent(module.coordinate() + ":" + external.recordName(), key ->
+                            new DiscoverResult.Foreign(external.recordName(), module.coordinate(),
+                                    module.pinnedVersion().orElse(null),
+                                    loaded.argumentFor(module)
+                                            .map(target -> "bal discover " + target + " type "
+                                                    + Texts.shellWord(external.recordName()))
+                                            .orElse(null)));
                 }
             }
         }

@@ -304,7 +304,67 @@ Past the closure budget (40 of 48)
   ServiceUnavailable
 
 ... 8 more, narrow further
+Next: bal discover ballerina/http type
 Next: bal discover ballerina/http type <name>
+== ballerina__http type ResourceConfig ==
+ballerina/http · type · ResourceConfig
+
+# The annotation which is used to configure an HTTP resource.
+public annotation HttpResourceConfig ResourceConfig on object function;
+
+Types it names (5)
+  # Configuration for an HTTP resource.
+  public type HttpResourceConfig record {|
+      # The name of the resource
+      string name?;
+      # The media types which are accepted by resource
+      string[] consumes = [];
+      # The media types which are produced by resource
+      string[] produces = [];
+      # The cross origin resource sharing configurations for the resource. If not set, the resource will inherit the CORS behaviour of the enclosing service.
+      CorsConfig cors = {};
+      # Allow to participate in the distributed transactions if value is true
+      boolean transactionInfectable = true;
+      # Resource auth configurations
+      ListenerAuthConfig[]|Scopes auth?;
+      # The array of linked resources
+      LinkedTo[] linkedTo?;
+  |};
+
+  # Configurations for CORS support.
+  public type CorsConfig record {|
+      # The array of allowed headers by the service
+      string[] allowHeaders = [];
+      # The array of allowed methods by the service
+      string[] allowMethods = [];
+      # The array of origins with which the response is shared by the service
+      string[] allowOrigins = [];
+      # The allowlisted headers, which clients are allowed to access
+      string[] exposeHeaders = [];
+      # Specifies whether credentials are required to access the service
+      boolean allowCredentials = false;
+      # The maximum duration to cache the preflight from client side
+      decimal maxAge = -1;
+  |};
+
+  # Defines the authentication configurations for the HTTP listener.
+  public type ListenerAuthConfig FileUserStoreConfigWithScopes|LdapUserStoreConfigWithScopes|JwtValidatorConfigWithScopes|OAuth2IntrospectionConfigWithScopes;
+
+  # Represents the annotation used for authorization.
+  public type Scopes record {|
+      # Scopes allowed for authorization
+      string|string[] scopes;
+  |};
+
+  public type LinkedTo record {|
+      # Name of the linked resource
+      string name;
+      # Name of the relationship between the linked resource and the current resource.
+      # Defaulted to the IANA link relation `self`
+      string relation = "self";
+      # Method allowed in the linked resource
+      string method?;
+  |};
 == ballerina__http type Client ==
 ballerina/http · type · Client
 1 resource path, 15 remote methods, 4 normal methods

@@ -142,7 +142,7 @@ public class ViewsTest {
     public void curatedTypeLeavesAreUnchanged() {
         String[][] leaves = {
                 {"ballerina__http", "ClientConfiguration"}, {"ballerina__http", "ClientError"},
-                {"ballerina__http", "StatusCodeResponse"},
+                {"ballerina__http", "StatusCodeResponse"}, {"ballerina__http", "ResourceConfig"},
                 {"ballerina__http", "Client"}, {"ballerina__graphql", "ID"},
                 {"ballerinax__github", "ConnectionConfig"}, {"ballerinax__googleapis.sheets", "ConnectionConfig"},
                 {"ballerinax__kafka", "TopicPartitionOffset"}, {"ballerinax__kafka", "NoSuchType"}};
@@ -793,16 +793,24 @@ public class ViewsTest {
                 type("ballerina__http", "StatusCodeResponse"));
         Assert.assertEquals(status.omitted().size(), Containers.MAX_ENTRIES);
         Assert.assertEquals(status.omittedTotal(), 48);
-        Assert.assertTrue(JsonRenderer.render(status).contains("\"omittedTotal\":48"), JsonRenderer.render(status));
+        Assert.assertEquals(status.omittedNext(), "bal discover ballerina/http type");
+        com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(JsonRenderer.render(status))
+                .getAsJsonObject();
+        Assert.assertEquals(json.get("omittedTotal").getAsInt(), 48);
+        Assert.assertEquals(json.get("omittedNext").getAsString(), "bal discover ballerina/http type");
+        Assert.assertEquals(json.getAsJsonArray("omitted").size(), 40);
         String text = TextRenderer.render(status, new TextRenderer.Context(
                 http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null));
         Assert.assertTrue(text.contains("Past the closure budget (40 of 48)"), text);
-        Assert.assertTrue(text.contains("... 8 more, narrow further"), text);
+        Assert.assertTrue(text.contains("\n... 8 more, narrow further\nNext: bal discover ballerina/http type"), text);
+        Assert.assertEquals(text.lines().filter(line -> line.startsWith("Past the closure budget")).count(), 1L);
 
         DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
                 type("ballerina__http", "ClientError"));
         Assert.assertEquals(config.omittedTotal(), config.omitted().size());
+        Assert.assertNull(config.omittedNext());
         Assert.assertFalse(JsonRenderer.render(config).contains("omittedTotal"));
+        Assert.assertFalse(JsonRenderer.render(config).contains("omittedNext"));
     }
 
     @Test(dataProvider = "fixtures")
@@ -868,6 +876,68 @@ public class ViewsTest {
                 Surface.Scope.CLIENT, new Containers.Options(List.of("ProxyConfig"), "foo", 1));
         Assert.assertFalse(routed.isOk(), "the filter was silently ignored");
         Assert.assertTrue(routed.failure() instanceof Failure.Validation, routed.failure().describe());
+    }
+
+    @Test
+    public void anAnnotationInlinesTheRecordItsAttachmentMustCarry() {
+        DiscoverResult.TypeDeclaration payload = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerina__http", "Payload"));
+        Assert.assertEquals(payload.kind(), "annotation");
+        Assert.assertEquals(payload.declaration(), "# The annotation which is used to define the Payload resource "
+                + "signature parameter and return parameter.\npublic annotation HttpPayload Payload on parameter, "
+                + "return;");
+        Assert.assertEquals(payload.types().stream().map(DiscoverResult.Signature.Type::name).toList(),
+                List.of("HttpPayload"));
+        Assert.assertTrue(payload.types().get(0).declaration().contains("string|string[] mediaType?;"),
+                payload.types().get(0).declaration());
+        Assert.assertTrue(payload.omitted().isEmpty());
+        Assert.assertEquals(payload.omittedTotal(), 0);
+        Assert.assertTrue(payload.foreign().isEmpty());
+        Assert.assertNull(payload.note());
+
+        DiscoverResult.TypeDeclaration resource = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerina__http", "ResourceConfig"));
+        Assert.assertEquals(resource.types().stream().map(DiscoverResult.Signature.Type::name).toList(),
+                List.of("HttpResourceConfig", "CorsConfig", "ListenerAuthConfig", "Scopes", "LinkedTo"));
+    }
+
+    @Test
+    public void aMarkerAnnotationNamesNoRecord() {
+        DiscoverResult.TypeDeclaration marker = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerina__graphql", "ID"));
+        Assert.assertEquals(marker.declaration(), "# Represents the annotation of the ID type.\n"
+                + "public annotation ID on record field, parameter, return;");
+        Assert.assertTrue(marker.types().isEmpty());
+        Assert.assertTrue(marker.omitted().isEmpty());
+        Assert.assertTrue(marker.foreign().isEmpty());
+    }
+
+    @Test
+    public void anAnnotationSharingANameWithATypeIsListedBesideItAndNamedByTheTypesLeaf() {
+        LoadedPackage graphql = FixtureCorpus.loadedFixture("ballerina__graphql");
+        Library library = graphql.library();
+        List<io.ballerina.tools.discover.model.TypeDef> declarations =
+                new java.util.ArrayList<>(library.typeDefs());
+        declarations.add(new io.ballerina.tools.discover.model.TypeDef.Alias("ID", "A type.",
+                new io.ballerina.tools.discover.model.TypeRef("string", List.of())));
+        LoadedPackage shared = new LoadedPackage(graphql.qualified(), graphql.version(),
+                new Library(library.name(), library.description(), declarations, library.clients(),
+                        library.functions(), library.listeners(), library.services(), library.annotations(),
+                        library.configurables()),
+                graphql.readme(), graphql.module(), graphql.submodules(), graphql.warning());
+
+        Assert.assertEquals(Types.names(shared).stream().filter("ID"::equals).count(), 2L);
+        DiscoverResult.TypeRoster roster = as(DiscoverResult.TypeRoster.class, result(
+                Types.render(shared, new Types.Options(List.of(), null, 1)), "type"));
+        Assert.assertEquals(roster.counts().get("aliases").intValue(), 7);
+        Assert.assertEquals(roster.counts().get("annotations").intValue(), 4);
+
+        DiscoverResult.TypeDeclaration leaf = as(DiscoverResult.TypeDeclaration.class, result(
+                Types.render(shared, new Types.Options(List.of("ID"), null, 1)), "type ID"));
+        Assert.assertEquals(leaf.kind(), "alias");
+        Assert.assertEquals(leaf.declaration(), "# A type.\npublic type ID string;");
+        Assert.assertEquals(leaf.note(), "'ID' is also an annotation: # Represents the annotation of the ID type. "
+                + "public annotation ID on record field, parameter, return;");
     }
 
     @Test

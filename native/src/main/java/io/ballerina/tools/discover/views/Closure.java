@@ -186,6 +186,13 @@ public final class Closure {
         return List.copyOf(new LinkedHashSet<>(roots));
     }
 
+    /** The same-package declarations one type expression names, for a declaration that has no signature. */
+    public static List<String> rootsOf(TypeRef type, Declarations index) {
+        List<String> roots = new ArrayList<>();
+        addLocalNames(type, index, roots);
+        return List.copyOf(roots);
+    }
+
     private static void addLocalNames(TypeRef type, Declarations index, List<String> into) {
         for (String token : localTokens(type.name())) {
             if (index.get(token) != null && !into.contains(token)) {

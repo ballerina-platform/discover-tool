@@ -121,6 +121,20 @@ public class PointersTest {
         return answers;
     }
 
+    @Test
+    public void theCommandsPastAClosureCeilingRunAndAnswer() {
+        String slug = "ballerina__http";
+        LoadedPackage context = FixtureCorpus.loadedFixture(slug);
+        DiscoverResult.TypeDeclaration status = (DiscoverResult.TypeDeclaration) expect(
+                Types.render(context, new Types.Options(List.of("StatusCodeResponse"), null, 1)));
+        Assert.assertEquals(status.omittedNext(), "bal discover ballerina/http type");
+        JsonObject roster = run(slug, centralFor(slug), status.omittedNext());
+        Assert.assertEquals(roster.get("total").getAsInt(), Types.count(context));
+        Assert.assertTrue(roster.has("next"), roster.toString());
+        status.omitted().forEach(each -> Assert.assertEquals(
+                run(slug, centralFor(slug), each.command()).get("name").getAsString(), each.name()));
+    }
+
     /** The type roster, a filtered one, and a leaf for the first two declarations of every kind. */
     private static List<DiscoverResult> typeAnswers(LoadedPackage context) {
         List<DiscoverResult> answers = new ArrayList<>();
@@ -188,6 +202,7 @@ public class PointersTest {
             }
             case DiscoverResult.Signature signature -> {
                 signature.omitted().forEach(omitted -> commands.add(omitted.command()));
+                addIfPresent(commands, signature.omittedNext());
                 addForeign(commands, signature.foreign());
             }
             case DiscoverResult.MixedListing mixed -> {
@@ -216,6 +231,7 @@ public class PointersTest {
             }
             case DiscoverResult.TypeDeclaration declaration -> {
                 declaration.omitted().forEach(omitted -> commands.add(omitted.command()));
+                addIfPresent(commands, declaration.omittedNext());
                 addForeign(commands, declaration.foreign());
             }
         }
@@ -433,7 +449,8 @@ public class PointersTest {
                 if (field.getKey().equals("foreign")) {
                     continue;
                 }
-                if ((field.getKey().equals("command") || field.getKey().equals("next"))
+                if ((field.getKey().equals("command") || field.getKey().equals("next")
+                        || field.getKey().equals("omittedNext"))
                         && field.getValue().isJsonPrimitive()) {
                     into.add(field.getValue().getAsString());
                 } else if (field.getKey().equals("commands") && field.getValue().isJsonObject()) {
