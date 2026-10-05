@@ -171,13 +171,14 @@ public final class Coordinates {
 
     /**
      * The module names one version's registry row lists — {@code aws} and {@code aws.auth} for
-     * {@code ballerinax/aws} — or an empty list when the row is not the shape expected.
+     * {@code ballerinax/aws} — or empty when the row is not the shape expected, which says nothing about what the
+     * package publishes.
      */
-    static List<String> moduleNames(JsonElement raw) {
-        return objectsIn(raw, "modules").orElse(List.of()).stream()
+    static Optional<List<String>> moduleNames(JsonElement raw) {
+        return objectsIn(raw, "modules").map(modules -> modules.stream()
                 .map(module -> Json.string(module, "name"))
                 .filter(name -> name != null && !name.isEmpty())
-                .toList();
+                .toList());
     }
 
     /** The first entry of a versions array, or {@code null} if it is not a non-empty array of strings. */

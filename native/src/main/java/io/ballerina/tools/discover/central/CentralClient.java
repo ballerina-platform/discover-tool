@@ -302,6 +302,11 @@ public final class CentralClient {
                         + "`bal search <keyword>` lists what Central publishes.");
     }
 
+    /**
+     * The failure for a dotted name whose prefix is a package, worded by what that version's registry row says:
+     * the module is listed, it is not, or the row could not be read. Fetched through {@link #fetchJson}'s retries
+     * but not cached: it is asked only on this failure path, and the command it leads to never needs it again.
+     */
     private static Failure moduleOf(
             QualifiedName qualified, QualifiedName parent, Version version, HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
@@ -310,18 +315,21 @@ public final class CentralClient {
         String url = CENTRAL_BASE_URL + "registry/packages/" + encode(parent.org()) + "/" + encode(parent.name())
                 + "/" + encode(version.text());
         Result<JsonElement> response = fetchJson(url, options);
-        List<String> modules = response.isOk() ? Coordinates.moduleNames(response.value()) : List.of();
+        Optional<List<String>> listed = response.isOk() ? Coordinates.moduleNames(response.value()) : Optional.empty();
         String suggestion;
-        if (modules.contains(qualified.name())) {
+        if (listed.isEmpty()) {
+            suggestion = "'" + qualified.qualified() + "' is not a package, but " + parent.qualified()
+                    + " is, and Central could not say which modules it publishes. If '" + submodule
+                    + "' is one of them, read it with " + command + ".";
+        } else if (listed.get().contains(qualified.name())) {
             suggestion = "'" + qualified.qualified() + "' is not a package: it is the '" + submodule
                     + "' module of the " + parent.qualified() + " package. Read it with " + command + ".";
-        } else if (modules.isEmpty()) {
-            suggestion = "'" + qualified.qualified() + "' is not a package, but " + parent.qualified()
-                    + " is. If '" + submodule + "' is one of its modules, read it with " + command + ".";
         } else {
+            List<String> modules = listed.get();
             suggestion = "'" + qualified.qualified() + "' is not a package, and " + parent.qualified()
-                    + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
-                    + "). Check the name; `bal search <keyword>` lists what Central publishes.";
+                    + " publishes no '" + submodule + "' module"
+                    + (modules.isEmpty() ? "" : " (its modules are " + String.join(", ", modules) + ")")
+                    + ". Check the name; `bal search <keyword>` lists what Central publishes.";
         }
         return new Failure.PackageNotFound(qualified.qualified(), suggestion);
     }

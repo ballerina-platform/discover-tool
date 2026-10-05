@@ -353,8 +353,45 @@ public class ClientTest {
     public void aModuleListTheRegistryCannotServeStillOffersTheCommandWithoutClaimingTheModule() {
         FakeTransport transport = registry(Map.of("ballerinax/aws", "[\"1.0.1\"]"));
         String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
-        Assert.assertTrue(suggestion.contains("If 'auth' is one of its modules"), suggestion);
+        Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes. If 'auth' is one "
+                + "of them"), suggestion);
         Assert.assertTrue(suggestion.contains("`bal discover ballerinax/aws --module auth`"), suggestion);
+    }
+
+    @Test
+    public void aModuleListLostToTheTransportIsUnknownRatherThanEmpty() {
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (url.endsWith("/registry/packages/ballerinax/aws")) {
+                return FakeTransport.ok("[\"1.0.1\"]");
+            }
+            return url.endsWith("/registry/packages/ballerinax/aws/1.0.1")
+                    ? FakeTransport.status(503)
+                    : FakeTransport.status(404);
+        });
+        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal discover ballerinax/aws --module auth`"), suggestion);
+        // The row is retried like any other registry call before it is given up on.
+        Assert.assertEquals(transport.urls().stream().filter(url -> url.endsWith("/aws/1.0.1")).count(), 3);
+    }
+
+    @Test
+    public void aModuleListInAnUnexpectedShapeIsUnknownRatherThanEmpty() {
+        FakeTransport transport = registry(Map.of(
+                "ballerinax/aws", "[\"1.0.1\"]",
+                "ballerinax/aws/1.0.1", "{\"modules\":\"aws, aws.auth\"}"));
+        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
+    }
+
+    @Test
+    public void aModuleListThatIsReadButEmptyIsNotListedRatherThanUnknown() {
+        FakeTransport transport = registry(Map.of(
+                "ballerinax/aws", "[\"1.0.1\"]",
+                "ballerinax/aws/1.0.1", modules()));
+        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Assert.assertTrue(suggestion.contains("ballerinax/aws publishes no 'auth' module. Check the name"), suggestion);
+        Assert.assertFalse(suggestion.contains("--module"), suggestion);
     }
 
     @Test
