@@ -26,6 +26,7 @@ import io.ballerina.tools.discover.model.Param;
 import io.ballerina.tools.discover.model.RecordField;
 import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.model.TypeRef;
+import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.TypeDefs;
 import io.ballerina.tools.discover.symbols.Declarations;
 
@@ -75,6 +76,13 @@ public final class Closure {
      */
     public static final int MAX_BYTES = 20_000;
 
+    /**
+     * How many bytes a LEAF's closure may print — the declarations inlined under one fully-resolved result,
+     * whether a signature's or a declaration's own. It bounds a closure (how many types a result transitively
+     * names), unrelated to the entry ceiling on a listing.
+     */
+    public static final int LEAF_BYTES = 6_000;
+
     /** Every level. The depth argument exists for the one-level inlining a single-result view does. */
     public static final int UNBOUNDED = Integer.MAX_VALUE;
 
@@ -105,6 +113,22 @@ public final class Closure {
         public boolean truncated() {
             return !omitted.isEmpty();
         }
+
+        /** The printed declarations, in walk order. */
+        public List<DiscoverResult.Signature.Type> types(Declarations index) {
+            return names.stream()
+                    .map(name -> new DiscoverResult.Signature.Type(name, TypeDefs.renderTypeDef(index.get(name))))
+                    .toList();
+        }
+    }
+
+    /**
+     * The depth-1 closure a leaf inlines. An inclusion ({@code *T}) states that another record's fields ARE this
+     * one's, so it does not consume the depth: {@code ClientConfiguration}'s own field types would otherwise
+     * be hidden behind the records it includes.
+     */
+    public static Result leaf(List<String> roots, Declarations index) {
+        return of(roots, index, LEAF_BYTES, 1);
     }
 
     /**
@@ -134,6 +158,7 @@ public final class Closure {
             if (step.depth() >= maxDepth) {
                 continue;
             }
+            Set<String> included = inclusionsOf(index.get(step.name()));
             for (String referenced : localReferences(index.get(step.name()), index)) {
                 if (visited.contains(referenced)) {
                     continue;
@@ -146,7 +171,7 @@ public final class Closure {
                 visited.add(referenced);
                 spent += size;
                 order.add(referenced);
-                queue.add(new Step(referenced, step.depth() + 1));
+                queue.add(new Step(referenced, included.contains(referenced) ? step.depth() : step.depth() + 1));
             }
         }
         // A name reached late may also have been printed early on another branch; the omission list is what the
@@ -192,6 +217,16 @@ public final class Closure {
                 into.add(token);
             }
         }
+    }
+
+    private static Set<String> inclusionsOf(TypeDef typeDef) {
+        Set<String> names = new LinkedHashSet<>();
+        if (typeDef instanceof TypeDef.Rec record) {
+            record.fields().stream()
+                    .filter(field -> field.form() == RecordField.Form.INCLUSION)
+                    .forEach(field -> names.add(field.type().name()));
+        }
+        return names;
     }
 
     /** Every same-package declaration one declaration mentions. */

@@ -20,7 +20,6 @@ package io.ballerina.tools.discover.views;
 
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
-import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Bindings;
@@ -146,13 +145,6 @@ public final class Containers {
             return number < pages ? command + " --page " + (number + 1) : null;
         }
     }
-
-    /**
-     * How many bytes a type closure may take when inlined under a single fully-resolved result — {@link
-     * #signature}'s own budget, unrelated to the entry ceiling above: this bounds a CLOSURE (how many types a
-     * signature transitively names), not a LISTING (how many results a query matched).
-     */
-    public static final int MAX_CLOSURE_BYTES = 6_000;
 
     /**
      * How many additional path-grouping levels are allowed beyond the top-level segment, surveyed against real
@@ -512,8 +504,8 @@ public final class Containers {
     /**
      * The command that opens one container — in ANOTHER package for a service type a listener here accepts but
      * another module declares ({@code postgresql:CdcListener}'s {@code cdc:Service}), since that is where its
-     * contract is, when {@link #foreignCommand} can name that package; otherwise the local stub that says where
-     * the type is declared.
+     * contract is, when {@link LoadedPackage#argumentFor} can name that package; otherwise the local stub that
+     * says where the type is declared.
      */
     private static String openCommand(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, Options options) {
@@ -529,34 +521,9 @@ public final class Containers {
         return container.pairings().stream().filter(service -> service.declaredIn().isPresent()).findFirst();
     }
 
-    /**
-     * The command that opens another module's service type in its own package, or empty when that package is not
-     * known. Unpinned, as every command this tool prints is. A module of THIS package — its default module, or a
-     * submodule its payload lists, read from a sibling — is reached through {@code --module} or none; a name that
-     * merely starts with this package's is not enough, since {@code postgresql.driver} is a package of its own.
-     * An undotted module path is its package's default module, so it is the package coordinate as written.
-     * Another package's dotted module path names no package boundary, and a command guessing one would not be
-     * ready to run.
-     */
     private static Optional<String> foreignCommand(LoadedPackage loaded, Service service) {
-        ModuleRef module = service.declaredIn().orElseThrow();
-        QualifiedName pkg = loaded.qualified();
-        boolean sameOrg = module.orgName().equals(pkg.org());
-        String sibling = sameOrg && module.moduleName().startsWith(pkg.name() + ".")
-                ? module.moduleName().substring(pkg.name().length() + 1)
-                : null;
-        String target;
-        if (sameOrg && module.moduleName().equals(pkg.name())) {
-            target = pkg.qualified();
-        } else if (sibling != null
-                && loaded.submodules().stream().anyMatch(submodule -> submodule.name().equals(sibling))) {
-            target = pkg.qualified() + " --module " + sibling;
-        } else if (!module.moduleName().contains(".")) {
-            target = module.coordinate();
-        } else {
-            return Optional.empty();
-        }
-        return Optional.of("bal discover " + target + " service " + shellWord(service.name()));
+        return loaded.argumentFor(service.declaredIn().orElseThrow())
+                .map(target -> "bal discover " + target + " service " + shellWord(service.name()));
     }
 
     /**
@@ -996,12 +963,8 @@ public final class Containers {
         List<String> roots = Closure.rootsOf(fn, index);
         Closure.Result closure = roots.isEmpty()
                 ? null
-                : Closure.of(roots, index, MAX_CLOSURE_BYTES, 1);
-        List<DiscoverResult.Signature.Type> types = closure == null
-                ? List.of()
-                : closure.names().stream()
-                        .map(name -> new DiscoverResult.Signature.Type(name, TypeDefs.renderTypeDef(index.get(name))))
-                        .toList();
+                : Closure.leaf(roots, index);
+        List<DiscoverResult.Signature.Type> types = closure == null ? List.of() : closure.types(index);
         List<String> omitted = closure == null || !closure.truncated() ? List.of() : closure.omitted();
 
         String kind = switch (fn) {

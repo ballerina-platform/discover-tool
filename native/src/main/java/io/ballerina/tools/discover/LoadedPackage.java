@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.model.Library;
+import io.ballerina.tools.discover.model.ModuleRef;
 
 import java.util.List;
 import java.util.Optional;
@@ -74,6 +75,29 @@ public record LoadedPackage(
      */
     public String pkgArgument() {
         return module == null ? qualified.qualified() : qualified.qualified() + " --module " + Texts.shellWord(module);
+    }
+
+    /**
+     * The argument that reaches another module in its own package, or empty when that package is not known.
+     * Unpinned, as every command this tool prints is. A module of THIS package — its default module, or a
+     * submodule its payload lists, read from a sibling — is reached through {@code --module} or none; a name that
+     * merely starts with this package's is not enough, since {@code postgresql.driver} is a package of its own.
+     * An undotted module path is its package's default module, so it is the package coordinate as written.
+     * Another package's dotted module path names no package boundary, and a command guessing one would not be
+     * ready to run.
+     */
+    public Optional<String> argumentFor(ModuleRef module) {
+        boolean sameOrg = module.orgName().equals(qualified.org());
+        String sibling = sameOrg && module.moduleName().startsWith(qualified.name() + ".")
+                ? module.moduleName().substring(qualified.name().length() + 1)
+                : null;
+        if (sameOrg && module.moduleName().equals(qualified.name())) {
+            return Optional.of(qualified.qualified());
+        }
+        if (sibling != null && submodules.stream().anyMatch(submodule -> submodule.name().equals(sibling))) {
+            return Optional.of(qualified.qualified() + " --module " + Texts.shellWord(sibling));
+        }
+        return module.moduleName().contains(".") ? Optional.empty() : Optional.of(module.coordinate());
     }
 
     /** The same package with a different IR, which is what a test that removes every client needs. */
