@@ -77,11 +77,12 @@ public final class Coordinates {
      * <p>The mirror image of {@link #match} plus {@link #describesSubmodule}, for a cached entry and a page off the
      * wire alike: the page answering {@code docs/<org>/<package>.<submodule>/<version>} must carry that exact
      * module, at that version, flagged as NOT its package's default, and naming THIS package's default module
-     * among its {@code relatedModules}. The flag tells a submodule apart from a separately published package that
-     * shares the dotted name ({@code ballerinax/aws.s3} is a package, not a module of {@code ballerinax/aws}), so
-     * here an absent flag is not good enough. The related default module tells it apart from a submodule of a
-     * DIFFERENT package that shares the prefix: with {@code org/a.b} a package publishing {@code c},
-     * {@code org/a --module b.c} reaches {@code a.b}'s page, whose default module is {@code a.b}, not {@code a}.
+     * among its {@code relatedModules} whenever that list has a readable entry. The flag tells a submodule apart
+     * from a separately published package that shares the dotted name ({@code ballerinax/aws.s3} is a package, not
+     * a module of {@code ballerinax/aws}), so here an absent flag is not good enough. The related default module
+     * tells it apart from a submodule of a DIFFERENT package that shares the prefix: with {@code org/a.b} a package
+     * publishing {@code c}, {@code org/a --module b.c} reaches {@code a.b}'s page, whose default module is
+     * {@code a.b}, not {@code a}.
      */
     public static boolean isModulePage(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
         String id = qualified.name() + "." + submodule;
@@ -97,15 +98,20 @@ public final class Coordinates {
         return false;
     }
 
+    /**
+     * Does the page's {@code relatedModules} name this package's default module — or, when it has no readable entry
+     * at all (absent, not an array, every entry missing a string {@code id} or {@code orgName}), is there nothing to
+     * check? Drift in that list must not reject every real module page; the exact id and the explicit
+     * {@code isDefaultModule: false} still stand on their own, and still reject a separately published package.
+     */
     private static boolean namesDefaultModule(JsonObject module, QualifiedName qualified) {
-        for (JsonObject entry : objectsIn(module, "relatedModules").orElse(List.of())) {
-            if (qualified.name().equals(Json.string(entry, "id"))
-                    && qualified.org().equals(Json.string(entry, "orgName"))
-                    && flagged(entry, "isDefaultModule", true)) {
-                return true;
-            }
-        }
-        return false;
+        List<JsonObject> readable = objectsIn(module, "relatedModules").orElse(List.of()).stream()
+                .filter(entry -> Json.string(entry, "id") != null && Json.string(entry, "orgName") != null)
+                .toList();
+        return readable.isEmpty() || readable.stream().anyMatch(entry ->
+                qualified.name().equals(Json.string(entry, "id"))
+                        && qualified.org().equals(Json.string(entry, "orgName"))
+                        && flagged(entry, "isDefaultModule", true));
     }
 
     /** Is the value exactly this boolean? Absent and non-boolean values are neither. */
@@ -171,14 +177,20 @@ public final class Coordinates {
 
     /**
      * The module names one version's registry row lists — {@code aws} and {@code aws.auth} for
-     * {@code ballerinax/aws} — or empty when the row is not the shape expected, which says nothing about what the
-     * package publishes.
+     * {@code ballerinax/aws} — or empty when the row cannot be trusted to say: not the shape expected, an empty
+     * list (a real row always lists at least the default module), or any entry without a name. Empty says nothing
+     * about what the package publishes.
      */
     static Optional<List<String>> moduleNames(JsonElement raw) {
-        return objectsIn(raw, "modules").map(modules -> modules.stream()
+        JsonElement modules = raw != null && raw.isJsonObject() ? raw.getAsJsonObject().get("modules") : null;
+        if (modules == null || !modules.isJsonArray() || modules.getAsJsonArray().isEmpty()) {
+            return Optional.empty();
+        }
+        List<String> names = objectsIn(raw, "modules").orElse(List.of()).stream()
                 .map(module -> Json.string(module, "name"))
                 .filter(name -> name != null && !name.isEmpty())
-                .toList());
+                .toList();
+        return names.size() == modules.getAsJsonArray().size() ? Optional.of(names) : Optional.empty();
     }
 
     /** The first entry of a versions array, or {@code null} if it is not a non-empty array of strings. */

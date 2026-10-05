@@ -385,13 +385,23 @@ public class ClientTest {
     }
 
     @Test
-    public void aModuleListThatIsReadButEmptyIsNotListedRatherThanUnknown() {
+    public void anEmptyModuleListIsUnknownSinceARealRowListsAtLeastTheDefaultModule() {
         FakeTransport transport = registry(Map.of(
                 "ballerinax/aws", "[\"1.0.1\"]",
                 "ballerinax/aws/1.0.1", modules()));
         String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
-        Assert.assertTrue(suggestion.contains("ballerinax/aws publishes no 'auth' module. Check the name"), suggestion);
-        Assert.assertFalse(suggestion.contains("--module"), suggestion);
+        Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
+    }
+
+    @Test
+    public void aModuleListWithAnUnreadableEntryIsUnknownRatherThanShort() {
+        // The entry that could not be read may be the very module asked about.
+        FakeTransport transport = registry(Map.of(
+                "ballerinax/aws", "[\"1.0.1\"]",
+                "ballerinax/aws/1.0.1", "{\"modules\":[{\"name\":\"aws\"},{\"name\":42}]}"));
+        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
+        Assert.assertFalse(suggestion.contains("publishes no 'auth' module"), suggestion);
     }
 
     @Test
