@@ -3,15 +3,17 @@ ballerina/xlsx · client
 This package declares nothing in client.
 
 Elsewhere
-  class  3  bal discover ballerina/xlsx class
-  funcs  6  bal discover ballerina/xlsx funcs
+  class   3  bal discover ballerina/xlsx class
+  funcs   6  bal discover ballerina/xlsx funcs
+  type   38  bal discover ballerina/xlsx type
 == service ==
 ballerina/xlsx · service
 This package declares nothing in service.
 
 Elsewhere
-  class  3  bal discover ballerina/xlsx class
-  funcs  6  bal discover ballerina/xlsx funcs
+  class   3  bal discover ballerina/xlsx class
+  funcs   6  bal discover ballerina/xlsx funcs
+  type   38  bal discover ballerina/xlsx type
 == class ==
 ballerina/xlsx · class
 3 classes
@@ -33,3 +35,56 @@ ballerina/xlsx · funcs
   writeTable
 
 Next: bal discover ballerina/xlsx funcs <name>
+== type ==
+ballerina/xlsx · type
+19 records, 5 enums, 11 errors, 2 aliases, 1 annotation
+
+Records
+  CellRange
+  ColumnParseOptions
+  CommonParseOptions
+  CommonSheetParseOptions
+  DataProjection
+  ErrorDetails
+  FailSafeOptions
+  FileOutputMode
+  Location
+  LogOutput
+  NameConfig
+  ParseOptions
+  RowParseOptions
+  RowWriteOptions
+  SheetWriteOptions
+  TableParseOptions
+  TableRowParseOptions
+  TableWriteOptions
+  WriteOptions
+
+Enums
+  ErrorLogContentType
+  FileWriteOption
+  FormulaMode
+  SheetWriteMode
+  TableWriteMode
+
+Errors
+  ConstraintValidationError
+  Error
+  FileNotFoundError
+  InvalidTableRangeError
+  ParseError
+  SheetExistsError
+  SheetNotFoundError
+  TableExistsError
+  TableNotFoundError
+  TableOverlapError
+  TypeConversionError
+
+Aliases
+  CellValue
+  Row
+
+Annotations
+  Name
+
+Next: bal discover ballerina/xlsx type <name>

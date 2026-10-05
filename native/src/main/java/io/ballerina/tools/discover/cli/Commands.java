@@ -62,7 +62,7 @@ final class Commands {
     }
 
     /** Every bucket wired into dispatch. */
-    static final List<String> BUCKETS = List.of("client", "service", "class", "funcs", "readme");
+    static final List<String> BUCKETS = List.of("client", "service", "class", "funcs", "type", "readme");
 
     /**
      * The one command. {@code pkg} is optional at the grammar level — {@code bal discover} with nothing else is a

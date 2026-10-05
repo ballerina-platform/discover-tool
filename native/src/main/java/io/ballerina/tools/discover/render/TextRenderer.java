@@ -96,6 +96,8 @@ public final class TextRenderer {
             case DiscoverResult.NoMatch noMatch -> noMatch(layout, noMatch, where);
             case DiscoverResult.Owners owners -> owners(layout, owners);
             case DiscoverResult.EmptyBucket empty -> emptyBucket(layout, empty);
+            case DiscoverResult.TypeRoster roster -> typeRoster(layout, roster);
+            case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(layout, declaration);
         }
     }
 
@@ -362,6 +364,65 @@ public final class TextRenderer {
         empty.elsewhere().forEach(other -> table.row(other.bucket(), String.valueOf(other.count()), other.command()));
         layout.section("Elsewhere", table);
         layout.warning(empty.warning());
+    }
+
+    private static void typeRoster(Layout layout, DiscoverResult.TypeRoster roster) {
+        List<String> parts = new ArrayList<>();
+        roster.counts().forEach((kind, count) -> {
+            if (count > 0) {
+                parts.add(count + " " + kindNoun(kind, count));
+            }
+        });
+        layout.top(parts.isEmpty() ? "No types." : String.join(", ", parts));
+        List<DiscoverResult.Method> all = roster.sections().stream()
+                .flatMap(section -> section.entries().stream())
+                .toList();
+        Drill drill = methodDrill(all);
+        int offset = 0;
+        for (DiscoverResult.TypeRoster.Section section : roster.sections()) {
+            String heading = Character.toUpperCase(section.kind().charAt(0)) + section.kind().substring(1);
+            layout.section(heading, methodTable(section.entries(), drill, offset));
+            offset += section.entries().size();
+        }
+        documented(layout, roster.documented());
+        layout.notices(roster.note(), roster.warning());
+        layout.more(remaining(roster.shown(), roster.total(), roster.paging()), roster.paging());
+        layout.next(drill.pattern());
+        layout.next(roster.next());
+    }
+
+    private static String kindNoun(String kind, int count) {
+        if (count == 1) {
+            return switch (kind) {
+                case "aliases" -> "alias";
+                default -> kind.substring(0, kind.length() - 1);
+            };
+        }
+        return kind;
+    }
+
+    /** The declaration verbatim, then each type it names, indented, one block apiece — as a signature does. */
+    private static void typeDeclaration(Layout layout, DiscoverResult.TypeDeclaration declaration) {
+        layout.block(List.of(declaration.declaration()));
+        List<DiscoverResult.Signature.Type> types = declaration.types();
+        for (int i = 0; i < types.size(); i++) {
+            List<String> block = new ArrayList<>();
+            if (i == 0) {
+                block.add("Types it names (" + types.size() + ")");
+            }
+            block.addAll(indented(types.get(i).declaration().lines().toList()));
+            layout.block(block);
+        }
+        Drill drill = methodDrill(declaration.omitted());
+        layout.section("Past the closure budget (" + declaration.omitted().size() + ")",
+                methodTable(declaration.omitted(), drill));
+        TextTable foreign = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        declaration.foreign().forEach(type -> foreign.row(type.name(),
+                type.module() + (type.version() == null ? "" : " " + type.version()),
+                type.command() == null ? "(no command: package not known)" : type.command()));
+        layout.section("From other packages (" + declaration.foreign().size() + ")", foreign);
+        layout.notices(declaration.note(), declaration.warning());
+        layout.next(drill.pattern());
     }
 
     // -----------------------------------------------------------------------

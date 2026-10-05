@@ -144,7 +144,7 @@ public final class Documents {
      * {@code public annotation ResourceConfig on service_function;}: valid-looking, attached to a token the
      * compiler rejects, and giving no way to discover the field set of the record the attachment must carry.
      */
-    private static String renderAnnotation(Library.AnnotationDef annotation) {
+    public static String renderAnnotation(Library.AnnotationDef annotation) {
         List<String> lines = new ArrayList<>();
         if (!annotation.description().isEmpty()) {
             for (String line : annotation.description().split("\n", -1)) {

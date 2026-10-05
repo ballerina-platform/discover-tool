@@ -51,16 +51,68 @@ ballerinax/twilio · service
 This package declares nothing in service.
 
 Elsewhere
-  client  1  bal discover ballerinax/twilio client
+  client    1  bal discover ballerinax/twilio client
+  type    278  bal discover ballerinax/twilio type
 == class ==
 ballerinax/twilio · class
 This package declares nothing in class.
 
 Elsewhere
-  client  1  bal discover ballerinax/twilio client
+  client    1  bal discover ballerinax/twilio client
+  type    278  bal discover ballerinax/twilio type
 == funcs ==
 ballerinax/twilio · funcs
 This package declares nothing in funcs.
 
 Elsewhere
-  client  1  bal discover ballerinax/twilio client
+  client    1  bal discover ballerinax/twilio client
+  type    278  bal discover ballerinax/twilio type
+== type ==
+ballerinax/twilio · type
+212 records, 66 aliases
+
+Records
+  Account
+  Address
+  AddressDependent_phone_number
+  ApiKeyConfig
+  Application
+  Authorized_connect_app
+  AuthTokenConfig
+  Available_phone_number_country
+  Available_phone_number_local
+  Available_phone_number_local_capabilities
+  Available_phone_number_machine_to_machine
+  Available_phone_number_mobile
+  Available_phone_number_national
+  Available_phone_number_shared_cost
+  Available_phone_number_toll_free
+  Available_phone_number_voip
+  Balance
+  Call
+  CallCall_event
+  CallCall_feedback
+  CallCall_feedback_summary
+  CallCall_notification
+  CallCall_notificationInstance
+  CallCall_recording
+  CallPayments
+  CallSiprec
+  CallStream
+  CallUser_defined_message
+  CallUser_defined_message_subscription
+  ClientHttp1Settings
+  Conference
+  ConferenceConference_recording
+  ConferenceParticipant
+  Connect_app
+  ConnectionConfig
+  CreateAccountRequest
+  CreateAddressRequest
+  CreateApplicationRequest
+  CreateCallFeedbackSummaryRequest
+  CreateCallRecordingRequest
+
+... 238 more (page 1 of 7)
+Next: bal discover ballerinax/twilio type <name>
+Next: bal discover ballerinax/twilio type --page 2

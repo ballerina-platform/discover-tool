@@ -28,6 +28,7 @@ import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
+import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -111,10 +112,26 @@ public class PointersTest {
             }
         }
 
+        answers.addAll(typeAnswers(context));
         answers.add(expect(Readme.render(context, Readme.Options.BARE)));
         answers.add(expect(Readme.render(context, new Readme.Options(null, "config", 1))));
         for (Readme.Chunk chunk : Readme.chunksOf(context)) {
             answers.add(expect(Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1))));
+        }
+        return answers;
+    }
+
+    /** The type roster, a filtered one, and a leaf for the first two declarations of every kind. */
+    private static List<DiscoverResult> typeAnswers(LoadedPackage context) {
+        List<DiscoverResult> answers = new ArrayList<>();
+        DiscoverResult roster = expect(Types.render(context, new Types.Options(List.of(), null, 1)));
+        answers.add(roster);
+        answers.add(expect(Types.render(context, new Types.Options(List.of(), "config", 1))));
+        if (roster instanceof DiscoverResult.TypeRoster typed) {
+            for (DiscoverResult.TypeRoster.Section section : typed.sections()) {
+                section.entries().stream().limit(1).forEach(entry -> answers.add(
+                        expect(Types.render(context, new Types.Options(List.of(entry.name()), null, 1)))));
+            }
         }
         return answers;
     }
@@ -191,6 +208,15 @@ public class PointersTest {
             }
             case DiscoverResult.EmptyBucket empty ->
                     empty.elsewhere().forEach(other -> commands.add(other.command()));
+            case DiscoverResult.TypeRoster roster -> {
+                roster.sections().forEach(section ->
+                        section.entries().stream().limit(2).forEach(entry -> commands.add(entry.command())));
+                addIfPresent(commands, roster.next());
+            }
+            case DiscoverResult.TypeDeclaration declaration -> {
+                declaration.omitted().forEach(omitted -> commands.add(omitted.command()));
+                declaration.foreign().forEach(foreign -> addIfPresent(commands, foreign.command()));
+            }
         }
         return commands;
     }

@@ -33,3 +33,52 @@ ballerina/graphql · funcs
   getSdlString
 
 Next: bal discover ballerina/graphql funcs <name>
+== type ==
+ballerina/graphql · type
+47 records, 1 enum, 9 errors, 6 aliases, 5 constants, 3 variables, 4 annotations
+
+Records
+  __EnumValue
+  __Field
+  __InputValue
+  __Type
+  BearerTokenConfig
+  CacheConfig
+  CircuitBreakerConfig
+  ClientConfiguration
+  ClientHttp1Settings
+  ClientSecureSocket
+  CookieConfig
+  CorsConfig
+  CredentialsConfig
+  DocumentCacheConfig
+  ErrorDetail
+  FileUserStoreConfig
+  FileUserStoreConfigWithScopes
+  FollowRedirects
+  GenericResponse
+  GenericResponseWithErrors
+  Graphiql
+  GraphqlInterceptorConfig
+  GraphqlResourceConfig
+  GraphqlServiceConfig
+  JwtIssuerConfig
+  JwtValidatorConfig
+  JwtValidatorConfigWithScopes
+  LdapUserStoreConfig
+  LdapUserStoreConfigWithScopes
+  ListenerConfiguration
+  ListenerHttp1Settings
+  ListenerSecureSocket
+  Location
+  OAuth2ClientCredentialsGrantConfig
+  OAuth2IntrospectionConfig
+  OAuth2IntrospectionConfigWithScopes
+  OAuth2JwtBearerGrantConfig
+  OAuth2PasswordGrantConfig
+  OAuth2RefreshTokenGrantConfig
+  PoolConfiguration
+
+... 35 more (page 1 of 2)
+Next: bal discover ballerina/graphql type <name>
+Next: bal discover ballerina/graphql type --page 2

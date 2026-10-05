@@ -27,6 +27,7 @@ import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.TypeView;
+import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -126,10 +127,44 @@ public class ViewsTest {
                     .append("\n");
             json.append(JsonRenderer.render(listing)).append("\n");
         }
+        Result<DiscoverResult> types = Types.render(loaded, new Types.Options(List.of(), null, 1));
+        Assert.assertTrue(types.isOk(), slug + ": " + (types.isOk() ? "" : types.failure().describe()));
+        text.append("== type ==\n").append(TextRenderer.render(types.value(), new TextRenderer.Context(
+                loaded.qualified().qualified(), null, List.of("type"), null))).append("\n");
+        json.append(JsonRenderer.render(types.value())).append("\n");
         FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + ".buckets.txt"),
                 text.toString(), slug + " text");
         FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + ".buckets.json"),
                 json.toString(), slug + " json");
+    }
+
+    /** One of each shape a leaf takes, so a change to any of them shows in a diff. */
+    @Test
+    public void curatedTypeLeavesAreUnchanged() {
+        String[][] leaves = {
+                {"ballerina__http", "ClientConfiguration"}, {"ballerina__http", "ClientError"},
+                {"ballerina__http", "Client"}, {"ballerina__graphql", "ID"},
+                {"ballerinax__github", "ConnectionConfig"}, {"ballerinax__googleapis.sheets", "ConnectionConfig"},
+                {"ballerinax__kafka", "TopicPartitionOffset"}, {"ballerinax__kafka", "NoSuchType"}};
+        StringBuilder text = new StringBuilder();
+        StringBuilder json = new StringBuilder();
+        for (String[] leaf : leaves) {
+            LoadedPackage loaded = FixtureCorpus.loadedFixture(leaf[0]);
+            Result<DiscoverResult> answer = Types.render(loaded, new Types.Options(List.of(leaf[1]), null, 1));
+            text.append("== ").append(leaf[0]).append(" type ").append(leaf[1]).append(" ==\n");
+            if (answer.isOk()) {
+                text.append(TextRenderer.render(answer.value(), new TextRenderer.Context(
+                        loaded.qualified().qualified(), null, List.of("type", leaf[1]), null))).append("\n");
+                json.append(JsonRenderer.render(answer.value())).append("\n");
+            } else {
+                text.append(answer.failure().describe()).append("\n");
+                json.append(answer.failure().describe()).append("\n");
+            }
+        }
+        FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve("type-leaves.txt"), text.toString(),
+                "type leaves text");
+        FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve("type-leaves.json"), json.toString(),
+                "type leaves json");
     }
 
     // -----------------------------------------------------------------------
@@ -297,11 +332,13 @@ public class ViewsTest {
         Assert.assertTrue(cookie.note().contains("'Cookie' is addressed by class"), cookie.note());
         Assert.assertTrue(cookie.note().contains("bal discover ballerina/http class Cookie"), cookie.note());
 
-        // A record, asked of `client`: not a callable at all, and no bucket answers for a bare declaration name.
-        Result<DiscoverResult> asType = Containers.render(http, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("ClientConfiguration")));
-        Assert.assertFalse(asType.isOk(), "no bucket answers for a non-callable declaration any more");
-        Assert.assertTrue(asType.failure() instanceof Failure.SymbolNotFound, asType.failure().describe());
+        // A record, asked of `client`: not a callable, so the type bucket answers it and says so.
+        DiscoverResult.TypeDeclaration asType = as(DiscoverResult.TypeDeclaration.class,
+                render(http, Surface.Scope.CLIENT, List.of("ClientConfiguration")));
+        Assert.assertEquals(asType.kind(), "record");
+        Assert.assertTrue(asType.note().contains("'ClientConfiguration' is addressed by type"), asType.note());
+        Assert.assertTrue(asType.note().contains("bal discover ballerina/http type ClientConfiguration"),
+                asType.note());
     }
 
     @Test

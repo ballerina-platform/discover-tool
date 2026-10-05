@@ -1,0 +1,353 @@
+== ballerina__http type ClientConfiguration ==
+ballerina/http · type · ClientConfiguration
+
+# Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
+# The following fields are inherited from the other configuration records in addition to the `Client`-specific
+# configs.
+public type ClientConfiguration record {|
+    *CommonClientConfiguration;
+    # SSL/TLS security settings for HTTPS connections
+    ClientSecureSocket? secureSocket = ();
+|};
+
+Types it names (7)
+  # Common client configurations for the next level clients.
+  public type CommonClientConfiguration record {|
+      # HTTP protocol version supported by the client
+      HttpVersion httpVersion = HTTP_2_0;
+      # HTTP/1.x specific settings
+      ClientHttp1Settings http1Settings = {};
+      # HTTP/2 specific settings
+      ClientHttp2Settings http2Settings = {};
+      # Maximum time(in seconds) to wait for a response before the request times out
+      decimal timeout = 30;
+      # The choice of setting `Forwarded`/`X-Forwarded-For` header, when acting as a proxy
+      string forwarded = "disable";
+      # HTTP redirect handling configurations (with 3xx status codes)
+      FollowRedirects? followRedirects = ();
+      # Configurations associated with the request connection pool
+      PoolConfiguration? poolConfig = ();
+      # HTTP response caching related configurations
+      CacheConfig cache = {};
+      # Enable request/response compression (using `accept-encoding` header)
+      Compression compression = COMPRESSION_AUTO;
+      # Client authentication options (Basic, Bearer token, OAuth, etc.)
+      ClientAuthConfig? auth = ();
+      # Circuit breaker configurations to prevent cascading failures
+      CircuitBreakerConfig? circuitBreaker = ();
+      # Automatic retry settings for failed requests
+      RetryConfig? retryConfig = ();
+      # Cookie handling settings for session management
+      CookieConfig? cookieConfig = ();
+      # Limits for response size and headers (to prevent memory issues)
+      ResponseLimitConfigs responseLimits = {};
+      # Proxy server settings if requests need to go through a proxy
+      ProxyConfig? proxy = ();
+      # Enable automatic payload validation for request/response data against constraints
+      boolean validation = true;
+      # Low-level socket settings (timeouts, buffer sizes, etc.)
+      ClientSocketConfig socketConfig = {};
+      # Enable relaxed data binding on the client side.
+      # When enabled:
+      # - `null` values in JSON are allowed to be mapped to optional fields
+      # - missing fields in JSON are allowed to be mapped as `null` values
+      boolean laxDataBinding = false;
+  |};
+
+  # Provides configurations for facilitating secure communication with a remote HTTP endpoint.
+  public type ClientSecureSocket record {|
+      # Enable SSL validation
+      boolean enable = true;
+      # Configurations associated with `crypto:TrustStore` or single certificate file that the client trusts
+      crypto:TrustStore|string cert?; // Special Agent Note: TrustStore FROM ballerina/crypto module
+      # Configurations associated with `crypto:KeyStore` or combination of certificate and private key of the client
+      crypto:KeyStore|CertKey key?; // Special Agent Note: KeyStore FROM ballerina/crypto module
+      # SSL/TLS protocol related options
+      record {Protocol name; string[] versions; } protocol?;
+      # Certificate validation against OCSP_CRL, OCSP_STAPLING related options
+      record {CertValidationType 'type; int cacheSize; int cacheValidityPeriod; } certValidation?;
+      # List of ciphers to be used
+      # eg: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+      string[] ciphers?;
+      # Enable/disable host name verification
+      boolean verifyHostName = true;
+      # Enable/disable new SSL session creation
+      boolean shareSession = true;
+      # SSL handshake time out
+      decimal handshakeTimeout?;
+      # SSL session time out
+      decimal sessionTimeout?;
+      # Server name indication(SNI) to be used. If this is not present, hostname from the target URL will be used
+      string serverName?;
+  |};
+
+  # Defines the supported HTTP protocols.
+  public enum HttpVersion {
+      # Represents HTTP/1.0 protocol
+      HTTP_1_0,
+      # Represents HTTP/1.1 protocol
+      HTTP_1_1,
+      # Represents HTTP/2.0 protocol
+      HTTP_2_0
+  }
+
+  # Provides settings related to HTTP/1.x protocol.
+  public type ClientHttp1Settings record {|
+      # Specifies whether to reuse a connection for multiple requests
+      KeepAlive keepAlive = KEEPALIVE_AUTO;
+      # The chunking behaviour of the request
+      Chunking chunking = CHUNKING_AUTO;
+      # Proxy server related options
+      ProxyConfig? proxy = ();
+  |};
+
+  # Provides settings related to HTTP/2 protocol.
+  public type ClientHttp2Settings record {|
+      # Configuration to enable HTTP/2 prior knowledge
+      boolean http2PriorKnowledge = false;
+      # Configuration to change the initial window size
+      int http2InitialWindowSize = 65535;
+  |};
+
+  # Provides configurations for controlling the endpoint's behaviour in response to HTTP redirect related responses.
+  # The response status codes of 301, 302, and 303 are redirected using a GET request while 300, 305, 307, and 308
+  # status codes use the original request HTTP method during redirection.
+  public type FollowRedirects record {|
+      # Enable/disable redirection
+      boolean enabled = false;
+      # Maximum number of redirects to follow
+      int maxCount = 5;
+      # By default Authorization and Proxy-Authorization headers are removed from the redirect requests.
+      # Set it to true if Auth headers are needed to be sent during the redirection
+      boolean allowAuthHeaders = false;
+  |};
+
+  # Options to compress using gzip or deflate.
+  # 
+  # `AUTO`: When service behaves as a HTTP gateway inbound request/response accept-encoding option is set as the
+  # outbound request/response accept-encoding/content-encoding option
+  # `ALWAYS`: Always set accept-encoding/content-encoding in outbound request/response
+  # `NEVER`: Never set accept-encoding/content-encoding header in outbound request/response
+  public type Compression COMPRESSION_AUTO|COMPRESSION_ALWAYS|COMPRESSION_NEVER;
+
+Past the closure budget (9)
+  PoolConfiguration
+  CacheConfig
+  ClientAuthConfig
+  CircuitBreakerConfig
+  RetryConfig
+  CookieConfig
+  ResponseLimitConfigs
+  ProxyConfig
+  ClientSocketConfig
+
+From other packages (2)
+  TrustStore  ballerina/crypto 2.9.3  bal discover ballerina/crypto type TrustStore
+  KeyStore    ballerina/crypto 2.9.3  bal discover ballerina/crypto type KeyStore
+
+Next: bal discover ballerina/http type <name>
+== ballerina__http type ClientError ==
+ballerina/http · type · ClientError
+
+# Defines the possible client error types.
+public type ClientError distinct Error;
+
+Types it names (1)
+  # Defines the common error type for the module.
+  public type Error distinct error;
+== ballerina__http type Client ==
+ballerina/http · type · Client
+1 resource path, 15 remote methods, 4 normal methods
+
+Resources (->)
+  :...path  get, post, put, delete, patch, head, options
+
+Remote (->)
+  delete
+  execute
+  forward
+  get
+  getNextPromise
+  getPromisedResponse
+  getResponse
+  hasPromise
+  head
+  options
+  patch
+  post
+  put
+  rejectPromise
+  submit
+
+Normal (.)
+  circuitBreakerForceClose
+  circuitBreakerForceOpen
+  getCircuitBreakerCurrentState
+  getCookieStore
+
+Note: 'Client' is addressed by client — showing it. Canonical: bal discover ballerina/http client Client
+Next: bal discover ballerina/http client Client <path> <accessor>
+Next: bal discover ballerina/http client Client <name>
+== ballerina__graphql type ID ==
+ballerina/graphql · type · ID
+
+# Represents the annotation of the ID type.
+public annotation ID on record field, parameter, return;
+== ballerinax__github type ConnectionConfig ==
+ballerinax/github · type · ConnectionConfig
+
+# Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
+public type ConnectionConfig record {|
+    # Configurations related to client authentication
+    http:BearerTokenConfig auth; // Special Agent Note: BearerTokenConfig FROM ballerina/http module
+    # The HTTP version understood by the client
+    http:HttpVersion httpVersion = http:HTTP_2_0; // Special Agent Note: HttpVersion FROM ballerina/http module
+    # Configurations related to HTTP/1.x protocol
+    http:ClientHttp1Settings http1Settings = {}; // Special Agent Note: ClientHttp1Settings FROM ballerina/http module
+    # Configurations related to HTTP/2 protocol
+    http:ClientHttp2Settings http2Settings = {}; // Special Agent Note: ClientHttp2Settings FROM ballerina/http module
+    # The maximum time to wait (in seconds) for a response before closing the connection
+    decimal timeout = 30;
+    # The choice of setting `forwarded`/`x-forwarded` header
+    string forwarded = "disable";
+    # Configurations associated with Redirection
+    http:FollowRedirects followRedirects?; // Special Agent Note: FollowRedirects FROM ballerina/http module
+    # Configurations associated with request pooling
+    http:PoolConfiguration poolConfig?; // Special Agent Note: PoolConfiguration FROM ballerina/http module
+    # HTTP caching related configurations
+    http:CacheConfig cache = {}; // Special Agent Note: CacheConfig FROM ballerina/http module
+    # Specifies the way of handling compression (`accept-encoding`) header
+    http:Compression compression = http:COMPRESSION_AUTO; // Special Agent Note: Compression FROM ballerina/http module
+    # Configurations associated with the behaviour of the Circuit Breaker
+    http:CircuitBreakerConfig circuitBreaker?; // Special Agent Note: CircuitBreakerConfig FROM ballerina/http module
+    # Configurations associated with retrying
+    http:RetryConfig retryConfig?; // Special Agent Note: RetryConfig FROM ballerina/http module
+    # Configurations associated with cookies
+    http:CookieConfig cookieConfig?; // Special Agent Note: CookieConfig FROM ballerina/http module
+    # Configurations associated with inbound response size limits
+    http:ResponseLimitConfigs responseLimits = {}; // Special Agent Note: ResponseLimitConfigs FROM ballerina/http module
+    # SSL/TLS-related options
+    http:ClientSecureSocket secureSocket?; // Special Agent Note: ClientSecureSocket FROM ballerina/http module
+    # Proxy server related options
+    http:ProxyConfig proxy?; // Special Agent Note: ProxyConfig FROM ballerina/http module
+    # Provides settings related to client socket configuration
+    http:ClientSocketConfig socketConfig = {}; // Special Agent Note: ClientSocketConfig FROM ballerina/http module
+    # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
+    boolean validation = true;
+    # Enables relaxed data binding on the client side. When enabled, `nil` values are treated as optional, 
+    # and absent fields are handled as `nilable` types. Enabled by default.
+    boolean laxDataBinding = true;
+|};
+
+From other packages (15)
+  BearerTokenConfig     ballerina/http 2.15.5  bal discover ballerina/http type BearerTokenConfig
+  HttpVersion           ballerina/http 2.15.5  bal discover ballerina/http type HttpVersion
+  ClientHttp1Settings   ballerina/http 2.15.5  bal discover ballerina/http type ClientHttp1Settings
+  ClientHttp2Settings   ballerina/http 2.15.5  bal discover ballerina/http type ClientHttp2Settings
+  FollowRedirects       ballerina/http 2.15.5  bal discover ballerina/http type FollowRedirects
+  PoolConfiguration     ballerina/http 2.15.5  bal discover ballerina/http type PoolConfiguration
+  CacheConfig           ballerina/http 2.15.5  bal discover ballerina/http type CacheConfig
+  Compression           ballerina/http 2.15.5  bal discover ballerina/http type Compression
+  CircuitBreakerConfig  ballerina/http 2.15.5  bal discover ballerina/http type CircuitBreakerConfig
+  RetryConfig           ballerina/http 2.15.5  bal discover ballerina/http type RetryConfig
+  CookieConfig          ballerina/http 2.15.5  bal discover ballerina/http type CookieConfig
+  ResponseLimitConfigs  ballerina/http 2.15.5  bal discover ballerina/http type ResponseLimitConfigs
+  ClientSecureSocket    ballerina/http 2.15.5  bal discover ballerina/http type ClientSecureSocket
+  ProxyConfig           ballerina/http 2.15.5  bal discover ballerina/http type ProxyConfig
+  ClientSocketConfig    ballerina/http 2.15.5  bal discover ballerina/http type ClientSocketConfig
+== ballerinax__googleapis.sheets type ConnectionConfig ==
+ballerinax/googleapis.sheets · type · ConnectionConfig
+
+# Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
+public type ConnectionConfig record {|
+    # Configurations related to client authentication
+    http:BearerTokenConfig|OAuth2RefreshTokenGrantConfig auth; // Special Agent Note: BearerTokenConfig FROM ballerina/http module
+    # The HTTP version understood by the client
+    http:HttpVersion httpVersion = http:HTTP_2_0; // Special Agent Note: HttpVersion FROM ballerina/http module
+    # Configurations related to HTTP/1.x protocol
+    ClientHttp1Settings http1Settings = {};
+    # Configurations related to HTTP/2 protocol
+    http:ClientHttp2Settings http2Settings = {}; // Special Agent Note: ClientHttp2Settings FROM ballerina/http module
+    # The maximum time to wait (in seconds) for a response before closing the connection
+    decimal timeout = 60;
+    # The choice of setting `forwarded`/`x-forwarded` header
+    string forwarded = "disable";
+    # Configurations associated with request pooling
+    http:PoolConfiguration? poolConfig = (); // Special Agent Note: PoolConfiguration FROM ballerina/http module
+    # HTTP caching related configurations
+    http:CacheConfig cache = {}; // Special Agent Note: CacheConfig FROM ballerina/http module
+    # Specifies the way of handling compression (`accept-encoding`) header
+    http:Compression compression = http:COMPRESSION_AUTO; // Special Agent Note: Compression FROM ballerina/http module
+    # Configurations associated with the behaviour of the Circuit Breaker
+    http:CircuitBreakerConfig? circuitBreaker = (); // Special Agent Note: CircuitBreakerConfig FROM ballerina/http module
+    # Configurations associated with retrying
+    http:RetryConfig? retryConfig = (); // Special Agent Note: RetryConfig FROM ballerina/http module
+    # Configurations associated with inbound response size limits
+    http:ResponseLimitConfigs responseLimits = {}; // Special Agent Note: ResponseLimitConfigs FROM ballerina/http module
+    # SSL/TLS-related options
+    http:ClientSecureSocket secureSocket = {}; // Special Agent Note: ClientSecureSocket FROM ballerina/http module
+    # Proxy server related options
+    http:ProxyConfig? proxy = (); // Special Agent Note: ProxyConfig FROM ballerina/http module
+    # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
+    boolean validation = true;
+|};
+
+Types it names (2)
+  # OAuth2 Refresh Token Grant Configs
+  public type OAuth2RefreshTokenGrantConfig record {|
+      *http:OAuth2RefreshTokenGrantConfig; // Special Agent Note: OAuth2RefreshTokenGrantConfig FROM ballerina/http module
+      # Refresh URL
+      string refreshUrl = "https://accounts.google.com/o/oauth2/token";
+  |};
+
+  # Provides settings related to HTTP/1.x protocol.
+  public type ClientHttp1Settings record {|
+      # Specifies whether to reuse a connection for multiple requests
+      http:KeepAlive keepAlive = http:KEEPALIVE_AUTO; // Special Agent Note: KeepAlive FROM ballerina/http module
+      # The chunking behaviour of the request
+      http:Chunking chunking = http:CHUNKING_AUTO; // Special Agent Note: Chunking FROM ballerina/http module
+      # Proxy server related options
+      ProxyConfig? proxy = ();
+  |};
+
+From other packages (14)
+  BearerTokenConfig              ballerina/http 2.14.10  bal discover ballerina/http type BearerTokenConfig
+  HttpVersion                    ballerina/http 2.14.10  bal discover ballerina/http type HttpVersion
+  ClientHttp2Settings            ballerina/http 2.14.10  bal discover ballerina/http type ClientHttp2Settings
+  PoolConfiguration              ballerina/http 2.14.10  bal discover ballerina/http type PoolConfiguration
+  CacheConfig                    ballerina/http 2.14.10  bal discover ballerina/http type CacheConfig
+  Compression                    ballerina/http 2.14.10  bal discover ballerina/http type Compression
+  CircuitBreakerConfig           ballerina/http 2.14.10  bal discover ballerina/http type CircuitBreakerConfig
+  RetryConfig                    ballerina/http 2.14.10  bal discover ballerina/http type RetryConfig
+  ResponseLimitConfigs           ballerina/http 2.14.10  bal discover ballerina/http type ResponseLimitConfigs
+  ClientSecureSocket             ballerina/http 2.14.10  bal discover ballerina/http type ClientSecureSocket
+  ProxyConfig                    ballerina/http 2.14.10  bal discover ballerina/http type ProxyConfig
+  OAuth2RefreshTokenGrantConfig  ballerina/http 2.14.10  bal discover ballerina/http type OAuth2RefreshTokenGrantConfig
+  KeepAlive                      ballerina/http 2.14.10  bal discover ballerina/http type KeepAlive
+  Chunking                       ballerina/http 2.14.10  bal discover ballerina/http type Chunking
+== ballerinax__kafka type TopicPartitionOffset ==
+ballerinax/kafka · type · TopicPartitionOffset
+
+# Represents a topic partition and an offset with a timestamp.
+public type TopicPartitionOffset [TopicPartition, OffsetAndTimestamp?];
+
+Types it names (2)
+  # Represents a topic partition.
+  public type TopicPartition record {|
+      # Topic to which the partition is related
+      string topic;
+      # Index of the specific partition
+      int partition;
+  |};
+
+  # Represents an offset and a timestamp for a topic partition.
+  public type OffsetAndTimestamp record {|
+      # The offset of the record in the topic partition
+      int offset;
+      # The timestamp of the record in the topic partition
+      int timestamp;
+      # The leader epoch of the record in the topic partition
+      int? leaderEpoch = ();
+  |};
+== ballerinax__kafka type NoSuchType ==
+{"kind":"symbol-not-found","qualified":"ballerinax/kafka:0.0.0-fixture","requested":["NoSuchType"],"candidates":["CompressionType","DeserializerType","SerializerType"],"suggestion":"No declaration matched. Re-run with one of the candidates if it is what you meant, or search by keyword with `bal discover ballerinax/kafka type --filter <keyword>`. Add --refresh if you believe the name exists and is newer than the cached copy."}

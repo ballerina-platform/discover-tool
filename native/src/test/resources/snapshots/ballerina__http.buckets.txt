@@ -91,3 +91,52 @@ ballerina/http · funcs
   parseHeader
 
 Next: bal discover ballerina/http funcs <name>
+== type ==
+ballerina/http · type
+135 records, 5 enums, 65 errors, 32 aliases, 144 constants, 61 variables, 7 annotations
+
+Records
+  Accepted
+  AccessLogConfiguration
+  AlreadyReported
+  BadGateway
+  BadRequest
+  BearerTokenConfig
+  Bucket
+  CacheConfig
+  CertKey
+  CircuitBreakerConfig
+  CircuitBreakerInferredConfig
+  CircuitHealth
+  ClientConfiguration
+  ClientHttp1Settings
+  ClientHttp2Settings
+  ClientSecureSocket
+  ClientSocketConfig
+  CommonClientConfiguration
+  CommonResponse
+  CompressionConfig
+  Conflict
+  Continue
+  CookieConfig
+  CookieOptions
+  CorsConfig
+  Created
+  CredentialsConfig
+  DefaultStatusCodeResponse
+  Detail
+  EarlyHints
+  ErrorPayload
+  ExpectationFailed
+  FailedDependency
+  FailoverClientConfiguration
+  FileUserStoreConfig
+  FileUserStoreConfigWithScopes
+  FollowRedirects
+  Forbidden
+  Found
+  GatewayTimeout
+
+... 409 more (page 1 of 12)
+Next: bal discover ballerina/http type <name>
+Next: bal discover ballerina/http type --page 2

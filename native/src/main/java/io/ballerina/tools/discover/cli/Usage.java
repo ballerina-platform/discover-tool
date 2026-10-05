@@ -66,6 +66,7 @@ final class Usage {
               2. A bucket, listed or one:     bal discover ballerinax/github client
                                               bal discover ballerinax/github client Client
               3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
+              4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
             """;
 
     private static final String BUCKETS =

@@ -185,7 +185,8 @@ public final class Containers {
         return render(loaded, scope, options, null);
     }
 
-    private static Result<DiscoverResult> render(
+    /** {@code note}: the advisory a caller routed here by another bucket gets, shown as the answer's own note. */
+    public static Result<DiscoverResult> render(
             LoadedPackage loaded, Surface.Scope scope, Options options, String note) {
         if (scope == Surface.Scope.SERVICE) {
             loaded = loaded.withBindings();
@@ -289,8 +290,12 @@ public final class Containers {
             if (Surface.byName(containers, token).isPresent()
                     || containers.stream().anyMatch(container ->
                             !selectExactly(container, options.selectors()).isEmpty())) {
-                return render(loaded, other, options, kindNote(loaded, other, options.selectors()));
+                return render(loaded, other, options, kindNote(loaded, other.verb(), options.selectors()));
             }
+        }
+        if (options.selectors().size() == 1 && Types.declares(loaded, token)) {
+            return Types.render(loaded, new Types.Options(options.selectors(), null, 1,
+                    kindNote(loaded, "type", options.selectors())));
         }
         return null;
     }
@@ -322,16 +327,16 @@ public final class Containers {
             }
             if (Surface.of(loaded.library(), other).stream()
                     .anyMatch(container -> !select(container, options.selectors()).isEmpty())) {
-                return render(loaded, other, options, kindNote(loaded, other, options.selectors()));
+                return render(loaded, other, options, kindNote(loaded, other.verb(), options.selectors()));
             }
         }
         return Result.err(notFound(loaded, scope, options.selectors().get(0),
                 Declarations.index(loaded.library().addressable())));
     }
 
-    private static String kindNote(LoadedPackage loaded, Surface.Scope actual, List<String> selectors) {
-        return "'" + selectors.get(0) + "' is addressed by " + actual.verb() + " — showing it. Canonical: "
-                + "bal discover " + loaded.pkgArgument() + " " + actual.verb() + shellWords(selectors);
+    private static String kindNote(LoadedPackage loaded, String verb, List<String> selectors) {
+        return "'" + selectors.get(0) + "' is addressed by " + verb + " — showing it. Canonical: "
+                + "bal discover " + loaded.pkgArgument() + " " + verb + shellWords(selectors);
     }
 
     private static String ownerNote(
@@ -420,18 +425,27 @@ public final class Containers {
 
     /** A scope with nothing in it, saying where the callable surface actually is. */
     private static DiscoverResult emptyBucket(LoadedPackage loaded, Surface.Scope scope) {
+        return emptyBucket(loaded, scope.verb());
+    }
+
+    /** A bucket with nothing in it — {@code type} included — and every other bucket that holds something. */
+    static DiscoverResult emptyBucket(LoadedPackage loaded, String bucket) {
         String pkg = loaded.pkgArgument();
         List<DiscoverResult.EmptyBucket.Elsewhere> elsewhere = new ArrayList<>();
         for (Surface.Scope other : Surface.Scope.values()) {
             List<Surface.Container> containers = Surface.of(loaded.library(), other);
-            if (other == scope || containers.isEmpty()) {
+            if (other.verb().equals(bucket) || containers.isEmpty()) {
                 continue;
             }
             int count = other == Surface.Scope.MODULE ? containers.get(0).functions().size() : containers.size();
             elsewhere.add(new DiscoverResult.EmptyBucket.Elsewhere(
                     other.verb(), count, "bal discover " + pkg + " " + other.verb()));
         }
-        return new DiscoverResult.EmptyBucket(scope.verb(), List.copyOf(elsewhere), loaded.warning());
+        int types = Types.count(loaded);
+        if (types > 0 && !"type".equals(bucket)) {
+            elsewhere.add(new DiscoverResult.EmptyBucket.Elsewhere("type", types, "bal discover " + pkg + " type"));
+        }
+        return new DiscoverResult.EmptyBucket(bucket, List.copyOf(elsewhere), loaded.warning());
     }
 
     // -----------------------------------------------------------------------

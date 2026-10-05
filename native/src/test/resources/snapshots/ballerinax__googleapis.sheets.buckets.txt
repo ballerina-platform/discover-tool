@@ -51,16 +51,65 @@ ballerinax/googleapis.sheets · service
 This package declares nothing in service.
 
 Elsewhere
-  client  1  bal discover ballerinax/googleapis.sheets client
+  client   1  bal discover ballerinax/googleapis.sheets client
+  type    31  bal discover ballerinax/googleapis.sheets type
 == class ==
 ballerinax/googleapis.sheets · class
 This package declares nothing in class.
 
 Elsewhere
-  client  1  bal discover ballerinax/googleapis.sheets client
+  client   1  bal discover ballerinax/googleapis.sheets client
+  type    31  bal discover ballerinax/googleapis.sheets type
 == funcs ==
 ballerinax/googleapis.sheets · funcs
 This package declares nothing in funcs.
 
 Elsewhere
-  client  1  bal discover ballerinax/googleapis.sheets client
+  client   1  bal discover ballerinax/googleapis.sheets client
+  type    31  bal discover ballerinax/googleapis.sheets type
+== type ==
+ballerinax/googleapis.sheets · type
+20 records, 6 enums, 3 errors, 1 alias, 1 constant
+
+Records
+  A1Range
+  Cell
+  ClientHttp1Settings
+  Column
+  ConnectionConfig
+  DeveloperMetadataLookupFilter
+  DimensionRange
+  GridProperties
+  GridRangeFilter
+  MetadataLocation
+  OAuth2RefreshTokenGrantConfig
+  ProxyConfig
+  Range
+  Row
+  Sheet
+  SheetProperties
+  Spreadsheet
+  SpreadsheetProperties
+  ValueRange
+  ValuesRange
+
+Enums
+  Dimension
+  LocationMatchingStrategy
+  LocationType
+  ValueInputOption
+  ValueRenderOption
+  Visibility
+
+Errors
+  Error
+  InvalidRangeError
+  SpreadsheetError
+
+Aliases
+  Filter
+
+Constants
+  REFRESH_URL
+
+Next: bal discover ballerinax/googleapis.sheets type <name>

@@ -53,15 +53,40 @@ This package declares nothing in service.
 
 Elsewhere
   client  1  bal discover ballerinax/redis client
+  type    9  bal discover ballerinax/redis type
 == class ==
 ballerinax/redis · class
 This package declares nothing in class.
 
 Elsewhere
   client  1  bal discover ballerinax/redis client
+  type    9  bal discover ballerinax/redis type
 == funcs ==
 ballerinax/redis · funcs
 This package declares nothing in funcs.
 
 Elsewhere
   client  1  bal discover ballerinax/redis client
+  type    9  bal discover ballerinax/redis type
+== type ==
+ballerinax/redis · type
+6 records, 1 enum, 1 error, 1 alias
+
+Records
+  CertKey
+  ConnectionConfig
+  ConnectionParams
+  KeepAliveConfig
+  Options
+  SecureSocket
+
+Enums
+  SslVerifyMode
+
+Errors
+  Error
+
+Aliases
+  ConnectionUri
+
+Next: bal discover ballerinax/redis type <name>
