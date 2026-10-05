@@ -247,17 +247,13 @@ public final class Types {
         }
 
         Closure.Result closure = Closure.leaf(List.of(name), index);
-        String shadowed = annotationNamed(library, name)
-                .map(annotation -> "'" + name + "' is also an annotation: "
-                        + Documents.renderAnnotation(annotation).replace("\n", " "))
-                .orElse(null);
         List<DiscoverResult.Signature.Type> types = closure.types(index).stream()
                 .filter(type -> !type.name().equals(name))
                 .toList();
         return Result.ok(new DiscoverResult.TypeDeclaration(name, singular(typeDef),
                 TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure), closure.omitted().size(),
                 omittedNext(loaded, closure), foreignOf(loaded, closure, index, List.of()), loaded.warning(),
-                note == null ? shadowed : shadowed == null ? note : note + " " + shadowed));
+                note));
     }
 
     /** An annotation inlines the record its attachment must carry, like a signature inlines its parameters. */
