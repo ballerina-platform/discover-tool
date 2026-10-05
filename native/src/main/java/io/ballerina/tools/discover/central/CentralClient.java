@@ -327,9 +327,8 @@ public final class CentralClient {
         } else {
             List<String> modules = listed.get();
             suggestion = "'" + qualified.qualified() + "' is not a package, and " + parent.qualified()
-                    + " publishes no '" + submodule + "' module"
-                    + (modules.isEmpty() ? "" : " (its modules are " + String.join(", ", modules) + ")")
-                    + ". Check the name; `bal search <keyword>` lists what Central publishes.";
+                    + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
+                    + "). Check the name; `bal search <keyword>` lists what Central publishes.";
         }
         return new Failure.PackageNotFound(qualified.qualified(), suggestion);
     }

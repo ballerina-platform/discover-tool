@@ -874,6 +874,35 @@ public class CliTest {
         Assert.assertEquals(capture.field("suggestion"), SUBGRAPH_UNCONFIRMED, capture.stderr());
     }
 
+    private static JsonObject subgraphPageWithRelatedModules(JsonElement relatedModules) {
+        JsonObject page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").getAsJsonObject();
+        JsonObject module = page.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject();
+        module.add("relatedModules", relatedModules);
+        return page;
+    }
+
+    @Test
+    public void aModulePageWithNoReadableRelatedModulesStandsOnItsOwnIdAndFlag() {
+        for (String related : List.of("\"not an array\"", "[]", "[{\"id\":1,\"orgName\":2}, null, 7]")) {
+            JsonObject page = subgraphPageWithRelatedModules(JsonParser.parseString(related));
+            Capture capture = new Capture();
+            int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+                    options(graphqlCentral(Map.of("subgraph", page))));
+            Assert.assertEquals(exitCode, 0, related + " -> " + capture.stderr());
+        }
+    }
+
+    @Test
+    public void aModulePageWhoseReadableRelatedModulesLackThisPackageIsStillRejected() {
+        JsonObject page = subgraphPageWithRelatedModules(JsonParser.parseString(
+                "[{\"id\":42}, {\"id\":\"graphql.other\",\"orgName\":\"ballerina\",\"isDefaultModule\":true}]"));
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+                options(graphqlCentral(Map.of("subgraph", page))));
+        Assert.assertEquals(exitCode, 1, capture.stdout());
+        Assert.assertEquals(capture.field("suggestion"), SUBGRAPH_UNCONFIRMED, capture.stderr());
+    }
+
     @Test
     public void aSubmoduleOfAnotherPackageSharingThePrefixIsNotTakenForThisPackages() {
         JsonObject page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").getAsJsonObject();
