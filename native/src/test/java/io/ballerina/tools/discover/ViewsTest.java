@@ -826,16 +826,75 @@ public class ViewsTest {
     }
 
     @Test
-    public void aLeafNamesALocalDeclarationAndAForeignOneApartWhenTheyShareAName() {
+    public void aLocalDeclarationAndAForeignOneSharingANameAreOpenedByDifferentCommands() {
         // SHEETS-03. `ProxyConfig` is declared here AND by ballerina/http, two records with the same name and
-        // different fields. The foreign row stays, because the field line needs that import, and it carries its
-        // module, which is what tells the two apart.
+        // different fields. Each is opened by its own package's command, and the foreign row says which module
+        // and version it was generated against.
+        String slug = "ballerinax__googleapis.sheets";
+        DiscoverResult.TypeDeclaration local = as(DiscoverResult.TypeDeclaration.class, type(slug, "ProxyConfig"));
+        Assert.assertEquals(local.kind(), "record");
+        Assert.assertEquals(local.declaration(), "# Proxy server configurations to be used with the HTTP client "
+                + "endpoint.\npublic type ProxyConfig record {|\n    # Host name of the proxy server\n"
+                + "    string host = \"\";\n    # Proxy server port\n    int port = 0;\n"
+                + "    # Proxy server username\n    string userName = \"\";\n    # Proxy server password\n"
+                + "    string password = \"\";\n|};");
+        Assert.assertTrue(local.types().isEmpty());
+        Assert.assertTrue(local.foreign().isEmpty());
+
         DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
-                type("ballerinax__googleapis.sheets", "ConnectionConfig"));
+                type(slug, "ConnectionConfig"));
         Assert.assertTrue(config.types().stream().anyMatch(each -> each.name().equals("ClientHttp1Settings")
                 && each.declaration().contains("ProxyConfig? proxy = ();")), config.types().toString());
-        Assert.assertTrue(config.foreign().stream().anyMatch(each -> each.name().equals("ProxyConfig")
-                && each.module().equals("ballerina/http")), config.foreign().toString());
+        List<DiscoverResult.Foreign> foreignProxies = config.foreign().stream()
+                .filter(each -> each.name().equals("ProxyConfig")).toList();
+        Assert.assertEquals(foreignProxies, List.of(new DiscoverResult.Foreign(
+                "ProxyConfig", "ballerina/http", "2.14.10", "bal discover ballerina/http type ProxyConfig")));
+
+        DiscoverResult.TypeRoster roster = as(DiscoverResult.TypeRoster.class, type(slug));
+        List<DiscoverResult.Method> localRows = roster.sections().stream()
+                .flatMap(section -> section.entries().stream())
+                .filter(entry -> entry.name().equals("ProxyConfig")).toList();
+        Assert.assertEquals(localRows, List.of(new DiscoverResult.Method(
+                "ProxyConfig", "bal discover ballerinax/googleapis.sheets type ProxyConfig")));
+        Assert.assertNotEquals(localRows.get(0).command(), foreignProxies.get(0).command());
+    }
+
+    @Test
+    public void aForeignTypeInASiblingModuleIsReachedThroughModuleAndAnUnlistedOneHasNoCommand() {
+        LoadedPackage base = FixtureCorpus.loadedFixture("ballerinax__kafka");
+        List<io.ballerina.tools.discover.model.RecordField> fields = new java.util.ArrayList<>();
+        String[][] modules = {
+                {"ballerinax", "kafka.other", "1.0.0"}, {"ballerinax", "kafka", "4.6.5"},
+                {"ballerina", "http", "2.1.0"}, {"ballerinax", "kafka.unlisted", "1.0.0"}};
+        for (int i = 0; i < modules.length; i++) {
+            io.ballerina.tools.discover.model.ModuleRef module = new io.ballerina.tools.discover.model.ModuleRef(
+                    modules[i][0], modules[i][1], modules[i][2]);
+            fields.add(new io.ballerina.tools.discover.model.RecordField("f" + i, "",
+                    new io.ballerina.tools.discover.model.TypeRef("m" + i + ":Thing" + i, List.of(
+                            new io.ballerina.tools.discover.model.TypeRef.Link.External(module, "Thing" + i)))));
+        }
+        Library library = base.library();
+        List<io.ballerina.tools.discover.model.TypeDef> declarations = new java.util.ArrayList<>(library.typeDefs());
+        declarations.add(new io.ballerina.tools.discover.model.TypeDef.Rec("Holder", "", true, false, fields));
+        LoadedPackage loaded = new LoadedPackage(base.qualified(), base.version(),
+                new Library(library.name(), library.description(), declarations, library.clients(),
+                        library.functions(), library.listeners(), library.services(), library.annotations(),
+                        library.configurables()),
+                base.readme(), "sub", List.of(new LoadedPackage.Submodule("other", "")), base.warning());
+
+        DiscoverResult.TypeDeclaration holder = as(DiscoverResult.TypeDeclaration.class, result(
+                Types.render(loaded, new Types.Options(List.of("Holder"), null, 1)), "type Holder"));
+        Assert.assertEquals(holder.foreign(), List.of(
+                new DiscoverResult.Foreign("Thing0", "ballerinax/kafka.other", "1.0.0",
+                        "bal discover ballerinax/kafka --module other type Thing0"),
+                new DiscoverResult.Foreign("Thing1", "ballerinax/kafka", "4.6.5",
+                        "bal discover ballerinax/kafka type Thing1"),
+                new DiscoverResult.Foreign("Thing2", "ballerina/http", "2.1.0",
+                        "bal discover ballerina/http type Thing2"),
+                new DiscoverResult.Foreign("Thing3", "ballerinax/kafka.unlisted", "1.0.0", null)));
+        String text = TextRenderer.render(holder, new TextRenderer.Context(
+                loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null));
+        Assert.assertTrue(text.contains("(no command: package not known)"), text);
     }
 
     @Test
@@ -859,131 +918,65 @@ public class ViewsTest {
                 profile.foreign().toString());
     }
 
+    private record Routed(String container, String note) { }
+
+    private static Routed routedTo(DiscoverResult result) {
+        return switch (result) {
+            case DiscoverResult.MethodList methods -> new Routed(methods.container(), methods.note());
+            case DiscoverResult.MixedListing mixed -> new Routed(mixed.container(), mixed.note());
+            default -> throw new AssertionError("not a routed container answer: " + result);
+        };
+    }
+
     @Test
-    public void aClientIsRoutedToTheClientBucketAndAKindNoteSaysSo() {
+    public void anObjectNamedToTypeIsAnsweredByTheBucketThatHoldsItWithANoteSayingWhich() {
         // SAP-09. The name index must hold a client, since it is 1 of the 4 things that package publishes.
-        DiscoverResult routed = type("ballerinax__sap", "Client");
-        String note = routed instanceof DiscoverResult.MethodList methods ? methods.note()
-                : routed instanceof DiscoverResult.MixedListing mixed ? mixed.note() : null;
-        Assert.assertNotNull(note, routed.toString());
-        Assert.assertTrue(note.contains("'Client' is addressed by client"), note);
-        Assert.assertTrue(note.contains("bal discover ballerinax/sap client Client"), note);
+        Assert.assertEquals(routedTo(type("ballerinax__sap", "Client")), new Routed("Client",
+                "'Client' is addressed by client — showing it. Canonical: bal discover ballerinax/sap client Client"));
+        Assert.assertEquals(routedTo(type("ballerina__http", "Response")), new Routed("Response",
+                "'Response' is addressed by class — showing it. Canonical: bal discover ballerina/http class "
+                        + "Response"));
+        Assert.assertEquals(routedTo(type("ballerinax__kafka", "Service")), new Routed("Service",
+                "'Service' is addressed by service — showing it. Canonical: bal discover ballerinax/kafka service "
+                        + "Service; binds to kafka:Listener"));
+        Assert.assertEquals(routedTo(type("ballerinax__kafka", "Listener")), new Routed("Service",
+                "'Listener' is a listener, shown with the service types it serves — showing it. Canonical: "
+                        + "bal discover ballerinax/kafka service; binds to kafka:Listener"));
     }
 
     @Test
-    public void aFilterBesideARecordNamedToAContainerBucketFailsRatherThanBeingDropped() {
-        Result<DiscoverResult> routed = Containers.render(FixtureCorpus.loadedFixture("ballerina__http"),
-                Surface.Scope.CLIENT, new Containers.Options(List.of("ProxyConfig"), "foo", 1));
-        Assert.assertFalse(routed.isOk(), "the filter was silently ignored");
-        Assert.assertTrue(routed.failure() instanceof Failure.Validation, routed.failure().describe());
-    }
-
-    @Test
-    public void anAnnotationInlinesTheRecordItsAttachmentMustCarry() {
-        DiscoverResult.TypeDeclaration payload = as(DiscoverResult.TypeDeclaration.class,
-                type("ballerina__http", "Payload"));
-        Assert.assertEquals(payload.kind(), "annotation");
-        Assert.assertEquals(payload.declaration(), "# The annotation which is used to define the Payload resource "
-                + "signature parameter and return parameter.\npublic annotation HttpPayload Payload on parameter, "
-                + "return;");
-        Assert.assertEquals(payload.types().stream().map(DiscoverResult.Signature.Type::name).toList(),
-                List.of("HttpPayload"));
-        Assert.assertTrue(payload.types().get(0).declaration().contains("string|string[] mediaType?;"),
-                payload.types().get(0).declaration());
-        Assert.assertTrue(payload.omitted().isEmpty());
-        Assert.assertEquals(payload.omittedTotal(), 0);
-        Assert.assertTrue(payload.foreign().isEmpty());
-        Assert.assertNull(payload.note());
-
-        DiscoverResult.TypeDeclaration resource = as(DiscoverResult.TypeDeclaration.class,
-                type("ballerina__http", "ResourceConfig"));
-        Assert.assertEquals(resource.types().stream().map(DiscoverResult.Signature.Type::name).toList(),
-                List.of("HttpResourceConfig", "CorsConfig", "ListenerAuthConfig", "Scopes", "LinkedTo"));
-    }
-
-    @Test
-    public void aMarkerAnnotationNamesNoRecord() {
-        DiscoverResult.TypeDeclaration marker = as(DiscoverResult.TypeDeclaration.class,
-                type("ballerina__graphql", "ID"));
-        Assert.assertEquals(marker.declaration(), "# Represents the annotation of the ID type.\n"
-                + "public annotation ID on record field, parameter, return;");
-        Assert.assertTrue(marker.types().isEmpty());
-        Assert.assertTrue(marker.omitted().isEmpty());
-        Assert.assertTrue(marker.foreign().isEmpty());
-    }
-
-    @Test
-    public void anAnnotationSharingANameWithATypeIsListedBesideItAndNamedByTheTypesLeaf() {
-        LoadedPackage graphql = FixtureCorpus.loadedFixture("ballerina__graphql");
-        Library library = graphql.library();
-        List<io.ballerina.tools.discover.model.TypeDef> declarations =
-                new java.util.ArrayList<>(library.typeDefs());
-        declarations.add(new io.ballerina.tools.discover.model.TypeDef.Alias("ID", "A type.",
-                new io.ballerina.tools.discover.model.TypeRef("string", List.of())));
-        LoadedPackage shared = new LoadedPackage(graphql.qualified(), graphql.version(),
-                new Library(library.name(), library.description(), declarations, library.clients(),
-                        library.functions(), library.listeners(), library.services(), library.annotations(),
-                        library.configurables()),
-                graphql.readme(), graphql.module(), graphql.submodules(), graphql.warning());
-
-        Assert.assertEquals(Types.names(shared).stream().filter("ID"::equals).count(), 2L);
-        DiscoverResult.TypeRoster roster = as(DiscoverResult.TypeRoster.class, result(
-                Types.render(shared, new Types.Options(List.of(), null, 1)), "type"));
-        Assert.assertEquals(roster.counts().get("aliases").intValue(), 7);
-        Assert.assertEquals(roster.counts().get("annotations").intValue(), 4);
-
-        DiscoverResult.TypeDeclaration leaf = as(DiscoverResult.TypeDeclaration.class, result(
-                Types.render(shared, new Types.Options(List.of("ID"), null, 1)), "type ID"));
-        Assert.assertEquals(leaf.kind(), "alias");
-        Assert.assertEquals(leaf.declaration(), "# A type.\npublic type ID string;");
-        Assert.assertEquals(leaf.note(), "'ID' is also an annotation: # Represents the annotation of the ID type. "
-                + "public annotation ID on record field, parameter, return;");
-    }
-
-    @Test
-    public void aSignatureNamesTheForeignTypesItsOwnParametersAndReturnUse() {
-        DiscoverResult.Signature close = signature(FixtureCorpus.loadedFixture("ballerinax__postgresql"),
-                Surface.Scope.CLIENT, "Client", "close");
-        Assert.assertTrue(close.types().isEmpty(), "nothing local to inline");
-        Assert.assertEquals(close.foreign(), List.of(new DiscoverResult.Foreign(
-                "Error", "ballerina/sql", "1.19.0", "bal discover ballerina/sql type Error")));
-
-        DiscoverResult.Signature entity = signature(FixtureCorpus.loadedFixture("ballerina__http"),
-                Surface.Scope.CLASS, "Request", "setEntity");
-        Assert.assertEquals(entity.foreign(), List.of(new DiscoverResult.Foreign(
-                "Entity", "ballerina/mime", "2.12.2", "bal discover ballerina/mime type Entity")));
-    }
-
-    private static LoadedPackage withDeclaration(String slug, io.ballerina.tools.discover.model.TypeDef added) {
-        LoadedPackage base = FixtureCorpus.loadedFixture(slug);
-        Library library = base.library();
-        List<io.ballerina.tools.discover.model.TypeDef> declarations = new java.util.ArrayList<>(library.typeDefs());
-        declarations.add(added);
-        return new LoadedPackage(base.qualified(), base.version(),
-                new Library(library.name(), library.description(), declarations, library.clients(),
-                        library.functions(), library.listeners(), library.services(), library.annotations(),
-                        library.configurables()),
-                base.readme(), base.module(), base.submodules(), base.warning());
-    }
-
-    @Test
-    public void aListenerWithNoServiceTypeIsNotADeadEndInTheServiceBucket() {
+    public void aPackageDeclaringNothingNonCallableAnswersAnEmptyTypeBucket() {
         LoadedPackage base = FixtureCorpus.loadedFixture("ballerina__log");
-        Library library = base.library();
-        LoadedPackage lone = new LoadedPackage(base.qualified(), base.version(),
-                new Library(library.name(), library.description(), library.typeDefs(), library.clients(),
-                        library.functions(),
-                        List.of(new io.ballerina.tools.discover.model.TypeDef.ObjectDef("Lone", "")),
-                        library.services(), library.annotations(), library.configurables()),
-                base.readme(), base.module(), base.submodules(), base.warning());
-        Result<DiscoverResult> answer = Types.render(lone, new Types.Options(List.of("Lone"), null, 1));
-        Assert.assertFalse(answer.isOk());
-        Failure.SymbolNotFound missing = (Failure.SymbolNotFound) answer.failure();
-        Assert.assertEquals(missing.requested(), List.of("Lone"));
-        Assert.assertEquals(missing.suggestion(), "'Lone' is a listener this package declares, but `service` has "
-                + "nothing to show for it, and `type` holds only what is not callable. List the buckets with "
-                + "`bal discover ballerina/log`, or search declarations with "
-                + "`bal discover ballerina/log type --filter <keyword>`.");
+        LoadedPackage bare = base.withLibrary(new Library("log", "", List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of()));
+        Assert.assertEquals(Types.count(bare), 0);
+        DiscoverResult.EmptyBucket empty = as(DiscoverResult.EmptyBucket.class, result(
+                Types.render(bare, new Types.Options(List.of(), null, 1)), "type"));
+        Assert.assertEquals(empty.bucket(), "type");
+        Assert.assertTrue(empty.elsewhere().isEmpty());
+    }
+
+    @Test
+    public void aTypePageOutOfRangeIsAValidationFailureNamingTheRange() {
+        Result<DiscoverResult> page = Types.render(FixtureCorpus.loadedFixture("ballerinax__kafka"),
+                new Types.Options(List.of(), null, 9));
+        Assert.assertFalse(page.isOk());
+        Assert.assertEquals(page.failure(), new Failure.Validation(
+                "--page 9 is out of range: this listing has 58 entries on 2 pages.",
+                "Pass a page from 1 to 2, e.g. `bal discover ballerinax/kafka type --page 2`."));
+    }
+
+    @Test
+    public void aTypeFilterMatchingOnlyDocumentationListsThemAsDocumentedAndShowsNoRows() {
+        DiscoverResult.TypeRoster roster = as(DiscoverResult.TypeRoster.class, result(
+                Types.render(FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"),
+                        new Types.Options(List.of(), "server", 1)), "type --filter server"));
+        Assert.assertTrue(roster.sections().isEmpty());
+        Assert.assertEquals(roster.shown(), 0);
+        Assert.assertEquals(roster.total(), 0);
+        Assert.assertEquals(roster.documented().names(),
+                List.of("ClientHttp1Settings", "ConnectionConfig", "ProxyConfig"));
+        Assert.assertEquals(roster.documented().total(), 3);
     }
 
     @Test

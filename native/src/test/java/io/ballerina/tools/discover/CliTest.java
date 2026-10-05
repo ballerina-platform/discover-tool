@@ -627,6 +627,33 @@ public class CliTest {
     }
 
     @Test
+    public void theTypeBucketCarriesTheModuleIntoEveryCommandItPrints() {
+        Capture roster = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type"), roster.streams(),
+                options(graphqlCentral()));
+        Assert.assertEquals(exitCode, 0, roster.stderr());
+        Assert.assertEquals(roster.stdout().strip(), "{\"sections\":{\"records\":[{\"name\":\"FederatedEntity\","
+                + "\"command\":\"bal discover ballerina/graphql --module subgraph type FederatedEntity\"},"
+                + "{\"name\":\"Representation\",\"command\":\"bal discover ballerina/graphql --module subgraph "
+                + "type Representation\"}],\"aliases\":[{\"name\":\"ReferenceResolver\",\"command\":"
+                + "\"bal discover ballerina/graphql --module subgraph type ReferenceResolver\"}],\"constants\":"
+                + "[{\"name\":\"ANY\",\"command\":\"bal discover ballerina/graphql --module subgraph type ANY\"}],"
+                + "\"annotations\":[{\"name\":\"Entity\",\"command\":\"bal discover ballerina/graphql --module "
+                + "subgraph type Entity\"},{\"name\":\"Subgraph\",\"command\":\"bal discover ballerina/graphql "
+                + "--module subgraph type Subgraph\"}]},\"counts\":{\"records\":2,\"aliases\":1,\"constants\":1,"
+                + "\"annotations\":2},\"shown\":6,\"total\":6}");
+
+        Capture leaf = new Capture();
+        Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Entity"), leaf.streams(),
+                options(graphqlCentral()));
+        JsonObject answer = JsonParser.parseString(leaf.stdout()).getAsJsonObject();
+        Assert.assertEquals(answer.get("kind").getAsString(), "annotation");
+        Assert.assertEquals(answer.getAsJsonArray("types").size(), 2);
+        Assert.assertEquals(answer.getAsJsonArray("types").get(0).getAsJsonObject().get("name").getAsString(),
+                "FederatedEntity");
+    }
+
+    @Test
     public void theModuleFlagTargetsTheSubmodulesOwnReadme() {
         JsonElement page = FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader");
         page.getAsJsonObject().getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject()
