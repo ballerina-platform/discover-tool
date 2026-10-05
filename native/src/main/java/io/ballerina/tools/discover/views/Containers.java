@@ -294,7 +294,7 @@ public final class Containers {
             }
         }
         if (options.selectors().size() == 1 && Types.declares(loaded, token)) {
-            return Types.render(loaded, new Types.Options(options.selectors(), null, 1,
+            return Types.render(loaded, new Types.Options(options.selectors(), options.filter(), options.page(),
                     kindNote(loaded, "type", options.selectors())));
         }
         return null;
