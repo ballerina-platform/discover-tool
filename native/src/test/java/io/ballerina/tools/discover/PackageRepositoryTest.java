@@ -22,6 +22,7 @@ import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.PackageRepository;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
+import io.ballerina.tools.discover.central.schema.Schema;
 import io.ballerina.tools.discover.model.Service;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -49,8 +50,10 @@ public class PackageRepositoryTest {
         private final Result<CentralClient.ResolvedVersion> version;
         private final Result<CentralDocs> docs;
         private final Optional<Map<String, String>> sources;
+        private Result<CentralDocs> modulePage;
         private int resolveCalls;
         private int fetchCalls;
+        private int moduleFetchCalls;
         private int sourceCalls;
 
         private FakeRepository(Result<CentralClient.ResolvedVersion> version, Result<CentralDocs> docs) {
@@ -92,7 +95,11 @@ public class PackageRepositoryTest {
         @Override
         public Result<CentralDocs> fetchModuleDocs(QualifiedName qualified, String submodule,
                 CentralClient.ResolvedVersion resolved, HttpOptions options) {
-            throw new AssertionError("no test here loads a submodule");
+            moduleFetchCalls++;
+            if (modulePage == null) {
+                throw new AssertionError("this repository was not set up to serve a submodule");
+            }
+            return modulePage;
         }
 
         @Override
@@ -291,5 +298,75 @@ public class PackageRepositoryTest {
         Assert.assertTrue(loaded.failure() instanceof Failure.SchemaDrift);
         Assert.assertEquals(second.resolveCalls, 0, "a module mismatch must not trigger fallback to a repository");
         Assert.assertEquals(second.fetchCalls, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // --module across several repositories
+    // -----------------------------------------------------------------------
+
+    private static final QualifiedName GRAPHQL = QualifiedName.parse("ballerina/graphql").value();
+
+    private static FakeRepository graphqlRepository(String id, Result<CentralDocs> modulePage) {
+        FakeRepository repository = new FakeRepository(id,
+                Result.ok(new CentralClient.ResolvedVersion(Version.parse("1.17.0").value(), false)),
+                Result.ok(FixtureCorpus.loadFixture("ballerina__graphql")));
+        repository.modulePage = modulePage;
+        return repository;
+    }
+
+    private static Result<CentralDocs> subgraphPage() {
+        return Schema.parse(FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph"), "subgraph");
+    }
+
+    private static Result<CentralDocs> noModulePage() {
+        return Result.err(new Failure.PackageNotFound("ballerina/graphql.subgraph:1.17.0", "no such page here"));
+    }
+
+    private static Result<LoadedPackage> loadSubgraph(FakeRepository... repositories) {
+        return Loader.loadPackage(GRAPHQL, new Loader.LoadOptions(
+                httpThatMustNotReachTheNetwork(), null, List.of(repositories), "subgraph"));
+    }
+
+    @Test
+    public void aSubmodulePageReadOnTheFirstTryCostsNoPackagePage() {
+        FakeRepository only = graphqlRepository("only", subgraphPage());
+        Result<LoadedPackage> loaded = loadSubgraph(only);
+        Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
+        Assert.assertEquals(only.moduleFetchCalls, 1);
+        Assert.assertEquals(only.fetchCalls, 0);
+    }
+
+    @Test
+    public void aLaterRepositoryPublishingTheSubmoduleAnswersBeforeAnyPackagePageIsRead() {
+        FakeRepository first = graphqlRepository("first", noModulePage());
+        FakeRepository second = graphqlRepository("second", subgraphPage());
+        Result<LoadedPackage> loaded = loadSubgraph(first, second);
+        Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
+        Assert.assertEquals(loaded.value().module(), "subgraph");
+        Assert.assertEquals(second.moduleFetchCalls, 1);
+        Assert.assertEquals(first.fetchCalls + second.fetchCalls, 0, "no package page on the success path");
+    }
+
+    @Test
+    public void onlyWhenEveryRepositoryLacksTheSubmoduleIsAPackagePageReadToNameTheCandidates() {
+        FakeRepository first = graphqlRepository("first", noModulePage());
+        FakeRepository second = graphqlRepository("second", noModulePage());
+        Result<LoadedPackage> loaded = loadSubgraph(first, second);
+        Assert.assertFalse(loaded.isOk());
+        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) loaded.failure();
+        Assert.assertEquals(failure.candidates(), List.of("dataloader", "subgraph"));
+        Assert.assertEquals(first.fetchCalls, 1);
+        Assert.assertEquals(second.fetchCalls, 0);
+    }
+
+    @Test
+    public void aTransportFailureOnASubmodulePageIsReportedRatherThanAMissingModule() {
+        FakeRepository first = graphqlRepository("first", Result.err(new Failure.Upstream(
+                "https://example.test/docs", 3, "HTTP 503", Failure.UPSTREAM_SUGGESTION, 503)));
+        FakeRepository second = graphqlRepository("second", noModulePage());
+        Result<LoadedPackage> loaded = loadSubgraph(first, second);
+        Assert.assertFalse(loaded.isOk());
+        Assert.assertTrue(loaded.failure() instanceof Failure.Upstream, loaded.failure().describe());
+        Assert.assertEquals(first.fetchCalls + second.fetchCalls, 0);
     }
 }
