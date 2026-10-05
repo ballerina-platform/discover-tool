@@ -41,8 +41,9 @@ are not callable, so they have no containers or members.
 `annotations`) and pages them like any listing; `--filter` is how a large one — `ballerinax/github` declares
 over a thousand records — is narrowed. `type <Name>` prints the declaration whole, then the declarations it
 names one level deep, within a size budget: what the budget left out is listed with the command that opens each
-one (up to 40; `omittedTotal` or an `... N more` line says how many there were in all), and so are the
-declarations another package owns (`bal discover ballerina/http type BearerTokenConfig`).
+one (up to 40; `omittedTotal` or an `... N more` line says how many there were in all, and `omittedNext` or the
+`Next:` line is the command that lists them: the whole `type` roster), and so are the declarations another
+package owns (`bal discover ballerina/http type BearerTokenConfig`).
 It takes one name and no `--filter`. A name that is really a class, client, service type or listener is
 answered by the bucket that holds it, and a record asked of `client` is answered by `type`; either way a note
 says which.
@@ -499,9 +500,9 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `next`, `documented`                 |
 | more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `foreign` (`name`, `module`, `version`, `command`), `documented`, `page`, `pages`, `next` |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`), `documented`, `page`, `pages`, `next` |
 | type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `next`, `documented` |
-| one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `foreign` (`name`, `module`, `version`, `command`) |
+| one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`) |
 | nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented`, `page`, `pages` |
 | member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `page`, `pages`, `next`                    |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
