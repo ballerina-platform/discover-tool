@@ -171,7 +171,7 @@ public final class Closure {
     /**
      * The same-package declarations a signature names — its parameters' types and its return's.
      *
-     * <p>This is the entry point that makes {@code -r} work on a callable. Deliberately the same walk afterwards:
+     * <p>This is the entry point that lets a callable have a closure at all. Deliberately the same walk afterwards:
      * a signature's types are just another set of roots, so there is one closure implementation rather than one
      * per entry point that could disagree about cycles or budgets.
      */
@@ -234,9 +234,9 @@ public final class Closure {
     /**
      * Every type expression a declaration mentions.
      *
-     * <p>Read off the rendered EXPRESSION rather than off Central's links, so the footer names exactly the
-     * foreign spellings a reader can see above it. The links answer the other half — WHICH module an alias stands
-     * for — and {@link #modulesByPrefix} reads them for that.
+     * <p>Read off the rendered EXPRESSION rather than off Central's links, so the local walk follows exactly the
+     * spellings a reader can see. Each expression's own links answer the other half — WHICH module a foreign name
+     * belongs to — which {@link Types} reads for its foreign rows.
      */
     public static List<TypeRef> expressionsOf(TypeDef typeDef) {
         return switch (typeDef) {
@@ -246,8 +246,7 @@ public final class Closure {
             case TypeDef.Variable variable -> List.of(variable.varType());
             case TypeDef.ErrorDef error -> error.base().map(List::of).orElse(List.of());
             case TypeDef.Enumeration ignored -> List.of();
-            // A class's dependencies are its members'. `-r` on `sql:Client` used to append nothing, because the
-            // declaration it walked had no members to walk.
+            // A class's dependencies are its members': the declaration itself has none to walk.
             case TypeDef.ObjectDef object -> objectExpressions(object);
         };
     }
