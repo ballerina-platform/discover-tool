@@ -26,6 +26,7 @@ import io.ballerina.tools.discover.model.Bindings;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Param;
+import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Signatures;
@@ -982,9 +983,12 @@ public final class Containers {
         List<DiscoverResult.Method> omitted = closure == null
                 ? List.of()
                 : Types.omittedOf(loaded, closure);
-        List<DiscoverResult.Foreign> foreign = closure == null
-                ? List.of()
-                : Types.foreignOf(loaded, closure, index, List.of());
+        List<TypeRef> named = new ArrayList<>(fn.params().stream().map(Param::type).toList());
+        if (fn.returns().hasType()) {
+            named.add(fn.returns().type());
+        }
+        List<DiscoverResult.Foreign> foreign = Types.foreignOf(
+                loaded, closure == null ? new Closure.Result(List.of(), List.of()) : closure, index, named);
 
         String kind = switch (fn) {
             case Fn.Resource ignored -> "resource";
