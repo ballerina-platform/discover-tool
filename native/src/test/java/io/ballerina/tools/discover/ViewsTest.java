@@ -941,6 +941,20 @@ public class ViewsTest {
     }
 
     @Test
+    public void aSignatureNamesTheForeignTypesItsOwnParametersAndReturnUse() {
+        DiscoverResult.Signature close = signature(FixtureCorpus.loadedFixture("ballerinax__postgresql"),
+                Surface.Scope.CLIENT, "Client", "close");
+        Assert.assertTrue(close.types().isEmpty(), "nothing local to inline");
+        Assert.assertEquals(close.foreign(), List.of(new DiscoverResult.Foreign(
+                "Error", "ballerina/sql", "1.19.0", "bal discover ballerina/sql type Error")));
+
+        DiscoverResult.Signature entity = signature(FixtureCorpus.loadedFixture("ballerina__http"),
+                Surface.Scope.CLASS, "Request", "setEntity");
+        Assert.assertEquals(entity.foreign(), List.of(new DiscoverResult.Foreign(
+                "Entity", "ballerina/mime", "2.12.2", "bal discover ballerina/mime type Entity")));
+    }
+
+    @Test
     public void typeTakesOneNameAndNoFilterBesideIt() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         Result<DiscoverResult> two = Types.render(http, new Types.Options(List.of("Error", "Response"), null, 1));
