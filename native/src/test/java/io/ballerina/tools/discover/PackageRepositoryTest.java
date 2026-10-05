@@ -27,6 +27,9 @@ import io.ballerina.tools.discover.model.Service;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -367,6 +370,52 @@ public class PackageRepositoryTest {
         Result<LoadedPackage> loaded = loadSubgraph(first, second);
         Assert.assertFalse(loaded.isOk());
         Assert.assertTrue(loaded.failure() instanceof Failure.Upstream, loaded.failure().describe());
+        Assert.assertEquals(first.fetchCalls + second.fetchCalls, 0);
+    }
+
+    private static Failure.Upstream unreachable() {
+        return new Failure.Upstream("https://example.test/x", 3, "HTTP 503", Failure.UPSTREAM_SUGGESTION, 503);
+    }
+
+    @Test
+    public void aRepositoryThatCouldNotResolveThePackageIsNotTakenForOneWithoutTheSubmodule() {
+        FakeRepository unreachable = new FakeRepository("unreachable", Result.err(unreachable()),
+                Result.err(new Failure.PackageNotFound("ballerina/graphql", "must not be reached")));
+        FakeRepository second = graphqlRepository("second", noModulePage());
+        Result<LoadedPackage> loaded = loadSubgraph(unreachable, second);
+        Assert.assertFalse(loaded.isOk());
+        Assert.assertTrue(loaded.failure() instanceof Failure.Upstream, loaded.failure().describe());
+        Assert.assertEquals(second.fetchCalls, 0);
+    }
+
+    @Test
+    public void aPackagePageThatCouldNotBeReadIsReportedOverOneThatIsMissing() {
+        CentralClient.ResolvedVersion version =
+                new CentralClient.ResolvedVersion(Version.parse("1.17.0").value(), false);
+        FakeRepository first = new FakeRepository("first", Result.ok(version), Result.err(unreachable()));
+        first.modulePage = noModulePage();
+        FakeRepository second = new FakeRepository("second", Result.ok(version),
+                Result.err(new Failure.PackageNotFound("ballerina/graphql:1.17.0", "not here")));
+        second.modulePage = noModulePage();
+        Result<LoadedPackage> loaded = loadSubgraph(first, second);
+        Assert.assertFalse(loaded.isOk());
+        Assert.assertTrue(loaded.failure() instanceof Failure.Upstream, loaded.failure().describe());
+        Assert.assertEquals(first.fetchCalls + second.fetchCalls, 2);
+    }
+
+    @Test
+    public void aLockedVersionAsksEveryRepositoryForTheSubmoduleAtThatVersion() throws IOException {
+        Path project = Files.createTempDirectory("bal-discover-lock-");
+        Files.writeString(project.resolve("Dependencies.toml"),
+                "[[package]]\norg = \"ballerina\"\nname = \"graphql\"\nversion = \"1.17.0\"\n");
+        FakeRepository first = graphqlRepository("first", noModulePage());
+        FakeRepository second = graphqlRepository("second", subgraphPage());
+        Result<LoadedPackage> loaded = Loader.loadPackage(GRAPHQL, new Loader.LoadOptions(
+                httpThatMustNotReachTheNetwork(), project.toString(), List.of(first, second), "subgraph"));
+        Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
+        Assert.assertEquals(loaded.value().version().text(), "1.17.0");
+        Assert.assertEquals(first.resolveCalls + second.resolveCalls, 0, "the lock, not the repositories, names it");
+        Assert.assertEquals(first.moduleFetchCalls + second.moduleFetchCalls, 2);
         Assert.assertEquals(first.fetchCalls + second.fetchCalls, 0);
     }
 }
