@@ -285,7 +285,7 @@ public final class TextRenderer {
             block.addAll(indented(types.get(i).declaration().lines().toList()));
             layout.block(block);
         }
-        Drill drill = closureTail(layout, signature.omitted(), signature.foreign());
+        Drill drill = closureTail(layout, signature.omitted(), signature.omittedTotal(), signature.foreign());
         documented(layout, signature.documented());
         layout.notices(signature.note(), signature.warning());
         layout.more(remaining(signature.documented().names().size(), signature.documented().total(),
@@ -413,16 +413,20 @@ public final class TextRenderer {
             block.addAll(indented(types.get(i).declaration().lines().toList()));
             layout.block(block);
         }
-        Drill drill = closureTail(layout, declaration.omitted(), declaration.foreign());
+        Drill drill = closureTail(layout, declaration.omitted(), declaration.omittedTotal(), declaration.foreign());
         layout.notices(declaration.note(), declaration.warning());
         layout.next(drill.pattern());
     }
 
     /** What a closure left behind: the names its budget dropped, and the declarations another package owns. */
     private static Drill closureTail(
-            Layout layout, List<DiscoverResult.Method> omitted, List<DiscoverResult.Foreign> foreign) {
+            Layout layout, List<DiscoverResult.Method> omitted, int omittedTotal,
+            List<DiscoverResult.Foreign> foreign) {
         Drill drill = methodDrill(omitted);
-        layout.section("Past the closure budget (" + omitted.size() + ")", methodTable(omitted, drill));
+        int unlisted = Math.max(0, omittedTotal - omitted.size());
+        layout.section("Past the closure budget (" + omitted.size() + (unlisted > 0 ? " of " + omittedTotal : "") + ")",
+                methodTable(omitted, drill));
+        layout.more(unlisted, null);
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
         foreign.forEach(type -> table.row(type.name(),
                 type.module() + (type.version() == null ? "" : " " + type.version()),

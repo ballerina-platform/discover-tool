@@ -91,6 +91,11 @@ public final class Types {
         return entries(loaded.library()).size();
     }
 
+    /** Every name this bucket holds, in listing order. */
+    public static List<String> names(LoadedPackage loaded) {
+        return entries(loaded.library()).stream().map(Entry::name).toList();
+    }
+
     /** Whether {@code name} is a declaration this bucket holds, for another bucket deciding to route here. */
     public static boolean declares(LoadedPackage loaded, String name) {
         Library library = loaded.library();
@@ -239,7 +244,7 @@ public final class Types {
             Library.AnnotationDef annotation = library.annotations().stream()
                     .filter(candidate -> candidate.name().equals(name)).findFirst().orElseThrow();
             return Result.ok(new DiscoverResult.TypeDeclaration(name, "annotation",
-                    Documents.renderAnnotation(annotation), List.of(), List.of(), List.of(), loaded.warning(),
+                    Documents.renderAnnotation(annotation), List.of(), List.of(), 0, List.of(), loaded.warning(),
                     note));
         }
 
@@ -249,8 +254,8 @@ public final class Types {
                 .toList();
         List<TypeDef> printed = closure.names().stream().map(index::get).toList();
         return Result.ok(new DiscoverResult.TypeDeclaration(name, singular(typeDef),
-                TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure), foreignOf(loaded, printed),
-                loaded.warning(), note));
+                TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure), closure.omitted().size(),
+                foreignOf(loaded, printed), loaded.warning(), note));
     }
 
     private static String singular(TypeDef typeDef) {
