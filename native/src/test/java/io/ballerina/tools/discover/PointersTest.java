@@ -186,8 +186,9 @@ public class PointersTest {
                 chunks.chunks().forEach(chunk -> commands.add(chunk.command()));
                 addIfPresent(commands, chunks.next());
             }
-            case DiscoverResult.Signature ignored -> {
-                // The end of a drill-down: nothing further to open.
+            case DiscoverResult.Signature signature -> {
+                signature.omitted().forEach(omitted -> commands.add(omitted.command()));
+                addForeign(commands, signature.foreign());
             }
             case DiscoverResult.MixedListing mixed -> {
                 mixed.resources().forEach(resource -> commands.addAll(resource.commands().values()));
@@ -215,10 +216,20 @@ public class PointersTest {
             }
             case DiscoverResult.TypeDeclaration declaration -> {
                 declaration.omitted().forEach(omitted -> commands.add(omitted.command()));
-                declaration.foreign().forEach(foreign -> addIfPresent(commands, foreign.command()));
+                addForeign(commands, declaration.foreign());
             }
         }
         return commands;
+    }
+
+    /**
+     * Another module's declaration, which this fixture cannot serve: a sibling submodule's page is a separate
+     * Central document the replayed transport does not hold, just as another package's is.
+     */
+    private static void addForeign(List<String> commands, List<DiscoverResult.Foreign> foreign) {
+        foreign.stream().map(DiscoverResult.Foreign::command)
+                .filter(command -> command != null && !command.contains(" --module "))
+                .forEach(commands::add);
     }
 
     private static void addIfPresent(List<String> commands, String command) {
@@ -419,6 +430,9 @@ public class PointersTest {
             element.getAsJsonArray().forEach(child -> collectCommands(child, into));
         } else if (element.isJsonObject()) {
             for (Map.Entry<String, JsonElement> field : element.getAsJsonObject().entrySet()) {
+                if (field.getKey().equals("foreign")) {
+                    continue;
+                }
                 if ((field.getKey().equals("command") || field.getKey().equals("next"))
                         && field.getValue().isJsonPrimitive()) {
                     into.add(field.getValue().getAsString());

@@ -979,7 +979,12 @@ public final class Containers {
                 ? null
                 : Closure.leaf(roots, index);
         List<DiscoverResult.Signature.Type> types = closure == null ? List.of() : closure.types(index);
-        List<String> omitted = closure == null || !closure.truncated() ? List.of() : closure.omitted();
+        List<DiscoverResult.Method> omitted = closure == null
+                ? List.of()
+                : Types.omittedOf(loaded, closure);
+        List<DiscoverResult.Foreign> foreign = closure == null
+                ? List.of()
+                : Types.foreignOf(loaded, closure.names().stream().map(index::get).toList());
 
         String kind = switch (fn) {
             case Fn.Resource ignored -> "resource";
@@ -997,7 +1002,7 @@ public final class Containers {
                 fn instanceof Fn.Resource resource ? resource.accessor() : null,
                 fn instanceof Fn.Resource ? pathName(entry.path()) : null,
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
-                types, omitted, documentedOn(window, documented, 0), window.paging(), window.next(command),
+                types, omitted, foreign, documentedOn(window, documented, 0), window.paging(), window.next(command),
                 loaded.warning(), mergeNotes(note, pathNote(container, selectors))));
     }
 

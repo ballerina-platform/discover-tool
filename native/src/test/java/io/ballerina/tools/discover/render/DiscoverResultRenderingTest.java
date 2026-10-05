@@ -502,14 +502,15 @@ public class DiscoverResultRenderingTest {
     // -----------------------------------------------------------------------
 
     private static DiscoverResult.Signature getPublicGists(List<DiscoverResult.Signature.Type> types,
-            List<String> omitted, String note) {
+            List<DiscoverResult.Method> omitted, String note) {
         return new DiscoverResult.Signature("Client", "resource", null, "get", "gists/'public", "->",
                 "resource function get gists/'public(map<string|string[]> headers = {}, *GistsListPublicQueries "
                         + "queries) returns BaseGist[]|error;",
                 List.of(new DiscoverResult.Signature.Parameter("headers", "map<string|string[]>", "{}", null, ""),
                         new DiscoverResult.Signature.Parameter(
                                 "queries", "GistsListPublicQueries", null, "inclusion", "Queries to send")),
-                "BaseGist[]|error", false, types, omitted, DiscoverResult.Documented.NONE, null, null, null, note);
+                "BaseGist[]|error", false, types, omitted, List.of(), DiscoverResult.Documented.NONE, null, null, null,
+                note);
     }
 
     @Test
@@ -517,7 +518,7 @@ public class DiscoverResultRenderingTest {
         String command = "bal discover pkg client Client echo --filter the";
         DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
-                false, List.of(), List.of(), new DiscoverResult.Documented(List.of("ping", "auth"), 82),
+                false, List.of(), List.of(), List.of(), new DiscoverResult.Documented(List.of("ping", "auth"), 82),
                 new DiscoverResult.Paging(2, 3, 2), command + " --page 3", null, null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.contains("\nMatched by documentation only (2 of 82)\n  ping\n  auth\n"), text);
@@ -561,7 +562,8 @@ public class DiscoverResultRenderingTest {
     public void aSignaturesTypesFollowItAndWhatTheBudgetLeftOutIsNamed() {
         DiscoverResult result = getPublicGists(
                 List.of(new DiscoverResult.Signature.Type("BaseGist", "public type BaseGist record {|\n|};")),
-                List.of("GistFile"), "relocated to gists/'public");
+                List.of(new DiscoverResult.Method("GistFile", "bal discover pkg type GistFile")),
+                "relocated to gists/'public");
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "",
@@ -572,16 +574,19 @@ public class DiscoverResultRenderingTest {
                 "  public type BaseGist record {|",
                 "  |};",
                 "",
-                "1 more past the closure budget, not shown",
+                "Past the closure budget (1)",
                 "  GistFile",
                 "",
-                "Note: relocated to gists/'public"));
+                "Note: relocated to gists/'public",
+                "Next: bal discover pkg type <name>"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonObject type = json.getAsJsonArray("types").get(0).getAsJsonObject();
         Assert.assertEquals(type.get("name").getAsString(), "BaseGist");
         Assert.assertEquals(type.get("declaration").getAsString(), "public type BaseGist record {|\n|};");
-        Assert.assertEquals(json.getAsJsonArray("omitted").get(0).getAsString(), "GistFile");
+        JsonObject omitted = json.getAsJsonArray("omitted").get(0).getAsJsonObject();
+        Assert.assertEquals(omitted.get("name").getAsString(), "GistFile");
+        Assert.assertEquals(omitted.get("command").getAsString(), "bal discover pkg type GistFile");
         Assert.assertEquals(json.get("note").getAsString(), "relocated to gists/'public");
     }
 

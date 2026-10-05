@@ -247,14 +247,10 @@ public final class Types {
         List<DiscoverResult.Signature.Type> types = closure.types(index).stream()
                 .filter(type -> !type.name().equals(name))
                 .toList();
-        List<DiscoverResult.Method> omitted = closure.omitted().stream()
-                .limit(Containers.MAX_ENTRIES)
-                .map(missing -> new DiscoverResult.Method(missing, commandFor(loaded, missing)))
-                .toList();
         List<TypeDef> printed = closure.names().stream().map(index::get).toList();
         return Result.ok(new DiscoverResult.TypeDeclaration(name, singular(typeDef),
-                TypeDefs.renderTypeDef(typeDef), types, omitted, foreignOf(loaded, printed), loaded.warning(),
-                note));
+                TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure), foreignOf(loaded, printed),
+                loaded.warning(), note));
     }
 
     private static String singular(TypeDef typeDef) {
@@ -292,6 +288,14 @@ public final class Types {
                 : "No declaration matched. Re-run with one of the candidates if it is what you meant, or search "
                         + "by keyword with " + search)
                 + ". Add --refresh if you believe the name exists and is newer than the cached copy.";
+    }
+
+    /** What a closure's budget left out, each with the command that opens it, up to the listing ceiling. */
+    static List<DiscoverResult.Method> omittedOf(LoadedPackage loaded, Closure.Result closure) {
+        return closure.omitted().stream()
+                .limit(Containers.MAX_ENTRIES)
+                .map(missing -> new DiscoverResult.Method(missing, commandFor(loaded, missing)))
+                .toList();
     }
 
     /** The command that opens a name this package declares: its own bucket when it is a container. */
