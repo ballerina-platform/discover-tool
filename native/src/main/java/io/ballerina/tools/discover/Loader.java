@@ -176,9 +176,12 @@ public final class Loader {
      *
      * <p>Under {@code --module} the version is still the PACKAGE's, resolved from its literal coordinate, and the
      * page read is the submodule's own. Its {@code relatedModules} lists the package's other modules, so the
-     * success path never fetches the package's page as well. A submodule the repository has no page for is
-     * answered with the package's page instead, which carries no such module: selection then fails the way it
-     * does for any module a page lacks, naming the submodules the package does publish.
+     * success path never fetches the package's page as well. Every repository is asked for the submodule's page
+     * before any package page is read: one repository lacking it is the routine fallback case, and a later one
+     * may publish it. Only when every repository that has the package answers that it has no such page is a
+     * package page read — from those same repositories in order, each at the version it resolved — purely so
+     * selection fails naming the submodules the package does publish. Any other failure on the way is reported
+     * as it is, never turned into a missing module.
      *
      * <p>Module selection happens exactly once, after some repository has actually answered — never inside the
      * per-repository retry. A repository that has nothing for this package is a routine fallback case, but a
@@ -187,42 +190,83 @@ public final class Loader {
      * the rest would only risk burying that specific failure under an unrelated one from a later repository.
      */
     public static Result<LoadedPackage> loadPackage(QualifiedName qualified, LoadOptions options) {
+        Function<PackageRepository, Result<CentralClient.ResolvedVersion>> resolve = repository ->
+                repository.resolveVersion(qualified, options.http());
         if (options.projectDir() != null) {
             String locked = DependenciesToml.lockedVersion(options.projectDir(), qualified);
             if (locked != null) {
-                Result<CentralClient.ResolvedVersion> resolved = fixed(locked);
-                if (!resolved.isOk()) {
-                    return resolved.cast();
+                Result<CentralClient.ResolvedVersion> fixed = fixed(locked);
+                if (!fixed.isOk()) {
+                    return fixed.cast();
                 }
-                Result<Fetched> fetched = tryEachRepository(options.repositories(),
-                        repository -> fetch(repository, qualified, resolved.value(), options));
-                return fetched.isOk() ? build(qualified, fetched.value(), options) : fetched.cast();
+                resolve = repository -> fixed;
             }
         }
-        Result<Fetched> fetched = tryEachRepository(options.repositories(), repository -> {
-            Result<CentralClient.ResolvedVersion> resolved = repository.resolveVersion(qualified, options.http());
-            return resolved.isOk() ? fetch(repository, qualified, resolved.value(), options) : resolved.cast();
-        });
+        Result<Fetched> fetched = options.module() == null
+                ? fetchPackage(qualified, options, resolve)
+                : fetchSubmodule(qualified, options, resolve);
         return fetched.isOk() ? build(qualified, fetched.value(), options) : fetched.cast();
     }
 
-    private static Result<Fetched> fetch(PackageRepository repository, QualifiedName qualified,
-            CentralClient.ResolvedVersion resolved, LoadOptions options) {
-        String submodule = options.module();
-        Result<CentralDocs> docs = submodule == null
-                ? repository.fetchDocs(qualified, resolved, options.http())
-                : repository.fetchModuleDocs(qualified, submodule, resolved, options.http());
-        if (docs.isOk()) {
-            return Result.ok(new Fetched(repository, resolved, docs.value()));
-        }
-        if (submodule == null || !(docs.failure() instanceof Failure.PackageNotFound)) {
-            return docs.cast();
-        }
-        Result<CentralDocs> packagePage = repository.fetchDocs(qualified, resolved, options.http());
-        return packagePage.isOk()
-                ? Result.ok(new Fetched(repository, resolved, packagePage.value()))
-                : packagePage.cast();
+    private static Result<Fetched> fetchPackage(QualifiedName qualified, LoadOptions options,
+            Function<PackageRepository, Result<CentralClient.ResolvedVersion>> resolve) {
+        return tryEachRepository(options.repositories(), repository -> {
+            Result<CentralClient.ResolvedVersion> resolved = resolve.apply(repository);
+            if (!resolved.isOk()) {
+                return resolved.cast();
+            }
+            Result<CentralDocs> docs = repository.fetchDocs(qualified, resolved.value(), options.http());
+            return docs.isOk() ? Result.ok(new Fetched(repository, resolved.value(), docs.value())) : docs.cast();
+        });
     }
+
+    private static Result<Fetched> fetchSubmodule(QualifiedName qualified, LoadOptions options,
+            Function<PackageRepository, Result<CentralClient.ResolvedVersion>> resolve) {
+        List<Resolved> withoutPage = new ArrayList<>();
+        Result<Fetched> last = null;
+        Result<Fetched> otherFailure = null;
+        for (PackageRepository repository : options.repositories()) {
+            Result<CentralClient.ResolvedVersion> resolved = resolve.apply(repository);
+            if (!resolved.isOk()) {
+                last = resolved.cast();
+                continue;
+            }
+            Result<CentralDocs> page =
+                    repository.fetchModuleDocs(qualified, options.module(), resolved.value(), options.http());
+            if (page.isOk()) {
+                return Result.ok(new Fetched(repository, resolved.value(), page.value()));
+            }
+            last = page.cast();
+            if (page.failure() instanceof Failure.PackageNotFound) {
+                withoutPage.add(new Resolved(repository, resolved.value()));
+            } else {
+                otherFailure = last;
+            }
+        }
+        if (otherFailure != null || withoutPage.isEmpty()) {
+            return otherFailure != null ? otherFailure : last;
+        }
+        Result<Fetched> packagePage = null;
+        for (Resolved candidate : withoutPage) {
+            Result<CentralDocs> docs =
+                    candidate.repository().fetchDocs(qualified, candidate.resolved(), options.http());
+            packagePage = docs.isOk()
+                    ? Result.ok(new Fetched(candidate.repository(), candidate.resolved(), docs.value()))
+                    : docs.cast();
+            if (packagePage.isOk()) {
+                break;
+            }
+        }
+        return packagePage;
+    }
+
+    /**
+     * A repository that has the package, but no page for the submodule asked for.
+     *
+     * @param repository the repository
+     * @param resolved the package version it resolved
+     */
+    private record Resolved(PackageRepository repository, CentralClient.ResolvedVersion resolved) { }
 
     /**
      * What one repository served, kept together so anything read later — the package source — comes from the
