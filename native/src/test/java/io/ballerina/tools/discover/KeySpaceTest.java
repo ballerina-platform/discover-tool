@@ -21,11 +21,15 @@ package io.ballerina.tools.discover;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.central.schema.Schema;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Central's payload shape, snapshotted.
@@ -72,6 +76,27 @@ public class KeySpaceTest {
         for (String slug : FixtureCorpus.listModulePages()) {
             Result<CentralDocs> parsed = Schema.parse(FixtureCorpus.loadRawModulePage(slug), slug);
             Assert.assertTrue(parsed.isOk(), slug + ": " + (parsed.isOk() ? "" : parsed.failure().describe()));
+        }
+    }
+
+    @Test
+    public void relatedModulesNeverMakeAPageFailToParse() {
+        for (String related : List.of("\"not an array\"", "{}", "[null, 7, \"x\"]",
+                "[{\"id\":42,\"orgName\":\"ballerina\"}, {\"id\":\"graphql.x\"}]",
+                "[{\"id\":\"graphql.x\",\"orgName\":\"ballerina\",\"summary\":3,"
+                        + "\"isDefaultModule\":\"yes\"}]")) {
+            JsonObject page = FixtureCorpus.loadRawFixture("ballerina__graphql").getAsJsonObject();
+            page.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject()
+                    .add("relatedModules", JsonParser.parseString(related));
+            Result<CentralDocs> parsed = Schema.parse(page, "related");
+            Assert.assertTrue(parsed.isOk(), related + ": " + (parsed.isOk() ? "" : parsed.failure().describe()));
+            List<CentralDocs.RelatedModule> read = parsed.value().modules().get(0).relatedModules();
+            if (related.contains("summary")) {
+                Assert.assertEquals(read, List.of(
+                        new CentralDocs.RelatedModule("graphql.x", "ballerina", Optional.empty(), false)));
+            } else {
+                Assert.assertEquals(read, List.of(), related);
+            }
         }
     }
 
