@@ -26,8 +26,8 @@ import io.ballerina.tools.discover.model.Bindings;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Param;
-import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.model.Service;
+import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Signatures;
 import io.ballerina.tools.discover.render.TypeDefs;
@@ -1008,7 +1008,8 @@ public final class Containers {
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
                 types, omitted, closure == null ? 0 : closure.omitted().size(),
                 closure == null ? null : Types.omittedNext(loaded, closure), foreign,
-                documentedOn(window, documented, 0), window.paging(), window.next(command), loaded.warning(), mergeNotes(note, pathNote(container, selectors))));
+                documentedOn(window, documented, 0), window.paging(), window.next(command),
+                loaded.warning(), mergeNotes(note, pathNote(container, selectors))));
     }
 
     /**
