@@ -1002,7 +1002,7 @@ public final class Containers {
                 fn instanceof Fn.Resource resource ? resource.accessor() : null,
                 fn instanceof Fn.Resource ? pathName(entry.path()) : null,
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
-                types, omitted, foreign, documentedOn(window, documented, 0), window.paging(), window.next(command),
+                types, omitted, closure == null ? 0 : closure.omitted().size(), foreign, documentedOn(window, documented, 0), window.paging(), window.next(command),
                 loaded.warning(), mergeNotes(note, pathNote(container, selectors))));
     }
 

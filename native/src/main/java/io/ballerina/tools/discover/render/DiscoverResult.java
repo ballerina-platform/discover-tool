@@ -344,7 +344,9 @@ public sealed interface DiscoverResult {
      * @param returns its return type, or {@code null} when it returns nothing
      * @param deprecated whether calling it is discouraged
      * @param types the declarations its signature names, one level deep, within the closure budget
-     * @param omitted the declarations the closure budget left out of {@code types}, each with its command
+     * @param omitted the declarations the closure budget left out of {@code types}, each with its command, up to
+     *     the listing ceiling
+     * @param omittedTotal how many the budget left out in all, which exceeds {@code omitted}'s size past the ceiling
      * @param foreign the declarations from other packages that {@code types} name
      * @param documented other entries a {@code --filter} matched only in their documentation
      * @param paging which page of {@code documented} this is, or {@code null} when it fit on one
@@ -355,7 +357,8 @@ public sealed interface DiscoverResult {
     record Signature(
             String container, String kind, String name, String accessor, String path, String form,
             String declaration, List<Parameter> params, String returns, boolean deprecated,
-            List<Type> types, List<Method> omitted, List<Foreign> foreign, Documented documented, Paging paging,
+            List<Type> types, List<Method> omitted, int omittedTotal, List<Foreign> foreign, Documented documented,
+            Paging paging,
             String next, String warning, String note) implements DiscoverResult {
 
         /**
@@ -502,14 +505,16 @@ public sealed interface DiscoverResult {
      *     or {@code annotation}
      * @param declaration the declaration, verbatim
      * @param types the declarations it names, one level deep, within the closure budget
-     * @param omitted the names the closure budget left out of {@code types}, each with the command that opens it
+     * @param omitted the names the closure budget left out of {@code types}, each with the command that opens it,
+     *     up to the listing ceiling
+     * @param omittedTotal how many the budget left out in all, which exceeds {@code omitted}'s size past the ceiling
      * @param foreign the declarations it names that another package declares
      * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the routing advisory when another bucket sent the caller here, or {@code null}
      */
     record TypeDeclaration(
             String name, String kind, String declaration, List<Signature.Type> types, List<Method> omitted,
-            List<Foreign> foreign, String warning, String note) implements DiscoverResult { }
+            int omittedTotal, List<Foreign> foreign, String warning, String note) implements DiscoverResult { }
 
     /**
      * A bucket this package declares nothing in, and the buckets that do hold its callable surface.

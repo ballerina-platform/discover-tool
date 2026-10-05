@@ -509,7 +509,7 @@ public class DiscoverResultRenderingTest {
                 List.of(new DiscoverResult.Signature.Parameter("headers", "map<string|string[]>", "{}", null, ""),
                         new DiscoverResult.Signature.Parameter(
                                 "queries", "GistsListPublicQueries", null, "inclusion", "Queries to send")),
-                "BaseGist[]|error", false, types, omitted, List.of(), DiscoverResult.Documented.NONE, null, null, null,
+                "BaseGist[]|error", false, types, omitted, omitted.size(), List.of(), DiscoverResult.Documented.NONE, null, null, null,
                 note);
     }
 
@@ -518,7 +518,7 @@ public class DiscoverResultRenderingTest {
         String command = "bal discover pkg client Client echo --filter the";
         DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
-                false, List.of(), List.of(), List.of(), new DiscoverResult.Documented(List.of("ping", "auth"), 82),
+                false, List.of(), List.of(), 0, List.of(), new DiscoverResult.Documented(List.of("ping", "auth"), 82),
                 new DiscoverResult.Paging(2, 3, 2), command + " --page 3", null, null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.contains("\nMatched by documentation only (2 of 82)\n  ping\n  auth\n"), text);

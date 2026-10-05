@@ -142,6 +142,7 @@ public class ViewsTest {
     public void curatedTypeLeavesAreUnchanged() {
         String[][] leaves = {
                 {"ballerina__http", "ClientConfiguration"}, {"ballerina__http", "ClientError"},
+                {"ballerina__http", "StatusCodeResponse"},
                 {"ballerina__http", "Client"}, {"ballerina__graphql", "ID"},
                 {"ballerinax__github", "ConnectionConfig"}, {"ballerinax__googleapis.sheets", "ConnectionConfig"},
                 {"ballerinax__kafka", "TopicPartitionOffset"}, {"ballerinax__kafka", "NoSuchType"}};
@@ -783,6 +784,37 @@ public class ViewsTest {
         Assert.assertTrue(wide.total() > Containers.MAX_ENTRIES, "github has far more than one page of repo types");
         Assert.assertNotNull(wide.paging());
         Assert.assertEquals(wide.next(), "bal discover ballerinax/github type --filter repo --page 2");
+    }
+
+    @Test
+    public void aClosureThatDropsMoreThanTheCeilingReportsTheTrueTotal() {
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        DiscoverResult.TypeDeclaration status = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerina__http", "StatusCodeResponse"));
+        Assert.assertEquals(status.omitted().size(), Containers.MAX_ENTRIES);
+        Assert.assertEquals(status.omittedTotal(), 48);
+        Assert.assertTrue(JsonRenderer.render(status).contains("\"omittedTotal\":48"), JsonRenderer.render(status));
+        String text = TextRenderer.render(status, new TextRenderer.Context(
+                http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null));
+        Assert.assertTrue(text.contains("Past the closure budget (40 of 48)"), text);
+        Assert.assertTrue(text.contains("... 8 more, narrow further"), text);
+
+        DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerina__http", "ClientError"));
+        Assert.assertEquals(config.omittedTotal(), config.omitted().size());
+        Assert.assertFalse(JsonRenderer.render(config).contains("omittedTotal"));
+    }
+
+    @Test(dataProvider = "fixtures")
+    public void anOmittedTotalIsNeverBelowTheRowsListed(String slug) {
+        LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
+        for (String name : Types.names(loaded)) {
+            Result<DiscoverResult> answer = Types.render(loaded, new Types.Options(List.of(name), null, 1));
+            if (answer.isOk() && answer.value() instanceof DiscoverResult.TypeDeclaration leaf) {
+                Assert.assertTrue(leaf.omittedTotal() >= leaf.omitted().size(), slug + " " + name);
+                Assert.assertTrue(leaf.omitted().size() <= Containers.MAX_ENTRIES, slug + " " + name);
+            }
+        }
     }
 
     @Test

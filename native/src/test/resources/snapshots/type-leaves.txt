@@ -155,6 +155,156 @@ public type ClientError distinct Error;
 Types it names (1)
   # Defines the common error type for the module.
   public type Error distinct error;
+== ballerina__http type StatusCodeResponse ==
+ballerina/http · type · StatusCodeResponse
+
+# Defines the possible status code response record types.
+public type StatusCodeResponse Continue|SwitchingProtocols|Processing|EarlyHints|Ok|Created|Accepted|NonAuthoritativeInformation|NoContent|ResetContent|PartialContent|MultiStatus|AlreadyReported|IMUsed|MultipleChoices|MovedPermanently|Found|SeeOther|NotModified|UseProxy|TemporaryRedirect|PermanentRedirect|BadRequest|Unauthorized|PaymentRequired|Forbidden|NotFound|MethodNotAllowed|NotAcceptable|ProxyAuthenticationRequired|RequestTimeout|Conflict|Gone|LengthRequired|PreconditionFailed|PayloadTooLarge|UriTooLong|UnsupportedMediaType|RangeNotSatisfiable|ExpectationFailed|MisdirectedRequest|UnprocessableEntity|Locked|FailedDependency|TooEarly|PreconditionRequired|UnavailableDueToLegalReasons|UpgradeRequired|TooManyRequests|RequestHeaderFieldsTooLarge|InternalServerError|NotImplemented|BadGateway|ServiceUnavailable|GatewayTimeout|HttpVersionNotSupported|VariantAlsoNegotiates|InsufficientStorage|LoopDetected|NotExtended|NetworkAuthenticationRequired|DefaultStatusCodeResponse;
+
+Types it names (14)
+  # The status code response record of `Continue`.
+  public type Continue record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusContinue status = STATUS_CONTINUE_OBJ; // Special Agent Note: the default STATUS_CONTINUE_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `SwitchingProtocols`.
+  public type SwitchingProtocols record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusSwitchingProtocols status = STATUS_SWITCHING_PROTOCOLS_OBJ; // Special Agent Note: the default STATUS_SWITCHING_PROTOCOLS_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `Processing`.
+  public type Processing record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusProcessing status = STATUS_PROCESSING_OBJ; // Special Agent Note: the default STATUS_PROCESSING_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `EarlyHints`.
+  public type EarlyHints record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusEarlyHints status = STATUS_EARLY_HINTS_OBJ; // Special Agent Note: the default STATUS_EARLY_HINTS_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `Ok`.
+  public type Ok record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusOK status = STATUS_OK_OBJ; // Special Agent Note: the default STATUS_OK_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `Created`.
+  public type Created record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusCreated status = STATUS_CREATED_OBJ; // Special Agent Note: the default STATUS_CREATED_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `Accepted`.
+  public type Accepted record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusAccepted status = STATUS_ACCEPTED_OBJ; // Special Agent Note: the default STATUS_ACCEPTED_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `NonAuthoritativeInformation`.
+  public type NonAuthoritativeInformation record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusNonAuthoritativeInformation status = STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ; // Special Agent Note: the default STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `NoContent`.
+  public type NoContent record {|
+      # The response headers
+      map<string|int|boolean|string[]|int[]|boolean[]> headers?;
+      # The response status code obj
+      readonly StatusNoContent status = STATUS_NO_CONTENT_OBJ; // Special Agent Note: the default STATUS_NO_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `ResetContent`.
+  public type ResetContent record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusResetContent status = STATUS_RESET_CONTENT_OBJ; // Special Agent Note: the default STATUS_RESET_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `PartialContent`.
+  public type PartialContent record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusPartialContent status = STATUS_PARTIAL_CONTENT_OBJ; // Special Agent Note: the default STATUS_PARTIAL_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `MultiStatus`.
+  public type MultiStatus record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusMultiStatus status = STATUS_MULTI_STATUS_OBJ; // Special Agent Note: the default STATUS_MULTI_STATUS_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `AlreadyReported`.
+  public type AlreadyReported record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusAlreadyReported status = STATUS_ALREADY_REPORTED_OBJ; // Special Agent Note: the default STATUS_ALREADY_REPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+  # The status code response record of `IMUsed`.
+  public type IMUsed record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusIMUsed status = STATUS_IM_USED_OBJ; // Special Agent Note: the default STATUS_IM_USED_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+Past the closure budget (40 of 48)
+  MultipleChoices
+  MovedPermanently
+  Found
+  SeeOther
+  NotModified
+  UseProxy
+  TemporaryRedirect
+  PermanentRedirect
+  BadRequest
+  Unauthorized
+  PaymentRequired
+  Forbidden
+  NotFound
+  MethodNotAllowed
+  NotAcceptable
+  ProxyAuthenticationRequired
+  RequestTimeout
+  Conflict
+  Gone
+  LengthRequired
+  PreconditionFailed
+  PayloadTooLarge
+  UriTooLong
+  UnsupportedMediaType
+  RangeNotSatisfiable
+  ExpectationFailed
+  MisdirectedRequest
+  UnprocessableEntity
+  Locked
+  FailedDependency
+  TooEarly
+  PreconditionRequired
+  UnavailableDueToLegalReasons
+  UpgradeRequired
+  TooManyRequests
+  RequestHeaderFieldsTooLarge
+  InternalServerError
+  NotImplemented
+  BadGateway
+  ServiceUnavailable
+
+... 8 more, narrow further
+Next: bal discover ballerina/http type <name>
 == ballerina__http type Client ==
 ballerina/http · type · Client
 1 resource path, 15 remote methods, 4 normal methods
