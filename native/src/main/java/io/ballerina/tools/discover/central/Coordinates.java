@@ -23,6 +23,10 @@ import com.google.gson.JsonObject;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Version;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 /**
  * Does this payload actually describe the package and version we asked for?
  *
@@ -94,15 +98,10 @@ public final class Coordinates {
     }
 
     private static boolean namesDefaultModule(JsonObject module, QualifiedName qualified) {
-        JsonElement related = module.get("relatedModules");
-        if (related == null || !related.isJsonArray()) {
-            return false;
-        }
-        for (JsonElement entry : related.getAsJsonArray()) {
-            if (entry.isJsonObject()
-                    && qualified.name().equals(Json.string(entry.getAsJsonObject(), "id"))
-                    && qualified.org().equals(Json.string(entry.getAsJsonObject(), "orgName"))
-                    && flagged(entry.getAsJsonObject(), "isDefaultModule", true)) {
+        for (JsonObject entry : objectsIn(module, "relatedModules").orElse(List.of())) {
+            if (qualified.name().equals(Json.string(entry, "id"))
+                    && qualified.org().equals(Json.string(entry, "orgName"))
+                    && flagged(entry, "isDefaultModule", true)) {
                 return true;
             }
         }
@@ -135,25 +134,31 @@ public final class Coordinates {
         return false;
     }
 
-    private static java.util.List<JsonObject> modules(JsonElement raw) {
-        if (raw == null || !raw.isJsonObject()) {
-            return java.util.List.of();
+    private static List<JsonObject> modules(JsonElement raw) {
+        JsonElement docsData = raw != null && raw.isJsonObject() ? raw.getAsJsonObject().get("docsData") : null;
+        return objectsIn(docsData, "modules").orElse(List.of());
+    }
+
+    /**
+     * The objects in {@code owner}'s {@code field} array, skipping any entry that is not an object — or empty when
+     * {@code owner} is not an object or {@code field} is not an array. The one shape question every reader here
+     * asks of a payload it does not trust, so its leniency is decided in one place.
+     */
+    private static Optional<List<JsonObject>> objectsIn(JsonElement owner, String field) {
+        if (owner == null || !owner.isJsonObject()) {
+            return Optional.empty();
         }
-        JsonElement docsData = raw.getAsJsonObject().get("docsData");
-        if (docsData == null || !docsData.isJsonObject()) {
-            return java.util.List.of();
+        JsonElement array = owner.getAsJsonObject().get(field);
+        if (array == null || !array.isJsonArray()) {
+            return Optional.empty();
         }
-        JsonElement modules = docsData.getAsJsonObject().get("modules");
-        if (modules == null || !modules.isJsonArray()) {
-            return java.util.List.of();
-        }
-        java.util.List<JsonObject> objects = new java.util.ArrayList<>();
-        for (JsonElement entry : modules.getAsJsonArray()) {
+        List<JsonObject> objects = new ArrayList<>();
+        for (JsonElement entry : array.getAsJsonArray()) {
             if (entry != null && entry.isJsonObject()) {
                 objects.add(entry.getAsJsonObject());
             }
         }
-        return objects;
+        return Optional.of(List.copyOf(objects));
     }
 
     private static boolean describes(JsonObject module, QualifiedName qualified, Version version) {
@@ -168,27 +173,16 @@ public final class Coordinates {
      * The module names one version's registry row lists — {@code aws} and {@code aws.auth} for
      * {@code ballerinax/aws} — or an empty list when the row is not the shape expected.
      */
-    static java.util.List<String> moduleNames(JsonElement raw) {
-        if (raw == null || !raw.isJsonObject()) {
-            return java.util.List.of();
-        }
-        JsonElement modules = raw.getAsJsonObject().get("modules");
-        if (modules == null || !modules.isJsonArray()) {
-            return java.util.List.of();
-        }
-        java.util.List<String> names = new java.util.ArrayList<>();
-        for (JsonElement entry : modules.getAsJsonArray()) {
-            String name = entry.isJsonObject() ? Json.string(entry.getAsJsonObject(), "name") : null;
-            if (name != null && !name.isEmpty()) {
-                names.add(name);
-            }
-        }
-        return java.util.List.copyOf(names);
+    static List<String> moduleNames(JsonElement raw) {
+        return objectsIn(raw, "modules").orElse(List.of()).stream()
+                .map(module -> Json.string(module, "name"))
+                .filter(name -> name != null && !name.isEmpty())
+                .toList();
     }
 
     /** The first entry of a versions array, or {@code null} if it is not a non-empty array of strings. */
     static String newestVersion(JsonElement raw) {
-        java.util.List<String> all = publishedVersions(raw);
+        List<String> all = publishedVersions(raw);
         return all.isEmpty() ? null : all.get(0);
     }
 
@@ -199,26 +193,26 @@ public final class Coordinates {
      * what was published — advice naming a step the caller had no way to take. Naming them in the failure is why
      * no {@code versions} verb is needed, and it is the only place they are ever printed.
      */
-    static java.util.List<String> publishedVersions(JsonElement raw) {
+    static List<String> publishedVersions(JsonElement raw) {
         if (raw == null || !raw.isJsonArray()) {
-            return java.util.List.of();
+            return List.of();
         }
-        java.util.List<String> versions = new java.util.ArrayList<>();
+        List<String> versions = new ArrayList<>();
         for (JsonElement entry : raw.getAsJsonArray()) {
             if (entry.isJsonPrimitive() && entry.getAsJsonPrimitive().isString()
                     && !entry.getAsString().isEmpty()) {
                 versions.add(entry.getAsString());
             }
         }
-        return java.util.List.copyOf(versions);
+        return List.copyOf(versions);
     }
 
     /** The registry's per-version entry's {@code balaURL}, when it names one. */
-    static java.util.Optional<String> balaUrl(JsonElement raw) {
+    static Optional<String> balaUrl(JsonElement raw) {
         if (raw == null || !raw.isJsonObject()) {
-            return java.util.Optional.empty();
+            return Optional.empty();
         }
         String url = Json.string(raw.getAsJsonObject(), "balaURL");
-        return url == null || url.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(url);
+        return url == null || url.isEmpty() ? Optional.empty() : Optional.of(url);
     }
 }
