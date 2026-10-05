@@ -108,11 +108,14 @@ public class CliTest {
      * else is a 404, as Central answers a module the package does not publish.
      */
     private static FakeTransport graphqlCentral(Map<String, JsonElement> modulePages) {
+        return graphqlCentral(FixtureCorpus.loadRawFixture("ballerina__graphql"), modulePages);
+    }
+
+    private static FakeTransport graphqlCentral(JsonElement packagePage, Map<String, JsonElement> modulePages) {
         Map<String, String> pages = new HashMap<>();
         modulePages.forEach((module, page) -> pages.put(
                 "/docs/ballerina/graphql." + module + "/" + GRAPHQL_VERSION, page.toString()));
-        pages.put("/docs/ballerina/graphql/" + GRAPHQL_VERSION,
-                FixtureCorpus.loadRawFixture("ballerina__graphql").toString());
+        pages.put("/docs/ballerina/graphql/" + GRAPHQL_VERSION, packagePage.toString());
         pages.put("/registry/packages/ballerina/graphql", "[\"" + GRAPHQL_VERSION + "\"]");
         return FakeTransport.routing(url -> pages.entrySet().stream()
                 .filter(page -> url.endsWith(page.getKey()))
@@ -887,6 +890,28 @@ public class CliTest {
         Assert.assertEquals(exitCode, 1, capture.stdout());
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
         Assert.assertEquals(capture.field("suggestion"), SUBGRAPH_UNCONFIRMED, capture.stderr());
+    }
+
+    @Test
+    public void aMalformedRelatedModuleOnlyShortensTheSubmoduleList() {
+        JsonObject page = FixtureCorpus.loadRawFixture("ballerina__graphql").getAsJsonObject();
+        JsonObject module = page.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject();
+        for (JsonElement related : module.getAsJsonArray("relatedModules")) {
+            JsonObject entry = related.getAsJsonObject();
+            if (entry.get("id").getAsString().equals("graphql.dataloader")) {
+                entry.addProperty("id", 42);
+            }
+        }
+
+        Capture client = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "client"), client.streams(),
+                options(graphqlCentral(page, Map.of()))), 0, client.stderr());
+
+        Capture bare = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql"), bare.streams(),
+                options(graphqlCentral(page, Map.of()))), 0, bare.stderr());
+        Assert.assertTrue(bare.stdout().contains("\"name\":\"subgraph\""), bare.stdout());
+        Assert.assertFalse(bare.stdout().contains("dataloader"), bare.stdout());
     }
 
     @Test
