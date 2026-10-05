@@ -954,6 +954,38 @@ public class ViewsTest {
                 "Entity", "ballerina/mime", "2.12.2", "bal discover ballerina/mime type Entity")));
     }
 
+    private static LoadedPackage withDeclaration(String slug, io.ballerina.tools.discover.model.TypeDef added) {
+        LoadedPackage base = FixtureCorpus.loadedFixture(slug);
+        Library library = base.library();
+        List<io.ballerina.tools.discover.model.TypeDef> declarations = new java.util.ArrayList<>(library.typeDefs());
+        declarations.add(added);
+        return new LoadedPackage(base.qualified(), base.version(),
+                new Library(library.name(), library.description(), declarations, library.clients(),
+                        library.functions(), library.listeners(), library.services(), library.annotations(),
+                        library.configurables()),
+                base.readme(), base.module(), base.submodules(), base.warning());
+    }
+
+    @Test
+    public void aListenerWithNoServiceTypeIsNotADeadEndInTheServiceBucket() {
+        LoadedPackage base = FixtureCorpus.loadedFixture("ballerina__log");
+        Library library = base.library();
+        LoadedPackage lone = new LoadedPackage(base.qualified(), base.version(),
+                new Library(library.name(), library.description(), library.typeDefs(), library.clients(),
+                        library.functions(),
+                        List.of(new io.ballerina.tools.discover.model.TypeDef.ObjectDef("Lone", "")),
+                        library.services(), library.annotations(), library.configurables()),
+                base.readme(), base.module(), base.submodules(), base.warning());
+        Result<DiscoverResult> answer = Types.render(lone, new Types.Options(List.of("Lone"), null, 1));
+        Assert.assertFalse(answer.isOk());
+        Failure.SymbolNotFound missing = (Failure.SymbolNotFound) answer.failure();
+        Assert.assertEquals(missing.requested(), List.of("Lone"));
+        Assert.assertEquals(missing.suggestion(), "'Lone' is a listener this package declares, but `service` has "
+                + "nothing to show for it, and `type` holds only what is not callable. List the buckets with "
+                + "`bal discover ballerina/log`, or search declarations with "
+                + "`bal discover ballerina/log type --filter <keyword>`.");
+    }
+
     @Test
     public void typeTakesOneNameAndNoFilterBesideIt() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");

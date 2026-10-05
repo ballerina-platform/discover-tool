@@ -299,8 +299,20 @@ public final class Types {
                 + (listener ? "a listener, shown with the service types it serves" : "addressed by " + scope.verb())
                 + " — showing it. Canonical: bal discover " + loaded.pkgArgument() + " " + scope.verb()
                 + (listener ? "" : " " + Texts.shellWord(object.name()));
-        return Containers.render(loaded, scope,
+        Result<DiscoverResult> answer = Containers.render(loaded, scope,
                 new Containers.Options(listener ? List.of() : List.of(object.name())), routing);
+        boolean nothingToShow = answer.isOk()
+                ? answer.value() instanceof DiscoverResult.EmptyBucket
+                : answer.failure() instanceof Failure.SymbolNotFound;
+        if (!nothingToShow) {
+            return answer;
+        }
+        return Result.err(new Failure.SymbolNotFound(
+                loaded.label(), List.of(object.name()), List.of(),
+                "'" + object.name() + "' is " + (listener ? "a listener" : "an object") + " this package declares, "
+                        + "but `" + scope.verb() + "` has nothing to show for it, and `type` holds only what is not "
+                        + "callable. List the buckets with `bal discover " + loaded.pkgArgument() + "`, or search "
+                        + "declarations with `bal discover " + loaded.pkgArgument() + " type --filter <keyword>`."));
     }
 
     private static String missSuggestion(LoadedPackage loaded, boolean ambiguous) {
