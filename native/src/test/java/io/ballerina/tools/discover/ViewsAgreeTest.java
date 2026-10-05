@@ -27,7 +27,7 @@ import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Closure;
 import io.ballerina.tools.discover.views.Containers;
-import io.ballerina.tools.discover.views.TypeView;
+import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.DataProvider;
@@ -38,8 +38,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * THE test that makes the addressed verbs safe, and a reviewer should refuse them without it.
@@ -189,14 +187,18 @@ public class ViewsAgreeTest {
         Assert.assertFalse(index.names().isEmpty());
 
         for (String name : index.names()) {
-            Result<String> view = TypeView.render(context, new TypeView.Options(List.of(name), false));
-            Assert.assertTrue(view.isOk(), "type could not resolve " + name + ", which the index holds");
             TypeDef typeDef = index.get(name);
             Assert.assertNotNull(typeDef);
-            // Byte-exact, not merely "contains": `type` IS `renderTypeDef` plus a header, so anything else means a
-            // view started reformatting declarations.
-            Assert.assertTrue(view.value().contains("\n" + TypeDefs.renderTypeDef(typeDef) + "\n"),
-                    "type " + name + " did not print renderTypeDef's output exactly");
+            Result<DiscoverResult> view = Types.render(context, new Types.Options(List.of(name), null, 1));
+            Assert.assertTrue(view.isOk(), "type could not resolve " + name + ", which the index holds");
+            if (typeDef instanceof TypeDef.ObjectDef) {
+                Assert.assertFalse(view.value() instanceof DiscoverResult.TypeDeclaration,
+                        "type " + name + " is an object, which another bucket answers");
+                continue;
+            }
+            // Byte-exact: `type` IS `renderTypeDef`, so anything else means a view started reformatting.
+            Assert.assertEquals(((DiscoverResult.TypeDeclaration) view.value()).declaration(),
+                    TypeDefs.renderTypeDef(typeDef), "type " + name + " did not print renderTypeDef's output");
         }
     }
 
@@ -211,7 +213,7 @@ public class ViewsAgreeTest {
             if (held.contains(invented)) {
                 continue;
             }
-            Result<String> view = TypeView.render(context, new TypeView.Options(List.of(invented), false));
+            Result<DiscoverResult> view = Types.render(context, new Types.Options(List.of(invented), null, 1));
             Assert.assertFalse(view.isOk(), invented + " must not resolve");
             Assert.assertTrue(view.failure() instanceof Failure.SymbolNotFound);
         }
@@ -229,9 +231,9 @@ public class ViewsAgreeTest {
         Assert.assertFalse(collisions.isEmpty(),
                 "the corpus should contain at least one normalisation collision");
 
-        Result<String> view = TypeView.render(
+        Result<DiscoverResult> view = Types.render(
                 FixtureCorpus.loadedFixture("ballerina__http"),
-                new TypeView.Options(List.of(collisions.get(0).toLowerCase(java.util.Locale.ROOT)), false));
+                new Types.Options(List.of(collisions.get(0).toLowerCase(java.util.Locale.ROOT)), null, 1));
         Assert.assertFalse(view.isOk());
         Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
         Assert.assertTrue(failure.candidates().size() > 1, "every colliding name has to be listed");
@@ -242,13 +244,14 @@ public class ViewsAgreeTest {
 
     @Test
     public void aMissIsNotDescribedAsACollisionEvenThoughBothCarryCandidates() {
-        Result<String> view = TypeView.render(
+        Result<DiscoverResult> view = Types.render(
                 FixtureCorpus.loadedFixture("ballerina__http"),
-                new TypeView.Options(List.of("NoSuchType"), false));
+                new Types.Options(List.of("NoSuchType"), null, 1));
         Assert.assertFalse(view.isOk());
         Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
         Assert.assertFalse(failure.candidates().isEmpty(), "near misses are still offered");
         Assert.assertTrue(failure.suggestion().startsWith("No declaration matched."), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("type --filter <keyword>"), failure.suggestion());
         Assert.assertFalse(failure.suggestion().contains("normalise to the same name"));
     }
 
@@ -334,53 +337,27 @@ public class ViewsAgreeTest {
     // 5. Closures terminate, do not repeat, and stay bounded
     // -----------------------------------------------------------------------
 
-    /**
-     * The name a declaration line declares.
-     *
-     * <p>{@code public} is not optional in the pattern even though every declaration carries it, and the
-     * non-emptiness assertion below is why: when the qualifier landed, an anchored {@code ^type} stopped matching
-     * and this test went green over an empty list. A duplicate-detection test that finds no declarations passes for
-     * the same reason it would pass on an empty document.
-     */
-    private static final Pattern DECLARED = Pattern.compile(
-            "^public (?:type|enum|(?:[a-z]+ )*class) ([A-Za-z0-9_']+)"
-                    + "|^public const (?:[^\\s=]+ )?([A-Za-z0-9_']+) ="
-                    // `public final <type> <name> = <init>;` — the module-level variable form. Its type may
-                    // contain spaces (`readonly & Continue`), so the name is the token before ` = ` or `;`.
-                    + "|^public final .+?([A-Za-z0-9_']+)(?: = |;)",
-            Pattern.MULTILINE);
-
     @Test(dataProvider = "fixtures")
-    public void resolvedClosuresTerminateForEveryDeclaration(String slug) {
+    public void leafClosuresTerminateAndNeverRepeatForEveryDeclaration(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
-        Declarations index = Declarations.index(context.library().typeDefs());
+        Declarations index = Declarations.index(context.library().addressable());
         for (String name : index.names()) {
             // A record whose field is an array of itself is ordinary, so this is a real cycle risk rather than a
-            // hypothetical one. The view returning at all is the assertion; an unguarded walk would not.
-            Result<String> view = TypeView.render(context, new TypeView.Options(List.of(name), true));
-            Assert.assertTrue(view.isOk(), "-r failed on " + name);
-
-            // And no declaration is printed twice inside one closure. `const` puts the TYPE before the name, so a
-            // naive capture reads `string` three times and reports a duplicate that is not one.
-            List<String> declared = new ArrayList<>();
-            Matcher matcher = DECLARED.matcher(view.value());
-            while (matcher.find()) {
-                declared.add(matcher.group(1) != null ? matcher.group(1) : matcher.group(2));
-            }
-            Assert.assertFalse(declared.isEmpty(),
-                    "-r printed no declaration line this pattern recognises for " + name
-                            + "; a duplicate check over an empty list passes vacuously");
-            Assert.assertEquals(new HashSet<>(declared).size(), declared.size(),
-                    "-r repeated a declaration for " + name);
+            // hypothetical one. The walk returning at all is the assertion; an unguarded one would not.
+            Closure.Result closure = Closure.leaf(List.of(name), index);
+            Assert.assertEquals(new HashSet<>(closure.names()).size(), closure.names().size(),
+                    "the closure repeated a declaration for " + name);
+            Assert.assertTrue(closure.names().isEmpty() || closure.names().get(0).equals(name),
+                    "the root comes first for " + name);
         }
     }
 
     /**
      * The closure is BOUNDED, and anything it dropped is NAMED.
      *
-     * <p>T7. {@code type ballerina/http ClientConfiguration --deps} was 38 declarations, 505 lines and 24,183
-     * bytes handed back whole, with no bound at all. A budget that dropped names silently would be worse than the
-     * dump; a name is a legal {@code type} argument, so naming them keeps a truncated closure actionable.
+     * <p>T7. {@code ClientConfiguration}'s closure was 38 declarations and 24,183 bytes handed back whole, with no
+     * bound at all. A budget that dropped names silently would be worse than the dump; a name is a legal
+     * {@code type} argument, so naming them keeps a truncated closure actionable.
      */
     @Test(dataProvider = "fixtures")
     public void aTruncatedClosureNamesEveryTypeItDroppedAndEachIsResolvable(String slug) {
@@ -388,8 +365,7 @@ public class ViewsAgreeTest {
         Declarations index = Declarations.index(context.library().addressable());
         int truncated = 0;
         for (String name : index.names()) {
-            Closure.Result closure =
-                    Closure.of(List.of(name), index, Closure.MAX_BYTES, Closure.UNBOUNDED);
+            Closure.Result closure = Closure.of(List.of(name), index, Closure.LEAF_BYTES, Closure.UNBOUNDED);
             if (!closure.truncated()) {
                 continue;
             }
@@ -405,6 +381,19 @@ public class ViewsAgreeTest {
         if ("ballerina__http".equals(slug)) {
             Assert.assertTrue(truncated > 0, "http's ClientConfiguration closure was 24,183 bytes unbounded");
         }
+    }
+
+    @Test
+    public void anInclusionDoesNotConsumeALeafsDepth() {
+        // `ClientConfiguration` is `*CommonClientConfiguration` plus one field; the included record's own field
+        // types are the configuration a caller sets, and would be hidden one level further down otherwise.
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        DiscoverResult.TypeDeclaration config = (DiscoverResult.TypeDeclaration) expectAnswer(
+                Types.render(http, new Types.Options(List.of("ClientConfiguration"), null, 1)),
+                "type ClientConfiguration");
+        List<String> named = config.types().stream().map(DiscoverResult.Signature.Type::name).toList();
+        Assert.assertTrue(named.contains("CommonClientConfiguration"), named.toString());
+        Assert.assertTrue(named.contains("HttpVersion"), "a field of the included record: " + named);
     }
 
     @Test
@@ -434,79 +423,15 @@ public class ViewsAgreeTest {
     }
 
     @Test
-    public void depsFollowsAChainInOrderAndStopsAtThePackageBoundary() {
-        Result<String> view = TypeView.render(
-                FixtureCorpus.loadedFixture("ballerina__http"),
-                new TypeView.Options(List.of("ClientRequestError"), true));
-        Assert.assertTrue(view.isOk());
-        List<String> order = new ArrayList<>();
-        Matcher matcher =
-                Pattern.compile("^public type ([A-Za-z0-9_]+) ", Pattern.MULTILINE).matcher(view.value());
-        while (matcher.find()) {
-            order.add(matcher.group(1));
-        }
-        Assert.assertTrue(order.size() >= 4, "the closure printed " + order.size() + " declarations: " + order);
-        // BREADTH-FIRST now, where it used to be depth-first: the root, then everything it names, then their
-        // references. The chain is still complete and still in a reader's order; what changed is that a shallow
-        // field can no longer be pushed past the budget by a deep one.
-        Assert.assertEquals(order.get(0), "ClientRequestError");
+    public void aLeafFollowsAChainInBreadthFirstOrderAndStopsAtThePackageBoundary() {
+        DiscoverResult.TypeDeclaration error = (DiscoverResult.TypeDeclaration) expectAnswer(
+                Types.render(FixtureCorpus.loadedFixture("ballerina__http"),
+                        new Types.Options(List.of("ClientRequestError"), null, 1)), "type ClientRequestError");
+        List<String> order = error.types().stream().map(DiscoverResult.Signature.Type::name).toList();
+        // The root, then everything it names: a shallow field can no longer be pushed past the budget by a deep
+        // one, and the chain a reader needs is complete.
         Assert.assertTrue(order.contains("ApplicationResponseError"), order.toString());
-        Assert.assertTrue(order.contains("ClientError"), order.toString());
+        Assert.assertFalse(order.contains("ClientRequestError"), "the root is the declaration, not a named type");
         Assert.assertTrue(order.contains("Detail"), "the detail record the patch unlocked has to be reachable");
-    }
-
-    @Test
-    public void depsNamesCrossPackageEdgesInsteadOfFetchingThem() {
-        // `http:ConnectionConfig` has a LOCAL closure of one and fifteen external edges; crossing the boundary
-        // would hide a five-second cold fetch inside an answer the caller expects to be warm.
-        Result<String> view = TypeView.render(
-                FixtureCorpus.loadedFixture("ballerinax__github"),
-                new TypeView.Options(List.of("ConnectionConfig"), true));
-        Assert.assertTrue(view.isOk());
-        Assert.assertTrue(view.value().contains(
-                "\n// Declared in other modules, not included above:\n"));
-        // That the command below is to be RUN rather than adapted was a line of `--help` prose, read
-        // before there was a command to apply it to. It belongs on the line above the commands.
-        Assert.assertTrue(view.value().contains("// Run one of these verbatim"), view.value());
-        // The version Central published for the edge is PRINTED, so a reader can see which version these
-        // signatures were generated against — and is NOT an argument, because resolution is internal now and the
-        // project's own Dependencies.toml pins the far side of the edge.
-        Assert.assertTrue(view.value().contains("<-  ballerina/http 2.15.5"), view.value());
-        Assert.assertFalse(view.value().contains("--version"), "versions are no longer arguments");
-        Assert.assertTrue(Pattern.compile("^// {3}bal discover type ballerina/http .* -r$", Pattern.MULTILINE)
-                .matcher(view.value()).find(), view.value());
-    }
-
-    @Test
-    public void theCrossPackageFooterIsWhatResolvingBuysAndIsNotPrintedWithoutIt() {
-        // SAP-04's second half. `-r` is what asks for cross-package edges to be named rather than followed, so a
-        // caller could not otherwise tell from the flag whether edge naming had been requested.
-        TypeView.Options bare = new TypeView.Options(List.of("ConnectionConfig"), false);
-        Result<String> plain = TypeView.render(FixtureCorpus.loadedFixture("ballerinax__github"), bare);
-        Assert.assertTrue(plain.isOk());
-        Assert.assertFalse(plain.value().contains("// Declared in other modules"),
-                "the footer is what -r buys: " + plain.value());
-        // The per-line note still names the module, so a bare `type` is not left silent about the boundary.
-        Assert.assertTrue(plain.value().contains("FROM ballerina/http module"), plain.value());
-    }
-
-    @Test
-    public void aPredeclaredLanglibIsNeitherAnImportNorAnEdge() {
-        // GMAIL-01. `int:Signed32` needs no import — `undefined module` is what the OTHER langlib modules get —
-        // so the note had nothing to advise, and the command the footer printed for it answers
-        // `// Unknown type: Signed32`. Both are gone; the type expression is untouched.
-        Result<String> view = TypeView.render(
-                FixtureCorpus.loadedFixture("ballerinax__googleapis.gmail"),
-                new TypeView.Options(List.of("Profile"), true));
-        Assert.assertTrue(view.isOk());
-        Assert.assertTrue(view.value().contains("int:Signed32 messagesTotal?;\n"), view.value());
-        Assert.assertFalse(view.value().contains("lang.int"), view.value());
-        // `lang.value` is NOT pre-declared, measured with the compiler, so its note stays.
-        Result<String> context = TypeView.render(
-                FixtureCorpus.loadedFixture("ballerina__graphql"),
-                new TypeView.Options(List.of("Context"), false));
-        Assert.assertTrue(context.isOk());
-        Assert.assertTrue(
-                context.value().contains("Cloneable FROM ballerina/lang.value module"), context.value());
     }
 }
