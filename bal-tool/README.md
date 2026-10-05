@@ -28,10 +28,21 @@ place, use `bal search <keyword>`; `bal discover` only drills into one you alrea
 | `service` | Service object types, under the listener(s) that accept them; the rest are listed apart.                 |
 | `class`   | Plain objects reached with `.`.                                                                          |
 | `funcs`   | Module-level functions.                                                                                  |
+| `type`    | Everything else the module declares: records, enums, errors, type aliases, constants, module variables and annotations. `type <Name>` reads one whole. |
 | `readme`  | The module's README, verbatim. `readme <n>` or `readme "<title>"` opens one code-carrying section.       |
 
 The first four are derived from how a symbol is called, not from Central's `isClient`-style flags:
-`ballerina/http` declares ten clients, two of which Central files as ordinary declarations.
+`ballerina/http` declares ten clients, two of which Central files as ordinary declarations. `type` and `readme`
+are not callable, so they have no containers or members.
+
+`type` lists its declarations grouped by kind (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`,
+`annotations`) and pages them like any listing; `--filter` is how a large one — `ballerinax/github` declares
+over a thousand records — is narrowed. `type <Name>` prints the declaration whole, then the declarations it
+names one level deep, within a size budget: what the budget left out is listed with the command that opens each
+one, and so are the declarations another package owns (`bal discover ballerina/http type BearerTokenConfig`).
+It takes one name and no `--filter`. A name that is really a class, client, service type or listener is
+answered by the bucket that holds it, and a record asked of `client` is answered by `type`; either way a note
+says which.
 
 Selectors after the bucket name a container, then a member: a method name, or a resource path followed by
 its accessor (`client "gists/'public" get`). With one container in the bucket, the container name can be
@@ -41,7 +52,7 @@ left out.
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
-| `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
+| `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, the `type` declarations, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again.                   |
 
@@ -55,17 +66,18 @@ What a package has:
 ```
 $ bal discover ballerinax/kafka
 ballerinax/kafka
-4 buckets
+5 buckets
 
   client
   service
   class
+  type
   readme
 
 Next: bal discover ballerinax/kafka <bucket>
 
 $ bal discover ballerinax/kafka | cat
-{"buckets":["client","service","class","readme"]}
+{"buckets":["client","service","class","type","readme"]}
 ```
 
 Every JSON answer is exactly one line, however long, so cutting the output with `head` or `tail` never
@@ -429,6 +441,35 @@ ballerinax/kafka · client · commit
   Consumer  3 matches  bal discover ballerinax/kafka client Consumer commit
 ```
 
+A declaration that is not callable, read whole with the declarations it names:
+
+```
+$ bal discover ballerinax/kafka type TopicPartitionOffset
+ballerinax/kafka · type · TopicPartitionOffset
+
+# Represents a topic partition and an offset with a timestamp.
+public type TopicPartitionOffset [TopicPartition, OffsetAndTimestamp?];
+
+Types it names (2)
+  # Represents a topic partition.
+  public type TopicPartition record {|
+      # Topic to which the partition is related
+      string topic;
+      # Index of the specific partition
+      int partition;
+  |};
+
+  # Represents an offset and a timestamp for a topic partition.
+  public type OffsetAndTimestamp record {|
+      # The offset of the record in the topic partition
+      int offset;
+      # The timestamp of the record in the topic partition
+      int timestamp;
+      # The leader epoch of the record in the topic partition
+      int? leaderEpoch = ();
+  |};
+```
+
 A large readme can be narrowed to the sections that mention a keyword:
 
 ```
@@ -455,7 +496,9 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `next`, `documented`                 |
 | more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted`, `documented`, `page`, `pages`, `next` |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`), `documented`, `page`, `pages`, `next` |
+| type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `next`, `documented` |
+| one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`) |
 | nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented`, `page`, `pages` |
 | member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `page`, `pages`, `next`                    |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
