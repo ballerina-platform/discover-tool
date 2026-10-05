@@ -863,6 +863,14 @@ public class ViewsTest {
     }
 
     @Test
+    public void aFilterBesideARecordNamedToAContainerBucketFailsRatherThanBeingDropped() {
+        Result<DiscoverResult> routed = Containers.render(FixtureCorpus.loadedFixture("ballerina__http"),
+                Surface.Scope.CLIENT, new Containers.Options(List.of("ProxyConfig"), "foo", 1));
+        Assert.assertFalse(routed.isOk(), "the filter was silently ignored");
+        Assert.assertTrue(routed.failure() instanceof Failure.Validation, routed.failure().describe());
+    }
+
+    @Test
     public void typeTakesOneNameAndNoFilterBesideIt() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         Result<DiscoverResult> two = Types.render(http, new Types.Options(List.of("Error", "Response"), null, 1));
