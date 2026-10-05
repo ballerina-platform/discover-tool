@@ -296,15 +296,13 @@ public final class JsonRenderer {
         if (signature.deprecated()) {
             json.addProperty("deprecated", true);
         }
-        JsonArray types = new JsonArray();
-        for (DiscoverResult.Signature.Type type : signature.types()) {
-            JsonObject entry = new JsonObject();
-            entry.addProperty("name", type.name());
-            entry.addProperty("declaration", type.declaration());
-            types.add(entry);
+        json.add("types", types(signature.types()));
+        if (!signature.omitted().isEmpty()) {
+            json.add("omitted", methods(signature.omitted()));
         }
-        json.add("types", types);
-        addIfNotEmpty(json, "omitted", signature.omitted());
+        if (!signature.foreign().isEmpty()) {
+            json.add("foreign", foreign(signature.foreign()));
+        }
         addDocumented(json, signature.documented());
         addPaging(json, signature.paging());
         addIfPresent(json, "next", signature.next());

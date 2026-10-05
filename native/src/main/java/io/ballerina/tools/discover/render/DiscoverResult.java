@@ -344,7 +344,8 @@ public sealed interface DiscoverResult {
      * @param returns its return type, or {@code null} when it returns nothing
      * @param deprecated whether calling it is discouraged
      * @param types the declarations its signature names, one level deep, within the closure budget
-     * @param omitted the names the closure budget left out of {@code types}
+     * @param omitted the declarations the closure budget left out of {@code types}, each with its command
+     * @param foreign the declarations from other packages that {@code types} name
      * @param documented other entries a {@code --filter} matched only in their documentation
      * @param paging which page of {@code documented} this is, or {@code null} when it fit on one
      * @param next the ready-to-run command that turns {@code documented}'s page, or {@code null} on the last
@@ -354,8 +355,8 @@ public sealed interface DiscoverResult {
     record Signature(
             String container, String kind, String name, String accessor, String path, String form,
             String declaration, List<Parameter> params, String returns, boolean deprecated,
-            List<Type> types, List<String> omitted, Documented documented, Paging paging, String next,
-            String warning, String note) implements DiscoverResult {
+            List<Type> types, List<Method> omitted, List<Foreign> foreign, Documented documented, Paging paging,
+            String next, String warning, String note) implements DiscoverResult {
 
         /**
          * @param name the parameter's name
