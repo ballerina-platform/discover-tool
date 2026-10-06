@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   and annotations — listed by kind, with `type <Name>` reading one whole together with the declarations it names, the
   ones its size budget left out and the ones another package owns, each with the command that opens it; a class,
   client, service type or listener named to `type`, and a record named to a container bucket, is answered by the
-  bucket that holds it
+  bucket that holds it, and an enum member to the enum that declares it
 - Pair each service type with the listener it binds to in the `service` bucket — the listener's `attach` target,
   or a type that includes it, read from the package's source when Central's docs cannot say — and list the
   service types no listener accepts apart
@@ -29,7 +29,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Central page; the bare package lists its submodules, and a submodule named as the package (e.g.
   `ballerinax/aws.auth`) fails with the `--module` command that reads it
 - Add the `--filter` flag to narrow a bucket listing by keyword
-- Cap every listing at 40 entries, with `--page` to page through any longer one
+- Add the `--version` flag to read one exact version of a package; it outranks the version a project locks, and is
+  carried into every command the answer prints
+- Cap every listing at 40 entries, with `--page` to page through any longer one; a text listing that continues also
+  ends with the `--filter <keyword>` command that narrows it
+- List containers, service types, methods, resource paths and declarations alphabetically
 - Add a ready-to-run next command to every listing entry: `command`, or `commands` keyed by accessor on resource rows,
   plus a `next` command when a listing continues
 - Add JSON output (one line per answer) and aligned human-readable text output, selected by `--output json|text` and

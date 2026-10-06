@@ -10,7 +10,7 @@ import ballerina/http;
 public type Accepted record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusAccepted status = STATUS_ACCEPTED_OBJ; // Special Agent Note: the default STATUS_ACCEPTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusAccepted status = STATUS_ACCEPTED_OBJ; // the default STATUS_ACCEPTED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents HTTP access log configuration.
@@ -32,21 +32,21 @@ public type AccessLogConfiguration record {|
 public type AlreadyReported record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusAlreadyReported status = STATUS_ALREADY_REPORTED_OBJ; // Special Agent Note: the default STATUS_ALREADY_REPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusAlreadyReported status = STATUS_ALREADY_REPORTED_OBJ; // the default STATUS_ALREADY_REPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `BadGateway`.
 public type BadGateway record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusBadGateway status = STATUS_BAD_GATEWAY_OBJ; // Special Agent Note: the default STATUS_BAD_GATEWAY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusBadGateway status = STATUS_BAD_GATEWAY_OBJ; // the default STATUS_BAD_GATEWAY_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `BadRequest`.
 public type BadRequest record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusBadRequest status = STATUS_BAD_REQUEST_OBJ; // Special Agent Note: the default STATUS_BAD_REQUEST_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusBadRequest status = STATUS_BAD_REQUEST_OBJ; // the default STATUS_BAD_REQUEST_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents token for Bearer token authentication.
@@ -64,7 +64,7 @@ public type Bucket record {|
     # Number of rejected requests during the sub-window time frame
     int rejectedCount = 0;
     # The time that the `Bucket` is last updated.
-    time:Utc lastUpdatedTime?; // Special Agent Note: Utc FROM ballerina/time module
+    time:Utc lastUpdatedTime?;
 |};
 
 # Provides a set of configurations for controlling the caching behaviour of the endpoint.
@@ -132,13 +132,13 @@ public type CircuitHealth record {|
     # ID of the last bucket used in Circuit Breaker calculations
     int lastUsedBucketId = 0;
     # Circuit Breaker start time
-    time:Utc startTime = time:utcNow(); // Special Agent Note: Utc FROM ballerina/time module
+    time:Utc startTime = time:utcNow();
     # The time that the last request received
-    time:Utc lastRequestTime?; // Special Agent Note: Utc FROM ballerina/time module
+    time:Utc lastRequestTime?;
     # The time that the last error occurred
-    time:Utc lastErrorTime?; // Special Agent Note: Utc FROM ballerina/time module
+    time:Utc lastErrorTime?;
     # The time that circuit forcefully opened at last
-    time:Utc lastForcedOpenTime?; // Special Agent Note: Utc FROM ballerina/time module
+    time:Utc lastForcedOpenTime?;
     # The discrete time buckets into which the time window is divided
     Bucket?[] totalBuckets = [];
 |};
@@ -175,9 +175,9 @@ public type ClientSecureSocket record {|
     # Enable SSL validation
     boolean enable = true;
     # Configurations associated with `crypto:TrustStore` or single certificate file that the client trusts
-    crypto:TrustStore|string cert?; // Special Agent Note: TrustStore FROM ballerina/crypto module
+    crypto:TrustStore|string cert?;
     # Configurations associated with `crypto:KeyStore` or combination of certificate and private key of the client
-    crypto:KeyStore|CertKey key?; // Special Agent Note: KeyStore FROM ballerina/crypto module
+    crypto:KeyStore|CertKey key?;
     # SSL/TLS protocol related options
     record {Protocol name; string[] versions; } protocol?;
     # Certificate validation against OCSP_CRL, OCSP_STAPLING related options
@@ -279,14 +279,14 @@ public type CompressionConfig record {|
 public type Conflict record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusConflict status = STATUS_CONFLICT_OBJ; // Special Agent Note: the default STATUS_CONFLICT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusConflict status = STATUS_CONFLICT_OBJ; // the default STATUS_CONFLICT_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `Continue`.
 public type Continue record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusContinue status = STATUS_CONTINUE_OBJ; // Special Agent Note: the default STATUS_CONTINUE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusContinue status = STATUS_CONTINUE_OBJ; // the default STATUS_CONTINUE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Client configuration for cookies.
@@ -319,9 +319,9 @@ public type CookieOptions record {|
     # Cookie is sent only to secure channels
     boolean secure = false;
     # At what time the cookie was created
-    time:Utc createdTime = time:utcNow(); // Special Agent Note: Utc FROM ballerina/time module
+    time:Utc createdTime = time:utcNow();
     # Last-accessed time of the cookie
-    time:Utc lastAccessedTime = time:utcNow(); // Special Agent Note: Utc FROM ballerina/time module
+    time:Utc lastAccessedTime = time:utcNow();
     # Cookie is sent only to the requested host
     boolean hostOnly = false;
 |};
@@ -346,12 +346,12 @@ public type CorsConfig record {|
 public type Created record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusCreated status = STATUS_CREATED_OBJ; // Special Agent Note: the default STATUS_CREATED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusCreated status = STATUS_CREATED_OBJ; // the default STATUS_CREATED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents credentials for Basic Auth authentication.
 public type CredentialsConfig record {|
-    *auth:CredentialsConfig; // Special Agent Note: CredentialsConfig FROM ballerina/auth module
+    *auth:CredentialsConfig;
 |};
 
 # The default status code response record.
@@ -375,7 +375,7 @@ public type Detail record {
 public type EarlyHints record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusEarlyHints status = STATUS_EARLY_HINTS_OBJ; // Special Agent Note: the default STATUS_EARLY_HINTS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusEarlyHints status = STATUS_EARLY_HINTS_OBJ; // the default STATUS_EARLY_HINTS_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents the structure of the HTTP error payload.
@@ -398,14 +398,14 @@ public type ErrorPayload record {
 public type ExpectationFailed record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusExpectationFailed status = STATUS_EXPECTATION_FAILED_OBJ; // Special Agent Note: the default STATUS_EXPECTATION_FAILED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusExpectationFailed status = STATUS_EXPECTATION_FAILED_OBJ; // the default STATUS_EXPECTATION_FAILED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `FailedDependency`.
 public type FailedDependency record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusFailedDependency status = STATUS_FAILED_DEPENDENCY_OBJ; // Special Agent Note: the default STATUS_FAILED_DEPENDENCY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusFailedDependency status = STATUS_FAILED_DEPENDENCY_OBJ; // the default STATUS_FAILED_DEPENDENCY_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Provides a set of HTTP related configurations and failover related configurations.
@@ -450,28 +450,28 @@ public type FollowRedirects record {|
 public type Forbidden record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusForbidden status = STATUS_FORBIDDEN_OBJ; // Special Agent Note: the default STATUS_FORBIDDEN_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusForbidden status = STATUS_FORBIDDEN_OBJ; // the default STATUS_FORBIDDEN_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `Found`.
 public type Found record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusFound status = STATUS_FOUND_OBJ; // Special Agent Note: the default STATUS_FOUND_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusFound status = STATUS_FOUND_OBJ; // the default STATUS_FOUND_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `GatewayTimeout`.
 public type GatewayTimeout record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusGatewayTimeout status = STATUS_GATEWAY_TIMEOUT_OBJ; // Special Agent Note: the default STATUS_GATEWAY_TIMEOUT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusGatewayTimeout status = STATUS_GATEWAY_TIMEOUT_OBJ; // the default STATUS_GATEWAY_TIMEOUT_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `Gone`.
 public type Gone record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusGone status = STATUS_GONE_OBJ; // Special Agent Note: the default STATUS_GONE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusGone status = STATUS_GONE_OBJ; // the default STATUS_GONE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents the parsed header value details
@@ -589,14 +589,14 @@ public type HttpServiceConfig record {|
 public type HttpVersionNotSupported record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusHttpVersionNotSupported status = STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ; // Special Agent Note: the default STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusHttpVersionNotSupported status = STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ; // the default STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `IMUsed`.
 public type IMUsed record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusIMUsed status = STATUS_IM_USED_OBJ; // Special Agent Note: the default STATUS_IM_USED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusIMUsed status = STATUS_IM_USED_OBJ; // the default STATUS_IM_USED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Provides a set of cloneable configurations for HTTP listener.
@@ -623,24 +623,24 @@ public type InferredListenerConfiguration record {|
 public type InsufficientStorage record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusInsufficientStorage status = STATUS_INSUFFICIENT_STORAGE_OBJ; // Special Agent Note: the default STATUS_INSUFFICIENT_STORAGE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusInsufficientStorage status = STATUS_INSUFFICIENT_STORAGE_OBJ; // the default STATUS_INSUFFICIENT_STORAGE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `InternalServerError`.
 public type InternalServerError record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusInternalServerError status = STATUS_INTERNAL_SERVER_ERROR_OBJ; // Special Agent Note: the default STATUS_INTERNAL_SERVER_ERROR_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusInternalServerError status = STATUS_INTERNAL_SERVER_ERROR_OBJ; // the default STATUS_INTERNAL_SERVER_ERROR_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents JWT issuer configurations for JWT authentication.
 public type JwtIssuerConfig record {|
-    *jwt:IssuerConfig; // Special Agent Note: IssuerConfig FROM ballerina/jwt module
+    *jwt:IssuerConfig;
 |};
 
 # Represents JWT validator configurations for JWT authentication.
 public type JwtValidatorConfig record {|
-    *jwt:ValidatorConfig; // Special Agent Note: ValidatorConfig FROM ballerina/jwt module
+    *jwt:ValidatorConfig;
     # The key used to fetch the scopes
     string scopeKey = "scope";
 |};
@@ -655,7 +655,7 @@ public type JwtValidatorConfigWithScopes record {|
 
 # Represents LDAP user store configurations for Basic Auth authentication.
 public type LdapUserStoreConfig record {|
-    *auth:LdapUserStoreConfig; // Special Agent Note: LdapUserStoreConfig FROM ballerina/auth module
+    *auth:LdapUserStoreConfig;
 |};
 
 # Represents the auth annotation for LDAP user store configurations with scopes.
@@ -670,7 +670,7 @@ public type LdapUserStoreConfigWithScopes record {|
 public type LengthRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusLengthRequired status = STATUS_LENGTH_REQUIRED_OBJ; // Special Agent Note: the default STATUS_LENGTH_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusLengthRequired status = STATUS_LENGTH_REQUIRED_OBJ; // the default STATUS_LENGTH_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents a server-provided hyperlink
@@ -742,13 +742,13 @@ public type ListenerHttp1Settings record {|
     # Defines the maximum number of requests that can be processed at a given time on a single
     # connection. By default 10 requests can be pipelined on a single connection and user can
     # change this limit appropriately.
-    int maxPipelinedRequests = MAX_PIPELINED_REQUESTS; // Special Agent Note: the default MAX_PIPELINED_REQUESTS is not exported by this package; omit the argument rather than repeating it
+    int maxPipelinedRequests = MAX_PIPELINED_REQUESTS; // the default MAX_PIPELINED_REQUESTS is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Configures the SSL/TLS options to be used for HTTP service.
 public type ListenerSecureSocket record {|
     # Configurations associated with `crypto:KeyStore` or combination of certificate and (PKCS8) private key of the server
-    crypto:KeyStore|CertKey key; // Special Agent Note: KeyStore FROM ballerina/crypto module
+    crypto:KeyStore|CertKey key;
     # Configures associated with mutual SSL operations
     record {VerifyClient verifyClient; crypto:TrustStore|string cert; } mutualSsl?;
     # SSL/TLS protocol related options
@@ -803,7 +803,7 @@ public type Local record {|
 public type Locked record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusLocked status = STATUS_LOCKED_OBJ; // Special Agent Note: the default STATUS_LOCKED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusLocked status = STATUS_LOCKED_OBJ; // the default STATUS_LOCKED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents HTTP access log file configuration.
@@ -811,49 +811,49 @@ public type LogFileConfig record {|
     # The file path to store access logs
     string path;
     # The log rotation configuration for file destinations
-    log:RotationConfig rotation?; // Special Agent Note: RotationConfig FROM ballerina/log module
+    log:RotationConfig rotation?;
 |};
 
 # The status code response record of `LoopDetected`.
 public type LoopDetected record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusLoopDetected status = STATUS_LOOP_DETECTED_OBJ; // Special Agent Note: the default STATUS_LOOP_DETECTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusLoopDetected status = STATUS_LOOP_DETECTED_OBJ; // the default STATUS_LOOP_DETECTED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `MethodNotAllowed`.
 public type MethodNotAllowed record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMethodNotAllowed status = STATUS_METHOD_NOT_ALLOWED_OBJ; // Special Agent Note: the default STATUS_METHOD_NOT_ALLOWED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMethodNotAllowed status = STATUS_METHOD_NOT_ALLOWED_OBJ; // the default STATUS_METHOD_NOT_ALLOWED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `MisdirectedRequest`.
 public type MisdirectedRequest record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMisdirectedRequest status = STATUS_MISDIRECTED_REQUEST_OBJ; // Special Agent Note: the default STATUS_MISDIRECTED_REQUEST_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMisdirectedRequest status = STATUS_MISDIRECTED_REQUEST_OBJ; // the default STATUS_MISDIRECTED_REQUEST_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `MovedPermanently`.
 public type MovedPermanently record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMovedPermanently status = STATUS_MOVED_PERMANENTLY_OBJ; // Special Agent Note: the default STATUS_MOVED_PERMANENTLY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMovedPermanently status = STATUS_MOVED_PERMANENTLY_OBJ; // the default STATUS_MOVED_PERMANENTLY_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `MultipleChoices`.
 public type MultipleChoices record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMultipleChoices status = STATUS_MULTIPLE_CHOICES_OBJ; // Special Agent Note: the default STATUS_MULTIPLE_CHOICES_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMultipleChoices status = STATUS_MULTIPLE_CHOICES_OBJ; // the default STATUS_MULTIPLE_CHOICES_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `MultiStatus`.
 public type MultiStatus record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMultiStatus status = STATUS_MULTI_STATUS_OBJ; // Special Agent Note: the default STATUS_MULTI_STATUS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMultiStatus status = STATUS_MULTI_STATUS_OBJ; // the default STATUS_MULTI_STATUS_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # A record for providing mutual SSL handshake results.
@@ -868,7 +868,7 @@ public type MutualSslHandshake record {|
 public type NetworkAuthenticationRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // Special Agent Note: the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `NetworkAuthorizationRequired`.
@@ -878,7 +878,7 @@ public type NetworkAuthorizationRequired record {|
     # The response status code obj
     # # Deprecated
     # This record is deprecated. Please use `NetworkAuthenticationRequired` instead.
-    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // Special Agent Note: the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `NoContent`.
@@ -886,59 +886,59 @@ public type NoContent record {|
     # The response headers
     map<string|int|boolean|string[]|int[]|boolean[]> headers?;
     # The response status code obj
-    readonly StatusNoContent status = STATUS_NO_CONTENT_OBJ; // Special Agent Note: the default STATUS_NO_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNoContent status = STATUS_NO_CONTENT_OBJ; // the default STATUS_NO_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `NonAuthoritativeInformation`.
 public type NonAuthoritativeInformation record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNonAuthoritativeInformation status = STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ; // Special Agent Note: the default STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNonAuthoritativeInformation status = STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ; // the default STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `NotAcceptable`.
 public type NotAcceptable record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotAcceptable status = STATUS_NOT_ACCEPTABLE_OBJ; // Special Agent Note: the default STATUS_NOT_ACCEPTABLE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotAcceptable status = STATUS_NOT_ACCEPTABLE_OBJ; // the default STATUS_NOT_ACCEPTABLE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `NotExtended`.
 public type NotExtended record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotExtended status = STATUS_NOT_EXTENDED_OBJ; // Special Agent Note: the default STATUS_NOT_EXTENDED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotExtended status = STATUS_NOT_EXTENDED_OBJ; // the default STATUS_NOT_EXTENDED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `NotFound`.
 public type NotFound record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotFound status = STATUS_NOT_FOUND_OBJ; // Special Agent Note: the default STATUS_NOT_FOUND_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotFound status = STATUS_NOT_FOUND_OBJ; // the default STATUS_NOT_FOUND_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `NotImplemented`.
 public type NotImplemented record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotImplemented status = STATUS_NOT_IMPLEMENTED_OBJ; // Special Agent Note: the default STATUS_NOT_IMPLEMENTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotImplemented status = STATUS_NOT_IMPLEMENTED_OBJ; // the default STATUS_NOT_IMPLEMENTED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `NotModified`.
 public type NotModified record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotModified status = STATUS_NOT_MODIFIED_OBJ; // Special Agent Note: the default STATUS_NOT_MODIFIED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotModified status = STATUS_NOT_MODIFIED_OBJ; // the default STATUS_NOT_MODIFIED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents OAuth2 client credentials grant configurations for OAuth2 authentication.
 public type OAuth2ClientCredentialsGrantConfig record {|
-    *oauth2:ClientCredentialsGrantConfig; // Special Agent Note: ClientCredentialsGrantConfig FROM ballerina/oauth2 module
+    *oauth2:ClientCredentialsGrantConfig;
 |};
 
 # Represents OAuth2 introspection server configurations for OAuth2 authentication.
 public type OAuth2IntrospectionConfig record {|
-    *oauth2:IntrospectionConfig; // Special Agent Note: IntrospectionConfig FROM ballerina/oauth2 module
+    *oauth2:IntrospectionConfig;
     # The key used to fetch the scopes
     string scopeKey = "scope";
 |};
@@ -953,52 +953,52 @@ public type OAuth2IntrospectionConfigWithScopes record {|
 
 # Represents OAuth2 JWT bearer grant configurations for OAuth2 authentication.
 public type OAuth2JwtBearerGrantConfig record {|
-    *oauth2:JwtBearerGrantConfig; // Special Agent Note: JwtBearerGrantConfig FROM ballerina/oauth2 module
+    *oauth2:JwtBearerGrantConfig;
 |};
 
 # Represents OAuth2 password grant configurations for OAuth2 authentication.
 public type OAuth2PasswordGrantConfig record {|
-    *oauth2:PasswordGrantConfig; // Special Agent Note: PasswordGrantConfig FROM ballerina/oauth2 module
+    *oauth2:PasswordGrantConfig;
 |};
 
 # Represents OAuth2 refresh token grant configurations for OAuth2 authentication.
 public type OAuth2RefreshTokenGrantConfig record {|
-    *oauth2:RefreshTokenGrantConfig; // Special Agent Note: RefreshTokenGrantConfig FROM ballerina/oauth2 module
+    *oauth2:RefreshTokenGrantConfig;
 |};
 
 # The status code response record of `Ok`.
 public type Ok record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusOK status = STATUS_OK_OBJ; // Special Agent Note: the default STATUS_OK_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusOK status = STATUS_OK_OBJ; // the default STATUS_OK_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `PartialContent`.
 public type PartialContent record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPartialContent status = STATUS_PARTIAL_CONTENT_OBJ; // Special Agent Note: the default STATUS_PARTIAL_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPartialContent status = STATUS_PARTIAL_CONTENT_OBJ; // the default STATUS_PARTIAL_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `PayloadTooLarge`.
 public type PayloadTooLarge record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPayloadTooLarge status = STATUS_PAYLOAD_TOO_LARGE_OBJ; // Special Agent Note: the default STATUS_PAYLOAD_TOO_LARGE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPayloadTooLarge status = STATUS_PAYLOAD_TOO_LARGE_OBJ; // the default STATUS_PAYLOAD_TOO_LARGE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `PaymentRequired`.
 public type PaymentRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPaymentRequired status = STATUS_PAYMENT_REQUIRED_OBJ; // Special Agent Note: the default STATUS_PAYMENT_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPaymentRequired status = STATUS_PAYMENT_REQUIRED_OBJ; // the default STATUS_PAYMENT_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `PermanentRedirect`.
 public type PermanentRedirect record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPermanentRedirect status = STATUS_PERMANENT_REDIRECT_OBJ; // Special Agent Note: the default STATUS_PERMANENT_REDIRECT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPermanentRedirect status = STATUS_PERMANENT_REDIRECT_OBJ; // the default STATUS_PERMANENT_REDIRECT_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Configurations for managing HTTP client connection pool.
@@ -1028,28 +1028,28 @@ public type PoolConfiguration record {|
 public type PreconditionFailed record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPreconditionFailed status = STATUS_PRECONDITION_FAILED_OBJ; // Special Agent Note: the default STATUS_PRECONDITION_FAILED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPreconditionFailed status = STATUS_PRECONDITION_FAILED_OBJ; // the default STATUS_PRECONDITION_FAILED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `PreconditionRequired`.
 public type PreconditionRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPreconditionRequired status = STATUS_PRECONDITION_REQUIRED_OBJ; // Special Agent Note: the default STATUS_PRECONDITION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPreconditionRequired status = STATUS_PRECONDITION_REQUIRED_OBJ; // the default STATUS_PRECONDITION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `Processing`.
 public type Processing record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusProcessing status = STATUS_PROCESSING_OBJ; // Special Agent Note: the default STATUS_PROCESSING_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusProcessing status = STATUS_PROCESSING_OBJ; // the default STATUS_PROCESSING_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `ProxyAuthenticationRequired`.
 public type ProxyAuthenticationRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusProxyAuthenticationRequired status = STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ; // Special Agent Note: the default STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusProxyAuthenticationRequired status = STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Proxy server configurations to be used with the HTTP client endpoint.
@@ -1081,7 +1081,7 @@ public type QueryParams record {|
 public type RangeNotSatisfiable record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusRangeNotSatisfiable status = STATUS_RANGE_NOT_SATISFIABLE_OBJ; // Special Agent Note: the default STATUS_RANGE_NOT_SATISFIABLE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusRangeNotSatisfiable status = STATUS_RANGE_NOT_SATISFIABLE_OBJ; // the default STATUS_RANGE_NOT_SATISFIABLE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Presents a read-only view of the remote address.
@@ -1098,7 +1098,7 @@ public type Remote record {|
 public type RequestHeaderFieldsTooLarge record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusRequestHeaderFieldsTooLarge status = STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ; // Special Agent Note: the default STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusRequestHeaderFieldsTooLarge status = STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ; // the default STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Provides inbound request URI, total header and entity body size threshold configurations.
@@ -1120,14 +1120,14 @@ public type RequestLimitConfigs record {|
 public type RequestTimeout record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusRequestTimeout status = STATUS_REQUEST_TIMEOUT_OBJ; // Special Agent Note: the default STATUS_REQUEST_TIMEOUT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusRequestTimeout status = STATUS_REQUEST_TIMEOUT_OBJ; // the default STATUS_REQUEST_TIMEOUT_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `ResetContent`.
 public type ResetContent record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusResetContent status = STATUS_RESET_CONTENT_OBJ; // Special Agent Note: the default STATUS_RESET_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusResetContent status = STATUS_RESET_CONTENT_OBJ; // the default STATUS_RESET_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Provides inbound response status line, total header and entity body size threshold configurations.
@@ -1176,7 +1176,7 @@ public type Scopes record {|
 public type SeeOther record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusSeeOther status = STATUS_SEE_OTHER_OBJ; // Special Agent Note: the default STATUS_SEE_OTHER_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusSeeOther status = STATUS_SEE_OTHER_OBJ; // the default STATUS_SEE_OTHER_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Provides settings related to server socket configuration.
@@ -1190,7 +1190,7 @@ public type ServerSocketConfig record {|
 public type ServiceUnavailable record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusServiceUnavailable status = STATUS_SERVICE_UNAVAILABLE_OBJ; // Special Agent Note: the default STATUS_SERVICE_UNAVAILABLE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusServiceUnavailable status = STATUS_SERVICE_UNAVAILABLE_OBJ; // the default STATUS_SERVICE_UNAVAILABLE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents a Server Sent Event emitted from a service.
@@ -1228,7 +1228,7 @@ public type StatusCodeRecord record {|
 public type SwitchingProtocols record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusSwitchingProtocols status = STATUS_SWITCHING_PROTOCOLS_OBJ; // Special Agent Note: the default STATUS_SWITCHING_PROTOCOLS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusSwitchingProtocols status = STATUS_SWITCHING_PROTOCOLS_OBJ; // the default STATUS_SWITCHING_PROTOCOLS_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents a single service and its related configurations.
@@ -1243,21 +1243,21 @@ public type TargetService record {|
 public type TemporaryRedirect record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusTemporaryRedirect status = STATUS_TEMPORARY_REDIRECT_OBJ; // Special Agent Note: the default STATUS_TEMPORARY_REDIRECT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusTemporaryRedirect status = STATUS_TEMPORARY_REDIRECT_OBJ; // the default STATUS_TEMPORARY_REDIRECT_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `TooEarly`.
 public type TooEarly record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusTooEarly status = STATUS_TOO_EARLY_OBJ; // Special Agent Note: the default STATUS_TOO_EARLY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusTooEarly status = STATUS_TOO_EARLY_OBJ; // the default STATUS_TOO_EARLY_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `TooManyRequests`.
 public type TooManyRequests record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusTooManyRequests status = STATUS_TOO_MANY_REQUESTS_OBJ; // Special Agent Note: the default STATUS_TOO_MANY_REQUESTS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusTooManyRequests status = STATUS_TOO_MANY_REQUESTS_OBJ; // the default STATUS_TOO_MANY_REQUESTS_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents HTTP trace log configuration.
@@ -1279,56 +1279,56 @@ public type TraceLogAdvancedConfiguration record {|
 public type Unauthorized record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUnauthorized status = STATUS_UNAUTHORIZED_OBJ; // Special Agent Note: the default STATUS_UNAUTHORIZED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUnauthorized status = STATUS_UNAUTHORIZED_OBJ; // the default STATUS_UNAUTHORIZED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `UnavailableDueToLegalReasons`.
 public type UnavailableDueToLegalReasons record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUnavailableDueToLegalReasons status = STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ; // Special Agent Note: the default STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUnavailableDueToLegalReasons status = STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ; // the default STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `UnprocessableEntity`.
 public type UnprocessableEntity record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUnprocessableEntity status = STATUS_UNPROCESSABLE_ENTITY_OBJ; // Special Agent Note: the default STATUS_UNPROCESSABLE_ENTITY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUnprocessableEntity status = STATUS_UNPROCESSABLE_ENTITY_OBJ; // the default STATUS_UNPROCESSABLE_ENTITY_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `UnsupportedMediaType`.
 public type UnsupportedMediaType record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUnsupportedMediaType status = STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ; // Special Agent Note: the default STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUnsupportedMediaType status = STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ; // the default STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `UpgradeRequired`.
 public type UpgradeRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUpgradeRequired status = STATUS_UPGRADE_REQUIRED_OBJ; // Special Agent Note: the default STATUS_UPGRADE_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUpgradeRequired status = STATUS_UPGRADE_REQUIRED_OBJ; // the default STATUS_UPGRADE_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `UriTooLong`.
 public type UriTooLong record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUriTooLong status = STATUS_URI_TOO_LONG_OBJ; // Special Agent Note: the default STATUS_URI_TOO_LONG_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUriTooLong status = STATUS_URI_TOO_LONG_OBJ; // the default STATUS_URI_TOO_LONG_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `UseProxy`.
 public type UseProxy record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUseProxy status = STATUS_USE_PROXY_OBJ; // Special Agent Note: the default STATUS_USE_PROXY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUseProxy status = STATUS_USE_PROXY_OBJ; // the default STATUS_USE_PROXY_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # The status code response record of `VariantAlsoNegotiates`.
 public type VariantAlsoNegotiates record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusVariantAlsoNegotiates status = STATUS_VARIANT_ALSO_NEGOTIATES_OBJ; // Special Agent Note: the default STATUS_VARIANT_ALSO_NEGOTIATES_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusVariantAlsoNegotiates status = STATUS_VARIANT_ALSO_NEGOTIATES_OBJ; // the default STATUS_VARIANT_ALSO_NEGOTIATES_OBJ is not exported by this package; omit the argument rather than repeating it
 |};
 
 # Represents a client error that occurred due to all the load balance endpoint failure.
@@ -2072,9 +2072,9 @@ public readonly class Cookie {
     # Cookie is sent only to secure channels
     public boolean secure;
     # At what time the cookie was created
-    public time:Utc createdTime; // Special Agent Note: Utc FROM ballerina/time module
+    public time:Utc createdTime;
     # Last-accessed time of the cookie
-    public time:Utc lastAccessedTime; // Special Agent Note: Utc FROM ballerina/time module
+    public time:Utc lastAccessedTime;
     # Cookie is sent only to the requested host
     public boolean hostOnly;
 
@@ -2236,13 +2236,13 @@ public isolated class ListenerFileUserStoreBasicAuthHandler {
     # Authenticates with the relevant authentication requirements.
     # + data - The `http:Request` instance or `http:Headers` instance or `string` Authorization header
     # + return - The `auth:UserDetails` instance or else `Unauthorized` type in case of an error
-    isolated function authenticate(Request|Headers|string data) returns auth:UserDetails|Unauthorized; // Special Agent Note: UserDetails FROM ballerina/auth module
+    isolated function authenticate(Request|Headers|string data) returns auth:UserDetails|Unauthorized;
 
     # Authorizes with the relevant authorization requirements.
     # + userDetails - The `auth:UserDetails` instance which is received from authentication results
     # + expectedScopes - The expected scopes as `string` or `string[]`
     # + return - `()`, if it is successful or else `Forbidden` type in case of an error
-    isolated function authorize(auth:UserDetails userDetails, string|string[] expectedScopes) returns Forbidden?; // Special Agent Note: UserDetails FROM ballerina/auth module
+    isolated function authorize(auth:UserDetails userDetails, string|string[] expectedScopes) returns Forbidden?;
 }
 
 # Defines the JWT auth handler for listener authentication.
@@ -2254,13 +2254,13 @@ public isolated class ListenerJwtAuthHandler {
     # Authenticates with the relevant authentication requirements.
     # + data - The `http:Request` instance or `http:Headers` instance or `string` Authorization header
     # + return - The `jwt:Payload` instance or else `Unauthorized` type in case of an error
-    isolated function authenticate(Request|Headers|string data) returns jwt:Payload|Unauthorized; // Special Agent Note: Payload FROM ballerina/jwt module
+    isolated function authenticate(Request|Headers|string data) returns jwt:Payload|Unauthorized;
 
     # Authorizes with the relevant authorization requirements.
     # + jwtPayload - The `jwt:Payload` instance which is received from authentication results
     # + expectedScopes - The expected scopes as `string` or `string[]`
     # + return - `()`, if it is successful or else `Forbidden` type in case of an error
-    isolated function authorize(jwt:Payload jwtPayload, string|string[] expectedScopes) returns Forbidden?; // Special Agent Note: Payload FROM ballerina/jwt module
+    isolated function authorize(jwt:Payload jwtPayload, string|string[] expectedScopes) returns Forbidden?;
 }
 
 # Implementation of round robin load balancing strategy.
@@ -2345,7 +2345,7 @@ public class Request {
 
     # Sets the provided `Entity` to the request.
     # + e - The `Entity` to be set to the request
-    isolated function setEntity(mime:Entity e); // Special Agent Note: Entity FROM ballerina/mime module
+    isolated function setEntity(mime:Entity e);
 
     # Gets the query parameters of the request as a map consisting of a string array.
     # + return - String array map of the query params
@@ -2370,7 +2370,7 @@ public class Request {
 
     # Gets the `Entity` associated with the request.
     # + return - The `Entity` of the request. An `http:ClientError` is returned, if entity construction fails
-    isolated function getEntity() returns mime:Entity|ClientError; // Special Agent Note: Entity FROM ballerina/mime module
+    isolated function getEntity() returns mime:Entity|ClientError;
 
     # Checks whether the requested header key exists in the header map.
     # + headerName - The header name
@@ -2449,7 +2449,7 @@ public class Request {
     # `Request.getBodyParts()`.
     # + arraySize - A defaultable parameter to state the size of the byte array. Default size is 8KB
     # + return - A byte stream from which the message payload can be read or `http:ClientError` in case of errors
-    isolated function getByteStream(int arraySize = 8192) returns stream<byte[], io:Error?>|ClientError; // Special Agent Note: Error FROM ballerina/io module
+    isolated function getByteStream(int arraySize = 8192) returns stream<byte[], io:Error?>|ClientError;
 
     # Gets the request payload as a `byte[]`.
     # + return - The byte[] representation of the message payload or `http:ClientError` in case of errors
@@ -2463,7 +2463,7 @@ public class Request {
     # is returned.
     # + return - The body parts as an array of entities or else an `http:ClientError` if there were any errors
     # constructing the body parts from the request
-    isolated function getBodyParts() returns mime:Entity[]|ClientError; // Special Agent Note: Entity FROM ballerina/mime module
+    isolated function getBodyParts() returns mime:Entity[]|ClientError;
 
     # Sets a `json` as the payload. If the content-type header is not set then this method set content-type
     # headers with the default content-type, which is `application/json`. Any existing content-type can be
@@ -2504,7 +2504,7 @@ public class Request {
     # + bodyParts - The entities which make up the message body
     # + contentType - The content type of the top level message. This is an optional parameter.
     # The `multipart/form-data` is the default value
-    isolated function setBodyParts(mime:Entity[] bodyParts, string? contentType = ()); // Special Agent Note: Entity FROM ballerina/mime module
+    isolated function setBodyParts(mime:Entity[] bodyParts, string? contentType = ());
 
     # Sets the content of the specified file as the entity body of the request. If the content-type header
     # is not set then this method set content-type headers with the default content-type, which is
@@ -2521,7 +2521,7 @@ public class Request {
     # + byteStream - Byte stream, which needs to be set to the request
     # + contentType - Content-type to be used with the payload. This is an optional parameter.
     # The `application/octet-stream` is the default value
-    isolated function setByteStream(stream<byte[], io:Error?> byteStream, string? contentType = ()); // Special Agent Note: Error FROM ballerina/io module
+    isolated function setByteStream(stream<byte[], io:Error?> byteStream, string? contentType = ());
 
     # Sets the request payload. This method overrides any existing content-type by passing the content-type
     # as an optional parameter. If the content type parameter is not provided then the default value derived
@@ -2530,7 +2530,7 @@ public class Request {
     # `Entity[]` (i.e., a set of body parts) or any other value of type `anydata` which will
     # be converted to `json` using the `toJson` method.
     # + contentType - Content-type to be used with the payload. This is an optional parameter
-    isolated function setPayload(anydata|mime:Entity[]|stream<byte[], io:Error?> payload, string? contentType = ()); // Special Agent Note: Entity FROM ballerina/mime module, Error FROM ballerina/io module
+    isolated function setPayload(anydata|mime:Entity[]|stream<byte[], io:Error?> payload, string? contentType = ());
 
     # Adds cookies to the request.
     # + cookiesToAdd - Represents the cookies to be added
@@ -2619,11 +2619,11 @@ public class Response {
 
     # Gets the `Entity` associated with the response.
     # + return - The `Entity` of the response. An `http:ClientError` is returned, if entity construction fails
-    isolated function getEntity() returns mime:Entity|ClientError; // Special Agent Note: Entity FROM ballerina/mime module
+    isolated function getEntity() returns mime:Entity|ClientError;
 
     # Sets the provided `Entity` to the response.
     # + e - The `Entity` to be set to the response
-    isolated function setEntity(mime:Entity e); // Special Agent Note: Entity FROM ballerina/mime module
+    isolated function setEntity(mime:Entity e);
 
     # Checks whether the requested header key exists in the header map.
     # + headerName - The header name
@@ -2713,7 +2713,7 @@ public class Response {
     # `Response.getBodyParts()`.
     # + arraySize - A defaultable parameter to state the size of the byte array. Default size is 8KB
     # + return - A byte stream from which the message payload can be read or `http:ClientError` in case of errors
-    isolated function getByteStream(int arraySize = 8192) returns stream<byte[], io:Error?>|ClientError; // Special Agent Note: Error FROM ballerina/io module
+    isolated function getByteStream(int arraySize = 8192) returns stream<byte[], io:Error?>|ClientError;
 
     # Gets the response payload as a `byte[]`.
     # + return - The byte[] representation of the message payload or `http:ClientError` in case of errors
@@ -2726,7 +2726,7 @@ public class Response {
     # Extracts body parts from the response. If the content type is not a composite media type, an error is returned.
     # + return - The body parts as an array of entities or else an `http:ClientError` if there were any errors in
     # constructing the body parts from the response
-    isolated function getBodyParts() returns mime:Entity[]|ClientError; // Special Agent Note: Entity FROM ballerina/mime module
+    isolated function getBodyParts() returns mime:Entity[]|ClientError;
 
     # Sets the `etag` header for the given payload. The ETag is generated using a CRC32 hash isolated function.
     # + payload - The payload for which the ETag should be set
@@ -2781,7 +2781,7 @@ public class Response {
     # + bodyParts - The entities which make up the message body
     # + contentType - The content type of the top level message. This is an optional parameter.
     # The `multipart/form-data` is the default value
-    isolated function setBodyParts(mime:Entity[] bodyParts, string? contentType = ()); // Special Agent Note: Entity FROM ballerina/mime module
+    isolated function setBodyParts(mime:Entity[] bodyParts, string? contentType = ());
 
     # Sets the content of the specified file as the entity body of the response. If the content-type header
     # is not set then this method set content-type headers with the default content-type, which is
@@ -2798,7 +2798,7 @@ public class Response {
     # + byteStream - Byte stream, which needs to be set to the response
     # + contentType - Content-type to be used with the payload. This is an optional parameter.
     # The `application/octet-stream` is the default value
-    isolated function setByteStream(stream<byte[], io:Error?> byteStream, string? contentType = ()); // Special Agent Note: Error FROM ballerina/io module
+    isolated function setByteStream(stream<byte[], io:Error?> byteStream, string? contentType = ());
 
     # Sets an `http:SseEvent` stream as the payload, along with the Content-Type and Cache-Control 
     # headers set to 'text/event-stream' and 'no-cache', respectively.
@@ -2814,7 +2814,7 @@ public class Response {
     # parts) or any other value of type `anydata` which will be converted to `json` using the
     # `toJson` method.
     # + contentType - Content-type to be used with the payload. This is an optional parameter
-    isolated function setPayload(anydata|mime:Entity[]|stream<byte[], io:Error?>|stream<SseEvent, error?> payload, string? contentType = ()); // Special Agent Note: Entity FROM ballerina/mime module, Error FROM ballerina/io module
+    isolated function setPayload(anydata|mime:Entity[]|stream<byte[], io:Error?>|stream<SseEvent, error?> payload, string? contentType = ());
 
     # Adds the cookie to response.
     # + cookie - The cookie, which is added to response
@@ -3728,10 +3728,10 @@ public type InterceptableService distinct service object {
 public type CachingPolicy CACHE_CONTROL_AND_VALIDATORS|RFC_7234;
 
 # The types of messages that are accepted by HTTP `client` when sending out the outbound request.
-public type RequestMessage anydata|Request|mime:Entity[]|stream<byte[], io:Error?>; // Special Agent Note: Entity FROM ballerina/mime module, Error FROM ballerina/io module
+public type RequestMessage anydata|Request|mime:Entity[]|stream<byte[], io:Error?>;
 
 # The types of messages that are accepted by HTTP `listener` when sending out the outbound response.
-public type ResponseMessage anydata|Response|mime:Entity[]|stream<byte[], io:Error?>|stream<SseEvent, error?>|stream<SseEvent, error>; // Special Agent Note: Entity FROM ballerina/mime module, Error FROM ballerina/io module
+public type ResponseMessage anydata|Response|mime:Entity[]|stream<byte[], io:Error?>|stream<SseEvent, error?>|stream<SseEvent, error>;
 
 # Defines the HTTP operations related to circuit breaker, failover and load balancer.
 # 
@@ -3821,13 +3821,13 @@ public type SimpleQueryParamType boolean|int|float|decimal|string;
 public type QueryParamType SimpleQueryParamType[]|SimpleQueryParamType;
 
 # Represents an error, which occurred due to a failure in interceptor return.
-public type InterceptorReturnError distinct ListenerError & httpscerr:InternalServerErrorError; // Special Agent Note: InternalServerErrorError FROM ballerina/http.httpscerr module
+public type InterceptorReturnError distinct ListenerError & httpscerr:InternalServerErrorError;
 
 # Represents an error, which occurred due to a query parameter binding.
-public type QueryParameterBindingError distinct ListenerError & httpscerr:BadRequestError; // Special Agent Note: BadRequestError FROM ballerina/http.httpscerr module
+public type QueryParameterBindingError distinct ListenerError & httpscerr:BadRequestError;
 
 # Represents an error, which occurred due to a path parameter binding.
-public type PathParameterBindingError distinct ListenerError & httpscerr:BadRequestError; // Special Agent Note: BadRequestError FROM ballerina/http.httpscerr module
+public type PathParameterBindingError distinct ListenerError & httpscerr:BadRequestError;
 
 # Defines the authentication error types that returned from listener.
 public type ListenerAuthnError distinct httpscerr:UnauthorizedError & ListenerAuthError;
@@ -3839,28 +3839,28 @@ public type ListenerAuthzError distinct httpscerr:ForbiddenError & ListenerAuthE
 public type LoadBalanceActionError distinct ResiliencyError & error<LoadBalanceActionErrorData>;
 
 # Represents Service Not Found error.
-public type ServiceNotFoundError httpscerr:NotFoundError & ServiceDispatchingError; // Special Agent Note: NotFoundError FROM ballerina/http.httpscerr module
+public type ServiceNotFoundError httpscerr:NotFoundError & ServiceDispatchingError;
 
 # Represents Bad Matrix Parameter in the request error.
-public type BadMatrixParamError httpscerr:BadRequestError & ServiceDispatchingError; // Special Agent Note: BadRequestError FROM ballerina/http.httpscerr module
+public type BadMatrixParamError httpscerr:BadRequestError & ServiceDispatchingError;
 
 # Represents an error, which occurred when the resource is not found during dispatching.
-public type ResourceNotFoundError httpscerr:NotFoundError & ResourceDispatchingError; // Special Agent Note: NotFoundError FROM ballerina/http.httpscerr module
+public type ResourceNotFoundError httpscerr:NotFoundError & ResourceDispatchingError;
 
 # Represents an error, which occurred due to a path parameter constraint validation.
-public type ResourcePathValidationError httpscerr:BadRequestError & ResourceDispatchingError; // Special Agent Note: BadRequestError FROM ballerina/http.httpscerr module
+public type ResourcePathValidationError httpscerr:BadRequestError & ResourceDispatchingError;
 
 # Represents an error, which occurred when the resource method is not allowed during dispatching.
-public type ResourceMethodNotAllowedError httpscerr:MethodNotAllowedError & ResourceDispatchingError; // Special Agent Note: MethodNotAllowedError FROM ballerina/http.httpscerr module
+public type ResourceMethodNotAllowedError httpscerr:MethodNotAllowedError & ResourceDispatchingError;
 
 # Represents an error, which occurred when the media type is not supported during dispatching.
-public type UnsupportedRequestMediaTypeError httpscerr:UnsupportedMediaTypeError & ResourceDispatchingError; // Special Agent Note: UnsupportedMediaTypeError FROM ballerina/http.httpscerr module
+public type UnsupportedRequestMediaTypeError httpscerr:UnsupportedMediaTypeError & ResourceDispatchingError;
 
 # Represents an error, which occurred when the payload is not acceptable during dispatching.
-public type RequestNotAcceptableError httpscerr:NotAcceptableError & ResourceDispatchingError; // Special Agent Note: NotAcceptableError FROM ballerina/http.httpscerr module
+public type RequestNotAcceptableError httpscerr:NotAcceptableError & ResourceDispatchingError;
 
 # Represents other internal server errors during dispatching.
-public type ResourceDispatchingServerError httpscerr:InternalServerErrorError & ResourceDispatchingError; // Special Agent Note: InternalServerErrorError FROM ballerina/http.httpscerr module
+public type ResourceDispatchingServerError httpscerr:InternalServerErrorError & ResourceDispatchingError;
 
 # Represents the client status code binding error
 public type StatusCodeResponseBindingError distinct ClientError & error<StatusCodeBindingErrorDetail>;
@@ -4593,13 +4593,13 @@ public isolated client class ListenerLdapUserStoreBasicAuthHandler {
     # Authenticates with the relevant authentication requirements.
     # + data - The `http:Request` instance or `http:Headers` instance or `string` Authorization header
     # + return - The `auth:UserDetails` instance or else `Unauthorized` type in case of an error
-    isolated remote function authenticate(Request|Headers|string data) returns auth:UserDetails|Unauthorized; // Special Agent Note: UserDetails FROM ballerina/auth module
+    isolated remote function authenticate(Request|Headers|string data) returns auth:UserDetails|Unauthorized;
 
     # Authorizes with the relevant authorization requirements.
     # + userDetails - The `auth:UserDetails` instance which is received from authentication results
     # + expectedScopes - The expected scopes as `string` or `string[]`
     # + return - `()`, if it is successful or else `Forbidden` type in case of an error
-    isolated remote function authorize(auth:UserDetails userDetails, string|string[] expectedScopes) returns Forbidden?; // Special Agent Note: UserDetails FROM ballerina/auth module
+    isolated remote function authorize(auth:UserDetails userDetails, string|string[] expectedScopes) returns Forbidden?;
 }
 
 # Defines the OAuth2 handler for listener authentication.
@@ -4613,7 +4613,7 @@ public isolated client class ListenerOAuth2Handler {
     # + expectedScopes - The expected scopes as `string` or `string[]`
     # + optionalParams - Map of optional parameters that need to be sent to introspection endpoint
     # + return - The `oauth2:IntrospectionResponse` instance or else `Unauthorized` or `Forbidden` type in case of an error
-    isolated remote function authorize(Request|Headers|string data, string|string[]? expectedScopes = (), map<string>? optionalParams = ()) returns oauth2:IntrospectionResponse|Unauthorized|Forbidden; // Special Agent Note: IntrospectionResponse FROM ballerina/oauth2 module
+    isolated remote function authorize(Request|Headers|string data, string|string[]? expectedScopes = (), map<string>? optionalParams = ()) returns oauth2:IntrospectionResponse|Unauthorized|Forbidden;
 }
 
 # LoadBalanceClient endpoint provides load balancing functionality over multiple HTTP clients.

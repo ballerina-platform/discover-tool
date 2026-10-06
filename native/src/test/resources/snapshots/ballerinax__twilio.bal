@@ -723,9 +723,9 @@ public type CallUser_defined_message_subscription record {
 # Provides settings related to HTTP/1.x protocol.
 public type ClientHttp1Settings record {|
     # Specifies whether to reuse a connection for multiple requests
-    http:KeepAlive keepAlive = http:KEEPALIVE_AUTO; // Special Agent Note: KeepAlive FROM ballerina/http module
+    http:KeepAlive keepAlive = http:KEEPALIVE_AUTO;
     # The chunking behaviour of the request
-    http:Chunking chunking = http:CHUNKING_AUTO; // Special Agent Note: Chunking FROM ballerina/http module
+    http:Chunking chunking = http:CHUNKING_AUTO;
     # Proxy server related options
     ProxyConfig proxy?;
 |};
@@ -850,31 +850,31 @@ public type ConnectionConfig record {|
     # Configurations related to client authentication
     AuthTokenConfig|ApiKeyConfig auth;
     # The HTTP version understood by the client
-    http:HttpVersion httpVersion = http:HTTP_2_0; // Special Agent Note: HttpVersion FROM ballerina/http module
+    http:HttpVersion httpVersion = http:HTTP_2_0;
     # Configurations related to HTTP/1.x protocol
     ClientHttp1Settings http1Settings?;
     # Configurations related to HTTP/2 protocol
-    http:ClientHttp2Settings http2Settings?; // Special Agent Note: ClientHttp2Settings FROM ballerina/http module
+    http:ClientHttp2Settings http2Settings?;
     # The maximum time to wait (in seconds) for a response before closing the connection
     decimal timeout = 60;
     # The choice of setting `forwarded`/`x-forwarded` header
     string forwarded = "disable";
     # Configurations associated with request pooling
-    http:PoolConfiguration poolConfig?; // Special Agent Note: PoolConfiguration FROM ballerina/http module
+    http:PoolConfiguration poolConfig?;
     # HTTP caching related configurations
-    http:CacheConfig cache?; // Special Agent Note: CacheConfig FROM ballerina/http module
+    http:CacheConfig cache?;
     # Specifies the way of handling compression (`accept-encoding`) header
-    http:Compression compression = http:COMPRESSION_AUTO; // Special Agent Note: Compression FROM ballerina/http module
+    http:Compression compression = http:COMPRESSION_AUTO;
     # Configurations associated with the behaviour of the Circuit Breaker
-    http:CircuitBreakerConfig circuitBreaker?; // Special Agent Note: CircuitBreakerConfig FROM ballerina/http module
+    http:CircuitBreakerConfig circuitBreaker?;
     # Configurations associated with retrying
-    http:RetryConfig retryConfig?; // Special Agent Note: RetryConfig FROM ballerina/http module
+    http:RetryConfig retryConfig?;
     # Configurations associated with inbound response size limits
-    http:ResponseLimitConfigs responseLimits?; // Special Agent Note: ResponseLimitConfigs FROM ballerina/http module
+    http:ResponseLimitConfigs responseLimits?;
     # SSL/TLS-related options
-    http:ClientSecureSocket secureSocket?; // Special Agent Note: ClientSecureSocket FROM ballerina/http module
+    http:ClientSecureSocket secureSocket?;
     # Proxy server related options
-    http:ProxyConfig proxy?; // Special Agent Note: ProxyConfig FROM ballerina/http module
+    http:ProxyConfig proxy?;
     # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
     boolean validation = true;
 |};
@@ -4947,7 +4947,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Address resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that is responsible for the Address resource to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteAddress(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteAddress(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of applications representing an application within the requesting account
     # + friendlyName - The string that identifies the Application resources to read.
@@ -4981,7 +4981,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Application resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Application resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteApplication(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteApplication(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Fetch an instance of an authorized-connect-app
     # + connectAppSid - The SID of the Connect App to fetch.
@@ -5246,7 +5246,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided Call SID that uniquely identifies the Call resource to delete
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Call resource(s) to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteCall(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteCall(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of all events for a call.
     # + callSid - The unique SID identifier of the Call.
@@ -5286,7 +5286,7 @@ public isolated client class Client {
     # + sid - A 34 character string that uniquely identifies this resource.
     # + accountSid - The unique id of the [Account](https://www.twilio.com/docs/iam/api/account) responsible for this resource.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteCallFeedbackSummary(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteCallFeedbackSummary(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Fetch call notifications for a call
     # + callSid - The [Call](https://www.twilio.com/docs/voice/api/call-resource) SID of the Call Notification resource to fetch.
@@ -5347,7 +5347,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Recording resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Recording resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteCallRecording(string callSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteCallRecording(string callSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Fetch an instance of a conference
     # + sid - The Twilio-provided string that uniquely identifies the Conference resource to fetch
@@ -5398,7 +5398,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Conference Recording resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Conference Recording resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteConferenceRecording(string conferenceSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteConferenceRecording(string conferenceSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of recordings belonging to the call used to make the request
     # + conferenceSid - The Conference SID that identifies the conference associated with the recording to read.
@@ -5429,7 +5429,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the ConnectApp resource to fetch.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the ConnectApp resource to fetch.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteConnectApp(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteConnectApp(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of connect-apps belonging to the account used to make the request
     # + pageSize - How many resources to return in each list page. The default is 50, and the maximum is 1000.
@@ -5465,7 +5465,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the IncomingPhoneNumber resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the IncomingPhoneNumber resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteIncomingPhoneNumber(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteIncomingPhoneNumber(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of incoming-phone-numbers belonging to the account used to make the request.
     # + beta - Whether to include phone numbers new to the Twilio platform. Can be: `true` or `false` and the default is `true`.
@@ -5497,7 +5497,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteIncomingPhoneNumberAssignedAddOn(string resourceSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteIncomingPhoneNumberAssignedAddOn(string resourceSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of Add-on installations currently assigned to this Number.
     # + resourceSid - The SID of the Phone Number to which the Add-on is assigned.
@@ -5604,7 +5604,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Key resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Key resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteKey(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteKey(string sid, string? accountSid = ()) returns http:Response|error;
 
     # List of Keys resources.
     # + pageSize - How many resources to return in each list page. The default is 50, and the maximum is 1000.
@@ -5632,7 +5632,7 @@ public isolated client class Client {
     # + sid - The unique identifier of the to-be-deleted Media resource.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that is associated with the Media resource.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteMedia(string messageSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteMedia(string messageSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Read a list of Media resources associated with a specific Message resource
     # + messageSid - The SID of the Message resource that is associated with the Media resources.
@@ -5706,7 +5706,7 @@ public isolated client class Client {
     # + sid - The SID of the Message resource you wish to delete
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) associated with the Message resource
     # + return - The resource was deleted successfully.
-    isolated remote function deleteMessage(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteMessage(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Create Message Feedback to confirm a tracked user action was performed by the recipient of the associated Message
     # + messageSid - The SID of the Message resource for which to create MessageFeedback.
@@ -5764,7 +5764,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the OutgoingCallerId resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the OutgoingCallerId resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteOutgoingCallerId(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteOutgoingCallerId(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of outgoing-caller-ids belonging to the account used to make the request
     # + phoneNumber - The phone number of the OutgoingCallerId resources to read.
@@ -5802,7 +5802,7 @@ public isolated client class Client {
     # + callSid - The [Call](https://www.twilio.com/docs/voice/api/call-resource) SID or label of the participant to delete. Non URL safe characters in a label must be percent encoded, for example, a space character is represented as %20.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Participant resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteParticipant(string conferenceSid, string callSid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteParticipant(string conferenceSid, string callSid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of participants belonging to the account used to make the request
     # + conferenceSid - The SID of the conference with the participants to read.
@@ -5855,7 +5855,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Queue resource to delete
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Queue resource to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteQueue(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteQueue(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of queues belonging to the account used to make the request
     # + pageSize - How many resources to return in each list page. The default is 50, and the maximum is 1000.
@@ -5882,7 +5882,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Recording resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Recording resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteRecording(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteRecording(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of recordings belonging to the account used to make the request
     # + dateCreated - Only include recordings that were created on this date. Specify a date as `YYYY-MM-DD` in GMT, for example: `2009-07-06`, to read recordings that were created on this date. You can also specify an inequality, such as `DateCreated<=YYYY-MM-DD`, to read recordings that were created on or before midnight of this date, and `DateCreated>=YYYY-MM-DD` to read recordings that were created on or after midnight of this date.
@@ -5910,7 +5910,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Recording AddOnResult resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Recording AddOnResult resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteRecordingAddOnResult(string referenceSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteRecordingAddOnResult(string referenceSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of results belonging to the recording
     # + referenceSid - The SID of the recording to which the result to read belongs.
@@ -5935,7 +5935,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Recording AddOnResult Payload resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Recording AddOnResult Payload resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteRecordingAddOnResultPayload(string referenceSid, string addOnResultSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteRecordingAddOnResultPayload(string referenceSid, string addOnResultSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of payloads belonging to the AddOnResult
     # + referenceSid - The SID of the recording to which the AddOnResult resource that contains the payloads to read belongs.
@@ -5959,7 +5959,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Transcription resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Transcription resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteRecordingTranscription(string recordingSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteRecordingTranscription(string recordingSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of transcriptions belonging to the recording
     # + recordingSid - The SID of the [Recording](https://www.twilio.com/docs/voice/api/recording) that created the transcriptions to read.
@@ -6010,7 +6010,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the SigningKey resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the SigningKey resource(s) to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSigningKey(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSigningKey(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of credential list mappings belonging to the domain used in the request
     # + domainSid - The SID of the SIP domain that contains the resources to read.
@@ -6040,7 +6040,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the CredentialListMapping resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the CredentialListMapping resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipAuthCallsCredentialListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipAuthCallsCredentialListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of IP Access Control List mappings belonging to the domain used in the request
     # + domainSid - The SID of the SIP domain that contains the resources to read.
@@ -6070,7 +6070,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the IpAccessControlListMapping resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the IpAccessControlListMapping resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipAuthCallsIpAccessControlListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipAuthCallsIpAccessControlListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of credential list mappings belonging to the domain used in the request
     # + domainSid - The SID of the SIP domain that contains the resources to read.
@@ -6100,7 +6100,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the CredentialListMapping resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the CredentialListMapping resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipAuthRegistrationsCredentialListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipAuthRegistrationsCredentialListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of credentials.
     # + credentialListSid - The unique id that identifies the credential list that contains the desired credentials.
@@ -6138,7 +6138,7 @@ public isolated client class Client {
     # + sid - The unique id that identifies the resource to delete.
     # + accountSid - The unique id of the Account that is responsible for this resource.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipCredential(string credentialListSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipCredential(string credentialListSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Get All Credential Lists
     # + pageSize - How many resources to return in each list page. The default is 50, and the maximum is 1000.
@@ -6171,7 +6171,7 @@ public isolated client class Client {
     # + sid - The credential list Sid that uniquely identifies this resource.
     # + accountSid - The unique id of the Account that is responsible for this resource.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipCredentialList(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipCredentialList(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Read multiple CredentialListMapping resources from an account.
     # + domainSid - A 34 character string that uniquely identifies the SIP Domain that includes the resource to read.
@@ -6201,7 +6201,7 @@ public isolated client class Client {
     # + sid - A 34 character string that uniquely identifies the resource to delete.
     # + accountSid - The unique id of the [Account](https://www.twilio.com/docs/iam/api/account) responsible for this resource.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipCredentialListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipCredentialListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of domains belonging to the account used to make the request
     # + pageSize - How many resources to return in each list page. The default is 50, and the maximum is 1000.
@@ -6234,7 +6234,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the SipDomain resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the SipDomain resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipDomain(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipDomain(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of IpAccessControlLists that belong to the account used to make the request
     # + pageSize - How many resources to return in each list page. The default is 50, and the maximum is 1000.
@@ -6267,7 +6267,7 @@ public isolated client class Client {
     # + sid - A 34 character string that uniquely identifies the resource to delete.
     # + accountSid - The unique id of the [Account](https://www.twilio.com/docs/iam/api/account) responsible for this resource.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipIpAccessControlList(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipIpAccessControlList(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Fetch an IpAccessControlListMapping resource.
     # + domainSid - A 34 character string that uniquely identifies the SIP domain.
@@ -6281,7 +6281,7 @@ public isolated client class Client {
     # + sid - A 34 character string that uniquely identifies the resource to delete.
     # + accountSid - The unique id of the Account that is responsible for this resource.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipIpAccessControlListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipIpAccessControlListMapping(string domainSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of IpAccessControlListMapping resources.
     # + domainSid - A 34 character string that uniquely identifies the SIP domain.
@@ -6335,7 +6335,7 @@ public isolated client class Client {
     # + sid - A 34 character string that uniquely identifies the resource to delete.
     # + accountSid - The unique id of the [Account](https://www.twilio.com/docs/iam/api/account) responsible for this resource.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteSipIpAddress(string ipAccessControlListSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteSipIpAddress(string ipAccessControlListSid, string sid, string? accountSid = ()) returns http:Response|error;
 
     # Create a Siprec
     # + callSid - The SID of the [Call](https://www.twilio.com/docs/voice/api/call-resource) the Siprec resource is associated with.
@@ -6383,7 +6383,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the Transcription resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the Transcription resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteTranscription(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteTranscription(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of transcriptions belonging to the account used to make the request
     # + pageSize - How many resources to return in each list page. The default is 50, and the maximum is 1000.
@@ -6518,7 +6518,7 @@ public isolated client class Client {
     # + sid - The Twilio-provided string that uniquely identifies the UsageTrigger resource to delete.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that created the UsageTrigger resources to delete.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteUsageTrigger(string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteUsageTrigger(string sid, string? accountSid = ()) returns http:Response|error;
 
     # Retrieve a list of usage-triggers belonging to the account used to make the request
     # + recurring - The frequency of recurring UsageTriggers to read. Can be: `daily`, `monthly`, or `yearly` to read recurring UsageTriggers. An empty value or a value of `alltime` reads non-recurring UsageTriggers.
@@ -6556,5 +6556,5 @@ public isolated client class Client {
     # + sid - The SID that uniquely identifies this User Defined Message Subscription.
     # + accountSid - The SID of the [Account](https://www.twilio.com/docs/iam/api/account) that subscribed to the User Defined Messages.
     # + return - The resource was deleted successfully.
-    isolated remote function deleteUserDefinedMessageSubscription(string callSid, string sid, string? accountSid = ()) returns http:Response|error; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function deleteUserDefinedMessageSubscription(string callSid, string sid, string? accountSid = ()) returns http:Response|error;
 }

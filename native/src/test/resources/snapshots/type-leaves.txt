@@ -59,9 +59,9 @@ Types it names (7)
       # Enable SSL validation
       boolean enable = true;
       # Configurations associated with `crypto:TrustStore` or single certificate file that the client trusts
-      crypto:TrustStore|string cert?; // Special Agent Note: TrustStore FROM ballerina/crypto module
+      crypto:TrustStore|string cert?;
       # Configurations associated with `crypto:KeyStore` or combination of certificate and private key of the client
-      crypto:KeyStore|CertKey key?; // Special Agent Note: KeyStore FROM ballerina/crypto module
+      crypto:KeyStore|CertKey key?;
       # SSL/TLS protocol related options
       record {Protocol name; string[] versions; } protocol?;
       # Certificate validation against OCSP_CRL, OCSP_STAPLING related options
@@ -161,61 +161,61 @@ ballerina/http · type · StatusCodeResponse
 # Defines the possible status code response record types.
 public type StatusCodeResponse Continue|SwitchingProtocols|Processing|EarlyHints|Ok|Created|Accepted|NonAuthoritativeInformation|NoContent|ResetContent|PartialContent|MultiStatus|AlreadyReported|IMUsed|MultipleChoices|MovedPermanently|Found|SeeOther|NotModified|UseProxy|TemporaryRedirect|PermanentRedirect|BadRequest|Unauthorized|PaymentRequired|Forbidden|NotFound|MethodNotAllowed|NotAcceptable|ProxyAuthenticationRequired|RequestTimeout|Conflict|Gone|LengthRequired|PreconditionFailed|PayloadTooLarge|UriTooLong|UnsupportedMediaType|RangeNotSatisfiable|ExpectationFailed|MisdirectedRequest|UnprocessableEntity|Locked|FailedDependency|TooEarly|PreconditionRequired|UnavailableDueToLegalReasons|UpgradeRequired|TooManyRequests|RequestHeaderFieldsTooLarge|InternalServerError|NotImplemented|BadGateway|ServiceUnavailable|GatewayTimeout|HttpVersionNotSupported|VariantAlsoNegotiates|InsufficientStorage|LoopDetected|NotExtended|NetworkAuthenticationRequired|DefaultStatusCodeResponse;
 
-Types it names (14)
+Types it names (15)
   # The status code response record of `Continue`.
   public type Continue record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusContinue status = STATUS_CONTINUE_OBJ; // Special Agent Note: the default STATUS_CONTINUE_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusContinue status = STATUS_CONTINUE_OBJ; // the default STATUS_CONTINUE_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `SwitchingProtocols`.
   public type SwitchingProtocols record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusSwitchingProtocols status = STATUS_SWITCHING_PROTOCOLS_OBJ; // Special Agent Note: the default STATUS_SWITCHING_PROTOCOLS_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusSwitchingProtocols status = STATUS_SWITCHING_PROTOCOLS_OBJ; // the default STATUS_SWITCHING_PROTOCOLS_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `Processing`.
   public type Processing record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusProcessing status = STATUS_PROCESSING_OBJ; // Special Agent Note: the default STATUS_PROCESSING_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusProcessing status = STATUS_PROCESSING_OBJ; // the default STATUS_PROCESSING_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `EarlyHints`.
   public type EarlyHints record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusEarlyHints status = STATUS_EARLY_HINTS_OBJ; // Special Agent Note: the default STATUS_EARLY_HINTS_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusEarlyHints status = STATUS_EARLY_HINTS_OBJ; // the default STATUS_EARLY_HINTS_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `Ok`.
   public type Ok record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusOK status = STATUS_OK_OBJ; // Special Agent Note: the default STATUS_OK_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusOK status = STATUS_OK_OBJ; // the default STATUS_OK_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `Created`.
   public type Created record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusCreated status = STATUS_CREATED_OBJ; // Special Agent Note: the default STATUS_CREATED_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusCreated status = STATUS_CREATED_OBJ; // the default STATUS_CREATED_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `Accepted`.
   public type Accepted record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusAccepted status = STATUS_ACCEPTED_OBJ; // Special Agent Note: the default STATUS_ACCEPTED_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusAccepted status = STATUS_ACCEPTED_OBJ; // the default STATUS_ACCEPTED_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `NonAuthoritativeInformation`.
   public type NonAuthoritativeInformation record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusNonAuthoritativeInformation status = STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ; // Special Agent Note: the default STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusNonAuthoritativeInformation status = STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ; // the default STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `NoContent`.
@@ -223,48 +223,54 @@ Types it names (14)
       # The response headers
       map<string|int|boolean|string[]|int[]|boolean[]> headers?;
       # The response status code obj
-      readonly StatusNoContent status = STATUS_NO_CONTENT_OBJ; // Special Agent Note: the default STATUS_NO_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusNoContent status = STATUS_NO_CONTENT_OBJ; // the default STATUS_NO_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `ResetContent`.
   public type ResetContent record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusResetContent status = STATUS_RESET_CONTENT_OBJ; // Special Agent Note: the default STATUS_RESET_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusResetContent status = STATUS_RESET_CONTENT_OBJ; // the default STATUS_RESET_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `PartialContent`.
   public type PartialContent record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusPartialContent status = STATUS_PARTIAL_CONTENT_OBJ; // Special Agent Note: the default STATUS_PARTIAL_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusPartialContent status = STATUS_PARTIAL_CONTENT_OBJ; // the default STATUS_PARTIAL_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `MultiStatus`.
   public type MultiStatus record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusMultiStatus status = STATUS_MULTI_STATUS_OBJ; // Special Agent Note: the default STATUS_MULTI_STATUS_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusMultiStatus status = STATUS_MULTI_STATUS_OBJ; // the default STATUS_MULTI_STATUS_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `AlreadyReported`.
   public type AlreadyReported record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusAlreadyReported status = STATUS_ALREADY_REPORTED_OBJ; // Special Agent Note: the default STATUS_ALREADY_REPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusAlreadyReported status = STATUS_ALREADY_REPORTED_OBJ; // the default STATUS_ALREADY_REPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
   # The status code response record of `IMUsed`.
   public type IMUsed record {|
       *CommonResponse;
       # The response status code obj
-      readonly StatusIMUsed status = STATUS_IM_USED_OBJ; // Special Agent Note: the default STATUS_IM_USED_OBJ is not exported by this package; omit the argument rather than repeating it
+      readonly StatusIMUsed status = STATUS_IM_USED_OBJ; // the default STATUS_IM_USED_OBJ is not exported by this package; omit the argument rather than repeating it
   |};
 
-Past the closure budget (40 of 48)
+  # The status code response record of `Found`.
+  public type Found record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusFound status = STATUS_FOUND_OBJ; // the default STATUS_FOUND_OBJ is not exported by this package; omit the argument rather than repeating it
+  |};
+
+Past the closure budget (40 of 47)
   MultipleChoices
   MovedPermanently
-  Found
   SeeOther
   NotModified
   UseProxy
@@ -302,8 +308,9 @@ Past the closure budget (40 of 48)
   NotImplemented
   BadGateway
   ServiceUnavailable
+  GatewayTimeout
 
-... 8 more, narrow further
+... 7 more, narrow further
 Next: bal discover ballerina/http type
 Next: bal discover ballerina/http type <name>
 == ballerina__http type ResourceConfig ==
@@ -409,39 +416,39 @@ ballerinax/github · type · ConnectionConfig
 # Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
 public type ConnectionConfig record {|
     # Configurations related to client authentication
-    http:BearerTokenConfig auth; // Special Agent Note: BearerTokenConfig FROM ballerina/http module
+    http:BearerTokenConfig auth;
     # The HTTP version understood by the client
-    http:HttpVersion httpVersion = http:HTTP_2_0; // Special Agent Note: HttpVersion FROM ballerina/http module
+    http:HttpVersion httpVersion = http:HTTP_2_0;
     # Configurations related to HTTP/1.x protocol
-    http:ClientHttp1Settings http1Settings = {}; // Special Agent Note: ClientHttp1Settings FROM ballerina/http module
+    http:ClientHttp1Settings http1Settings = {};
     # Configurations related to HTTP/2 protocol
-    http:ClientHttp2Settings http2Settings = {}; // Special Agent Note: ClientHttp2Settings FROM ballerina/http module
+    http:ClientHttp2Settings http2Settings = {};
     # The maximum time to wait (in seconds) for a response before closing the connection
     decimal timeout = 30;
     # The choice of setting `forwarded`/`x-forwarded` header
     string forwarded = "disable";
     # Configurations associated with Redirection
-    http:FollowRedirects followRedirects?; // Special Agent Note: FollowRedirects FROM ballerina/http module
+    http:FollowRedirects followRedirects?;
     # Configurations associated with request pooling
-    http:PoolConfiguration poolConfig?; // Special Agent Note: PoolConfiguration FROM ballerina/http module
+    http:PoolConfiguration poolConfig?;
     # HTTP caching related configurations
-    http:CacheConfig cache = {}; // Special Agent Note: CacheConfig FROM ballerina/http module
+    http:CacheConfig cache = {};
     # Specifies the way of handling compression (`accept-encoding`) header
-    http:Compression compression = http:COMPRESSION_AUTO; // Special Agent Note: Compression FROM ballerina/http module
+    http:Compression compression = http:COMPRESSION_AUTO;
     # Configurations associated with the behaviour of the Circuit Breaker
-    http:CircuitBreakerConfig circuitBreaker?; // Special Agent Note: CircuitBreakerConfig FROM ballerina/http module
+    http:CircuitBreakerConfig circuitBreaker?;
     # Configurations associated with retrying
-    http:RetryConfig retryConfig?; // Special Agent Note: RetryConfig FROM ballerina/http module
+    http:RetryConfig retryConfig?;
     # Configurations associated with cookies
-    http:CookieConfig cookieConfig?; // Special Agent Note: CookieConfig FROM ballerina/http module
+    http:CookieConfig cookieConfig?;
     # Configurations associated with inbound response size limits
-    http:ResponseLimitConfigs responseLimits = {}; // Special Agent Note: ResponseLimitConfigs FROM ballerina/http module
+    http:ResponseLimitConfigs responseLimits = {};
     # SSL/TLS-related options
-    http:ClientSecureSocket secureSocket?; // Special Agent Note: ClientSecureSocket FROM ballerina/http module
+    http:ClientSecureSocket secureSocket?;
     # Proxy server related options
-    http:ProxyConfig proxy?; // Special Agent Note: ProxyConfig FROM ballerina/http module
+    http:ProxyConfig proxy?;
     # Provides settings related to client socket configuration
-    http:ClientSocketConfig socketConfig = {}; // Special Agent Note: ClientSocketConfig FROM ballerina/http module
+    http:ClientSocketConfig socketConfig = {};
     # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
     boolean validation = true;
     # Enables relaxed data binding on the client side. When enabled, `nil` values are treated as optional, 
@@ -471,33 +478,33 @@ ballerinax/googleapis.sheets · type · ConnectionConfig
 # Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
 public type ConnectionConfig record {|
     # Configurations related to client authentication
-    http:BearerTokenConfig|OAuth2RefreshTokenGrantConfig auth; // Special Agent Note: BearerTokenConfig FROM ballerina/http module
+    http:BearerTokenConfig|OAuth2RefreshTokenGrantConfig auth;
     # The HTTP version understood by the client
-    http:HttpVersion httpVersion = http:HTTP_2_0; // Special Agent Note: HttpVersion FROM ballerina/http module
+    http:HttpVersion httpVersion = http:HTTP_2_0;
     # Configurations related to HTTP/1.x protocol
     ClientHttp1Settings http1Settings = {};
     # Configurations related to HTTP/2 protocol
-    http:ClientHttp2Settings http2Settings = {}; // Special Agent Note: ClientHttp2Settings FROM ballerina/http module
+    http:ClientHttp2Settings http2Settings = {};
     # The maximum time to wait (in seconds) for a response before closing the connection
     decimal timeout = 60;
     # The choice of setting `forwarded`/`x-forwarded` header
     string forwarded = "disable";
     # Configurations associated with request pooling
-    http:PoolConfiguration? poolConfig = (); // Special Agent Note: PoolConfiguration FROM ballerina/http module
+    http:PoolConfiguration? poolConfig = ();
     # HTTP caching related configurations
-    http:CacheConfig cache = {}; // Special Agent Note: CacheConfig FROM ballerina/http module
+    http:CacheConfig cache = {};
     # Specifies the way of handling compression (`accept-encoding`) header
-    http:Compression compression = http:COMPRESSION_AUTO; // Special Agent Note: Compression FROM ballerina/http module
+    http:Compression compression = http:COMPRESSION_AUTO;
     # Configurations associated with the behaviour of the Circuit Breaker
-    http:CircuitBreakerConfig? circuitBreaker = (); // Special Agent Note: CircuitBreakerConfig FROM ballerina/http module
+    http:CircuitBreakerConfig? circuitBreaker = ();
     # Configurations associated with retrying
-    http:RetryConfig? retryConfig = (); // Special Agent Note: RetryConfig FROM ballerina/http module
+    http:RetryConfig? retryConfig = ();
     # Configurations associated with inbound response size limits
-    http:ResponseLimitConfigs responseLimits = {}; // Special Agent Note: ResponseLimitConfigs FROM ballerina/http module
+    http:ResponseLimitConfigs responseLimits = {};
     # SSL/TLS-related options
-    http:ClientSecureSocket secureSocket = {}; // Special Agent Note: ClientSecureSocket FROM ballerina/http module
+    http:ClientSecureSocket secureSocket = {};
     # Proxy server related options
-    http:ProxyConfig? proxy = (); // Special Agent Note: ProxyConfig FROM ballerina/http module
+    http:ProxyConfig? proxy = ();
     # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
     boolean validation = true;
 |};
@@ -505,7 +512,7 @@ public type ConnectionConfig record {|
 Types it names (2)
   # OAuth2 Refresh Token Grant Configs
   public type OAuth2RefreshTokenGrantConfig record {|
-      *http:OAuth2RefreshTokenGrantConfig; // Special Agent Note: OAuth2RefreshTokenGrantConfig FROM ballerina/http module
+      *http:OAuth2RefreshTokenGrantConfig;
       # Refresh URL
       string refreshUrl = "https://accounts.google.com/o/oauth2/token";
   |};
@@ -513,9 +520,9 @@ Types it names (2)
   # Provides settings related to HTTP/1.x protocol.
   public type ClientHttp1Settings record {|
       # Specifies whether to reuse a connection for multiple requests
-      http:KeepAlive keepAlive = http:KEEPALIVE_AUTO; // Special Agent Note: KeepAlive FROM ballerina/http module
+      http:KeepAlive keepAlive = http:KEEPALIVE_AUTO;
       # The chunking behaviour of the request
-      http:Chunking chunking = http:CHUNKING_AUTO; // Special Agent Note: Chunking FROM ballerina/http module
+      http:Chunking chunking = http:CHUNKING_AUTO;
       # Proxy server related options
       ProxyConfig? proxy = ();
   |};

@@ -68,9 +68,9 @@ public type Options record {|
 # Configurations for secure communication with the Redis server.
 public type SecureSocket record {|
     # Configurations associated with `crypto:TrustStore` or single certificate file that the client trusts
-    crypto:TrustStore|string cert?; // Special Agent Note: TrustStore FROM ballerina/crypto module
+    crypto:TrustStore|string cert?;
     # Configurations associated with `crypto:KeyStore` or combination of certificate and private key of the client
-    crypto:KeyStore|CertKey key?; // Special Agent Note: KeyStore FROM ballerina/crypto module
+    crypto:KeyStore|CertKey key?;
     # List of protocols used for the connection established to Redis Server, such as TLSv1.2, TLSv1.1, TLSv1.
     string[] protocols?;
     # List of ciphers to be used for SSL connections

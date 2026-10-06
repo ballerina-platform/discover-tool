@@ -1304,39 +1304,39 @@ public type CommentObj record {|
 # Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
 public type ConnectionConfig record {|
     # Configurations related to client authentication
-    http:BearerTokenConfig|OAuth2RefreshTokenGrantConfig auth; // Special Agent Note: BearerTokenConfig FROM ballerina/http module
+    http:BearerTokenConfig|OAuth2RefreshTokenGrantConfig auth;
     # The HTTP version understood by the client
-    http:HttpVersion httpVersion = http:HTTP_2_0; // Special Agent Note: HttpVersion FROM ballerina/http module
+    http:HttpVersion httpVersion = http:HTTP_2_0;
     # Configurations related to HTTP/1.x protocol
-    http:ClientHttp1Settings http1Settings = {}; // Special Agent Note: ClientHttp1Settings FROM ballerina/http module
+    http:ClientHttp1Settings http1Settings = {};
     # Configurations related to HTTP/2 protocol
-    http:ClientHttp2Settings http2Settings = {}; // Special Agent Note: ClientHttp2Settings FROM ballerina/http module
+    http:ClientHttp2Settings http2Settings = {};
     # The maximum time to wait (in seconds) for a response before closing the connection
     decimal timeout = 30;
     # The choice of setting `forwarded`/`x-forwarded` header
     string forwarded = "disable";
     # Configurations associated with Redirection
-    http:FollowRedirects followRedirects?; // Special Agent Note: FollowRedirects FROM ballerina/http module
+    http:FollowRedirects followRedirects?;
     # Configurations associated with request pooling
-    http:PoolConfiguration poolConfig?; // Special Agent Note: PoolConfiguration FROM ballerina/http module
+    http:PoolConfiguration poolConfig?;
     # HTTP caching related configurations
-    http:CacheConfig cache = {}; // Special Agent Note: CacheConfig FROM ballerina/http module
+    http:CacheConfig cache = {};
     # Specifies the way of handling compression (`accept-encoding`) header
-    http:Compression compression = http:COMPRESSION_AUTO; // Special Agent Note: Compression FROM ballerina/http module
+    http:Compression compression = http:COMPRESSION_AUTO;
     # Configurations associated with the behaviour of the Circuit Breaker
-    http:CircuitBreakerConfig circuitBreaker?; // Special Agent Note: CircuitBreakerConfig FROM ballerina/http module
+    http:CircuitBreakerConfig circuitBreaker?;
     # Configurations associated with retrying
-    http:RetryConfig retryConfig?; // Special Agent Note: RetryConfig FROM ballerina/http module
+    http:RetryConfig retryConfig?;
     # Configurations associated with cookies
-    http:CookieConfig cookieConfig?; // Special Agent Note: CookieConfig FROM ballerina/http module
+    http:CookieConfig cookieConfig?;
     # Configurations associated with inbound response size limits
-    http:ResponseLimitConfigs responseLimits = {}; // Special Agent Note: ResponseLimitConfigs FROM ballerina/http module
+    http:ResponseLimitConfigs responseLimits = {};
     # SSL/TLS-related options
-    http:ClientSecureSocket secureSocket?; // Special Agent Note: ClientSecureSocket FROM ballerina/http module
+    http:ClientSecureSocket secureSocket?;
     # Proxy server related options
-    http:ProxyConfig proxy?; // Special Agent Note: ProxyConfig FROM ballerina/http module
+    http:ProxyConfig proxy?;
     # Provides settings related to client socket configuration
-    http:ClientSocketConfig socketConfig = {}; // Special Agent Note: ClientSocketConfig FROM ballerina/http module
+    http:ClientSocketConfig socketConfig = {};
     # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
     boolean validation = true;
     # Enables relaxed data binding on the client side. When enabled, `nil` values are treated as optional, 
@@ -2658,7 +2658,7 @@ public type NewPagingStyle record {|
 
 # OAuth2 Refresh Token Grant Configs
 public type OAuth2RefreshTokenGrantConfig record {|
-    *http:OAuth2RefreshTokenGrantConfig; // Special Agent Note: OAuth2RefreshTokenGrantConfig FROM ballerina/http module
+    *http:OAuth2RefreshTokenGrantConfig;
     # Refresh URL
     string refreshUrl = "https://slack.com/api/oauth.access";
 |};

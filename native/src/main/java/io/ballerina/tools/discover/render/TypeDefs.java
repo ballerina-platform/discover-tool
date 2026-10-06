@@ -135,25 +135,22 @@ public final class TypeDefs {
     private static String renderRecordField(RecordField field, Owner owner) {
         List<Signatures.ExternalLink> links = Signatures.collectExternalLinks(field.type());
         String typeName = Signatures.applyPrefixToTypeName(field.type().name(), links);
-        String note = Signatures.buildSpecialAgentNote(links);
         String description = Signatures.renderDocComment(field.description(), "    ");
         return switch (field.form()) {
             // An inclusion takes no visibility qualifier in either body: `*sql:TypedValue;` is a statement about
             // where the members come from, not a member of its own.
-            case INCLUSION -> description + "    *" + typeName + ";" + note;
+            case INCLUSION -> description + "    *" + typeName + ";";
             // No doc comment: Central's description for a rest field is the literal string "Rest field",
             // which is its label for the FORM and not documentation. The source writes none either.
-            case REST -> "    " + typeName + "...;" + note;
+            case REST -> "    " + typeName + "...;";
             case DECLARED -> {
                 String deprecated = field.deprecated() ? "    @deprecated\n" : "";
                 String visibility = owner == Owner.OBJECT ? PUBLIC : "";
                 String readonly = field.readonly() ? "readonly " : "";
                 String optional = field.optional() ? "?" : "";
                 String defaultValue = field.hasDefault() ? " = " + field.defaultValue() : "";
-                // The note is rebuilt here rather than reused, because an unwritable default and a foreign
-                // type name must end up in ONE trailing comment.
-                String caveat = Signatures.buildSpecialAgentNote(
-                        links, field.unwritableDefault() ? List.of(field.defaultValue()) : List.of());
+                String caveat = Signatures.trailingNote(
+                        field.unwritableDefault() ? List.of(field.defaultValue()) : List.of());
                 yield description + deprecated + "    " + visibility + readonly + typeName + " "
                         + Identifiers.write(field.name())
                         + optional + defaultValue + ";" + caveat;
@@ -265,8 +262,7 @@ public final class TypeDefs {
         }
         List<Signatures.ExternalLink> links = Signatures.collectExternalLinks(typeDef.type());
         String type = Signatures.applyPrefixToTypeName(typeDef.type().name(), links);
-        return description + PUBLIC + "type " + typeDef.name() + " " + type + ";"
-                + Signatures.buildSpecialAgentNote(links);
+        return description + PUBLIC + "type " + typeDef.name() + " " + type + ";";
     }
 
     /**
@@ -292,8 +288,7 @@ public final class TypeDefs {
         String type = Signatures.applyPrefixToTypeName(typeDef.varType().name(), links);
         String initialiser = typeDef.initialiser().isEmpty() ? "" : " = " + typeDef.initialiser();
         return Signatures.renderDescription(typeDef.description())
-                + PUBLIC + "final " + type + " " + typeDef.name() + initialiser + ";"
-                + Signatures.buildSpecialAgentNote(links);
+                + PUBLIC + "final " + type + " " + typeDef.name() + initialiser + ";";
     }
 
     private static String renderConstant(TypeDef.Constant typeDef) {
@@ -333,7 +328,6 @@ public final class TypeDefs {
         String narrowed = baseRef != null && typeDef.detailRecord() ? "error<" + base + ">" : base;
         String distinct = typeDef.isDistinct() ? "distinct " : "";
         return Signatures.renderDescription(typeDef.description())
-                + PUBLIC + "type " + typeDef.name() + " " + distinct + narrowed + ";"
-                + Signatures.buildSpecialAgentNote(links);
+                + PUBLIC + "type " + typeDef.name() + " " + distinct + narrowed + ";";
     }
 }

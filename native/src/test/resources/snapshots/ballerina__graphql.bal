@@ -147,7 +147,7 @@ public type DocumentCacheConfig record {|
 
 # Represents an error in GraphQL.
 public type ErrorDetail record {|
-    *parser:ErrorDetail; // Special Agent Note: ErrorDetail FROM ballerina/graphql.parser module
+    *parser:ErrorDetail;
 |};
 
 # Represents file user store configurations for Basic Auth authentication.
@@ -216,7 +216,7 @@ public type GraphqlServiceConfig record {|
     # Listener authentication configurations
     ListenerAuthConfig[] auth?;
     # Function to initialize the context. If not provided, an empty context will be created
-    ContextInit contextInit = initDefaultContext; // Special Agent Note: the default initDefaultContext is not exported by this package; omit the argument rather than repeating it
+    ContextInit contextInit = initDefaultContext; // the default initDefaultContext is not exported by this package; omit the argument rather than repeating it
     # The cross origin resource sharing configurations for the service
     CorsConfig cors?;
     # GraphiQL client configurations
@@ -246,7 +246,7 @@ public type JwtIssuerConfig record {|
 
 # Represents JWT validator configurations for JWT authentication.
 public type JwtValidatorConfig record {|
-    *jwt:ValidatorConfig; // Special Agent Note: ValidatorConfig FROM ballerina/jwt module
+    *jwt:ValidatorConfig;
     # The key used to fetch the scopes
     string scopeKey = "scope";
 |};
@@ -261,7 +261,7 @@ public type JwtValidatorConfigWithScopes record {|
 
 # Represents LDAP user store configurations for Basic Auth authentication.
 public type LdapUserStoreConfig record {|
-    *auth:LdapUserStoreConfig; // Special Agent Note: LdapUserStoreConfig FROM ballerina/auth module
+    *auth:LdapUserStoreConfig;
 |};
 
 # Represents the auth annotation for LDAP user store configurations with scopes.
@@ -287,7 +287,7 @@ public type ListenerSecureSocket record {|
 
 # Represents a location in a GraphQL document.
 public type Location record {|
-    *parser:Location; // Special Agent Note: Location FROM ballerina/graphql.parser module
+    *parser:Location;
 |};
 
 # Represents OAuth2 client credentials grant configurations for OAuth2 authentication.
@@ -369,7 +369,7 @@ public type Upload record {|
     # File stream encoding
     string encoding;
     # File content as a stream of `byte[]`
-    stream<byte[], io:Error?> byteStream; // Special Agent Note: Error FROM ballerina/io module
+    stream<byte[], io:Error?> byteStream;
 |};
 
 # Represents the authentication error type.
@@ -441,21 +441,21 @@ public isolated class Context {
 
     # Sets a given value for a given key in the GraphQL context.
     # + value - Value to be set
-    isolated function set(string 'key, value:Cloneable|isolated object {} value); // Special Agent Note: Cloneable FROM ballerina/lang.value module
+    isolated function set(string 'key, value:Cloneable|isolated object {} value);
 
     # Retrieves a value using the given key from the GraphQL context.
     # ```ballerina
     # string userId = check context.get("userId").ensureType();  
     # ```
     # + return - The value if the key is present in the context, a `graphql:Error` otherwise
-    isolated function get(string 'key) returns value:Cloneable|isolated object {}|Error; // Special Agent Note: Cloneable FROM ballerina/lang.value module
+    isolated function get(string 'key) returns value:Cloneable|isolated object {}|Error;
 
     # Removes a value using the given key from the GraphQL context.
     # ```ballerina
     # string userId = check context.remove("userId").ensureType();  
     # ```
     # + return - The value if the key is present in the context, a `graphql:Error` otherwise
-    isolated function remove(string 'key) returns value:Cloneable|isolated object {}|Error; // Special Agent Note: Cloneable FROM ballerina/lang.value module
+    isolated function remove(string 'key) returns value:Cloneable|isolated object {}|Error;
 
     # Register a given DataLoader instance for a given key in the GraphQL context.
     # ```ballerina
@@ -464,7 +464,7 @@ public isolated class Context {
     # ```
     # + key - The key for the DataLoader to be registered
     # + dataloader - The DataLoader instance to be registered
-    isolated function registerDataLoader(string key, dataloader:DataLoader dataloader); // Special Agent Note: DataLoader FROM ballerina/graphql.dataloader module
+    isolated function registerDataLoader(string key, dataloader:DataLoader dataloader);
 
     # Retrieves a DataLoader instance using the given key from the GraphQL context.
     # ```ballerina
@@ -472,7 +472,7 @@ public isolated class Context {
     # ```
     # + key - The key corresponding to the required DataLoader instance
     # + return - The DataLoader instance if the key is present in the context otherwise panics
-    isolated function getDataLoader(string key) returns dataloader:DataLoader; // Special Agent Note: DataLoader FROM ballerina/graphql.dataloader module
+    isolated function getDataLoader(string key) returns dataloader:DataLoader;
 
     # Remove cache entries related to the given path.
     # + path - The path corresponding to the cache entries to be removed (Ex: "person.address.city")

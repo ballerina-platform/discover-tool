@@ -88,3 +88,4 @@ Constants
 ... 18 more (page 1 of 2)
 Next: bal discover ballerinax/kafka type <name>
 Next: bal discover ballerinax/kafka type --page 2
+Next: bal discover ballerinax/kafka type --filter <keyword>

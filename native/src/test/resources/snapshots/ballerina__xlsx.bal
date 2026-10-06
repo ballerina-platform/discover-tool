@@ -603,7 +603,7 @@ public type Table object {
 public type Row map<CellValue>|string[];
 
 # An XLSX cell value: a string, number (int/float/decimal), boolean, date/time, or `()` for a blank cell.
-public type CellValue string|int|float|decimal|boolean|time:Date|time:Civil|time:TimeOfDay|(); // Special Agent Note: Date, Civil, TimeOfDay FROM ballerina/time module
+public type CellValue string|int|float|decimal|boolean|time:Date|time:Civil|time:TimeOfDay|();
 
 // --- Functions ---
 

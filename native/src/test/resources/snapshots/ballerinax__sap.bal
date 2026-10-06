@@ -7,13 +7,13 @@ import ballerinax/sap;
 // --- Types ---
 
 # The `sap` client return type for the HTTP client actions.
-public type TargetType http:Response|anydata; // Special Agent Note: Response FROM ballerina/http module
+public type TargetType http:Response|anydata;
 
 # Defines the possible client error types.
-public type ClientError http:ClientError; // Special Agent Note: ClientError FROM ballerina/http module
+public type ClientError http:ClientError;
 
 # Represents an error, which occured due to a CSRF token fetch failure.
-public type CSRFTokenFetchFailure http:ClientError; // Special Agent Note: ClientError FROM ballerina/http module
+public type CSRFTokenFetchFailure http:ClientError;
 
 // --- Client ---
 
@@ -26,7 +26,7 @@ public isolated client class Client {
     # + url - URL of the target service
     # + config - The configurations to be used when initializing the `client`
     # + return - The `client` or an `sap:ClientError` if the initialization failed
-    isolated function init(string url, http:ClientConfiguration config) returns ClientError?; // Special Agent Note: ClientConfiguration FROM ballerina/http module
+    isolated function init(string url, http:ClientConfiguration config) returns ClientError?;
 
     # The client resource function to send HTTP POST requests to SAP HTTP endpoints.
     # + message - An HTTP outbound request or any allowed payload
@@ -36,7 +36,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function post [http:PathParamType... path](http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError; // Special Agent Note: RequestMessage, QueryParams FROM ballerina/http module
+    isolated resource function post [http:PathParamType... path](http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError;
 
     # The `Client.post()` function can be used to send HTTP POST requests to SAP HTTP endpoints.
     # + path - Resource path
@@ -46,7 +46,7 @@ public isolated client class Client {
     # + targetType - HTTP response or `anydata`, which is expected to be returned after data binding
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated remote function post(string path, http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>) returns targetType|ClientError; // Special Agent Note: RequestMessage FROM ballerina/http module
+    isolated remote function post(string path, http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>) returns targetType|ClientError;
 
     # The client resource function to send HTTP PUT requests to SAP HTTP endpoints.
     # + message - An HTTP outbound request or any allowed payload
@@ -56,7 +56,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function put [http:PathParamType... path](http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError; // Special Agent Note: RequestMessage, QueryParams FROM ballerina/http module
+    isolated resource function put [http:PathParamType... path](http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError;
 
     # The `Client.put()` function can be used to send HTTP PUT requests to SAP HTTP endpoints.
     # + path - Resource path
@@ -66,7 +66,7 @@ public isolated client class Client {
     # + targetType - HTTP response or `anydata`, which is expected to be returned after data binding
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated remote function put(string path, http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>) returns targetType|ClientError; // Special Agent Note: RequestMessage FROM ballerina/http module
+    isolated remote function put(string path, http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>) returns targetType|ClientError;
 
     # The client resource function to send HTTP PATCH requests to SAP HTTP endpoints.
     # + message - An HTTP outbound request or any allowed payload
@@ -76,7 +76,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function patch [http:PathParamType... path](http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError; // Special Agent Note: RequestMessage, QueryParams FROM ballerina/http module
+    isolated resource function patch [http:PathParamType... path](http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError;
 
     # The `Client.patch()` function can be used to send HTTP PATCH requests to SAP HTTP endpoints.
     # + path - Resource path
@@ -86,7 +86,7 @@ public isolated client class Client {
     # + targetType - HTTP response or `anydata`, which is expected to be returned after data binding
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated remote function patch(string path, http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>) returns targetType|ClientError; // Special Agent Note: RequestMessage FROM ballerina/http module
+    isolated remote function patch(string path, http:RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>) returns targetType|ClientError;
 
     # The client resource function to send HTTP DELETE requests to SAP HTTP endpoints.
     # + message - An optional HTTP outbound request or any allowed payload
@@ -96,7 +96,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function delete [http:PathParamType... path](http:RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError; // Special Agent Note: RequestMessage, QueryParams FROM ballerina/http module
+    isolated resource function delete [http:PathParamType... path](http:RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError;
 
     # The `Client.delete()` function can be used to send HTTP DELETE requests to SAP HTTP endpoints.
     # + path - Resource path
@@ -106,19 +106,19 @@ public isolated client class Client {
     # + targetType - HTTP response or `anydata`, which is expected to be returned after data binding
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated remote function delete(string path, http:RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>) returns targetType|ClientError; // Special Agent Note: RequestMessage FROM ballerina/http module
+    isolated remote function delete(string path, http:RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), typedesc<TargetType> targetType = <>) returns targetType|ClientError;
 
     # The client resource function to send HTTP HEAD requests to SAP HTTP endpoints.
     # + headers - The entity headers
     # + params - The query parameters
     # + return - The response or an `sap:ClientError` if failed to establish the communication with the upstream server
-    isolated resource function head [http:PathParamType... path](map<string|string[]>? headers = (), *http:QueryParams params) returns http:Response|ClientError; // Special Agent Note: QueryParams, Response FROM ballerina/http module
+    isolated resource function head [http:PathParamType... path](map<string|string[]>? headers = (), *http:QueryParams params) returns http:Response|ClientError;
 
     # The `Client.head()` function can be used to send HTTP HEAD requests to SAP HTTP endpoints.
     # + path - Resource path
     # + headers - The entity headers
     # + return - The response or an `sap:ClientError` if failed to establish the communication with the upstream server
-    isolated remote function head(string path, map<string|string[]>? headers = ()) returns http:Response|ClientError; // Special Agent Note: Response FROM ballerina/http module
+    isolated remote function head(string path, map<string|string[]>? headers = ()) returns http:Response|ClientError;
 
     # The client resource function to send HTTP GET requests to SAP HTTP endpoints.
     # + headers - The entity headers
@@ -126,7 +126,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function get [http:PathParamType... path](map<string|string[]>? headers = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError; // Special Agent Note: QueryParams FROM ballerina/http module
+    isolated resource function get [http:PathParamType... path](map<string|string[]>? headers = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError;
 
     # The `Client.get()` function can be used to send HTTP GET requests to SAP HTTP endpoints.
     # + path - Request path
@@ -142,7 +142,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `sap:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function options [http:PathParamType... path](map<string|string[]>? headers = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError; // Special Agent Note: QueryParams FROM ballerina/http module
+    isolated resource function options [http:PathParamType... path](map<string|string[]>? headers = (), typedesc<TargetType> targetType = <>, *http:QueryParams params) returns targetType|ClientError;
 
     # The `Client.options()` function can be used to send HTTP OPTIONS requests to SAP HTTP endpoints.
     # + path - Request path

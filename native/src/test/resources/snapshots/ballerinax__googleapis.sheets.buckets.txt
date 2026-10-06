@@ -46,6 +46,7 @@ ballerinax/googleapis.sheets · client · Client
 ... 3 more (page 1 of 2)
 Next: bal discover ballerinax/googleapis.sheets client Client <name>
 Next: bal discover ballerinax/googleapis.sheets client Client --page 2
+Next: bal discover ballerinax/googleapis.sheets client --filter <keyword>
 == service ==
 ballerinax/googleapis.sheets · service
 This package declares nothing in service.

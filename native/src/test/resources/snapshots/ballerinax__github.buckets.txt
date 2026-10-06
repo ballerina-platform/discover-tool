@@ -111,3 +111,4 @@ Records
 ... 1187 more (page 1 of 31)
 Next: bal discover ballerinax/github type <name>
 Next: bal discover ballerinax/github type --page 2
+Next: bal discover ballerinax/github type --filter <keyword>

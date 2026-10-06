@@ -46,7 +46,8 @@ one (up to 40; `omittedTotal` or an `... N more` line says how many there were i
 package owns (`bal discover ballerina/http type BearerTokenConfig`).
 It takes one name and no `--filter`. A name that is really a class, client, service type or listener is
 answered by the bucket that holds it, and a record asked of `client` is answered by `type`; either way a note
-says which.
+says which. The name of an enum member (`HTTP_1_1`) is answered by the enum that declares it (`HttpVersion`), with a
+note.
 
 Selectors after the bucket name a container, then a member: a method name, or a resource path followed by
 its accessor (`client "gists/'public" get`). With one container in the bucket, the container name can be
@@ -58,6 +59,7 @@ left out.
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
 | `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, the `type` declarations, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
+| `--version <version>`  | Read this exact version of the package, ahead of the one the project locks and Central's latest. Carried into every command the answer prints. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again.                   |
 
 ## Walkthrough
@@ -102,16 +104,16 @@ $ bal discover ballerina/http client
 ballerina/http · client
 10 clients
 
-  ClientObject                           1 resource  15 remote
-  StatusCodeClientObject                 1 resource  15 remote
   Caller                                              5 remote  1 normal
   Client                                 1 resource  15 remote  4 normal
   ClientOAuth2Handler                                 1 remote  2 normal
+  ClientObject                           1 resource  15 remote
   FailoverClient                         1 resource  15 remote  1 normal
   ListenerLdapUserStoreBasicAuthHandler               2 remote
   ListenerOAuth2Handler                               1 remote
   LoadBalanceClient                      1 resource  15 remote
   StatusCodeClient                       1 resource  15 remote  4 normal
+  StatusCodeClientObject                 1 resource  15 remote
 
 Next: bal discover ballerina/http client <name>
 
@@ -120,15 +122,15 @@ ballerina/http · service
 7 service types
 
 http:Listener
+  InterceptableService  1 normal
   Service
   ServiceContract
-  InterceptableService  1 normal
 
 Not attachable to a listener
-  RequestInterceptor
-  ResponseInterceptor
   RequestErrorInterceptor
+  RequestInterceptor
   ResponseErrorInterceptor
+  ResponseInterceptor
 
 Next: bal discover ballerina/http service <name>
 ```
@@ -231,12 +233,12 @@ ballerinax/github · client · Client · gists
 
   gists                              get, post
   gists/:gistId                      get, delete, patch
+  gists/:gistId/:sha                 get
   gists/:gistId/comments             get, post
   gists/:gistId/comments/:commentId  get, delete, patch
-  gists/:gistId/star                 get, put, delete
-  gists/:gistId/forks                get, post
-  gists/:gistId/:sha                 get
   gists/:gistId/commits              get
+  gists/:gistId/forks                get, post
+  gists/:gistId/star                 get, put, delete
   gists/'public                      get                 bal discover ballerinax/github client Client "gists/'public" get
   gists/starred                      get
 
@@ -265,6 +267,7 @@ Groups (operations under each)
 Next: bal discover ballerinax/github client Client <path> <accessor>
 Next: bal discover ballerinax/github client Client <group>
 Next: bal discover ballerinax/github client Client repos --page 2
+Next: bal discover ballerinax/github client repos --filter <keyword>
 ```
 
 In JSON, every resource entry carries a `commands` object keyed by accessor, in `accessors` order: for each
@@ -375,6 +378,7 @@ ballerinax/twilio · client · Client
 ... 159 more (page 1 of 5)
 Next: bal discover ballerinax/twilio client Client <name>
 Next: bal discover ballerinax/twilio client Client --page 2
+Next: bal discover ballerinax/twilio client --filter <keyword>
 
 $ bal discover ballerinax/twilio client --filter message
 ballerinax/twilio · client · Client · --filter message
@@ -517,6 +521,13 @@ giving how many there are (in text, a `Matched by documentation only (40 of 102)
 they are its last section, after every entry the filter matched by name; beside one signature, or as all a
 filter found, they page on their own, and `next` turns that page.
 
+### Order
+
+Every listing is alphabetical: containers in a roster, service types under their listener (and the listeners
+themselves), methods, resource paths and `type` declarations within their kind. The exception is a level of path
+groups, which goes by the number of operations under each, largest first (alphabetical among equals), because it is
+read to choose where to go next.
+
 ### The entry ceiling
 
 No listing shows more than **40 entries**. Over that:
@@ -541,7 +552,8 @@ No listing shows more than **40 entries**. Over that:
 
 A cut listing always says so: `shown`/`total`, `page`/`pages` and `next` (the `--page` command that continues
 it) in JSON, or a `... N more (page P of Q)` line followed by `Next: <command>` in text, where `N` counts what
-comes after this page.
+comes after this page. In text, a listing that continues also ends with the command that narrows it by keyword,
+`Next: bal discover <package> <bucket> --filter <keyword>`, which is usually shorter than paging.
 
 ### Paths
 
@@ -572,9 +584,12 @@ $ bal discover ballerinax/kafka client NoSuchContainer
 `symbol-not-found` need a different command; `schema-drift` means Central's payload changed shape and is for
 a maintainer.
 
-**Versions are never an argument.** Inside a Ballerina project the tool walks up to `Ballerina.toml` and uses
-the version `Dependencies.toml` locks, so a lookup sees what `bal build` compiles against. Outside one it uses
-Central's latest.
+**Which version is read.** `--version <version>` if given. Otherwise, inside a Ballerina project the tool walks up
+to `Ballerina.toml` and uses the version `Dependencies.toml` locks, so a lookup sees what `bal build` compiles
+against, and outside one it uses Central's latest. A version is a flag, never a positional: `bal discover
+ballerina/http client 2.16.6` and `ballerina/http:2.16.6` are `validation` failures that name `--version`. Under
+`--version` every command the answer prints carries it (`bal discover ballerina/http --version 2.15.0 client
+Client`), so drilling in stays on that version; without it the printed commands are unpinned.
 
 ## Caching
 

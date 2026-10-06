@@ -300,43 +300,36 @@ public final class Constructs {
 
                 Construct.faithful(
                         "fields/cross-package-type",
-                        "a name from another package is qualified with that package's alias, and the note "
-                                + "says which import to add",
+                        "a name from another package is qualified with that package's alias",
                         record(Decl.field("message", Node.external("ballerinax", "googleapis.gmail", "Message"))),
-                        body("    gmail:Message message;"
-                                + " // Special Agent Note: Message FROM ballerinax/googleapis.gmail module")));
+                        body("    gmail:Message message;")));
     }
 
     private static List<Construct> foreignNames() {
         return List.of(
                 Construct.faithful(
                         "fields/predeclared-langlib",
-                        "a langlib type whose prefix is a basic-type keyword gets no import note, because it "
-                                + "needs no import",
+                        "a langlib type whose prefix is a basic-type keyword needs no import",
                         record(Decl.field("size", Node.external("ballerina", "lang.int", "Signed32"))),
                         body("    int:Signed32 size;")),
                 Construct.faithful(
                         "fields/langlib-needing-an-import",
-                        "a langlib type whose prefix is NOT a basic-type keyword keeps its note: `value:` is "
+                        "a langlib type whose prefix is NOT a basic-type keyword is still qualified: `value:` is "
                                 + "an undefined module without the import",
                         record(Decl.field("held", Node.external("ballerina", "lang.value", "Cloneable"))),
-                        body("    value:Cloneable held;"
-                                + " // Special Agent Note: Cloneable FROM ballerina/lang.value module")),
+                        body("    value:Cloneable held;")),
                 Construct.faithful(
                         "fields/reserved-word-module-path",
                         "a module path segment that is a Ballerina keyword is quoted in the import advice",
                         record(Decl.field("config",
                                 Node.external("ballerinax", "client.config", "ConnectionConfig"))),
-                        body("    config:ConnectionConfig config;"
-                                + " // Special Agent Note: ConnectionConfig FROM"
-                                + " ballerinax/'client.config module")),
+                        body("    config:ConnectionConfig config;")),
                 Construct.faithful(
                         "fields/non-default-module",
                         "a name from a module that is not its package's default is named as a module, because "
                                 + "that is what an import takes",
                         record(Decl.field("auth", Node.external("ballerinax", "aws.auth", "AuthConfig"))),
-                        body("    auth:AuthConfig auth;"
-                                + " // Special Agent Note: AuthConfig FROM ballerinax/aws.auth module")));
+                        body("    auth:AuthConfig auth;")));
     }
 
     // -----------------------------------------------------------------------
@@ -479,8 +472,7 @@ public final class Constructs {
                         """
                         // --- Types ---
 
-                        public type ClientError http:ClientError;"""
-                                + " // Special Agent Note: ClientError FROM ballerina/http module"),
+                        public type ClientError http:ClientError;"""),
 
                 Construct.faithful(
                         "types/inline-record-named-fields",
@@ -938,7 +930,7 @@ public final class Constructs {
                                                 .with("defaultValue", "BASE_URL"))
                                 .returns(Node.builtin("error?"))),
                         clientBody("    function init(string serviceUrl = BASE_URL) returns error?;"
-                                + " // Special Agent Note: the default BASE_URL is not exported by this "
+                                + " // the default BASE_URL is not exported by this "
                                 + "package; omit the argument rather than repeating it")));
     }
 

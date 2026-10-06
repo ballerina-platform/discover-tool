@@ -24,6 +24,7 @@ import io.ballerina.tools.discover.Loader;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
+import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
@@ -146,7 +147,7 @@ public final class Cli {
         // `--refresh` is only known once arguments are parsed. The transport and the cache arrive from the process
         // wrapper, so the options are rebuilt here rather than there.
         HttpOptions resolved = http.withRefresh(root.refresh);
-        Loader.LoadOptions options = new Loader.LoadOptions(resolved, projectDir, root.module);
+        Loader.LoadOptions options = new Loader.LoadOptions(resolved, projectDir, root.module, root.version);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified.value(), options);
         if (!loaded.isOk()) {
             return fail(loaded.failure(), streams);
@@ -163,7 +164,7 @@ public final class Cli {
             return fail(notPaged(root, filter), streams);
         }
         TextRenderer.Context where = new TextRenderer.Context(qualified.value().qualified(), root.module, rest,
-                filter);
+                filter, root.version);
         emit(answer.value(), where, streams, root.output, interactive);
         return 0;
     }
@@ -202,6 +203,9 @@ public final class Cli {
         StringBuilder command = new StringBuilder("bal discover ").append(root.pkg);
         if (root.module != null) {
             command.append(" --module ").append(Texts.shellWord(root.module));
+        }
+        if (root.version != null) {
+            command.append(" --version ").append(Texts.shellWord(root.version));
         }
         if (root.rest != null) {
             root.rest.forEach(word -> command.append(' ').append(Texts.shellWord(word)));
@@ -250,8 +254,7 @@ public final class Cli {
         List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.BucketList.Submodule(
                         submodule.name(), submodule.summary(),
-                        "bal discover " + loaded.qualified().qualified() + " --module "
-                                + Texts.shellWord(submodule.name())))
+                        "bal discover " + loaded.pkgArgument(submodule.name())))
                 .toList();
         return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
     }
@@ -275,7 +278,18 @@ public final class Cli {
                     "--page " + root.page + " is out of range: pages are numbered from 1.",
                     "Pass --page 1 or later, or drop it for the first page.");
         }
-        return rejectVersionArguments(root);
+        Failure badVersion = rejectInvalidVersion(root);
+        return badVersion != null ? badVersion : rejectVersionArguments(root);
+    }
+
+    private static Failure rejectInvalidVersion(Commands.Root root) {
+        if (root.version == null
+                || VERSION_SHAPED.matcher(root.version).matches() && Version.parse(root.version).isOk()) {
+            return null;
+        }
+        return new Failure.Validation(
+                "'" + root.version + "' is not a version.",
+                "Pass a version as Central publishes it, e.g. --version 2.15.0.");
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
@@ -292,12 +306,11 @@ public final class Cli {
             Pattern.compile("^\\d+\\.\\d+\\.\\d+([-+.].*)?$");
 
     /**
-     * A version passed as an argument, when versions are no longer arguments.
+     * A version passed as a positional argument; it is a flag, {@code --version}.
      *
-     * <p>Version resolution is internal — see {@link Loader} — so a version-shaped token after the package is a
-     * caller carrying an old habit. Left alone it would be read as a bucket or a selector and reported as
-     * {@code validation}/{@code symbol-not-found} on a "bucket" called {@code 4.6.5}, which names neither the
-     * mistake nor what to do.
+     * <p>Left alone, a version-shaped token after the package would be read as a bucket or a selector and
+     * reported as {@code validation}/{@code symbol-not-found} on a "bucket" called {@code 4.6.5}, which names
+     * neither the mistake nor what to do.
      */
     private static Failure rejectVersionArguments(Commands.Root root) {
         List<String> tokens = root.rest;
@@ -312,10 +325,10 @@ public final class Cli {
             return null;
         }
         return new Failure.Validation(
-                "'" + misplaced + "' looks like a version, and this tool does not take one.",
-                "The version is resolved from your project: run inside the component whose "
-                        + "Dependencies.toml locks it, and the lookup matches what `bal build` compiles "
-                        + "against. Outside a project it is Central's latest. Drop the argument.");
+                "'" + misplaced + "' looks like a version, and a version is a flag, not an argument.",
+                "Pass it as --version " + misplaced + ". Without it the version is resolved from your project: "
+                        + "the one its Dependencies.toml locks, so a lookup matches what `bal build` compiles "
+                        + "against, or outside a project Central's latest.");
     }
 
     /**

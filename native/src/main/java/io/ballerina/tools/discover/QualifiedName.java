@@ -81,7 +81,8 @@ public final class QualifiedName {
         if (!match.matches() || Version.isTraversal(match.group(1)) || Version.isTraversal(match.group(2))) {
             return Result.err(new Failure.Validation(
                     "Invalid package name '" + input + "'. Expected 'org/name' (no version suffix).",
-                    "Drop any ':version' suffix and pass strictly 'org/name', e.g. 'ballerinax/github'."));
+                    "Drop any ':version' suffix and pass strictly 'org/name', e.g. 'ballerinax/github'. "
+                            + "To read one version, add --version <version>."));
         }
         return Result.ok(new QualifiedName(match.group(1), match.group(2)));
     }

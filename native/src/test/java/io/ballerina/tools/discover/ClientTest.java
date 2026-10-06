@@ -146,11 +146,10 @@ public class ClientTest {
     /**
      * A version a PROJECT locked that Central does not publish.
      *
-     * <p>T10, and the only reachable "supplied version" path now that there is no {@code --version} flag: the
-     * version came out of a {@code Dependencies.toml}, so "omit the version to take the latest" names a step the
-     * caller cannot take. The failure lists what IS published instead, which is why no {@code versions} verb is
-     * needed — and the list is fetched on a path that has already failed, so it degrades to no list rather than to
-     * a different failure.
+     * <p>T10, and the "supplied version" path ({@code --version}, or a {@code Dependencies.toml} lock): "omit the
+     * version to take the latest" would name a step the caller did not take. The failure lists the newest
+     * published versions instead, which is why no {@code versions} verb is needed — and the list is fetched on a
+     * path that has already failed, so it degrades to no list rather than to a different failure.
      */
     @Test
     public void aVersionTheProjectLockedAndCentralDoesNotPublishNamesTheOnesItDoes() {
@@ -162,7 +161,8 @@ public class ClientTest {
         Assert.assertFalse(result.isOk());
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
         Assert.assertEquals(failure.qualified(), "ballerinax/github:9.9.9");
-        Assert.assertTrue(failure.suggestion().contains("Your project locks"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("named by --version or locked by your project"),
+                failure.suggestion());
         Assert.assertTrue(failure.suggestion().contains("published versions are 6.0.0, 5.1.0"),
                 failure.suggestion());
         Assert.assertFalse(failure.suggestion().contains("omit the version"),
@@ -192,6 +192,28 @@ public class ClientTest {
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
         Assert.assertFalse(failure.suggestion().contains("omit the version"), failure.suggestion());
         Assert.assertTrue(failure.suggestion().contains("Check the name"), failure.suggestion());
+    }
+
+    @Test
+    public void aMissingModulePageNamesTheListingCommandAndRepeatsAPinnedVersionOnly() {
+        QualifiedName graphql = QualifiedName.parse("ballerina/graphql").value();
+        FakeTransport transport = FakeTransport.always(FakeTransport.status(404));
+        CentralClient.ResolvedVersion pinned =
+                new CentralClient.ResolvedVersion(Version.parse("1.17.0").value(), false, true, true);
+        CentralClient.ResolvedVersion locked = supplied("1.17.0");
+
+        Failure.PackageNotFound withPin = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
+                graphql, "nosuch", pinned, fast(transport).build()).failure();
+        Assert.assertTrue(withPin.suggestion().contains("Run `bal discover ballerina/graphql --version 1.17.0` "),
+                withPin.suggestion());
+
+        for (CentralClient.ResolvedVersion unpinned : List.of(locked, resolved("1.17.0"))) {
+            Failure.PackageNotFound without = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
+                    graphql, "nosuch", unpinned, fast(transport).build()).failure();
+            Assert.assertTrue(without.suggestion().contains("Run `bal discover ballerina/graphql` to list"),
+                    without.suggestion());
+            Assert.assertFalse(without.suggestion().contains("--version"), without.suggestion());
+        }
     }
 
     /** A version the caller pinned. */

@@ -119,7 +119,8 @@ public class ServiceAnswersTest {
         String text = run(central("ballerina__http", false), "ballerina/http", "service", "--output", "text");
         Assert.assertTrue(text.contains("http:Listener\n  Service"), text);
         Assert.assertTrue(text.contains("http:Listener — not confirmed (package source unavailable)\n"
-                + "  ServiceContract"), text);
+                + "  InterceptableService      1 normal\n"
+                + "  RequestErrorInterceptor"), text);
     }
 
     @Test

@@ -53,8 +53,7 @@ public final class Defaults {
     /**
      * A module-qualified reference — {@code http:HTTP_2_0}, {@code time:utcNow()}.
      *
-     * <p>Removed before the scan rather than resolved: the prefix names an import, the trailing
-     * {@code // Special Agent Note} on the same line already says which package to import, and the tool does
+     * <p>Removed before the scan rather than resolved: the prefix names an import, and the tool does
      * not fetch a foreign package to check one identifier.
      */
     private static final Pattern QUALIFIED = Pattern.compile("'?[A-Za-z_][\\w.']*\\s*:\\s*[A-Za-z_]\\w*");

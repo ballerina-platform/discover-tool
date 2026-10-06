@@ -18,9 +18,9 @@ Elsewhere
 ballerina/xlsx · class
 3 classes
 
-  Workbook  12 normal
   Sheet     21 normal
   Table     18 normal
+  Workbook  12 normal
 
 Next: bal discover ballerina/xlsx class <name>
 == funcs ==

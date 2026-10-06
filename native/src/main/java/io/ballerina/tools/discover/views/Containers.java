@@ -1183,7 +1183,9 @@ public final class Containers {
                     .add(((Fn.Resource) entry.fn()).accessor());
         }
         List<DiscoverResult.ResourceList.Resource> resources = new ArrayList<>();
-        accessorsByPath.forEach((path, accessors) -> {
+        accessorsByPath.entrySet().stream().sorted(Map.Entry.comparingByKey(Texts.LOCALE_ORDER)).forEach(entry -> {
+            String path = entry.getKey();
+            List<String> accessors = entry.getValue();
             Map<String, String> commands = new LinkedHashMap<>();
             accessors.forEach(accessor -> commands.put(accessor, base + " " + shellWord(path) + " " + accessor));
             resources.add(new DiscoverResult.ResourceList.Resource(path, accessors, commands));

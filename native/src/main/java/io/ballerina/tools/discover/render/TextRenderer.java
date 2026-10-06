@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.render;
 import io.ballerina.tools.discover.Texts;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,10 +55,15 @@ public final class TextRenderer {
      * @param module the {@code --module} submodule, or {@code null}
      * @param trail the bucket and selectors, as typed
      * @param filter the {@code --filter} keyword, or {@code null}
+     * @param version the {@code --version} the caller pinned, or {@code null}
      */
-    public record Context(String pkg, String module, List<String> trail, String filter) {
+    public record Context(String pkg, String module, List<String> trail, String filter, String version) {
 
         public static final Context NONE = new Context(null, null, List.of(), null);
+
+        public Context(String pkg, String module, List<String> trail, String filter) {
+            this(pkg, module, trail, filter, null);
+        }
 
         public Context {
             trail = trail == null ? List.of() : List.copyOf(trail);
@@ -79,7 +85,23 @@ public final class TextRenderer {
         Layout layout = new Layout();
         layout.top(header(where, containerOf(result)));
         fill(layout, result, where);
+        if (layout.hasLaterPages && where.filter() == null && where.pkg() != null) {
+            layout.next(filterCommand(where));
+        }
         return layout.render();
+    }
+
+    /** The command that narrows the listing just shown by a keyword, which is what most callers want over a page. */
+    private static String filterCommand(Context where) {
+        StringBuilder command = new StringBuilder("bal discover ").append(Texts.shellWord(where.pkg()));
+        if (where.module() != null) {
+            command.append(" --module ").append(Texts.shellWord(where.module()));
+        }
+        if (where.version() != null) {
+            command.append(" --version ").append(Texts.shellWord(where.version()));
+        }
+        where.trail().forEach(word -> command.append(' ').append(Texts.shellWord(word)));
+        return command.append(" --filter <keyword>").toString();
     }
 
     private static void fill(Layout layout, DiscoverResult result, Context where) {
@@ -119,7 +141,9 @@ public final class TextRenderer {
         layout.warning(bucketList.warning());
         if (where.pkg() != null && !bucketList.buckets().isEmpty()) {
             layout.next("bal discover " + Texts.shellWord(where.pkg())
-                    + (where.module() == null ? "" : " --module " + Texts.shellWord(where.module())) + " <bucket>");
+                    + (where.module() == null ? "" : " --module " + Texts.shellWord(where.module()))
+                    + (where.version() == null ? "" : " --version " + Texts.shellWord(where.version()))
+                    + " <bucket>");
         }
     }
 
@@ -154,7 +178,14 @@ public final class TextRenderer {
             byListener.computeIfAbsent(heading, key -> new ArrayList<>()).add(i);
         }
         boolean paired = !byListener.containsKey(null) || byListener.size() > 1;
-        byListener.forEach((listener, rows) -> {
+        Comparator<Map.Entry<String, List<Integer>>> byListenerThenConfirmed = Comparator
+                .comparing((Map.Entry<String, List<Integer>> group) ->
+                        containers.get(group.getValue().get(0)).listener(),
+                        Comparator.nullsLast(Texts.LOCALE_ORDER))
+                .thenComparing(group -> containers.get(group.getValue().get(0)).unconfirmed() != null);
+        byListener.entrySet().stream().sorted(byListenerThenConfirmed).forEach(group -> {
+            String listener = group.getKey();
+            List<Integer> rows = group.getValue();
             TextTable table = new TextTable(TextTable.Column.LEFT,
                     TextTable.Column.count("resource", "resources"),
                     TextTable.Column.count("remote", "remote"),
@@ -647,6 +678,7 @@ public final class TextRenderer {
         private final List<String> notices = new ArrayList<>();
         private final List<String> more = new ArrayList<>();
         private final List<String> next = new ArrayList<>();
+        private boolean hasLaterPages;
 
         void top(String line) {
             if (line != null) {
@@ -693,6 +725,7 @@ public final class TextRenderer {
                     more.add("... " + remaining + " more, narrow further");
                 }
             } else if (remaining > 0) {
+                hasLaterPages = true;
                 more.add("... " + remaining + " more (page " + paging.page() + " of " + paging.pages() + ")");
             } else if (paging.pages() > 1) {
                 more.add("Last page (page " + paging.page() + " of " + paging.pages() + ")");

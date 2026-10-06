@@ -792,17 +792,17 @@ public class ViewsTest {
         DiscoverResult.TypeDeclaration status = as(DiscoverResult.TypeDeclaration.class,
                 type("ballerina__http", "StatusCodeResponse"));
         Assert.assertEquals(status.omitted().size(), Containers.MAX_ENTRIES);
-        Assert.assertEquals(status.omittedTotal(), 48);
+        Assert.assertEquals(status.omittedTotal(), 47);
         Assert.assertEquals(status.omittedNext(), "bal discover ballerina/http type");
         com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(JsonRenderer.render(status))
                 .getAsJsonObject();
-        Assert.assertEquals(json.get("omittedTotal").getAsInt(), 48);
+        Assert.assertEquals(json.get("omittedTotal").getAsInt(), 47);
         Assert.assertEquals(json.get("omittedNext").getAsString(), "bal discover ballerina/http type");
         Assert.assertEquals(json.getAsJsonArray("omitted").size(), 40);
         String text = TextRenderer.render(status, new TextRenderer.Context(
                 http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null));
-        Assert.assertTrue(text.contains("Past the closure budget (40 of 48)"), text);
-        Assert.assertTrue(text.contains("\n... 8 more, narrow further\nNext: bal discover ballerina/http type"), text);
+        Assert.assertTrue(text.contains("Past the closure budget (40 of 47)"), text);
+        Assert.assertTrue(text.contains("\n... 7 more, narrow further\nNext: bal discover ballerina/http type"), text);
         Assert.assertEquals(text.lines().filter(line -> line.startsWith("Past the closure budget")).count(), 1L);
 
         DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
@@ -895,6 +895,27 @@ public class ViewsTest {
         String text = TextRenderer.render(holder, new TextRenderer.Context(
                 loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null));
         Assert.assertTrue(text.contains("(no command: package not known)"), text);
+    }
+
+    @Test
+    public void aMemberOfSeveralEnumsIsNeverRoutedToOneOfThem() {
+        LoadedPackage base = FixtureCorpus.loadedFixture("ballerinax__kafka");
+        Library library = base.library();
+        List<io.ballerina.tools.discover.model.TypeDef> declarations = new java.util.ArrayList<>(library.typeDefs());
+        for (String name : List.of("Alpha", "Beta")) {
+            declarations.add(new io.ballerina.tools.discover.model.TypeDef.Enumeration(name, "", List.of(
+                    new io.ballerina.tools.discover.model.TypeDef.Enumeration.Member("SHARED_MEMBER", ""))));
+        }
+        LoadedPackage loaded = base.withLibrary(new Library(library.name(), library.description(), declarations,
+                library.clients(), library.functions(), library.listeners(), library.services(),
+                library.annotations(), library.configurables()));
+
+        Result<DiscoverResult> answer =
+                Types.render(loaded, new Types.Options(List.of("SHARED_MEMBER"), null, 1));
+        Assert.assertFalse(answer.isOk());
+        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) answer.failure();
+        Assert.assertEquals(failure.candidates(), List.of("Alpha", "Beta"));
+        Assert.assertTrue(failure.suggestion().contains("member of several enums"), failure.suggestion());
     }
 
     @Test
