@@ -233,11 +233,12 @@ public final class Types {
 
         Names.Match match = Names.match(requested, names);
         if (!(match instanceof Names.Match.Found found)) {
-            List<TypeDef.Enumeration> owners = enumsWithMember(library, requested);
+            List<TypeDef.Enumeration> owners = enumsWithMember(loaded, requested);
             if (owners.size() == 1) {
                 String enumName = owners.get(0).name();
                 String routing = "'" + memberName(requested) + "' is a member of the enum " + enumName
-                        + " — showing it. Canonical: bal discover " + loaded.pkgArgument() + " type " + enumName;
+                        + " — showing it. Canonical: bal discover " + loaded.pkgArgument() + " type "
+                        + Texts.shellWord(enumName);
                 return leaf(loaded, enumName, note == null ? routing : routing + " " + note);
             }
             if (owners.size() > 1) {
@@ -270,10 +271,17 @@ public final class Types {
                 note));
     }
 
-    /** The enums declaring a member called {@code requested}, which may be spelled {@code module:Member}. */
-    private static List<TypeDef.Enumeration> enumsWithMember(Library library, String requested) {
+    /**
+     * The enums declaring a member called {@code requested}, which may be spelled {@code module:Member} — but only
+     * with this package's own prefix, so another package's member is never taken for a local one.
+     */
+    private static List<TypeDef.Enumeration> enumsWithMember(LoadedPackage loaded, String requested) {
+        int colon = requested.lastIndexOf(':');
+        if (colon >= 0 && !requested.substring(0, colon).equals(loaded.qualified().moduleAlias())) {
+            return List.of();
+        }
         String member = memberName(requested);
-        return library.addressable().stream()
+        return loaded.library().addressable().stream()
                 .filter(TypeDef.Enumeration.class::isInstance)
                 .map(TypeDef.Enumeration.class::cast)
                 .filter(each -> each.memberNames().contains(member))
