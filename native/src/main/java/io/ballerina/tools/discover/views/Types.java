@@ -177,10 +177,8 @@ public final class Types {
             Filter.Split<Entry> split = Filter.apply(options.filter(), all, Entry::surface, Entry::docs);
             surface = split.surface();
             documented = split.documented().stream().map(Entry::name).sorted(Texts.LOCALE_ORDER).toList();
-            if (surface.isEmpty() && documented.isEmpty()) {
-                return Result.ok(new DiscoverResult.NoMatch(options.filter(), null,
-                        Names.nearMisses(options.filter(), all.stream().map(Entry::name).toList()), List.of(), null,
-                        base, DiscoverResult.Documented.NONE, null, loaded.warning(), options.note()));
+            if (surface.isEmpty()) {
+                return noMatch(loaded, options, all, documented, base, command);
             }
         }
 
@@ -218,6 +216,24 @@ public final class Types {
                 : new DiscoverResult.Documented(window.slice(documented, total), documented.size());
         return Result.ok(new DiscoverResult.TypeRoster(List.copyOf(sections), counts, shown, total,
                 window.paging(), window.next(command), documentedHere, loaded.warning(), options.note()));
+    }
+
+    /**
+     * A {@code --filter} no name, type or member matched — answered as every bucket answers it, with the
+     * documentation-only matches, if any, paged on their own as a container's are.
+     */
+    private static Result<DiscoverResult> noMatch(
+            LoadedPackage loaded, Options options, List<Entry> all, List<String> documented, String base,
+            String command) {
+        Result<Containers.Page> page = Containers.documentedPage(documented, options.page(), command);
+        if (!page.isOk()) {
+            return page.cast();
+        }
+        Containers.Page window = page.value();
+        return Result.ok(new DiscoverResult.NoMatch(options.filter(), null,
+                Names.nearMisses(options.filter(), all.stream().map(Entry::name).toList()), List.of(), null,
+                window.paging() == null ? base : window.next(command), Containers.documentedOn(window, documented, 0),
+                window.paging(), loaded.warning(), options.note()));
     }
 
     // -----------------------------------------------------------------------

@@ -308,7 +308,7 @@ Past the closure budget (40 of 47)
   ServiceUnavailable            bal discover ballerina/http type ServiceUnavailable
   GatewayTimeout                bal discover ballerina/http type GatewayTimeout
 
-... 7 more, narrow further
+... 7 more past the closure budget, listed by the type roster
 Next: bal discover ballerina/http type
 == ballerina__http type ResourceConfig ==
 ballerina/http · type · ResourceConfig

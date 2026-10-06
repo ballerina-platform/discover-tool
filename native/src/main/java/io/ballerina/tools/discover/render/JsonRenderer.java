@@ -102,6 +102,7 @@ public final class JsonRenderer {
             }
             if (container.unconfirmed() != null) {
                 entry.addProperty("confirmed", false);
+                entry.addProperty("unconfirmedReason", container.unconfirmed());
             }
             entry.addProperty("command", container.command());
             containers.add(entry);
@@ -494,6 +495,7 @@ public final class JsonRenderer {
         if (paging != null) {
             json.addProperty("page", paging.page());
             json.addProperty("pages", paging.pages());
+            json.addProperty("remaining", paging.remaining());
         }
     }
 
