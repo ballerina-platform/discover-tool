@@ -220,7 +220,7 @@ public class DiscoverTool implements BLauncherCmd {
     @Override
     @Deprecated
     public void printUsage(StringBuilder sb) {
-        sb.append("  bal discover <org/name> [bucket] [args...] [--refresh] [-h|--help]\n");
+        sb.append("  ").append(UsageRenderer.synopsisLine(Commands.Grammar.create())).append("\n");
     }
 
     @Override

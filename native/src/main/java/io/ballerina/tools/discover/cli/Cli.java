@@ -344,8 +344,7 @@ public final class Cli {
             if (token.startsWith("-")) {
                 return new Failure.Validation(
                         "Unknown option '" + token + "'.",
-                        "Known flags are --module/-m, --filter, --page, --output, --refresh and --help. "
-                                + "Run with --help for usage.");
+                        UsageRenderer.knownFlags(Commands.Grammar.create()) + " Run with --help for usage.");
             }
             return new Failure.Validation(
                     "Unexpected argument '" + token + "'.",
