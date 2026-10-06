@@ -58,7 +58,7 @@ left out.
 | `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, the `type` declarations, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
 | `--version <version>`  | Read this exact version of the package, ahead of the one the project locks and Central's latest. Carried into every command the answer prints. |
-| `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again.                   |
+| `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. |
 
 ## Walkthrough
 

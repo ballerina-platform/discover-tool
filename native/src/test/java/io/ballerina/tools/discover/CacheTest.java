@@ -834,6 +834,59 @@ public class CacheTest {
         Assert.assertEquals(docs[0], 2, "the refetched page is cached again and answers the next run");
     }
 
+    @Test
+    public void aRefreshThatCannotReachCentralKeepsTheCachedPayload() {
+        Path root = freshRoot();
+        DocsCache cache = cacheAt(root);
+        Cli.run(List.of(PKG, "client"), new Capture().streams(), options(new CountingCentral().transport(), cache)
+                .build());
+        JsonElement before = readEntry(root);
+
+        HttpOptions down = options(FakeTransport.always(FakeTransport.status(503)), cache).maxAttempts(1).build();
+        Capture refreshed = new Capture();
+        Assert.assertEquals(Cli.run(List.of(PKG, "client", "--refresh"), refreshed.streams(), down), 1);
+        Assert.assertTrue(refreshed.stderr().contains("\"kind\":\"upstream\""), refreshed.stderr());
+        Assert.assertEquals(readEntry(root), before, "a failed refresh must leave the cached payload in place");
+
+        Capture offline = new Capture();
+        Assert.assertEquals(Cli.run(List.of(PKG, "client"), offline.streams(), down), 0, offline.stderr());
+    }
+
+    @Test
+    public void aRefreshThatCannotReachCentralKeepsTheCachedModulePage() {
+        DocsCache cache = cacheAt(freshRoot());
+        String page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph").toString();
+        boolean[] up = {true};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            if (!up[0]) {
+                return FakeTransport.status(503);
+            }
+            if (url.endsWith("/docs/ballerina/graphql.subgraph/1.17.0")) {
+                return FakeTransport.ok(page);
+            }
+            return url.endsWith("/registry/packages/ballerina/graphql")
+                    ? FakeTransport.ok("[\"1.17.0\"]")
+                    : FakeTransport.status(404);
+        });
+        HttpOptions http = options(transport, cache).maxAttempts(1).build();
+        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+        DocsCache.ModuleKey key = new DocsCache.ModuleKey(
+                CentralClient.REPOSITORY_ID, "ballerina", "graphql", "subgraph", "1.17.0");
+
+        Assert.assertEquals(Cli.run(argv, new Capture().streams(), http), 0);
+        JsonElement before = cache.readModuleDocs(key);
+        Assert.assertNotNull(before);
+
+        up[0] = false;
+        List<String> refresh = new ArrayList<>(argv);
+        refresh.add("--refresh");
+        Assert.assertEquals(Cli.run(refresh, new Capture().streams(), http), 1);
+        Assert.assertEquals(cache.readModuleDocs(key), before, "a failed refresh must leave the module page");
+
+        Capture offline = new Capture();
+        Assert.assertEquals(Cli.run(argv, offline.streams(), http), 0, offline.stderr());
+    }
+
     // -----------------------------------------------------------------------
 
     private static void write(Path path, String contents) {

@@ -450,6 +450,9 @@ public final class CentralClient {
      * truncated one, one that is not JSON, one the schema no longer accepts, one whose coordinates do not
      * match its own path. Each of those drops the entry and uses the network, so a corrupt entry cannot
      * produce a wrong document and heals on the next successful fetch.
+     *
+     * <p>{@code --refresh} skips the read but never drops the entry: only a fetch that succeeds replaces it, so a
+     * refresh while Central is unreachable leaves the cached copy for every later run.
      */
     public static Result<CentralDocs> fetchDocs(
             QualifiedName qualified, ResolvedVersion resolved, HttpOptions options) {
@@ -459,9 +462,7 @@ public final class CentralClient {
                 new DocsCache.DocsKey(REPOSITORY_ID, qualified.org(), qualified.name(), version.text());
         String label = qualified.versioned(version);
 
-        if (options.refresh()) {
-            cache.removeDocs(key);
-        } else {
+        if (!options.refresh()) {
             JsonElement cached = cache.readDocs(key);
             if (cached != null) {
                 Result<CentralDocs> parsed = Coordinates.match(cached, qualified, version)
@@ -525,9 +526,7 @@ public final class CentralClient {
         String moduleName = qualified.name() + "." + submodule;
         String label = qualified.org() + "/" + moduleName + ":" + version.text();
 
-        if (options.refresh()) {
-            cache.removeModuleDocs(key);
-        } else {
+        if (!options.refresh()) {
             JsonElement cached = cache.readModuleDocs(key);
             if (cached != null) {
                 Result<CentralDocs> parsed = Coordinates.isModulePage(cached, qualified, submodule, version)
