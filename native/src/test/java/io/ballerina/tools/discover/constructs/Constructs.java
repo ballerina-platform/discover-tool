@@ -482,6 +482,50 @@ public final class Constructs {
                                 Decl.member("count", Node.builtin("int"))))),
                         body("    record {string cursor; int count; } meta;")),
 
+                // ballerina/http's `ClientSecureSocket.protocol` is `record {| … |}` in source and arrives as
+                // `inline_closed_record`; printed open, it claimed the record accepts fields it rejects.
+                Construct.faithful(
+                        "types/inline-record-closed",
+                        "an `inline_closed_record` is an exclusive record, `record {| … |}`",
+                        record(Decl.field("meta", Node.named("", "inline_closed_record").members(
+                                Decl.member("cursor", Node.builtin("string")),
+                                Decl.member("count", Node.builtin("int"))))),
+                        body("    record {|string cursor; int count; |} meta;")),
+
+                // No recorded payload sets this flag on an inline member — slack 5.0.1's `last_read?` arrives
+                // without it — so this pins only where the `?` goes when it is set: after the name, since
+                // `T? f` is a required nilable field and `T f?` an optional one.
+                Construct.faithful(
+                        "types/inline-record-optional-field",
+                        "an optional inline field is `T f?;`, not the nilable `T? f;`",
+                        record(Decl.field("meta", Node.named("", "inline_record").members(
+                                Decl.member("cursor", Node.builtin("string")).on("isOptional"),
+                                Decl.member("count", Node.builtin("int"))))),
+                        body("    record {string cursor?; int count; } meta;")),
+
+                // ballerina/log's `Module`: named fields, then a nameless member whose element type is the
+                // rest descriptor. `T...;` is legal only in an exclusive record.
+                Construct.faithful(
+                        "types/inline-record-rest",
+                        "an inline record's rest member is `T...;`, inside `record {| … |}`",
+                        record(Decl.field("meta", Node.named("", "inline_record").members(
+                                Decl.member("name", Node.builtin("string")),
+                                Node.structural().elementType(Node.structural()
+                                        .on("isRestParam")
+                                        .elementType(Node.builtin("anydata")))))),
+                        body("    record {|string name; anydata...; |} meta;")),
+
+                // ballerinax/github's rest-only inline records (`record {|string...;|}`), which the reader
+                // used to collapse to `record {}` — a record accepting any field of any anydata type.
+                Construct.faithful(
+                        "types/inline-record-rest-only",
+                        "an inline record holding only a rest member is `record {|T...; |}`, not `record {}`",
+                        record(Decl.field("meta", Node.named("", "inline_record").members(
+                                Node.structural().elementType(Node.structural()
+                                        .on("isRestParam")
+                                        .elementType(Node.builtin("string")))))),
+                        body("    record {|string...; |} meta;")),
+
                 Construct.faithful(
                         "types/unencoded-node",
                         "a type node the reader cannot encode must not be reported as an anonymous record — "

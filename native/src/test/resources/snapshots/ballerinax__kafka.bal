@@ -304,9 +304,9 @@ public type SecureSocket record {|
     # Configurations associated with crypto:TrustStore or single certificate file that the client trusts
     crypto:TrustStore|string cert;
     # Configurations associated with crypto:KeyStore or combination of certificate and private key of the client
-    record {crypto:KeyStore keyStore; string keyPassword; }|CertKey key?;
+    record {|crypto:KeyStore keyStore; string keyPassword; |}|CertKey key?;
     # SSL/TLS protocol related options
-    record {Protocol name; string[] versions; } protocol?;
+    record {|Protocol name; string[] versions; |} protocol?;
     # List of ciphers to be used. By default, all the available cipher suites are supported
     string[] ciphers?;
     # Name of the security provider used for SSL connections. The default value is the default security provider

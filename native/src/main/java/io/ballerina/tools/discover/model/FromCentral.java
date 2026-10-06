@@ -264,26 +264,10 @@ public final class FromCentral {
 
         String category = type.category().orElse("");
         if (isInlineRecord(category)) {
-            CentralDocs.TypeNode first = members.isEmpty() ? null : members.get(0);
-            // Named-field form: each member is a field, not a type. The alternative form carries bare
-            // types and collapses to an opaque `record {}`.
-            if (first != null && first.name().isPresent() && first.elementType().isPresent()) {
-                StringBuilder body = new StringBuilder("record {");
-                for (CentralDocs.TypeNode member : members) {
-                    if (member.elementType().isEmpty()) {
-                        continue;
-                    }
-                    TypeRef fieldType = transformType(member.elementType().get(), scope);
-                    body.append(fieldType.name())
-                            .append(member.isOptional() ? "?" : "")
-                            .append(' ')
-                            .append(member.name().orElse(""))
-                            .append("; ");
-                }
-                body.append('}');
-                return optional(new TypeRef(body.toString()), type.isNullable());
-            }
-            return optional(inlineRecord(members, scope), type.isNullable());
+            TypeRef record = !members.isEmpty() && members.stream().allMatch(FromCentral::isInlineField)
+                    ? inlineRecordFields(members, "inline_closed_record".equals(category), scope)
+                    : inlineRecord(members, scope);
+            return optional(record, type.isNullable());
         }
 
         if (type.elementType().isPresent()) {
@@ -323,6 +307,47 @@ public final class FromCentral {
 
     private static List<TypeRef> transformAll(List<CentralDocs.TypeNode> types, Scope scope) {
         return types.stream().map(type -> transformType(type, scope)).toList();
+    }
+
+    /**
+     * A member of an inline record that is a field rather than a bare type: a named field, or the nameless rest
+     * member Central publishes as an element type flagged {@code isRestParam}.
+     */
+    private static boolean isInlineField(CentralDocs.TypeNode member) {
+        return member.elementType().isPresent()
+                && (member.name().filter(name -> !name.isEmpty()).isPresent()
+                        || member.elementType().get().isRestParam());
+    }
+
+    /**
+     * An inline record written out field by field, in the same grammar as a declared record.
+     *
+     * <p>Closed when Central says so or when it carries a rest member, for the reason {@link #isClosed} gives.
+     * A rest member that is not last is dropped, for the reason {@link #isStrandedRest} gives.
+     */
+    private static TypeRef inlineRecordFields(List<CentralDocs.TypeNode> members, boolean closed, Scope scope) {
+        StringBuilder fields = new StringBuilder();
+        List<TypeRef.Link> links = new ArrayList<>();
+        boolean exclusive = closed;
+        for (int i = 0; i < members.size(); i++) {
+            CentralDocs.TypeNode member = members.get(i);
+            CentralDocs.TypeNode fieldType = member.elementType().orElseThrow();
+            boolean isLast = i == members.size() - 1;
+            if (fieldType.isRestParam() && !isLast) {
+                continue;
+            }
+            TypeRef typeRef = transformType(fieldType, scope);
+            if (fieldType.isRestParam()) {
+                fields.append(typeRef.name()).append("...; ");
+                exclusive = true;
+            } else {
+                fields.append(typeRef.name()).append(' ').append(member.name().orElseThrow())
+                        .append(member.isOptional() ? "?" : "").append("; ");
+            }
+            links.addAll(typeRef.links());
+        }
+        String body = exclusive ? "record {|" + fields + "|}" : "record {" + fields + "}";
+        return ref(body, links);
     }
 
     /** An anonymous record whose fields Central did not describe; only its links survive. */

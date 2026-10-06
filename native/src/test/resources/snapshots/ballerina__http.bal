@@ -179,9 +179,9 @@ public type ClientSecureSocket record {|
     # Configurations associated with `crypto:KeyStore` or combination of certificate and private key of the client
     crypto:KeyStore|CertKey key?;
     # SSL/TLS protocol related options
-    record {Protocol name; string[] versions; } protocol?;
+    record {|Protocol name; string[] versions; |} protocol?;
     # Certificate validation against OCSP_CRL, OCSP_STAPLING related options
-    record {CertValidationType 'type; int cacheSize; int cacheValidityPeriod; } certValidation?;
+    record {|CertValidationType 'type; int cacheSize; int cacheValidityPeriod; |} certValidation?;
     # List of ciphers to be used
     # eg: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
     string[] ciphers?;
@@ -750,11 +750,11 @@ public type ListenerSecureSocket record {|
     # Configurations associated with `crypto:KeyStore` or combination of certificate and (PKCS8) private key of the server
     crypto:KeyStore|CertKey key;
     # Configures associated with mutual SSL operations
-    record {VerifyClient verifyClient; crypto:TrustStore|string cert; } mutualSsl?;
+    record {|VerifyClient verifyClient; crypto:TrustStore|string cert; |} mutualSsl?;
     # SSL/TLS protocol related options
-    record {Protocol name; string[] versions; } protocol?;
+    record {|Protocol name; string[] versions; |} protocol?;
     # Certificate validation against OCSP_CRL, OCSP_STAPLING related options
-    record {CertValidationType 'type; int cacheSize; int cacheValidityPeriod; } certValidation?;
+    record {|CertValidationType 'type; int cacheSize; int cacheValidityPeriod; |} certValidation?;
     # List of ciphers to be used
     # eg: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
     string[] ciphers = ["TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256",
