@@ -576,10 +576,9 @@ public class DiscoverResultRenderingTest {
                 "  |};",
                 "",
                 "Past the closure budget (1)",
-                "  GistFile",
+                "  GistFile  bal discover pkg type GistFile",
                 "",
-                "Note: relocated to gists/'public",
-                "Next: bal discover pkg type <name>"));
+                "Note: relocated to gists/'public"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         JsonObject type = json.getAsJsonArray("types").get(0).getAsJsonObject();
