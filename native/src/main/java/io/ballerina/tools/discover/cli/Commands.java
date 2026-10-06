@@ -91,9 +91,9 @@ final class Commands {
 
         @CommandLine.Option(names = "--page", paramLabel = "<n>", defaultValue = "1",
                 description = "1-indexed. Turns the page of any listing over the entry ceiling: a roster, a "
-                        + "level of path groups, methods, resource paths, a container listed by call form, "
-                        + "documentation-only matches, and readme sections narrowed by --filter. A page outside "
-                        + "the listing, or against an answer that does not page, is an error.")
+                        + "level of path groups, methods, resource paths, a container listed by call form, the type "
+                        + "declarations, documentation-only matches, and readme sections narrowed by --filter. A "
+                        + "page outside the listing, or against an answer that does not page, is an error.")
         int page;
 
         @CommandLine.Option(names = {"--module", "-m"}, paramLabel = "<name>",
