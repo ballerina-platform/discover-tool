@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover.render;
 
 import io.ballerina.tools.discover.Texts;
+import io.ballerina.tools.discover.symbols.Names;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,6 +44,7 @@ public final class TextRenderer {
 
     private static final String INDENT = "  ";
     private static final String SEPARATOR = " · ";
+    private static final String DOCUMENTED = "matched by documentation only";
 
     private TextRenderer() {
     }
@@ -75,20 +77,21 @@ public final class TextRenderer {
     }
 
     public static String render(DiscoverResult result, Context where) {
-        if (result instanceof DiscoverResult.Readme readme && readme.chunk() == null && !readme.markdown().isEmpty()) {
+        if (result instanceof DiscoverResult.Readme readme && readme.chunk() == null) {
             return verbatimReadme(readme);
         }
+        String container = containerOf(result);
         Layout layout = new Layout();
-        layout.top(header(where, containerOf(result)));
+        layout.top(header(where, container));
         fill(layout, result, where);
         if (layout.hasLaterPages && where.filter() == null && where.pkg() != null) {
-            layout.next(filterCommand(where));
+            layout.next(filterCommand(where, container));
         }
         return layout.render();
     }
 
     /** The command that narrows the listing just shown by a keyword, which is what most callers want over a page. */
-    private static String filterCommand(Context where) {
+    private static String filterCommand(Context where, String container) {
         StringBuilder command = new StringBuilder("bal discover ").append(Texts.shellWord(where.pkg()));
         if (where.module() != null) {
             command.append(" --module ").append(Texts.shellWord(where.module()));
@@ -96,7 +99,7 @@ public final class TextRenderer {
         if (where.version() != null) {
             command.append(" --version ").append(Texts.shellWord(where.version()));
         }
-        where.trail().forEach(word -> command.append(' ').append(Texts.shellWord(word)));
+        resolvedTrail(where, container).forEach(word -> command.append(' ').append(Texts.shellWord(word)));
         return command.append(" --filter <keyword>").toString();
     }
 
@@ -203,7 +206,12 @@ public final class TextRenderer {
         for (int i = 0; i < notAttachable.size(); i++) {
             unattachable.row(notAttachable.get(i).name(), drill.explicit(containers.size() + i));
         }
-        layout.section("Not attachable to a listener", unattachable);
+        int notAttachableTotal = roster.notAttachableTotal();
+        if (notAttachable.isEmpty() && notAttachableTotal > 0) {
+            layout.block(List.of("Not attachable to a listener: " + notAttachableTotal + ", on a later page"));
+        }
+        layout.section("Not attachable to a listener" + (notAttachable.size() < notAttachableTotal
+                ? " (" + notAttachable.size() + " of " + notAttachableTotal + ")" : ""), unattachable);
         layout.warning(roster.warning());
         layout.more(remaining(containers.size() + notAttachable.size(), roster.total(), roster.paging()),
                 roster.paging());
@@ -272,12 +280,8 @@ public final class TextRenderer {
     }
 
     private static void readmeChunk(Layout layout, DiscoverResult.Readme readme) {
-        if (readme.markdown().isEmpty()) {
-            layout.top("No readme in this module.");
-        } else {
-            layout.top("Chunk " + readme.chunk() + " of " + readme.of() + ": " + readme.title());
-            layout.block(List.of(readme.markdown()));
-        }
+        layout.top("Chunk " + readme.chunk() + " of " + readme.of() + ": " + readme.title());
+        layout.block(List.of(readme.markdown()));
         layout.warning(readme.warning());
     }
 
@@ -317,7 +321,7 @@ public final class TextRenderer {
         documented(layout, signature.documented());
         layout.notices(signature.note(), signature.warning());
         layout.more(remaining(signature.documented().names().size(), signature.documented().total(),
-                signature.paging()), signature.paging());
+                signature.paging()), signature.paging(), DOCUMENTED);
         layout.next(signature.next());
     }
 
@@ -367,7 +371,7 @@ public final class TextRenderer {
         }
         layout.notices(noMatch.note(), noMatch.warning());
         if (noMatch.paging() != null) {
-            layout.more(noMatch.paging().remaining(), noMatch.paging());
+            layout.more(noMatch.paging().remaining(), noMatch.paging(), DOCUMENTED);
             layout.next(noMatch.next());
         } else if (noMatch.available() == null) {
             layout.next(noMatch.next());
@@ -452,7 +456,7 @@ public final class TextRenderer {
         int unlisted = Math.max(0, omittedTotal - omitted.size());
         layout.section("Past the closure budget (" + omitted.size() + (unlisted > 0 ? " of " + omittedTotal : "") + ")",
                 commandTable(omitted));
-        layout.more(unlisted, null);
+        layout.more(unlisted, null, "past the closure budget, listed by the type roster");
         if (unlisted > 0) {
             layout.next(omittedNext);
         }
@@ -476,7 +480,7 @@ public final class TextRenderer {
         if (where.module() != null) {
             parts.add("module " + where.module());
         }
-        List<String> trail = new ArrayList<>(where.trail());
+        List<String> trail = new ArrayList<>(resolvedTrail(where, container));
         if (container != null && !trail.contains(container)) {
             trail.add(Math.min(1, trail.size()), container);
         }
@@ -485,6 +489,18 @@ public final class TextRenderer {
             parts.add("--filter " + where.filter());
         }
         return parts.isEmpty() ? null : String.join(SEPARATOR, parts);
+    }
+
+    /** The trail as typed, its container selector spelled as the container it resolved to. */
+    private static List<String> resolvedTrail(Context where, String container) {
+        List<String> trail = where.trail();
+        if (container == null || trail.size() < 2 || trail.get(1).equals(container)
+                || !Names.normalise(trail.get(1)).equals(Names.normalise(container))) {
+            return trail;
+        }
+        List<String> resolved = new ArrayList<>(trail);
+        resolved.set(1, container);
+        return resolved;
     }
 
     private static String containerOf(DiscoverResult result) {
@@ -718,13 +734,19 @@ public final class TextRenderer {
          * listing names its page instead, including the last one, which has nothing more to point at.
          */
         void more(int remaining, DiscoverResult.Paging paging) {
+            more(remaining, paging, null);
+        }
+
+        /** {@code what} names the entries counted, where the footer can hold another count of other entries. */
+        void more(int remaining, DiscoverResult.Paging paging, String what) {
+            String counted = "... " + remaining + " more" + (what == null ? "" : " " + what);
             if (paging == null) {
                 if (remaining > 0) {
-                    more.add("... " + remaining + " more, narrow further");
+                    more.add(what == null ? counted + ", narrow further" : counted);
                 }
             } else if (remaining > 0) {
                 hasLaterPages = true;
-                more.add("... " + remaining + " more (page " + paging.page() + " of " + paging.pages() + ")");
+                more.add(counted + " (page " + paging.page() + " of " + paging.pages() + ")");
             } else if (paging.pages() > 1) {
                 more.add("Last page (page " + paging.page() + " of " + paging.pages() + ")");
             }

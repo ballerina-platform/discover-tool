@@ -18,7 +18,12 @@
 
 package io.ballerina.tools.discover;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import io.ballerina.tools.discover.constructs.Decl;
+import io.ballerina.tools.discover.constructs.Payload;
 import io.ballerina.tools.discover.model.Library;
+import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
@@ -31,8 +36,10 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -851,7 +858,8 @@ public class ViewsTest {
         String text = TextRenderer.render(status, new TextRenderer.Context(
                 http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null, null));
         Assert.assertTrue(text.contains("Past the closure budget (40 of 47)"), text);
-        Assert.assertTrue(text.contains("\n... 7 more, narrow further\nNext: bal discover ballerina/http type"), text);
+        Assert.assertTrue(text.contains("\n... 7 more past the closure budget, listed by the type roster\n"
+                + "Next: bal discover ballerina/http type"), text);
         Assert.assertEquals(text.lines().filter(line -> line.startsWith("Past the closure budget")).count(), 1L);
 
         DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
@@ -1053,16 +1061,20 @@ public class ViewsTest {
     }
 
     @Test
-    public void aTypeFilterMatchingOnlyDocumentationListsThemAsDocumentedAndShowsNoRows() {
-        DiscoverResult.TypeRoster roster = as(DiscoverResult.TypeRoster.class, result(
-                Types.render(FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"),
-                        new Types.Options(List.of(), "server", 1)), "type --filter server"));
-        Assert.assertTrue(roster.sections().isEmpty());
-        Assert.assertEquals(roster.shown(), 0);
-        Assert.assertEquals(roster.total(), 0);
-        Assert.assertEquals(roster.documented().names(),
+    public void aTypeFilterMatchingOnlyDocumentationIsANoMatchAsInEveryOtherBucket() {
+        DiscoverResult answer = result(Types.render(FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"),
+                new Types.Options(List.of(), "server", 1)), "type --filter server");
+        DiscoverResult.NoMatch noMatch = as(DiscoverResult.NoMatch.class, answer);
+        Assert.assertEquals(noMatch.documented().names(),
                 List.of("ClientHttp1Settings", "ConnectionConfig", "ProxyConfig"));
-        Assert.assertEquals(roster.documented().total(), 3);
+        Assert.assertEquals(noMatch.documented().total(), 3);
+        Assert.assertEquals(noMatch.next(), "bal discover ballerinax/googleapis.sheets type");
+
+        String text = TextRenderer.render(answer, new TextRenderer.Context("ballerinax/googleapis.sheets", null,
+                List.of("type"), "server", null));
+        Assert.assertFalse(text.contains("No types."), text);
+        Assert.assertTrue(text.contains("Nothing matches 'server'.\n"), text);
+        Assert.assertTrue(text.contains("\nMatched by documentation only\n  ClientHttp1Settings\n"), text);
     }
 
     @Test
@@ -1106,6 +1118,45 @@ public class ViewsTest {
         // is TRUE.
         Assert.assertTrue(FixtureCorpus.readSnapshot("ballerina__http")
                 .contains("not exported by this package"), "the note stands");
+    }
+
+    private static LoadedPackage fromPayload(Payload payload) {
+        Library library = Pipeline.build(payload.module());
+        return new LoadedPackage(QualifiedName.parse("test/pkg").value(), FixtureCorpus.FIXTURE_VERSION, library,
+                Optional.empty(), null, List.of(), null, null, () -> library);
+    }
+
+    @Test
+    public void aPageFullOfNamesWithDocumentationOnlyMatchesLeftSaysHowManyRemainInJson() {
+        Payload payload = Payload.pkg();
+        List<Decl> methods = new ArrayList<>();
+        for (int index = 1; index <= 30; index++) {
+            methods.add(Decl.method("send" + index).on("isRemote"));
+        }
+        for (int index = 1; index <= 15; index++) {
+            methods.add(Decl.method("other" + index).on("isRemote").with("description", "Can send it."));
+        }
+        payload.with("clients", Decl.client("Client", methods.toArray(new Decl[0])));
+        DiscoverResult.MethodList first = as(DiscoverResult.MethodList.class, result(
+                Containers.render(fromPayload(payload), Surface.Scope.CLIENT,
+                        new Containers.Options(List.of("Client"), "send", 1)), "client Client --filter send"));
+        Assert.assertEquals(first.shown(), 30);
+        Assert.assertEquals(first.total(), 30);
+        Assert.assertEquals(first.documented().names().size(), 10);
+
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(first)).getAsJsonObject();
+        Assert.assertEquals(json.get("shown").getAsInt(), json.get("total").getAsInt(),
+                "shown/total count the names only");
+        Assert.assertEquals(json.get("remaining").getAsInt(), 5, "so the documentation-only rest is counted here");
+        Assert.assertEquals(json.get("pages").getAsInt(), 2);
+        Assert.assertEquals(json.get("next").getAsString(),
+                "bal discover test/pkg client Client --filter send --page 2");
+
+        DiscoverResult.MethodList second = as(DiscoverResult.MethodList.class, result(
+                Containers.render(fromPayload(payload), Surface.Scope.CLIENT,
+                        new Containers.Options(List.of("Client"), "send", 2)), "client Client --filter send --page 2"));
+        Assert.assertEquals(JsonParser.parseString(JsonRenderer.render(second)).getAsJsonObject()
+                .get("remaining").getAsInt(), 0);
     }
 
     /** Sanity: the corpus still has the path shapes these tests reason about. */

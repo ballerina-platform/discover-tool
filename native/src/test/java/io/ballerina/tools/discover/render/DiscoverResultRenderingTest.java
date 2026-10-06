@@ -212,7 +212,7 @@ public class DiscoverResultRenderingTest {
                 "http:Listener",
                 "  Service",
                 "",
-                "Not attachable to a listener",
+                "Not attachable to a listener (1 of 3)",
                 "  RequestInterceptor",
                 "",
                 "... 2 more (page 1 of 2)",
@@ -226,6 +226,50 @@ public class DiscoverResultRenderingTest {
                 "bal discover ballerina/http service RequestInterceptor");
         Assert.assertEquals(json.get("notAttachableTotal").getAsInt(), 3);
         Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerina/http service --page 2");
+    }
+
+    @Test
+    public void anUnconfirmedPairingCarriesItsReasonInBothRenderings() {
+        DiscoverResult result = new DiscoverResult.ContainerRoster(
+                List.of(
+                        new DiscoverResult.ContainerRoster.Container(
+                                "Service", 0, 0, 1, "http:Listener", null,
+                                "bal discover ballerina/http service Service"),
+                        new DiscoverResult.ContainerRoster.Container(
+                                "InterceptableService", 0, 0, 1, "http:Listener", "package source unavailable",
+                                "bal discover ballerina/http service InterceptableService")),
+                2, null, null, null, List.of(), 0);
+        Assert.assertTrue(TextRenderer.render(result).contains(
+                "http:Listener — not confirmed (package source unavailable)\n  InterceptableService"));
+
+        JsonArray containers = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject()
+                .getAsJsonArray("containers");
+        JsonObject confirmed = containers.get(0).getAsJsonObject();
+        Assert.assertFalse(confirmed.has("confirmed"), confirmed.toString());
+        Assert.assertFalse(confirmed.has("unconfirmedReason"), confirmed.toString());
+        JsonObject unconfirmed = containers.get(1).getAsJsonObject();
+        Assert.assertFalse(unconfirmed.get("confirmed").getAsBoolean());
+        Assert.assertEquals(unconfirmed.get("unconfirmedReason").getAsString(), "package source unavailable");
+    }
+
+    @Test
+    public void aServiceRosterPageBeforeTheNotAttachableTypesSaysTheyAreComing() {
+        DiscoverResult result = new DiscoverResult.ContainerRoster(
+                List.of(new DiscoverResult.ContainerRoster.Container(
+                        "Service", 0, 0, 0, "http:Listener", null, "bal discover ballerina/http service Service")),
+                6, new DiscoverResult.Paging(1, 2, 5), "bal discover ballerina/http service --page 2", null,
+                List.of(), 5);
+        Assert.assertEquals(TextRenderer.render(result), lines(
+                "6 containers",
+                "",
+                "http:Listener",
+                "  Service",
+                "",
+                "Not attachable to a listener: 5, on a later page",
+                "",
+                "... 5 more (page 1 of 2)",
+                "Next: bal discover ballerina/http service <name>",
+                "Next: bal discover ballerina/http service --page 2"));
     }
 
     @Test
@@ -447,16 +491,6 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
-    public void aPackageWithNoReadmeIsNoneInTextAndAnEmptyStringInJson() {
-        DiscoverResult result = new DiscoverResult.Readme("", 0, null);
-        Assert.assertEquals(TextRenderer.render(result), "No readme in this module.");
-
-        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
-        Assert.assertEquals(json.get("readme").getAsString(), "");
-        Assert.assertEquals(json.get("lines").getAsInt(), 0);
-    }
-
-    @Test
     public void oneChunkCarriesItsPositionInJsonAndAHeaderLineInText() {
         DiscoverResult result = new DiscoverResult.Readme("## Quickstart\n\ncode", 3, 2, 5, "Quickstart", null);
         Assert.assertEquals(TextRenderer.render(result), "Chunk 2 of 5: Quickstart\n\n## Quickstart\n\ncode");
@@ -524,13 +558,46 @@ public class DiscoverResultRenderingTest {
                 command + " --page 3", null, null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.contains("\nMatched by documentation only (2 of 82)\n  ping\n  auth\n"), text);
-        Assert.assertTrue(text.endsWith("\n... 2 more (page 2 of 3)\nNext: " + command + " --page 3"), text);
+        Assert.assertTrue(text.endsWith("\n... 2 more matched by documentation only (page 2 of 3)\nNext: " + command
+                + " --page 3"), text);
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("documentedTotal").getAsInt(), 82);
         Assert.assertEquals(json.get("page").getAsInt(), 2);
         Assert.assertEquals(json.get("pages").getAsInt(), 3);
         Assert.assertEquals(json.get("next").getAsString(), command + " --page 3");
+    }
+
+    @Test
+    public void aLeafFooterLabelsTheClosuresCountApartFromTheDocumentationOnlyPage() {
+        String command = "bal discover pkg client Client echo --filter the";
+        DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
+                "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
+                false, List.of(), List.of(new DiscoverResult.Method("Gist", "bal discover pkg type Gist")), 3,
+                "bal discover pkg type", List.of(),
+                new DiscoverResult.Documented(List.of("ping"), 41), new DiscoverResult.Paging(1, 2, 1),
+                command + " --page 2", null, null);
+        String text = TextRenderer.render(result);
+        Assert.assertTrue(text.endsWith(lines(
+                "... 2 more past the closure budget, listed by the type roster",
+                "... 1 more matched by documentation only (page 1 of 2)",
+                "Next: bal discover pkg type",
+                "Next: " + command + " --page 2")), text);
+        Assert.assertFalse(text.contains("narrow further"), text);
+    }
+
+    @Test
+    public void aContainerTypedInAnotherCaseIsNamedOnceAsItResolved() {
+        DiscoverResult result = new DiscoverResult.MethodList("Client",
+                List.of(new DiscoverResult.Method("createCall", "bal discover ballerinax/twilio client Client "
+                        + "createCall")),
+                1, 199, new DiscoverResult.Paging(1, 5, 159), "bal discover ballerinax/twilio client Client --page 2",
+                DiscoverResult.Documented.NONE, null, null);
+        String text = TextRenderer.render(result, new TextRenderer.Context("ballerinax/twilio", null,
+                List.of("client", "client"), null, null));
+        Assert.assertTrue(text.startsWith("ballerinax/twilio · client · Client\n"), text);
+        Assert.assertTrue(text.contains("\nNext: bal discover ballerinax/twilio client Client --filter <keyword>"),
+                text);
     }
 
     @Test
@@ -660,6 +727,7 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.get("next").getAsString(), next);
         Assert.assertEquals(json.get("page").getAsInt(), 1);
         Assert.assertEquals(json.get("pages").getAsInt(), 2);
+        Assert.assertEquals(json.get("remaining").getAsInt(), 2);
         Assert.assertEquals(json.getAsJsonArray("documented").get(0).getAsString(), "forward");
         Assert.assertEquals(json.get("documentedTotal").getAsInt(), 3);
         Assert.assertFalse(json.has("resources"), "a section with nothing on this page is omitted");
