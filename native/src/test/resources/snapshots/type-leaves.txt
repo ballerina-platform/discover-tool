@@ -131,21 +131,19 @@ Types it names (7)
   public type Compression COMPRESSION_AUTO|COMPRESSION_ALWAYS|COMPRESSION_NEVER;
 
 Past the closure budget (9)
-  PoolConfiguration
-  CacheConfig
-  ClientAuthConfig
-  CircuitBreakerConfig
-  RetryConfig
-  CookieConfig
-  ResponseLimitConfigs
-  ProxyConfig
-  ClientSocketConfig
+  PoolConfiguration     bal discover ballerina/http type PoolConfiguration
+  CacheConfig           bal discover ballerina/http type CacheConfig
+  ClientAuthConfig      bal discover ballerina/http type ClientAuthConfig
+  CircuitBreakerConfig  bal discover ballerina/http type CircuitBreakerConfig
+  RetryConfig           bal discover ballerina/http type RetryConfig
+  CookieConfig          bal discover ballerina/http type CookieConfig
+  ResponseLimitConfigs  bal discover ballerina/http type ResponseLimitConfigs
+  ProxyConfig           bal discover ballerina/http type ProxyConfig
+  ClientSocketConfig    bal discover ballerina/http type ClientSocketConfig
 
 From other packages (2)
   TrustStore  ballerina/crypto 2.9.3  bal discover ballerina/crypto type TrustStore
   KeyStore    ballerina/crypto 2.9.3  bal discover ballerina/crypto type KeyStore
-
-Next: bal discover ballerina/http type <name>
 == ballerina__http type ClientError ==
 ballerina/http · type · ClientError
 
@@ -269,50 +267,49 @@ Types it names (15)
   |};
 
 Past the closure budget (40 of 47)
-  MultipleChoices
-  MovedPermanently
-  SeeOther
-  NotModified
-  UseProxy
-  TemporaryRedirect
-  PermanentRedirect
-  BadRequest
-  Unauthorized
-  PaymentRequired
-  Forbidden
-  NotFound
-  MethodNotAllowed
-  NotAcceptable
-  ProxyAuthenticationRequired
-  RequestTimeout
-  Conflict
-  Gone
-  LengthRequired
-  PreconditionFailed
-  PayloadTooLarge
-  UriTooLong
-  UnsupportedMediaType
-  RangeNotSatisfiable
-  ExpectationFailed
-  MisdirectedRequest
-  UnprocessableEntity
-  Locked
-  FailedDependency
-  TooEarly
-  PreconditionRequired
-  UnavailableDueToLegalReasons
-  UpgradeRequired
-  TooManyRequests
-  RequestHeaderFieldsTooLarge
-  InternalServerError
-  NotImplemented
-  BadGateway
-  ServiceUnavailable
-  GatewayTimeout
+  MultipleChoices               bal discover ballerina/http type MultipleChoices
+  MovedPermanently              bal discover ballerina/http type MovedPermanently
+  SeeOther                      bal discover ballerina/http type SeeOther
+  NotModified                   bal discover ballerina/http type NotModified
+  UseProxy                      bal discover ballerina/http type UseProxy
+  TemporaryRedirect             bal discover ballerina/http type TemporaryRedirect
+  PermanentRedirect             bal discover ballerina/http type PermanentRedirect
+  BadRequest                    bal discover ballerina/http type BadRequest
+  Unauthorized                  bal discover ballerina/http type Unauthorized
+  PaymentRequired               bal discover ballerina/http type PaymentRequired
+  Forbidden                     bal discover ballerina/http type Forbidden
+  NotFound                      bal discover ballerina/http type NotFound
+  MethodNotAllowed              bal discover ballerina/http type MethodNotAllowed
+  NotAcceptable                 bal discover ballerina/http type NotAcceptable
+  ProxyAuthenticationRequired   bal discover ballerina/http type ProxyAuthenticationRequired
+  RequestTimeout                bal discover ballerina/http type RequestTimeout
+  Conflict                      bal discover ballerina/http type Conflict
+  Gone                          bal discover ballerina/http type Gone
+  LengthRequired                bal discover ballerina/http type LengthRequired
+  PreconditionFailed            bal discover ballerina/http type PreconditionFailed
+  PayloadTooLarge               bal discover ballerina/http type PayloadTooLarge
+  UriTooLong                    bal discover ballerina/http type UriTooLong
+  UnsupportedMediaType          bal discover ballerina/http type UnsupportedMediaType
+  RangeNotSatisfiable           bal discover ballerina/http type RangeNotSatisfiable
+  ExpectationFailed             bal discover ballerina/http type ExpectationFailed
+  MisdirectedRequest            bal discover ballerina/http type MisdirectedRequest
+  UnprocessableEntity           bal discover ballerina/http type UnprocessableEntity
+  Locked                        bal discover ballerina/http type Locked
+  FailedDependency              bal discover ballerina/http type FailedDependency
+  TooEarly                      bal discover ballerina/http type TooEarly
+  PreconditionRequired          bal discover ballerina/http type PreconditionRequired
+  UnavailableDueToLegalReasons  bal discover ballerina/http type UnavailableDueToLegalReasons
+  UpgradeRequired               bal discover ballerina/http type UpgradeRequired
+  TooManyRequests               bal discover ballerina/http type TooManyRequests
+  RequestHeaderFieldsTooLarge   bal discover ballerina/http type RequestHeaderFieldsTooLarge
+  InternalServerError           bal discover ballerina/http type InternalServerError
+  NotImplemented                bal discover ballerina/http type NotImplemented
+  BadGateway                    bal discover ballerina/http type BadGateway
+  ServiceUnavailable            bal discover ballerina/http type ServiceUnavailable
+  GatewayTimeout                bal discover ballerina/http type GatewayTimeout
 
 ... 7 more, narrow further
 Next: bal discover ballerina/http type
-Next: bal discover ballerina/http type <name>
 == ballerina__http type ResourceConfig ==
 ballerina/http · type · ResourceConfig
 

@@ -316,13 +316,12 @@ public final class TextRenderer {
             block.addAll(indented(types.get(i).declaration().lines().toList()));
             layout.block(block);
         }
-        Drill drill = closureTail(layout, signature.omitted(), signature.omittedTotal(), signature.omittedNext(),
+        closureTail(layout, signature.omitted(), signature.omittedTotal(), signature.omittedNext(),
                 signature.foreign());
         documented(layout, signature.documented());
         layout.notices(signature.note(), signature.warning());
         layout.more(remaining(signature.documented().names().size(), signature.documented().total(),
                 signature.paging()), signature.paging());
-        layout.next(drill.pattern());
         layout.next(signature.next());
     }
 
@@ -445,20 +444,18 @@ public final class TextRenderer {
             block.addAll(indented(types.get(i).declaration().lines().toList()));
             layout.block(block);
         }
-        Drill drill = closureTail(layout, declaration.omitted(), declaration.omittedTotal(), declaration.omittedNext(),
+        closureTail(layout, declaration.omitted(), declaration.omittedTotal(), declaration.omittedNext(),
                 declaration.foreign());
         layout.notices(declaration.note(), declaration.warning());
-        layout.next(drill.pattern());
     }
 
     /** What a closure left behind: the names its budget dropped, and the declarations another package owns. */
-    private static Drill closureTail(
+    private static void closureTail(
             Layout layout, List<DiscoverResult.Method> omitted, int omittedTotal, String omittedNext,
             List<DiscoverResult.Foreign> foreign) {
-        Drill drill = methodDrill(omitted);
         int unlisted = Math.max(0, omittedTotal - omitted.size());
         layout.section("Past the closure budget (" + omitted.size() + (unlisted > 0 ? " of " + omittedTotal : "") + ")",
-                methodTable(omitted, drill));
+                commandTable(omitted));
         layout.more(unlisted, null);
         if (unlisted > 0) {
             layout.next(omittedNext);
@@ -468,7 +465,6 @@ public final class TextRenderer {
                 type.module() + (type.version() == null ? "" : " " + type.version()),
                 type.command() == null ? "(no command: package not known)" : type.command()));
         layout.section("From other packages (" + foreign.size() + ")", table);
-        return drill;
     }
 
     // -----------------------------------------------------------------------
@@ -558,6 +554,12 @@ public final class TextRenderer {
         for (int i = 0; i < methods.size(); i++) {
             table.row(methods.get(i).name(), drill.explicit(offset + i));
         }
+        return table;
+    }
+
+    private static TextTable commandTable(List<DiscoverResult.Method> methods) {
+        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
+        methods.forEach(method -> table.row(method.name(), method.command()));
         return table;
     }
 
