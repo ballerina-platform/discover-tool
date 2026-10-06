@@ -39,6 +39,7 @@ import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -255,13 +256,26 @@ public final class Containers {
             LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers,
             List<String> selectors, Options options, String note, boolean exactly) {
         Map<Surface.Container, List<Entry>> owners = new LinkedHashMap<>();
+        Map<Surface.Container, Integer> readingFewer = new LinkedHashMap<>();
         for (Surface.Container container : containers) {
             List<Entry> hits = exactly
                     ? selectExactly(container, selectors)
                     : select(container, selectors);
-            if (!hits.isEmpty()) {
-                owners.put(container, hits);
+            if (hits.isEmpty()) {
+                continue;
             }
+            int read = consumed(container, selectors);
+            if (read == selectors.size()) {
+                owners.put(container, hits);
+            } else {
+                readingFewer.put(container, read);
+            }
+        }
+        if (owners.isEmpty() && readingFewer.size() == 1) {
+            return answer(loaded, scope, readingFewer.keySet().iterator().next(), selectors, options, note);
+        }
+        if (owners.isEmpty() && !readingFewer.isEmpty()) {
+            return Result.err(unread(loaded, scope, readingFewer, selectors, options));
         }
         if (owners.isEmpty()) {
             return null;
@@ -272,6 +286,17 @@ public final class Containers {
                     note != null ? note : ownerNote(loaded, scope, owner, selectors));
         }
         return owners(loaded, scope, owners, selectors, options, note);
+    }
+
+    /** Whether {@code container} holds what the selectors start with, read in full or by a leading part alone. */
+    private static boolean knows(Surface.Container container, List<String> selectors, boolean exactly) {
+        return !select(container, selectors, exactly).isEmpty();
+    }
+
+    /** Does {@code token} alone select a member that is not a resource, which is what it names when more follows? */
+    private static boolean namesMember(Surface.Container container, String token) {
+        return select(container, List.of(token)).stream()
+                .anyMatch(entry -> !(entry.fn() instanceof Fn.Resource));
     }
 
     /**
@@ -289,8 +314,7 @@ public final class Containers {
             }
             List<Surface.Container> containers = Surface.of(loaded.library(), other);
             if (Surface.byName(containers, token).isPresent()
-                    || containers.stream().anyMatch(container ->
-                            !selectExactly(container, options.selectors()).isEmpty())) {
+                    || containers.stream().anyMatch(container -> knows(container, options.selectors(), true))) {
                 return render(loaded, other, options, kindNote(loaded, other.verb(), options.selectors()));
             }
         }
@@ -327,7 +351,7 @@ public final class Containers {
                 continue;
             }
             if (Surface.of(loaded.library(), other).stream()
-                    .anyMatch(container -> !select(container, options.selectors()).isEmpty())) {
+                    .anyMatch(container -> knows(container, options.selectors(), false))) {
                 return render(loaded, other, options, kindNote(loaded, other.verb(), options.selectors()));
             }
         }
@@ -630,18 +654,19 @@ public final class Containers {
         if (selectors.isEmpty()) {
             return all;
         }
+        List<String> read = selectors.subList(0, consumed(container, selectors));
         if (container.hasPaths()) {
-            List<Entry> byPath = selectByPath(container, selectors);
+            List<Entry> byPath = selectByPath(container, read);
             if (!byPath.isEmpty()) {
                 return byPath;
             }
         }
-        // A single token is a name filter; more than one on a name-shaped container is a caller who typed a path
-        // at something that has none, and the empty result routes them to the recovery that says so.
-        String token = selectors.get(0);
-        if (selectors.size() > 1 && container.hasPaths()) {
+        // Two tokens are a path and its accessor. One that resolved nothing is a no-match, never a name filter on
+        // the accessor.
+        if (read.size() > 1) {
             return List.of();
         }
+        String token = read.get(0);
         // `new` is the constructor, which Ballerina spells `init`. An INPUT alias only — the document still prints
         // `init`, because it prints what the package declares.
         if (token.equalsIgnoreCase("new") && container.constructor().isPresent()) {
@@ -696,6 +721,123 @@ public final class Containers {
                 return Optional.of(new PathRequest(words[0], PathTree.splitPath(words[1])));
             }
             return Optional.of(new PathRequest(null, PathTree.splitPath(selectors.get(0))));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * How many leading selectors this container reads, derived from what they name: two that resolve as a path and
+     * its accessor are read as one, a first that names a member that is not a resource is read alone, and on a
+     * container with resource paths any other two are a pair that resolves nothing (a no-match). The rest are
+     * unread, and rejected rather than answered as if they were never typed.
+     */
+    private static int consumed(Surface.Container container, List<String> selectors) {
+        if (selectors.size() < 2 || !container.hasPaths()) {
+            return Math.min(selectors.size(), 1);
+        }
+        if (!selectByPath(container, selectors.subList(0, 2)).isEmpty()) {
+            return 2;
+        }
+        return namesMember(container, selectors.get(0)) ? 1 : 2;
+    }
+
+    /** Selectors after the ones {@code container} reads, as a usage failure naming the command without them. */
+    private static Failure unread(
+            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
+            Options options) {
+        int consumed = consumed(container, selectors);
+        String takes = container.hasPaths()
+                ? "a member name, or a resource path and its accessor"
+                : "one " + (container.isModule() ? "function" : "member") + " name";
+        String where = container.isModule() ? scope.verb() : container.name();
+        String base = baseCommand(loaded, scope, container);
+        Optional<String> joined = joinedPath(container, selectors)
+                .map(path -> "Join the path's segments with `/` in one argument: `" + base + path
+                        + filterArgument(options) + "`.");
+        return unread(selectors, consumed, where + " takes " + takes,
+                joined.orElse(drop(selectors, consumed, base, options)));
+    }
+
+    /**
+     * The same failure for what several containers declare, none of which reads what follows it: {@code owners}
+     * maps each to how many selectors it read.
+     */
+    private static Failure unread(
+            LoadedPackage loaded, Surface.Scope scope, Map<Surface.Container, Integer> owners,
+            List<String> selectors, Options options) {
+        String names = owners.keySet().stream().map(Surface.Container::name).collect(Collectors.joining(", "));
+        int consumed = Collections.min(owners.values());
+        return unread(selectors, consumed, "'" + String.join(" ", selectors.subList(0, consumed))
+                        + "' selects a member of " + names + "; name the container to select anything after it",
+                drop(selectors, consumed, "bal discover " + loaded.pkgArgument() + " " + scope.verb(), options));
+    }
+
+    private static Failure unread(List<String> selectors, int consumed, String reason, String suggestion) {
+        List<String> unread = selectors.subList(consumed, selectors.size());
+        return new Failure.Validation(
+                "Unexpected " + (unread.size() == 1 ? "argument " : "arguments ")
+                        + unread.stream().map(word -> "'" + word + "'").collect(Collectors.joining(" "))
+                        + " after '" + String.join(" ", selectors.subList(0, consumed)) + "': " + reason + ".",
+                suggestion);
+    }
+
+    private static String drop(List<String> selectors, int consumed, String base, Options options) {
+        return "Drop " + (selectors.size() - consumed == 1 ? "it" : "them") + ": `" + base
+                + shellWords(selectors.subList(0, consumed)) + filterArgument(options) + "`.";
+    }
+
+    /**
+     * A path typed as separate words, joined into the one argument that resolves, with its accessor when one was
+     * typed first or last: {@code repos :owner :repo} is {@code "repos/:owner/:repo"}.
+     */
+    private static Optional<String> joinedPath(Surface.Container container, List<String> selectors) {
+        if (!container.hasPaths()) {
+            return Optional.empty();
+        }
+        String accessor = null;
+        List<String> segments = selectors;
+        if (isAccessor(container, selectors.get(0))) {
+            accessor = selectors.get(0);
+            segments = selectors.subList(1, selectors.size());
+        } else if (isAccessor(container, selectors.get(selectors.size() - 1))) {
+            accessor = selectors.get(selectors.size() - 1);
+            segments = selectors.subList(0, selectors.size() - 1);
+        }
+        if (segments.size() < 2) {
+            return Optional.empty();
+        }
+        String path = String.join("/", segments);
+        if (!(PathTree.locate(PathTree.build(container.operations()), PathTree.splitPath(path)).resolution()
+                instanceof PathTree.Resolution.Found)) {
+            return Optional.empty();
+        }
+        return Optional.of(" " + shellWord(path) + (accessor == null ? "" : " " + accessor));
+    }
+
+    /**
+     * Two selectors that are not a path and a declared accessor, split into the one that resolves as a path and
+     * the other: {@code "gists/'public" head}, {@code gists zzz}.
+     *
+     * @param path the selector that resolves as a path
+     * @param entries the operations at or beneath it
+     */
+    private record UnresolvedPair(String path, List<Entry> entries) {
+
+        List<String> accessors() {
+            return entries.stream().map(Entry::fn).filter(Fn.Resource.class::isInstance)
+                    .map(fn -> ((Fn.Resource) fn).accessor()).distinct().toList();
+        }
+    }
+
+    private static Optional<UnresolvedPair> unresolvedPair(Surface.Container container, List<String> selectors) {
+        if (!container.hasPaths() || selectors.size() != 2 || pathRequest(container, selectors).isPresent()) {
+            return Optional.empty();
+        }
+        for (String token : selectors) {
+            List<Entry> entries = selectByPath(container, List.of(token));
+            if (!entries.isEmpty()) {
+                return Optional.of(new UnresolvedPair(token, entries));
+            }
         }
         return Optional.empty();
     }
@@ -819,6 +961,9 @@ public final class Containers {
             container = Surface.byName(Surface.of(loaded.library(), Surface.Scope.SERVICE), container.name())
                     .orElse(container);
         }
+        if (consumed(container, selectors) < selectors.size()) {
+            return Result.err(unread(loaded, scope, container, selectors, options));
+        }
         note = mergeNotes(note, listenerNote(loaded, container));
         List<Entry> selected = select(container, selectors);
         List<String> documented = List.of();
@@ -912,6 +1057,14 @@ public final class Containers {
                         .toList()
                 : List.of();
 
+        Optional<UnresolvedPair> pair = unresolvedPair(container, selectors);
+        if (pair.isPresent()) {
+            DiscoverResult forPath = listing(loaded, scope, container, List.of(pair.get().path()),
+                    pair.get().entries(), Options.bare(), List.of(), null, null).value();
+            return Result.ok(new DiscoverResult.NoMatch(asked, containerName(container), pair.get().accessors(),
+                    List.of(), forPath, window.paging() == null ? command : window.next(repeated),
+                    documentedOn(window, documented, 0), window.paging(), loaded.warning(), note));
+        }
         List<Entry> all = entriesOf(container);
         List<String> names = new ArrayList<>();
         for (Entry entry : all) {

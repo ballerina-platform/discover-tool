@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Every bucket's answers, snapshotted in both renderings, plus the composition rules that decide their shape.
@@ -492,6 +493,28 @@ public class ViewsTest {
                 || container.operations().stream()
                         .anyMatch(operation -> operation.segments().stream()
                                 .anyMatch(segment -> PathTree.readableSegment(segment).equalsIgnoreCase("new")));
+    }
+
+    @Test
+    public void aPathAndAccessorOnlyOneOfSeveralContainersHoldsRejectsAnExtraSelectorRatherThanNotFindingIt() {
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        Set<String> withPaths = Set.of(
+                "ClientObject", "FailoverClient", "LoadBalanceClient", "StatusCodeClient", "StatusCodeClientObject");
+        Library library = http.library();
+        LoadedPackage loaded = http.withLibrary(library
+                .withTypeDefs(library.typeDefs().stream().filter(type -> !withPaths.contains(type.name())).toList())
+                .withClients(library.clients().stream().filter(client -> !withPaths.contains(client.name())).toList()));
+        List<Surface.Container> containers = Surface.of(loaded.library(), Surface.Scope.CLIENT);
+        Assert.assertEquals(containers.stream().filter(Surface.Container::hasPaths).count(), 1L);
+        Assert.assertTrue(containers.size() > 1);
+
+        Result<DiscoverResult> answer = Containers.render(loaded, Surface.Scope.CLIENT,
+                new Containers.Options(List.of(":...path", "get", "extra")));
+        Assert.assertFalse(answer.isOk());
+        Failure.Validation unread = (Failure.Validation) answer.failure();
+        Assert.assertTrue(unread.message().contains("'extra' after ':...path get'"), unread.message());
+        Assert.assertTrue(unread.suggestion().contains("`bal discover ballerina/http client Client :...path get`"),
+                unread.suggestion());
     }
 
     @Test
