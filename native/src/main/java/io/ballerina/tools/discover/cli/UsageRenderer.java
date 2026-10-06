@@ -47,6 +47,44 @@ final class UsageRenderer {
     }
 
     static String synopsis(Commands.Grammar grammar) {
+        String label = "Usage: bal discover ";
+        return wrap(label, slots(grammar), label.length());
+    }
+
+    /** The synopsis on one unwrapped line, {@code --help} included, for the launcher's one-line usage. */
+    static String synopsisLine(Commands.Grammar grammar) {
+        List<String> slots = new ArrayList<>(slots(grammar));
+        grammar.line().getCommandSpec().options().stream()
+                .filter(OptionSpec::usageHelp)
+                .forEach(help -> slots.add("[" + String.join("|", help.names()) + "]"));
+        return "bal discover " + String.join(" ", slots);
+    }
+
+    /** Every flag the grammar accepts, {@code --help} last, as one sentence for an unknown-option failure. */
+    static String knownFlags(Commands.Grammar grammar) {
+        return knownFlags(grammar.line().getCommandSpec());
+    }
+
+    static String knownFlags(CommandSpec spec) {
+        List<OptionSpec> options = spec.options().stream()
+                .filter(option -> !option.hidden())
+                .sorted(Comparator.comparing(OptionSpec::usageHelp))
+                .toList();
+        List<String> names = options.stream()
+                .map(option -> {
+                    List<String> spellings = new ArrayList<>(List.of(option.names()));
+                    spellings.sort(Comparator.comparingInt(String::length).reversed());
+                    return String.join("/", spellings);
+                })
+                .toList();
+        if (names.size() < 2) {
+            return names.isEmpty() ? "This command takes no flags." : "The only known flag is " + names.get(0) + ".";
+        }
+        return "Known flags are " + String.join(", ", names.subList(0, names.size() - 1))
+                + " and " + names.get(names.size() - 1) + ".";
+    }
+
+    private static List<String> slots(Commands.Grammar grammar) {
         CommandSpec spec = grammar.line().getCommandSpec();
         List<String> slots = new ArrayList<>();
         for (PositionalParamSpec positional : spec.positionalParameters()) {
@@ -55,8 +93,7 @@ final class UsageRenderer {
         for (OptionSpec option : orderedOptions(spec)) {
             slots.add(slot(option));
         }
-        String label = "Usage: bal discover ";
-        return wrap(label, slots, label.length());
+        return slots;
     }
 
     /**

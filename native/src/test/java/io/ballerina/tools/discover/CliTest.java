@@ -360,6 +360,17 @@ public class CliTest {
     }
 
     @Test
+    public void anUnknownFlagListsEveryFlagTheGrammarAccepts() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--nonesuch"), capture.streams(), never()), 1);
+        String suggestion = capture.field("suggestion");
+        for (String flag : List.of("--refresh", "--output", "--filter", "--page", "--module/-m", "--version",
+                "--help/-h")) {
+            Assert.assertTrue(suggestion.contains(flag), flag + " missing from: " + suggestion);
+        }
+    }
+
+    @Test
     public void aVersionShapedArgumentIsRejectedWithTheRuleThatReplacedIt() {
         for (List<String> argv : List.of(
                 List.of("ballerinax/kafka", "client", "4.6.5"),
