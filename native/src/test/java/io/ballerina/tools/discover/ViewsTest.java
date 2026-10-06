@@ -544,10 +544,36 @@ public class ViewsTest {
         DiscoverResult.ResourceList resources = as(DiscoverResult.ResourceList.class,
                 clientAnswer(FixtureCorpus.loadedFixture("ballerinax__github"), "repos/owner/repo/caches"));
         Assert.assertEquals(resources.note(), "relocated to repos/:owner/:repo/actions/caches — the only "
-                + "match for that segment under the requested prefix");
+                + "match for that path under the requested prefix");
         Assert.assertTrue(resources.resources().stream()
                         .anyMatch(resource -> resource.path().equals("repos/:owner/:repo/actions/caches")),
                 resources.toString());
+    }
+
+    @Test
+    public void aShorthandThatSkipsParametersAtAnyDepthIsLocatedAndRelocatedNoted() {
+        LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
+        DiscoverResult.ResourceList resources =
+                as(DiscoverResult.ResourceList.class, clientAnswer(github, "repos/actions/runs"));
+        Assert.assertEquals(resources.note(), "relocated to repos/:owner/:repo/actions/runs — the only "
+                + "match for that path under the requested prefix");
+        Assert.assertTrue(resources.resources().stream()
+                        .allMatch(resource -> resource.path().startsWith("repos/:owner/:repo/actions/runs")),
+                resources.toString());
+        Assert.assertEquals(clientAnswer(github, "repos/:owner/:repo/actions/runs").getClass(),
+                resources.getClass());
+    }
+
+    @Test
+    public void aShorthandThatMatchesSeveralRealPathsIsListedRatherThanPicked() {
+        LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
+        DiscoverResult.NoMatch miss =
+                as(DiscoverResult.NoMatch.class, clientAnswer(github, "repos/secrets/public-key"));
+        Assert.assertTrue(miss.paths().size() > 1, miss.toString());
+        for (DiscoverResult.NoMatch.Alternative alternative : miss.paths()) {
+            Assert.assertTrue(alternative.path().startsWith("repos/:owner/:repo/"), alternative.path());
+            Assert.assertTrue(alternative.command().contains(alternative.path()), alternative.command());
+        }
     }
 
     @Test

@@ -284,15 +284,29 @@ public class SymbolsTest {
     }
 
     @Test
-    public void locationOnlyAppliesToTheLastSegmentAndNeverRelaxesAnchoringItself() {
+    public void severalMissedSegmentsAreLocatedInOrderUnderTheMatchedPrefix() {
         PathTree tree = github();
-        // A segment that misses in the MIDDLE is still a miss: there are tokens after it, so there is no single
-        // trailing segment to locate and guessing where the rest attaches would be exactly the suffix matching
-        // that returns nine operations for a three-operation path.
+        PathTree.Located located = PathTree.locate(tree, PathTree.splitPath("repos/actions/runs"));
+        Assert.assertTrue(located.relocated());
+        Assert.assertEquals(String.join("/", located.alternatives().get(0)), "repos/:owner/:repo/actions/runs");
+        PathTree.Located ambiguous = PathTree.locate(tree, PathTree.splitPath("repos/secrets/public-key"));
+        Assert.assertFalse(ambiguous.relocated());
+        Assert.assertTrue(ambiguous.alternatives().size() > 1, ambiguous.alternatives().toString());
+    }
+
+    @Test
+    public void locationNeverRelaxesAnchoringItself() {
+        PathTree tree = github();
+        // A segment that never matches anywhere under the prefix leaves nothing to locate.
         PathTree.Located middle = PathTree.locate(tree, PathTree.splitPath("repos/nonesuch/actions/caches"));
         Assert.assertFalse(middle.relocated());
         Assert.assertTrue(middle.resolution() instanceof PathTree.Resolution.Missing);
         Assert.assertTrue(middle.alternatives().isEmpty(), middle.alternatives().toString());
+
+        // A first segment that misses is never searched for when more tokens follow it.
+        PathTree.Located unanchored = PathTree.locate(tree, PathTree.splitPath("actions/runs"));
+        Assert.assertFalse(unanchored.relocated());
+        Assert.assertTrue(unanchored.alternatives().isEmpty(), unanchored.alternatives().toString());
 
         // And a path that resolves anchored is untouched — no search runs at all.
         PathTree.Located exact = PathTree.locate(tree, PathTree.splitPath("repos/owner/repo"));
