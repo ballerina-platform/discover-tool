@@ -1,6 +1,6 @@
 Usage: bal discover [<org/name>] [bucket] [args...] [--refresh]
                     [--output <json|text>] [--filter <keyword>] [--page <n>]
-                    [-m <name>]
+                    [-m <name>] [--version <version>]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
@@ -33,3 +33,6 @@ readme. No bucket lists which of them this package has.
                          module, the same everywhere including readme. The bare
                          submodule name only — <org/name> is always resolved as one
                          literal, complete package coordinate.
+  --version <version>    Read this exact version of the package instead of the one
+                         the project locks or Central's latest. Carried into every
+                         command the answer prints.

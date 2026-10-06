@@ -26,10 +26,8 @@ import io.ballerina.tools.discover.model.TypeRef;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -45,8 +43,7 @@ import java.util.stream.Collectors;
  * hand-roll a line rather than call this.
  *
  * <p>Two conventions carry meaning beyond syntax: a name owned by another package is rendered with that
- * package's module alias ({@code gmail:Message}), and the declaration it came from is repeated in a
- * trailing {@code // Special Agent Note:} so the caller knows which import to add.
+ * package's module alias ({@code gmail:Message}), which is the import the caller adds.
  *
  * @since 0.1.0
  */
@@ -138,42 +135,14 @@ public final class Signatures {
         return result;
     }
 
-    /** The trailing note naming which package each foreign type came from. */
-    public static String buildSpecialAgentNote(List<ExternalLink> links) {
-        return buildSpecialAgentNote(links, List.of());
-    }
-
     /**
-     * The one trailing note a line carries, however many things it has to say.
+     * The trailing comment a line carries when a default it shows cannot be written by the caller, or {@code ""}.
      *
-     * <p>Both facts go in the same comment because a second {@code //} would sit INSIDE the first comment,
-     * so two notes on a line are one note that reads as though the author lost track.
-     *
-     * <p>Deduplicated HERE, so every caller gets it. A type expression can mention one foreign name twice —
-     * {@code mime:Entity|Attachment|(mime:Entity|Attachment)[]} does, once bare and once as the array's element —
-     * and the note came out as {@code Entity, Entity FROM ballerina/mime package}, which reads either as a mangle
-     * or as two things needing two imports. The dedup used to live in {@link #collectSignatureLinks} alone, so
-     * signature notes had it and the record-field notes that call this directly did not.
+     * <p>Which package a foreign name comes from is not said here: the name is rendered with its module alias
+     * ({@code gmail:Message}), and an answer's {@code foreign} list names the module and the command that opens it.
      */
-    public static String buildSpecialAgentNote(List<ExternalLink> links, List<String> unwritableDefaults) {
-        if (links.isEmpty() && unwritableDefaults.isEmpty()) {
-            return "";
-        }
-        List<String> clauses = new ArrayList<>();
-        Map<String, List<String>> grouped = new LinkedHashMap<>();
-        for (ExternalLink link : deduplicated(links)) {
-            grouped.computeIfAbsent(link.module().importPath(), key -> new ArrayList<>())
-                    .add(link.recordName());
-        }
-        // "module", not "package", and the import path rather than the coordinate: this clause IS the import
-        // advice, an `import` statement names a module, and 15 of the corpus's notes name a module that is not
-        // its package at all (`ballerina/http.httpscerr`, `ballerina/graphql.parser`).
-        grouped.forEach((module, names) ->
-                clauses.add(String.join(", ", names) + " FROM " + module + " module"));
-        if (!unwritableDefaults.isEmpty()) {
-            clauses.add(unwritableClause(unwritableDefaults));
-        }
-        return " // Special Agent Note: " + String.join(", ", clauses);
+    public static String trailingNote(List<String> unwritableDefaults) {
+        return unwritableDefaults.isEmpty() ? "" : " // " + unwritableClause(unwritableDefaults);
     }
 
     /** Ballerina doc comments, one {@code #} per line, with the trailing newline callers splice in. */
@@ -188,23 +157,11 @@ public final class Signatures {
                 .collect(Collectors.joining("\n")) + "\n";
     }
 
-    /** One entry per distinct foreign name, keyed on the name AND its owning module, first occurrence winning. */
-    private static List<ExternalLink> deduplicated(List<ExternalLink> links) {
-        Set<String> seen = new LinkedHashSet<>();
-        List<ExternalLink> unique = new ArrayList<>();
-        for (ExternalLink link : links) {
-            if (seen.add(link.recordName() + "::" + link.module().coordinate())) {
-                unique.add(link);
-            }
-        }
-        return List.copyOf(unique);
-    }
-
     /**
      * Every foreign name a signature mentions, params before return.
      *
-     * <p>Not deduplicated: {@link #buildSpecialAgentNote} does that now, and {@link #applyPrefixToTypeName} is
-     * idempotent by its own "preceded by a colon" guard, so a repeated link qualifies a name once.
+     * <p>Not deduplicated: {@link #applyPrefixToTypeName} is idempotent by its own "preceded by a colon" guard, so
+     * a repeated link qualifies a name once.
      */
     private static List<ExternalLink> collectSignatureLinks(List<Param> params, TypeRef returns) {
         List<ExternalLink> links = new ArrayList<>();
@@ -385,7 +342,7 @@ public final class Signatures {
     public static String renderMemberFunction(Fn fn, String indent, Detail detail) {
         List<ExternalLink> links = collectSignatureLinks(fn.params(), fn.returns().type());
         String params = fn.params().stream().map(Signatures::renderParam).collect(Collectors.joining(", "));
-        String note = buildSpecialAgentNote(links, unwritableDefaults(fn.params()));
+        String note = trailingNote(unwritableDefaults(fn.params()));
         String docs = renderCallableDocs(fn, indent, detail);
         // Above the signature and below the doc comment, which is where the language puts it. A caller who
         // reads only the signature line still sees it, because it is on the line before.
@@ -456,7 +413,7 @@ public final class Signatures {
         String params = fn.params().stream().map(Signatures::renderParam).collect(Collectors.joining(", "));
         lines.add("public " + isolatedQualifier(fn) + "function " + Identifiers.write(fn.name())
                 + "(" + params + ")" + renderReturns(fn.returns(), links) + ";"
-                + buildSpecialAgentNote(links, unwritableDefaults(fn.params())));
+                + trailingNote(unwritableDefaults(fn.params())));
         return String.join("\n", lines);
     }
 }

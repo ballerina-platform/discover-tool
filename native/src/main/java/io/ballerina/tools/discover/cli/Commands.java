@@ -102,6 +102,11 @@ final class Commands {
                         + "resolved as one literal, complete package coordinate.")
         String module;
 
+        @CommandLine.Option(names = "--version", paramLabel = "<version>",
+                description = "Read this exact version of the package instead of the one the project locks or "
+                        + "Central's latest. Carried into every command the answer prints.")
+        String version;
+
         @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org/name>")
         String pkg;
 

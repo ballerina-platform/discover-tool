@@ -82,3 +82,4 @@ Records
 ... 35 more (page 1 of 2)
 Next: bal discover ballerina/graphql type <name>
 Next: bal discover ballerina/graphql type --page 2
+Next: bal discover ballerina/graphql type --filter <keyword>

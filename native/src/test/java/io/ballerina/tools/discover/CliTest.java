@@ -292,6 +292,92 @@ public class CliTest {
         }
     }
 
+    @Test
+    public void aPinnedVersionBeatsALockedOneAndIsCarriedIntoEveryPrintedCommand() {
+        Path projectDir = tempDir();
+        write(projectDir.resolve("Ballerina.toml"), "[package]\norg = \"acme\"\nname = \"app\"\n");
+        write(projectDir.resolve("Dependencies.toml"),
+                "[[package]]\norg = \"ballerinax\"\nname = \"kafka\"\nversion = \"4.6.4\"\n");
+        String docs = FixtureCorpus.loadRawFixture("ballerinax__kafka").toString();
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.ok(docs)
+                : FakeTransport.status(404));
+
+        Capture capture = new Capture();
+        List<String> argv = List.of("ballerinax/kafka", "client", "--version", "4.6.5");
+        Assert.assertEquals(Cli.run(argv, capture.streams(), options(transport), projectDir.toString()), 0,
+                capture.stderr());
+        List<String> urls = transport.urls();
+        Assert.assertTrue(urls.stream().noneMatch(url -> url.contains("4.6.4")), urls.toString());
+        Assert.assertTrue(urls.stream().anyMatch(url -> url.contains("4.6.5")), urls.toString());
+        String pinned = "\"bal discover ballerinax/kafka --version 4.6.5 client Producer\"";
+        Assert.assertTrue(capture.stdout().contains(pinned), capture.stdout());
+    }
+
+    @Test
+    public void aPinnedVersionAndAModuleAreBothCarriedIntoEveryPrintedCommand() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(
+                List.of("ballerina/graphql", "--module", "subgraph", "--version", GRAPHQL_VERSION, "type",
+                        "--output", "json"),
+                capture.streams(), options(graphqlCentral())), 0, capture.stderr());
+        String carried = "bal discover ballerina/graphql --module subgraph --version " + GRAPHQL_VERSION
+                + " type FederatedEntity";
+        Assert.assertTrue(capture.stdout().contains(carried), capture.stdout());
+    }
+
+    @Test
+    public void aMalformedVersionIsAValidationFailureThatFetchesNothing() {
+        Capture capture = new Capture();
+        Assert.assertEquals(
+                Cli.run(List.of("ballerinax/kafka", "--version", "latest"), capture.streams(), never()), 1);
+        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertTrue(capture.field("message").contains("is not a version"), capture.stderr());
+    }
+
+    @Test
+    public void anEnumMemberIsAnsweredByItsEnumWithANoteSayingSo() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/http", "type", "HTTP_1_1", "--output", "json"),
+                capture.streams(), centralFor("ballerina__http", "2.16.6")), 0, capture.stderr());
+        JsonObject answer = JsonParser.parseString(capture.stdout()).getAsJsonObject();
+        Assert.assertEquals(answer.get("name").getAsString(), "HttpVersion");
+        Assert.assertEquals(answer.get("kind").getAsString(), "enum");
+        Assert.assertTrue(answer.get("note").getAsString().startsWith("'HTTP_1_1' is a member of the enum HttpVersion"),
+                capture.stdout());
+    }
+
+    @Test
+    public void aListingWithLaterPagesPointsAtFilterAndALastOrFilteredOneDoesNot() {
+        HttpOptions kafka = centralFor("ballerinax__kafka", "4.6.5");
+        String hint = "Next: bal discover ballerinax/kafka type --filter <keyword>";
+        Assert.assertTrue(text(kafka, "ballerinax/kafka", "type").contains(hint));
+        Assert.assertFalse(text(kafka, "ballerinax/kafka", "type", "--page", "2").contains("--filter <keyword>"));
+        Assert.assertFalse(text(kafka, "ballerinax/kafka", "type", "--filter", "Config").contains("<keyword>"));
+    }
+
+    private static String text(HttpOptions http, String... argv) {
+        Capture capture = new Capture();
+        List<String> withOutput = new java.util.ArrayList<>(List.of(argv));
+        withOutput.addAll(List.of("--output", "text"));
+        Assert.assertEquals(Cli.run(withOutput, capture.streams(), http), 0, capture.stderr());
+        return capture.stdout();
+    }
+
+    @Test
+    public void aRosterAndAResourceListingAreAlphabetical() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/http", "client", "--output", "json"), capture.streams(),
+                centralFor("ballerina__http", "2.16.6")), 0, capture.stderr());
+        List<String> names = new java.util.ArrayList<>();
+        JsonParser.parseString(capture.stdout()).getAsJsonObject().getAsJsonArray("containers")
+                .forEach(each -> names.add(each.getAsJsonObject().get("name").getAsString()));
+        List<String> sorted = new java.util.ArrayList<>(names);
+        sorted.sort(Texts.LOCALE_ORDER);
+        Assert.assertEquals(names, sorted);
+        Assert.assertTrue(names.size() > 1);
+    }
+
     /**
      * A transport that answers the docs endpoint and FAILS the registry, which is what a locked version has to
      * make unnecessary.

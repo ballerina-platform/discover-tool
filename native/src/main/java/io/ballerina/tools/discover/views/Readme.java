@@ -108,7 +108,7 @@ public final class Readme {
                         + (loaded.module() == null ? "." : " for module " + loaded.module() + "."),
                 loaded.submodules().isEmpty()
                         ? "This package publishes no other module either."
-                        : "Check its other modules: `bal discover " + loaded.qualified().qualified() + "`.");
+                        : "Check its other modules: `bal discover " + loaded.pkgArgument(null) + "`.");
     }
 
     // -----------------------------------------------------------------------

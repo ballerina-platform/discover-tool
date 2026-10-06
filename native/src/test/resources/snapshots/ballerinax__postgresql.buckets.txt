@@ -67,6 +67,7 @@ ballerinax/postgresql · class
 ... 85 more (page 1 of 4)
 Next: bal discover ballerinax/postgresql class <name>
 Next: bal discover ballerinax/postgresql class --page 2
+Next: bal discover ballerinax/postgresql class --filter <keyword>
 == funcs ==
 ballerinax/postgresql · funcs
 This package declares nothing in funcs.

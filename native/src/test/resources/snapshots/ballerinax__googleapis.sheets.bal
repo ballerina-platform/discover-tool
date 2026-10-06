@@ -28,9 +28,9 @@ public type Cell record {
 # Provides settings related to HTTP/1.x protocol.
 public type ClientHttp1Settings record {|
     # Specifies whether to reuse a connection for multiple requests
-    http:KeepAlive keepAlive = http:KEEPALIVE_AUTO; // Special Agent Note: KeepAlive FROM ballerina/http module
+    http:KeepAlive keepAlive = http:KEEPALIVE_AUTO;
     # The chunking behaviour of the request
-    http:Chunking chunking = http:CHUNKING_AUTO; // Special Agent Note: Chunking FROM ballerina/http module
+    http:Chunking chunking = http:CHUNKING_AUTO;
     # Proxy server related options
     ProxyConfig? proxy = ();
 |};
@@ -46,33 +46,33 @@ public type Column record {
 # Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
 public type ConnectionConfig record {|
     # Configurations related to client authentication
-    http:BearerTokenConfig|OAuth2RefreshTokenGrantConfig auth; // Special Agent Note: BearerTokenConfig FROM ballerina/http module
+    http:BearerTokenConfig|OAuth2RefreshTokenGrantConfig auth;
     # The HTTP version understood by the client
-    http:HttpVersion httpVersion = http:HTTP_2_0; // Special Agent Note: HttpVersion FROM ballerina/http module
+    http:HttpVersion httpVersion = http:HTTP_2_0;
     # Configurations related to HTTP/1.x protocol
     ClientHttp1Settings http1Settings = {};
     # Configurations related to HTTP/2 protocol
-    http:ClientHttp2Settings http2Settings = {}; // Special Agent Note: ClientHttp2Settings FROM ballerina/http module
+    http:ClientHttp2Settings http2Settings = {};
     # The maximum time to wait (in seconds) for a response before closing the connection
     decimal timeout = 60;
     # The choice of setting `forwarded`/`x-forwarded` header
     string forwarded = "disable";
     # Configurations associated with request pooling
-    http:PoolConfiguration? poolConfig = (); // Special Agent Note: PoolConfiguration FROM ballerina/http module
+    http:PoolConfiguration? poolConfig = ();
     # HTTP caching related configurations
-    http:CacheConfig cache = {}; // Special Agent Note: CacheConfig FROM ballerina/http module
+    http:CacheConfig cache = {};
     # Specifies the way of handling compression (`accept-encoding`) header
-    http:Compression compression = http:COMPRESSION_AUTO; // Special Agent Note: Compression FROM ballerina/http module
+    http:Compression compression = http:COMPRESSION_AUTO;
     # Configurations associated with the behaviour of the Circuit Breaker
-    http:CircuitBreakerConfig? circuitBreaker = (); // Special Agent Note: CircuitBreakerConfig FROM ballerina/http module
+    http:CircuitBreakerConfig? circuitBreaker = ();
     # Configurations associated with retrying
-    http:RetryConfig? retryConfig = (); // Special Agent Note: RetryConfig FROM ballerina/http module
+    http:RetryConfig? retryConfig = ();
     # Configurations associated with inbound response size limits
-    http:ResponseLimitConfigs responseLimits = {}; // Special Agent Note: ResponseLimitConfigs FROM ballerina/http module
+    http:ResponseLimitConfigs responseLimits = {};
     # SSL/TLS-related options
-    http:ClientSecureSocket secureSocket = {}; // Special Agent Note: ClientSecureSocket FROM ballerina/http module
+    http:ClientSecureSocket secureSocket = {};
     # Proxy server related options
-    http:ProxyConfig? proxy = (); // Special Agent Note: ProxyConfig FROM ballerina/http module
+    http:ProxyConfig? proxy = ();
     # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
     boolean validation = true;
 |};
@@ -153,7 +153,7 @@ public type MetadataLocation record {
 
 # OAuth2 Refresh Token Grant Configs
 public type OAuth2RefreshTokenGrantConfig record {|
-    *http:OAuth2RefreshTokenGrantConfig; // Special Agent Note: OAuth2RefreshTokenGrantConfig FROM ballerina/http module
+    *http:OAuth2RefreshTokenGrantConfig;
     # Refresh URL
     string refreshUrl = "https://accounts.google.com/o/oauth2/token";
 |};
@@ -324,7 +324,7 @@ public isolated client class Client {
     # + serviceUrl - URL of the Google Sheets API
     # + driveServiceUrl - URL of the Google Drive API
     # + return - `http:Error` in case of failure to initialize or `null` if successfully initialized
-    isolated function init(ConnectionConfig config, string serviceUrl = BASE_URL, string driveServiceUrl = DRIVE_BASE_URL) returns error?; // Special Agent Note: the defaults BASE_URL, DRIVE_BASE_URL are not exported by this package; omit the arguments rather than repeating them
+    isolated function init(ConnectionConfig config, string serviceUrl = BASE_URL, string driveServiceUrl = DRIVE_BASE_URL) returns error?; // the defaults BASE_URL, DRIVE_BASE_URL are not exported by this package; omit the arguments rather than repeating them
 
     # Creates a new spreadsheet.
     # + name - Name of the spreadsheet

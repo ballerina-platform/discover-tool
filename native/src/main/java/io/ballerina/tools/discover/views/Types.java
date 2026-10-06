@@ -233,6 +233,20 @@ public final class Types {
 
         Names.Match match = Names.match(requested, names);
         if (!(match instanceof Names.Match.Found found)) {
+            List<TypeDef.Enumeration> owners = enumsWithMember(library, requested);
+            if (owners.size() == 1) {
+                String enumName = owners.get(0).name();
+                String routing = "'" + memberName(requested) + "' is a member of the enum " + enumName
+                        + " — showing it. Canonical: bal discover " + loaded.pkgArgument() + " type " + enumName;
+                return leaf(loaded, enumName, note == null ? routing : routing + " " + note);
+            }
+            if (owners.size() > 1) {
+                return Result.err(new Failure.SymbolNotFound(
+                        loaded.label(), List.of(requested), owners.stream().map(TypeDef.Enumeration::name).toList(),
+                        "'" + memberName(requested) + "' is a member of several enums, so this reader will not "
+                                + "choose between them. Re-run with the enum whose member you mean, exactly as "
+                                + "spelled."));
+            }
             return Result.err(new Failure.SymbolNotFound(
                     loaded.label(), List.of(requested), Names.candidatesOf(match),
                     missSuggestion(loaded, match instanceof Names.Match.Ambiguous)));
@@ -254,6 +268,21 @@ public final class Types {
                 TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure), closure.omitted().size(),
                 omittedNext(loaded, closure), foreignOf(loaded, closure, index, List.of()), loaded.warning(),
                 note));
+    }
+
+    /** The enums declaring a member called {@code requested}, which may be spelled {@code module:Member}. */
+    private static List<TypeDef.Enumeration> enumsWithMember(Library library, String requested) {
+        String member = memberName(requested);
+        return library.addressable().stream()
+                .filter(TypeDef.Enumeration.class::isInstance)
+                .map(TypeDef.Enumeration.class::cast)
+                .filter(each -> each.memberNames().contains(member))
+                .toList();
+    }
+
+    private static String memberName(String requested) {
+        String bare = requested.substring(requested.lastIndexOf(':') + 1);
+        return bare.startsWith("'") ? bare.substring(1) : bare;
     }
 
     /** An annotation inlines the record its attachment must carry, like a signature inlines its parameters. */

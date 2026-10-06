@@ -65,9 +65,9 @@ public type DateRange record {
 public type DateRecordRange record {
     *Range;
     # Upper value in the range
-    time:Date upper; // Special Agent Note: Date FROM ballerina/time module
+    time:Date upper;
     # Lower value in the range
-    time:Date lower; // Special Agent Note: Date FROM ballerina/time module
+    time:Date lower;
 };
 
 # Represents a value for `Enum` datatypes in PostgreSQL.
@@ -86,11 +86,11 @@ public type EnumRecord record {
 
 # Represents the extended snapshot configuration for the PostgreSQL CDC listener.
 public type ExtendedSnapshotConfiguration record {|
-    *cdc:RelationalExtendedSnapshotConfiguration; // Special Agent Note: RelationalExtendedSnapshotConfiguration FROM ballerinax/cdc module
+    *cdc:RelationalExtendedSnapshotConfiguration;
     # Lock acquisition timeout in seconds
     decimal lockTimeout = 10;
     # Transaction isolation level during snapshot
-    cdc:SnapshotIsolationMode isolationMode?; // Special Agent Note: SnapshotIsolationMode FROM ballerinax/cdc module
+    cdc:SnapshotIsolationMode isolationMode?;
 |};
 
 # Represents the `Int4Range` datatype in PostgreSQL.
@@ -217,7 +217,7 @@ public type Polygon record {
 
 # Represents the configuration for the Postgres CDC database connection.
 public type PostgresDatabaseConnection record {|
-    *cdc:DatabaseConnection; // Special Agent Note: DatabaseConnection FROM ballerinax/cdc module
+    *cdc:DatabaseConnection;
     # The class name of the PostgreSQL connector implementation to use
     string connectorClass = "io.debezium.connector.postgresql.PostgresConnector";
     # The hostname of the PostgreSQL server
@@ -239,7 +239,7 @@ public type PostgresDatabaseConnection record {|
     # Regex patterns for columns to exclude (mutually exclusive with `includedColumns`)
     string|string[] excludedColumns?;
     # Composite message key columns for change events
-    cdc:MessageKeyColumns[] messageKeyColumns?; // Special Agent Note: MessageKeyColumns FROM ballerinax/cdc module
+    cdc:MessageKeyColumns[] messageKeyColumns?;
     # The PostgreSQL connector always uses a single task and therefore does not use this value, so the default is always acceptable
     int tasksMax = 1;
     # Deprecated: Use `replicationConfig.pluginName` instead.
@@ -259,20 +259,20 @@ public type PostgresDatabaseConnection record {|
 public type PostgresListenerConfiguration record {|
     # PostgreSQL database connection, logical decoding, and capture settings
     PostgresDatabaseConnection database;
-    *cdc:ListenerConfiguration; // Special Agent Note: ListenerConfiguration FROM ballerinax/cdc module
+    *cdc:ListenerConfiguration;
     # PostgreSQL-specific CDC options including snapshot, heartbeat, signals, and data type handling
     PostgreSqlOptions options = {};
 |};
 
 # PostgreSQL-specific CDC options for configuring snapshot behavior and data type handling.
 public type PostgreSqlOptions record {|
-    *cdc:Options; // Special Agent Note: Options FROM ballerinax/cdc module
+    *cdc:Options;
     # Extended snapshot configuration with PostgreSQL-specific lock timeout and query settings
     ExtendedSnapshotConfiguration extendedSnapshot?;
     # Data type handling configuration including schema change tracking
-    cdc:DataTypeConfiguration dataTypeConfig?; // Special Agent Note: DataTypeConfiguration FROM ballerinax/cdc module
+    cdc:DataTypeConfiguration dataTypeConfig?;
     # Heartbeat configuration for keeping the PostgreSQL replication slot active
-    cdc:RelationalHeartbeatConfiguration heartbeatConfig?; // Special Agent Note: RelationalHeartbeatConfiguration FROM ballerinax/cdc module
+    cdc:RelationalHeartbeatConfiguration heartbeatConfig?;
 |};
 
 # PostgreSQL publication configuration (pgoutput plugin).
@@ -316,7 +316,7 @@ public type SecureSocket record {|
     # `%appdata%/postgresql/` on Windows.
     string rootcert?;
     # Keystore configuration of the client certificates
-    crypto:KeyStore|CertKey key?; // Special Agent Note: KeyStore FROM ballerina/crypto module
+    crypto:KeyStore|CertKey key?;
 |};
 
 # PostgreSQL streaming and status configuration.
@@ -333,9 +333,9 @@ public type StreamingConfiguration record {|
 public type TimestampCivilRange record {
     *Range;
     # Upper value in the range
-    time:Civil upper; // Special Agent Note: Civil FROM ballerina/time module
+    time:Civil upper;
     # Lower value in the range
-    time:Civil lower; // Special Agent Note: Civil FROM ballerina/time module
+    time:Civil lower;
 };
 
 # Represents the `Timestamp Range` datatype in PostgreSQL.
@@ -351,9 +351,9 @@ public type TimestampRange record {
 public type TimestamptzCivilRange record {
     *Range;
     # Upper value in the range
-    time:Civil upper; // Special Agent Note: Civil FROM ballerina/time module
+    time:Civil upper;
     # Lower value in the range
-    time:Civil lower; // Special Agent Note: Civil FROM ballerina/time module
+    time:Civil lower;
 };
 
 # Represents the `Timestamp with Timezone Range` datatype in PostgreSQL.
@@ -399,7 +399,7 @@ public enum SSLMode {
 
 # Represents the `Bit(n)` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class BitStringArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -408,7 +408,7 @@ public class BitStringArrayValue {
 
 # Represents the `Bit(n)` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class BitStringValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -417,7 +417,7 @@ public class BitStringValue {
 
 # Represents the `Box` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class BoxArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Box?[]|string?[] value;
 
@@ -429,12 +429,12 @@ public class BoxOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Box` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class BoxValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Box|string? value;
 
@@ -446,12 +446,12 @@ public class ByteaOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Cidr` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class CidrArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -463,12 +463,12 @@ public class CidrOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Cidr` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class CidrValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -477,7 +477,7 @@ public class CidrValue {
 
 # Represents the `Circle` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class CircleArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Circle?[]|string?[] value;
 
@@ -489,12 +489,12 @@ public class CircleOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Circle` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class CircleValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Circle|string? value;
 
@@ -506,17 +506,17 @@ public class CustomResultIterator {
     # Retrieves the next result from the `sql:ResultIterator`.
     # + iterator - The `sql:ResultIterator` to fetch the next result from.
     # + return - A record containing the next result, or an `sql:Error` if an error occurs.
-    isolated function nextResult(sql:ResultIterator iterator) returns record {}|sql:Error?; // Special Agent Note: ResultIterator, Error FROM ballerina/sql module
+    isolated function nextResult(sql:ResultIterator iterator) returns record {}|sql:Error?;
 
     # Retrieves the next query result from the `sql:ProcedureCallResult`.
     # + callResult - The `sql:ProcedureCallResult` to fetch the next query result from.
     # + return - `true` if there is a next query result, `false` if there are no more results, or an `sql:Error` if an error occurs.
-    isolated function getNextQueryResult(sql:ProcedureCallResult callResult) returns boolean|sql:Error; // Special Agent Note: ProcedureCallResult, Error FROM ballerina/sql module
+    isolated function getNextQueryResult(sql:ProcedureCallResult callResult) returns boolean|sql:Error;
 }
 
 # Represents the user-defined PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class CustomTypeValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public CustomValueRecord value;
 
@@ -525,7 +525,7 @@ public class CustomTypeValue {
 
 # Represents the `Date range` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class DateRangeArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public DateRange?[]|DateRecordRange?[]|string?[] value;
 
@@ -537,12 +537,12 @@ public class DateRangeOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Date range` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class DateRangeValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public DateRange|DateRecordRange|string? value;
 
@@ -554,12 +554,12 @@ public class EnumOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Enum` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class EnumValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public EnumRecord value;
 
@@ -568,7 +568,7 @@ public class EnumValue {
 
 # Represents the `Inet` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class InetArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -580,12 +580,12 @@ public class InetOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Inet` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class InetValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -594,19 +594,19 @@ public class InetValue {
 
 # Represents the PostgreSQL `InOutParameter` in `sql:ParameterizedCallQuery`.
 public class InOutParameter {
-    public sql:Value 'in; // Special Agent Note: Value FROM ballerina/sql module
+    public sql:Value 'in;
 
-    isolated function init(sql:Value 'in); // Special Agent Note: Value FROM ballerina/sql module
+    isolated function init(sql:Value 'in);
 
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Int4 range` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class IntegerRangeArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public IntegerRange?[]|string?[] value;
 
@@ -618,12 +618,12 @@ public class IntegerRangeOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Int4 range` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class IntegerRangeValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public IntegerRange|string? value;
 
@@ -632,7 +632,7 @@ public class IntegerRangeValue {
 
 # Represents the `Time interval` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class IntervalArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Interval?[]|string?[] value;
 
@@ -644,12 +644,12 @@ public class IntervalOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Time interval` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class IntervalValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Interval|string? value;
 
@@ -658,7 +658,7 @@ public class IntervalValue {
 
 # Represents the `JSON` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class JsonArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public json[]|string?[] value;
 
@@ -667,7 +667,7 @@ public class JsonArrayValue {
 
 # Represents the `JSONB` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class JsonBinaryArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public json[]|string?[] value;
 
@@ -676,7 +676,7 @@ public class JsonBinaryArrayValue {
 
 # Represents the `JSONB` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class JsonBinaryValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public json|string? value;
 
@@ -688,7 +688,7 @@ public class JsonbOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `JSON` `OutParameter` in `sql:ParameterizedCallQuery`.
@@ -696,12 +696,12 @@ public class JsonOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `JSONPath` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class JsonPathArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -713,12 +713,12 @@ public class JsonPathOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `JSONPath` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class JsonPathValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -727,7 +727,7 @@ public class JsonPathValue {
 
 # Represents the `JSON` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class JsonValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public json|string? value;
 
@@ -736,7 +736,7 @@ public class JsonValue {
 
 # Represents the `Line` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class LineArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Line?[]|string?[] value;
 
@@ -748,12 +748,12 @@ public class LineOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Line` segment array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class LineSegmentArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public LineSegment?[]|string?[] value;
 
@@ -762,7 +762,7 @@ public class LineSegmentArrayValue {
 
 # Represents the `Line` segment PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class LineSegmentValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public LineSegment|string? value;
 
@@ -771,7 +771,7 @@ public class LineSegmentValue {
 
 # Represents the `Line` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class LineValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Line|string? value;
 
@@ -780,7 +780,7 @@ public class LineValue {
 
 # Represents the `Int8 range` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class LongRangeArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public LongRange?[]|string?[] value;
 
@@ -792,12 +792,12 @@ public class LongRangeOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Int8 range` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class LongRangeValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public LongRange|string? value;
 
@@ -809,12 +809,12 @@ public class LsegOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Macaddress8` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class MacAddr8ArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -826,12 +826,12 @@ public class MacAddr8OutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Macaddress8` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class MacAddr8Value {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -840,7 +840,7 @@ public class MacAddr8Value {
 
 # Represents the `Macaddress` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class MacAddrArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -852,12 +852,12 @@ public class MacAddrOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Macaddress` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class MacAddrValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -866,7 +866,7 @@ public class MacAddrValue {
 
 # Represents the `Money` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class MoneyArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public decimal?[]|float?[]|string?[] value;
 
@@ -878,12 +878,12 @@ public class MoneyOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Money` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class MoneyValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public decimal|float|string? value;
 
@@ -892,7 +892,7 @@ public class MoneyValue {
 
 # Represents the `Numerical range` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class NumericRangeArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public NumericRange?[]|string?[] value;
 
@@ -904,12 +904,12 @@ public class NumericRangeOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Numerical range` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class NumericRangeValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public NumericRange|string? value;
 
@@ -918,7 +918,7 @@ public class NumericRangeValue {
 
 # Represents the `Path` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PathArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Path?[]|Point[]?[]|string?[] value;
 
@@ -930,12 +930,12 @@ public class PathOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Path` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PathValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Path|Point[]|string? value;
 
@@ -944,7 +944,7 @@ public class PathValue {
 
 # Represents the `Bit` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PGBitArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public boolean?[]|string?[] value;
 
@@ -956,12 +956,12 @@ public class PGBitOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Bit` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PGBitValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public boolean|string? value;
 
@@ -970,7 +970,7 @@ public class PGBitValue {
 
 # Represents the `pg_lsn` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PglsnArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -982,12 +982,12 @@ public class PglsnOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Pg_lsn` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PglsnValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -996,7 +996,7 @@ public class PglsnValue {
 
 # Represents the `regtype` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PGXmlArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[]|xml?[] value;
 
@@ -1008,12 +1008,12 @@ public class PGXmlOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regtype` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PGXmlValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string|xml? value;
 
@@ -1022,7 +1022,7 @@ public class PGXmlValue {
 
 # Represents the `Point` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PointArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Point?[]|string?[] value;
 
@@ -1034,12 +1034,12 @@ public class PointOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Point` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PointValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Point|string? value;
 
@@ -1048,7 +1048,7 @@ public class PointValue {
 
 # Represents the `Polygon` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PolygonArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Point[]?[]|string?[] value;
 
@@ -1060,12 +1060,12 @@ public class PolygonOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Polygon` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class PolygonValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public Point[]|string? value;
 
@@ -1074,7 +1074,7 @@ public class PolygonValue {
 
 # Represents the `regclass` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegClassArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1086,12 +1086,12 @@ public class RegClassOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regclass` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegClassValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1100,7 +1100,7 @@ public class RegClassValue {
 
 # Represents the `regconfig` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegConfigArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1112,12 +1112,12 @@ public class RegConfigOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regconfig` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegConfigValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1126,7 +1126,7 @@ public class RegConfigValue {
 
 # Represents the `regdictionary` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegDictionaryArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1138,12 +1138,12 @@ public class RegDictionaryOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regdictionary` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegDictionaryValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1152,7 +1152,7 @@ public class RegDictionaryValue {
 
 # Represents the `regnamespace` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegNamespaceArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1164,12 +1164,12 @@ public class RegNamespaceOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regnamespace` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegNamespaceValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1178,7 +1178,7 @@ public class RegNamespaceValue {
 
 # Represents the `regoper` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegOperArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1187,7 +1187,7 @@ public class RegOperArrayValue {
 
 # Represents the `regoperator` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegOperatorArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1199,12 +1199,12 @@ public class RegOperatorOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regoperator` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegOperatorValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1216,12 +1216,12 @@ public class RegOperOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regoper` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegOperValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1230,7 +1230,7 @@ public class RegOperValue {
 
 # Represents the `regproc` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegProcArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1239,7 +1239,7 @@ public class RegProcArrayValue {
 
 # Represents the `regprocedure` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegProcedureArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1251,12 +1251,12 @@ public class RegProcedureOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regprocedure` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegProcedureValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1268,12 +1268,12 @@ public class RegProcOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regproc` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegProcValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1282,7 +1282,7 @@ public class RegProcValue {
 
 # Represents the `regrole` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegRoleArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1294,12 +1294,12 @@ public class RegRoleOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regrole` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegRoleValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1308,7 +1308,7 @@ public class RegRoleValue {
 
 # Represents the `regtype` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegTypeArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1320,12 +1320,12 @@ public class RegTypeOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `regtype` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class RegTypeValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1337,7 +1337,7 @@ public class TimestampRangeOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Timestamp with Timezone Range` `OutParameter` in `sql:ParameterizedCallQuery`.
@@ -1345,12 +1345,12 @@ public class TimestampTzRangeOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Text query` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class TsQueryArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1362,12 +1362,12 @@ public class TsQueryOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Text query` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class TsQueryValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1376,7 +1376,7 @@ public class TsQueryValue {
 
 # Represents the `Timestamp range` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class TsRangeArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public TimestampRange?[]|TimestampCivilRange?[]|string?[] value;
 
@@ -1385,7 +1385,7 @@ public class TsRangeArrayValue {
 
 # Represents the `Timestamp range` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class TsRangeValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public TimestampRange|TimestampCivilRange|string? value;
 
@@ -1394,7 +1394,7 @@ public class TsRangeValue {
 
 # Represents the `Timestamp with timezone range` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class TsTzRangeArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public TimestamptzRange?[]|TimestamptzCivilRange?[]|string?[] value;
 
@@ -1403,7 +1403,7 @@ public class TsTzRangeArrayValue {
 
 # Represents the `Timestamp with timezone range` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class TsTzRangeValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public TimestamptzRange|TimestamptzCivilRange|string? value;
 
@@ -1412,7 +1412,7 @@ public class TsTzRangeValue {
 
 # Represents the `Text vector` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class TsVectorArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1424,12 +1424,12 @@ public class TsVectorOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Text vector` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class TsVectorValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1438,7 +1438,7 @@ public class TsVectorValue {
 
 # Represents the `UUID` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class UuidArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1450,12 +1450,12 @@ public class UuidOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `UUID` PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class UuidValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1464,7 +1464,7 @@ public class UuidValue {
 
 # Represents the `Bit vary(n)` array PostgreSQL type parameter in `sql:ParameterizedQuery`.
 public class VarBitStringArrayValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string?[] value;
 
@@ -1476,12 +1476,12 @@ public class VarBitStringOutParameter {
     # Parses the returned SQL value to a Ballerina value.
     # + typeDesc - The `typedesc` of the type to which the result needs to be returned
     # + return - The result in the `typeDesc` type, or an `sql:Error`
-    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function get(typedesc<anydata> typeDesc = <>) returns typeDesc|sql:Error;
 }
 
 # Represents the `Bit vary(n) PostgreSQL` type parameter in `sql:ParameterizedQuery`.
 public class VarBitStringValue {
-    *sql:TypedValue; // Special Agent Note: TypedValue FROM ballerina/sql module
+    *sql:TypedValue;
     # Value of the parameter
     public string? value;
 
@@ -1501,13 +1501,13 @@ public isolated client class Client {
     # + options - The advanced connection options specific to the PostgreSQL database.
     # + connectionPool - The `sql:ConnectionPool` object to be used within the client. If not provided, the global connection pool (shared by all clients) will be used
     # + return - An `sql:Error` if the client creation fails
-    isolated function init(string host = "localhost", string? username = "postgres", string? password = (), string? database = (), int port = 5432, Options? options = (), sql:ConnectionPool? connectionPool = ()) returns sql:Error?; // Special Agent Note: ConnectionPool, Error FROM ballerina/sql module
+    isolated function init(string host = "localhost", string? username = "postgres", string? password = (), string? database = (), int port = 5432, Options? options = (), sql:ConnectionPool? connectionPool = ()) returns sql:Error?;
 
     # Executes a SQL query and returns multiple results as a stream.
     # + sqlQuery - The SQL query as `sql:ParameterizedQuery` (e.g., `` `SELECT * FROM users WHERE id=${userId}` ``)
     # + rowType - The `typedesc` of the record type to which the result needs to be mapped
     # + return - Stream of records containing the query results. Please ensure that the stream is fully consumed, or close the stream.
-    isolated remote function query(sql:ParameterizedQuery sqlQuery, typedesc<record {}> rowType = <>) returns stream<rowType, sql:Error?>; // Special Agent Note: ParameterizedQuery, Error FROM ballerina/sql module
+    isolated remote function query(sql:ParameterizedQuery sqlQuery, typedesc<record {}> rowType = <>) returns stream<rowType, sql:Error?>;
 
     # Executes a SQL query that is expected to return a single row or value as the result.
     # + sqlQuery - The SQL query as `sql:ParameterizedQuery` (e.g., `` `SELECT * from Album WHERE name=${albumName}` ``)
@@ -1516,30 +1516,30 @@ public isolated client class Client {
     # + return - The result of the query or an `sql:Error`.
     # - If the query does not return any results, an `sql:NoRowsError` is returned.
     # - If the query returns multiple rows, only the first row is returned.
-    isolated remote function queryRow(sql:ParameterizedQuery sqlQuery, typedesc<anydata> returnType = <>) returns returnType|sql:Error; // Special Agent Note: ParameterizedQuery, Error FROM ballerina/sql module
+    isolated remote function queryRow(sql:ParameterizedQuery sqlQuery, typedesc<anydata> returnType = <>) returns returnType|sql:Error;
 
     # Executes a SQL query and returns execution metadata (not the actual query results).
     # This function is typically used for operations like `INSERT`, `UPDATE`, or `DELETE`.
     # + sqlQuery - The SQL query as `sql:ParameterizedQuery` (e.g., `` `DELETE FROM Album WHERE artist=${artistName}` ``)
     # + return - The execution metadata as an `sql:ExecutionResult`, or an `sql:Error` if execution fails
-    isolated remote function execute(sql:ParameterizedQuery sqlQuery) returns sql:ExecutionResult|sql:Error; // Special Agent Note: ParameterizedQuery, ExecutionResult, Error FROM ballerina/sql module
+    isolated remote function execute(sql:ParameterizedQuery sqlQuery) returns sql:ExecutionResult|sql:Error;
 
     # Executes a SQL query with multiple sets of parameters in a single batch operation and returns execution metadata (not the actual query results).
     # This function is typically used for batch operations like `INSERT`, `UPDATE`, or `DELETE`.
     # + sqlQueries - The SQL query with multiple sets of parameters as an array of `sql:ParameterizedQuery`
     # + return - The execution metadata as an array of `sql:ExecutionResult` or an `sql:Error`. If one of the commands in the batch fails, an `sql:BatchExecuteError` will be returned immediately
-    isolated remote function batchExecute(sql:ParameterizedQuery[] sqlQueries) returns sql:ExecutionResult[]|sql:Error; // Special Agent Note: ParameterizedQuery, ExecutionResult, Error FROM ballerina/sql module
+    isolated remote function batchExecute(sql:ParameterizedQuery[] sqlQueries) returns sql:ExecutionResult[]|sql:Error;
 
     # Calls a stored procedure with the given SQL query.
     # + sqlQuery - The SQL query to call the procedure as `sql:ParameterizedQuery` (e.g., `` `CALL get_user(${id})` ``)
     # + rowTypes - An array of `typedesc` of the record type to which the result needs to be mapped
     # + return - The summary of the execution and results are returned in an `sql:ProcedureCallResult`, or an `sql:Error`. Once the results are processed, invoke the `close` method on the `sql:ProcedureCallResult`.
-    isolated remote function call(sql:ParameterizedCallQuery sqlQuery, typedesc<record {}>[] rowTypes = []) returns sql:ProcedureCallResult|sql:Error; // Special Agent Note: ParameterizedCallQuery, ProcedureCallResult, Error FROM ballerina/sql module
+    isolated remote function call(sql:ParameterizedCallQuery sqlQuery, typedesc<record {}>[] rowTypes = []) returns sql:ProcedureCallResult|sql:Error;
 
     # Closes the PostgreSQL client and shuts down the connection pool.
     # The client should be closed only at the end of the application lifetime, or when performing graceful stops in a service.
     # + return - `sql:Error` if closing the client fails, else `()`
-    isolated function close() returns sql:Error?; // Special Agent Note: Error FROM ballerina/sql module
+    isolated function close() returns sql:Error?;
 }
 
 // --- Listeners ---
@@ -1547,7 +1547,7 @@ public isolated client class Client {
 # Represents the Ballerina Postgresql CDC Listener.
 public isolated class CdcListener {
     # Starts the CDC listener.
-    isolated function 'start() returns cdc:Error|(); // Special Agent Note: Error FROM ballerinax/cdc module
+    isolated function 'start() returns cdc:Error|();
 
     # Initializes the Postgresql listener with the given configuration.
     # + config - The configuration for the Postgresql connector
@@ -1557,18 +1557,18 @@ public isolated class CdcListener {
     # + s - The CDC service to attach
     # + name - Attachment points
     # + return - An `cdc:Error` if the service cannot be attached, or `()` if successful
-    isolated function attach(cdc:Service s, string[]|string? name = ()) returns cdc:Error?; // Special Agent Note: Service, Error FROM ballerinax/cdc module
+    isolated function attach(cdc:Service s, string[]|string? name = ()) returns cdc:Error?;
 
     # Detaches a CDC service from the Postgresql listener.
     # + s - The CDC service to detach
     # + return - An `cdc:Error` if the service cannot be detached, or `()` if successful
-    isolated function detach(cdc:Service s) returns cdc:Error?; // Special Agent Note: Service, Error FROM ballerinax/cdc module
+    isolated function detach(cdc:Service s) returns cdc:Error?;
 
     # Stops the Postgresql listener gracefully.
     # + return - An `cdc:Error` if the listener cannot be stopped, or `()` if successful
-    isolated function gracefulStop() returns cdc:Error?; // Special Agent Note: Error FROM ballerinax/cdc module
+    isolated function gracefulStop() returns cdc:Error?;
 
     # Stops the Postgresql listener immediately.
     # + return - An `cdc:Error` if the listener cannot be stopped, or `()` if successful
-    isolated function immediateStop() returns cdc:Error?; // Special Agent Note: Error FROM ballerinax/cdc module
+    isolated function immediateStop() returns cdc:Error?;
 }

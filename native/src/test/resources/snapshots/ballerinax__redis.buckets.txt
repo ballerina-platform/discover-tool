@@ -47,6 +47,7 @@ Remote (->)
 ... 72 more (page 1 of 3)
 Next: bal discover ballerinax/redis client Client <name>
 Next: bal discover ballerinax/redis client Client --page 2
+Next: bal discover ballerinax/redis client --filter <keyword>
 == service ==
 ballerinax/redis · service
 This package declares nothing in service.

@@ -46,6 +46,7 @@ ballerinax/twilio · client · Client
 ... 159 more (page 1 of 5)
 Next: bal discover ballerinax/twilio client Client <name>
 Next: bal discover ballerinax/twilio client Client --page 2
+Next: bal discover ballerinax/twilio client --filter <keyword>
 == service ==
 ballerinax/twilio · service
 This package declares nothing in service.
@@ -116,3 +117,4 @@ Records
 ... 238 more (page 1 of 7)
 Next: bal discover ballerinax/twilio type <name>
 Next: bal discover ballerinax/twilio type --page 2
+Next: bal discover ballerinax/twilio type --filter <keyword>

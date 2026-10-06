@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.symbols;
 
+import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.ModuleRef;
@@ -25,6 +26,7 @@ import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.model.TypeDef;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -209,7 +211,7 @@ public final class Surface {
                             List.copyOf(library.functions())));
         }
         if (scope == Scope.SERVICE) {
-            return serviceContainers(library);
+            return alphabetical(serviceContainers(library));
         }
         // The listener is addressed only alongside the service type(s) it binds, under Scope.SERVICE — never
         // here, whichever role it happens to derive as.
@@ -228,7 +230,12 @@ public final class Surface {
                         object.name(), scope, object.description(), object.methods()));
             }
         }
-        return List.copyOf(containers);
+        return alphabetical(containers);
+    }
+
+    /** Containers by name, so a roster reads the same whatever order the payload declared them in. */
+    private static List<Container> alphabetical(List<Container> containers) {
+        return containers.stream().sorted(Comparator.comparing(Container::name, Texts.LOCALE_ORDER)).toList();
     }
 
     /**

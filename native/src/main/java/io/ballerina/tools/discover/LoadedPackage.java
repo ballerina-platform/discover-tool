@@ -38,6 +38,8 @@ import java.util.function.Supplier;
  *     shown as {@code Submodules:}, regardless of which module {@code module} itself addresses
  * @param warning why this version cannot be trusted, or {@code null} when it was confirmed against the
  *     registry — see {@link Loader#unverifiedWarning}
+ * @param pinned the {@code --version} the caller supplied, or {@code null} when it was resolved — carried into
+ *     every command this lookup prints, so drilling further stays on the version being read
  * @param bound {@code library} with its service bindings read from the package source — deferred, since only an
  *     answer that shows a service type needs it, and reading it can mean a download
  * @since 0.1.0
@@ -50,12 +52,18 @@ public record LoadedPackage(
         String module,
         List<Submodule> submodules,
         String warning,
+        String pinned,
         Supplier<Library> bound) {
+
+    public LoadedPackage(QualifiedName qualified, Version version, Library library, Optional<String> readme,
+            String module, List<Submodule> submodules, String warning, Supplier<Library> bound) {
+        this(qualified, version, library, readme, module, submodules, warning, null, bound);
+    }
 
     /** A package whose {@code library} already shows every service binding it can. */
     public LoadedPackage(QualifiedName qualified, Version version, Library library, Optional<String> readme,
             String module, List<Submodule> submodules, String warning) {
-        this(qualified, version, library, readme, module, submodules, warning, () -> library);
+        this(qualified, version, library, readme, module, submodules, warning, null, () -> library);
     }
 
     /**
@@ -74,7 +82,16 @@ public record LoadedPackage(
      * this tool prints builds on, so drilling further never silently falls back to the default module.
      */
     public String pkgArgument() {
-        return module == null ? qualified.qualified() : qualified.qualified() + " --module " + Texts.shellWord(module);
+        return pkgArgument(module);
+    }
+
+    /** {@link #pkgArgument()} for another module of this package, or its default one when {@code other} is null. */
+    public String pkgArgument(String other) {
+        return qualified.qualified() + (other == null ? "" : " --module " + Texts.shellWord(other)) + pin();
+    }
+
+    private String pin() {
+        return pinned == null ? "" : " --version " + Texts.shellWord(pinned);
     }
 
     /**
@@ -92,17 +109,18 @@ public record LoadedPackage(
                 ? module.moduleName().substring(qualified.name().length() + 1)
                 : null;
         if (sameOrg && module.moduleName().equals(qualified.name())) {
-            return Optional.of(qualified.qualified());
+            return Optional.of(pkgArgument(null));
         }
         if (sibling != null && submodules.stream().anyMatch(submodule -> submodule.name().equals(sibling))) {
-            return Optional.of(qualified.qualified() + " --module " + Texts.shellWord(sibling));
+            return Optional.of(pkgArgument(sibling));
         }
         return module.moduleName().contains(".") ? Optional.empty() : Optional.of(module.coordinate());
     }
 
     /** The same package with a different IR, which is what a test that removes every client needs. */
     public LoadedPackage withLibrary(Library replacement) {
-        return new LoadedPackage(qualified, version, replacement, readme, module, submodules, warning);
+        return new LoadedPackage(qualified, version, replacement, readme, module, submodules, warning, pinned,
+                () -> replacement);
     }
 
     /**

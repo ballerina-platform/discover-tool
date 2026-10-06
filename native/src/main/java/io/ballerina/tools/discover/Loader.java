@@ -56,8 +56,8 @@ public final class Loader {
     /**
      * How the version is pinned, on top of the transport options.
      *
-     * <p>There is no {@code version} field and no way for a caller to supply one. That is the design: version
-     * resolution is INTERNAL (§3.8), and the only input to it is which project the process is standing in.
+     * <p>The version is resolved, not asked for, unless the caller pins one with {@code --version}: an explicit
+     * version outranks a locked {@code Dependencies.toml} one, which outranks Central's latest.
      *
      * @param http the transport options to fetch and cache through
      * @param projectDir the Ballerina project the lookup is running inside, or {@code null} when it is not in one
@@ -68,9 +68,10 @@ public final class Loader {
      *     several sources considered for ONE lookup, not one source picked ahead of time.
      * @param module the {@code --module} value, or {@code null} for the package's own default module — read from
      *     the submodule's own page, since a package's page carries its default module alone
+     * @param version the {@code --version} value, or {@code null} to resolve one
      */
     public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
-            String module) {
+            String module, String version) {
 
         public LoadOptions {
             if (repositories.isEmpty()) {
@@ -78,20 +79,29 @@ public final class Loader {
             }
         }
 
+        public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
+                String module) {
+            this(http, projectDir, repositories, module, null);
+        }
+
         public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories) {
-            this(http, projectDir, repositories, null);
+            this(http, projectDir, repositories, null, null);
         }
 
         public LoadOptions(HttpOptions http, String projectDir) {
-            this(http, projectDir, List.of(CentralRepository.INSTANCE), null);
+            this(http, projectDir, List.of(CentralRepository.INSTANCE), null, null);
         }
 
         public LoadOptions(HttpOptions http, String projectDir, String module) {
-            this(http, projectDir, List.of(CentralRepository.INSTANCE), module);
+            this(http, projectDir, List.of(CentralRepository.INSTANCE), module, null);
+        }
+
+        public LoadOptions(HttpOptions http, String projectDir, String module, String version) {
+            this(http, projectDir, List.of(CentralRepository.INSTANCE), module, version);
         }
 
         public static LoadOptions of(HttpOptions http) {
-            return new LoadOptions(http, null, List.of(CentralRepository.INSTANCE), null);
+            return new LoadOptions(http, null, List.of(CentralRepository.INSTANCE), null, null);
         }
     }
 
@@ -129,21 +139,27 @@ public final class Loader {
      */
     public static Result<CentralClient.ResolvedVersion> resolveVersion(
             QualifiedName qualified, LoadOptions options) {
-        if (options.projectDir() != null) {
-            String locked = DependenciesToml.lockedVersion(options.projectDir(), qualified);
-            if (locked != null) {
-                return fixed(locked);
-            }
+        String chosen = chosenVersion(qualified, options);
+        if (chosen != null) {
+            return fixed(chosen, options.version() != null);
         }
         return tryEachRepository(options.repositories(),
                 repository -> repository.resolveVersion(qualified, options.http()));
     }
 
+    /** The version the caller named, else the one a project locked, else {@code null}: resolve one. */
+    private static String chosenVersion(QualifiedName qualified, LoadOptions options) {
+        if (options.version() != null) {
+            return options.version();
+        }
+        return options.projectDir() == null ? null : DependenciesToml.lockedVersion(options.projectDir(), qualified);
+    }
+
     /** A version a build already locked, taken as given rather than confirmed against the registry. */
-    private static Result<CentralClient.ResolvedVersion> fixed(String input) {
+    private static Result<CentralClient.ResolvedVersion> fixed(String input, boolean pinned) {
         Result<Version> parsed = Version.parse(input);
         return parsed.isOk()
-                ? Result.ok(new CentralClient.ResolvedVersion(parsed.value(), false, true))
+                ? Result.ok(new CentralClient.ResolvedVersion(parsed.value(), false, true, pinned))
                 : parsed.cast();
     }
 
@@ -171,7 +187,7 @@ public final class Loader {
      * another — a "Local Central" cache and real Central would not necessarily agree on what a given version
      * even contains.
      *
-     * <p>A locked {@code Dependencies.toml} version is the one exception: it names no repository, so every
+     * <p>A pinned or locked {@code Dependencies.toml} version is the one exception: it names no repository, so every
      * repository is tried in order to serve THAT version, rather than resolve deciding which one wins.
      *
      * <p>Under {@code --module} the version is still the PACKAGE's, resolved from its literal coordinate, and the
@@ -192,15 +208,13 @@ public final class Loader {
     public static Result<LoadedPackage> loadPackage(QualifiedName qualified, LoadOptions options) {
         Function<PackageRepository, Result<CentralClient.ResolvedVersion>> resolve = repository ->
                 repository.resolveVersion(qualified, options.http());
-        if (options.projectDir() != null) {
-            String locked = DependenciesToml.lockedVersion(options.projectDir(), qualified);
-            if (locked != null) {
-                Result<CentralClient.ResolvedVersion> fixed = fixed(locked);
-                if (!fixed.isOk()) {
-                    return fixed.cast();
-                }
-                resolve = repository -> fixed;
+        String chosen = chosenVersion(qualified, options);
+        if (chosen != null) {
+            Result<CentralClient.ResolvedVersion> fixed = fixed(chosen, options.version() != null);
+            if (!fixed.isOk()) {
+                return fixed.cast();
             }
+            resolve = repository -> fixed;
         }
         Result<Fetched> fetched = options.module() == null
                 ? fetchPackage(qualified, options, resolve)
@@ -309,6 +323,7 @@ public final class Loader {
                 submodule,
                 submodulesOf(docs, qualified, submodule),
                 unverifiedWarning(resolved.stale()),
+                options.version(),
                 bound));
     }
 

@@ -146,8 +146,7 @@ public final class Documents {
                 .map(type -> Signatures.applyPrefixToTypeName(type.name(), links) + " ")
                 .filter(name -> !name.isBlank())
                 .orElse("");
-        lines.add("public annotation " + config + annotation.name() + " on " + annotation.attachmentPoints() + ";"
-                + Signatures.buildSpecialAgentNote(links));
+        lines.add("public annotation " + config + annotation.name() + " on " + annotation.attachmentPoints() + ";");
         return String.join("\n", lines);
     }
 }

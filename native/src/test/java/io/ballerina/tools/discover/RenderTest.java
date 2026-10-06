@@ -73,36 +73,7 @@ public class RenderTest {
     }
 
     @Test
-    public void theAgentNoteGroupsNamesByThePackageTheyComeFrom() {
-        String note = Signatures.buildSpecialAgentNote(List.of(
-                new Signatures.ExternalLink("Message", new ModuleRef("ballerinax", "googleapis.gmail")),
-                new Signatures.ExternalLink("Error", new ModuleRef("ballerina", "sql")),
-                new Signatures.ExternalLink("Draft", new ModuleRef("ballerinax", "googleapis.gmail"))));
-        Assert.assertEquals(note,
-                " // Special Agent Note: Message, Draft FROM ballerinax/googleapis.gmail module, "
-                        + "Error FROM ballerina/sql module");
-        Assert.assertEquals(Signatures.buildSpecialAgentNote(List.of()), "");
-    }
-
-    @Test
-    public void theAgentNoteNamesAForeignTypeOncePerTypeNotOncePerMention() {
-        // EMAIL-04. `mime:Entity|Attachment|(mime:Entity|Attachment)[]` mentions one foreign name twice — once
-        // bare and once as the array's element — and the note read `Entity, Entity FROM ballerina/mime module`,
-        // which is either a mangle or a claim that the line needs two imports.
-        Signatures.ExternalLink entity =
-                new Signatures.ExternalLink("Entity", new ModuleRef("ballerina", "mime"));
-        Assert.assertEquals(
-                Signatures.buildSpecialAgentNote(List.of(entity, entity)),
-                " // Special Agent Note: Entity FROM ballerina/mime module");
-        // Keyed on the name AND the package, so two packages that both declare `Error` still name both.
-        Assert.assertEquals(
-                Signatures.buildSpecialAgentNote(List.of(
-                        new Signatures.ExternalLink("Error", new ModuleRef("ballerina", "sql")),
-                        new Signatures.ExternalLink("Error", new ModuleRef("ballerinax", "kafka")))),
-                " // Special Agent Note: Error FROM ballerina/sql module, "
-                        + "Error FROM ballerinax/kafka module");
-        // The record-field path is the one that had no dedup, so it gets the assertion too: this is the exact
-        // shape of `email:Message.attachments`.
+    public void aForeignNameIsQualifiedOncePerMentionAndCarriesNoNote() {
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Rec("Message", "", List.of(
                         new RecordField("attachments", "", new TypeRef(
@@ -111,8 +82,7 @@ public class RenderTest {
                                         new TypeRef.Link.External(new ModuleRef("ballerina", "mime"), "Entity"))),
                                 null, true)))),
                 "public type Message record {\n"
-                        + "    mime:Entity|Attachment|(mime:Entity|Attachment)[] attachments?;"
-                        + " // Special Agent Note: Entity FROM ballerina/mime module\n};");
+                        + "    mime:Entity|Attachment|(mime:Entity|Attachment)[] attachments?;\n};");
     }
 
     @Test
@@ -407,7 +377,7 @@ public class RenderTest {
                         List.of(new Param("serviceUrl", "", new TypeRef("string"), "BASE_URL")
                                 .withUnwritableDefault()),
                         ReturnDef.none())),
-                "function init(string serviceUrl = BASE_URL); // Special Agent Note: the default BASE_URL is "
+                "function init(string serviceUrl = BASE_URL); // the default BASE_URL is "
                         + "not exported by this package; omit the argument rather than repeating it");
         // Two of them, and a foreign type name as well, all in ONE trailing comment — a second `//` would
         // sit inside the first.
@@ -420,7 +390,7 @@ public class RenderTest {
                 ReturnDef.none()));
         Assert.assertEquals(rendered,
                 "function init(http:Config config, string a = BASE_URL, string b = DRIVE_BASE_URL); "
-                        + "// Special Agent Note: Config FROM ballerina/http module, the defaults BASE_URL, "
+                        + "// the defaults BASE_URL, "
                         + "DRIVE_BASE_URL are not exported by this package; omit the arguments rather than "
                         + "repeating them");
     }
@@ -478,13 +448,12 @@ public class RenderTest {
         Assert.assertEquals(rendered,
                 "# The common status code response constant of `Continue`.\n"
                         + "public final readonly & Continue CONTINUE = {};");
-        // A foreign type in the position still gets its prefix and its import note.
+        // A foreign type in the position still gets its prefix.
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Variable("DEFAULT", "", new TypeRef("Config",
                         List.of(new TypeRef.Link.External(new ModuleRef("ballerina", "http"), "Config"))),
                         "{}", false)),
-                "public final http:Config DEFAULT = {};"
-                        + " // Special Agent Note: Config FROM ballerina/http module");
+                "public final http:Config DEFAULT = {};");
     }
 
     @Test

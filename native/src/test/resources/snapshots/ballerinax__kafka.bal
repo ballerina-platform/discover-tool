@@ -302,7 +302,7 @@ public type RecordMetadata record {|
 # Configurations for secure communication with the Kafka server.
 public type SecureSocket record {|
     # Configurations associated with crypto:TrustStore or single certificate file that the client trusts
-    crypto:TrustStore|string cert; // Special Agent Note: TrustStore FROM ballerina/crypto module
+    crypto:TrustStore|string cert;
     # Configurations associated with crypto:KeyStore or combination of certificate and private key of the client
     record {crypto:KeyStore keyStore; string keyPassword; }|CertKey key?;
     # SSL/TLS protocol related options

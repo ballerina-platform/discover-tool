@@ -2,16 +2,16 @@
 ballerina/http · client
 10 clients
 
-  ClientObject                           1 resource  15 remote
-  StatusCodeClientObject                 1 resource  15 remote
   Caller                                              5 remote  1 normal
   Client                                 1 resource  15 remote  4 normal
   ClientOAuth2Handler                                 1 remote  2 normal
+  ClientObject                           1 resource  15 remote
   FailoverClient                         1 resource  15 remote  1 normal
   ListenerLdapUserStoreBasicAuthHandler               2 remote
   ListenerOAuth2Handler                               1 remote
   LoadBalanceClient                      1 resource  15 remote
   StatusCodeClient                       1 resource  15 remote  4 normal
+  StatusCodeClientObject                 1 resource  15 remote
 
 Next: bal discover ballerina/http client <name>
 == service ==
@@ -19,15 +19,15 @@ ballerina/http · service
 7 service types
 
 http:Listener
+  InterceptableService  1 normal
   Service
   ServiceContract
-  InterceptableService  1 normal
 
 Not attachable to a listener
-  RequestInterceptor
-  ResponseInterceptor
   RequestErrorInterceptor
+  RequestInterceptor
   ResponseErrorInterceptor
+  ResponseInterceptor
 
 Next: bal discover ballerina/http service <name>
 == class ==
@@ -47,12 +47,15 @@ ballerina/http · class
   ListenerFileUserStoreBasicAuthHandler   2 normal
   ListenerJwtAuthHandler                  2 normal
   LoadBalancerRoundRobinRule              1 normal
+  LoadBalancerRule                        1 normal
+  PersistentCookieHandler                 4 normal
   PushPromise                             8 normal
   Request                                34 normal
   RequestCacheControl                     1 normal
   RequestContext                          7 normal
   Response                               35 normal
   ResponseCacheControl                    2 normal
+  Status
   StatusAccepted
   StatusAlreadyReported
   StatusBadGateway
@@ -71,13 +74,11 @@ ballerina/http · class
   StatusIMUsed
   StatusInsufficientStorage
   StatusInternalServerError
-  StatusLengthRequired
-  StatusLocked
-  StatusLoopDetected
 
 ... 43 more (page 1 of 3)
 Next: bal discover ballerina/http class <name>
 Next: bal discover ballerina/http class --page 2
+Next: bal discover ballerina/http class --filter <keyword>
 == funcs ==
 ballerina/http · funcs
 7 functions
@@ -140,3 +141,4 @@ Records
 ... 409 more (page 1 of 12)
 Next: bal discover ballerina/http type <name>
 Next: bal discover ballerina/http type --page 2
+Next: bal discover ballerina/http type --filter <keyword>
