@@ -919,6 +919,21 @@ public class ViewsTest {
     }
 
     @Test
+    public void anEnumMemberQualifiedByAnotherPackageIsNotTakenForALocalOne() {
+        LoadedPackage base = FixtureCorpus.loadedFixture("ballerinax__kafka");
+        Library library = base.library();
+        List<io.ballerina.tools.discover.model.TypeDef> declarations = new java.util.ArrayList<>(library.typeDefs());
+        declarations.add(new io.ballerina.tools.discover.model.TypeDef.Enumeration("Solo", "", List.of(
+                new io.ballerina.tools.discover.model.TypeDef.Enumeration.Member("SOLO_MEMBER", ""))));
+        LoadedPackage loaded = base.withLibrary(new Library(library.name(), library.description(), declarations,
+                library.clients(), library.functions(), library.listeners(), library.services(),
+                library.annotations(), library.configurables()));
+
+        Assert.assertTrue(Types.render(loaded, new Types.Options(List.of("kafka:SOLO_MEMBER"), null, 1)).isOk());
+        Assert.assertFalse(Types.render(loaded, new Types.Options(List.of("http:SOLO_MEMBER"), null, 1)).isOk());
+    }
+
+    @Test
     public void aForeignTypeCarriesTheModuleAndVersionItWasGeneratedAgainst() {
         DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
                 type("ballerinax__github", "ConnectionConfig"));
