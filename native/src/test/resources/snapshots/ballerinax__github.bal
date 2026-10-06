@@ -1181,7 +1181,7 @@ public type BaseGist record {
     # API URL for listing gist comments.
     string commentsUrl;
     # The files included in the gist.
-    record {} files;
+    record {|BaseGistFiles...; |} files;
     # The unique identifier of the gist.
     string id;
     # The user associated with the gist, if applicable.
@@ -4939,7 +4939,7 @@ public type Gist record {
     # The API URL for the gist's comments.
     string commentsUrl;
     # The files contained within the gist.
-    record {} files;
+    record {|BaseGistFiles...; |} files;
     # The unique identifier of the gist.
     string id;
     # The user associated with the gist.
@@ -5016,7 +5016,7 @@ public type GistsBody record {
     # Description of the gist
     string description?;
     # Names and content for the files that make up the gist
-    record {} files;
+    record {|GistsFiles...; |} files;
 };
 
 public type GistsFiles record {
@@ -5032,7 +5032,7 @@ public type GistsgistIdBody record {
     # 
     # To delete a file, set the whole file to null. For example: hello.py : null. The file will also be
     # deleted if the specified object does not contain at least one of content or filename
-    record {} files?;
+    record {|GistsgistIdFiles?...; |} files?;
 };
 
 public type GistsgistIdFiles record {
@@ -5081,7 +5081,7 @@ public type GistSimple record {
     # The API URL to retrieve comments on the gist.
     string commentsUrl?;
     # The files contained within the gist.
-    record {} files?;
+    record {|GistSimpleFiles?...; |} files?;
     # The unique identifier of the gist.
     string id?;
     # The username associated with the gist.
@@ -6941,7 +6941,7 @@ public type Manifest record {|
     # The name of the manifest
     string name;
     # A collection of resolved package dependencies
-    record {} resolved?;
+    record {|Dependency...; |} resolved?;
 |};
 
 public type ManifestConversions record {
@@ -8888,11 +8888,11 @@ public type OrganizationProgrammaticAccessGrant record {
 # Permissions requested, categorized by type of permission
 public type OrganizationProgrammaticAccessGrantPermissions record {
     # Other miscellaneous permissions granted by the access token.
-    record {} other?;
+    record {|string...; |} other?;
     # Organization-level permissions granted by the access token.
-    record {} organization?;
+    record {|string...; |} organization?;
     # Repository-level permissions granted by the access token.
-    record {} repository?;
+    record {|string...; |} repository?;
 };
 
 # Minimal representation of an organization programmatic access grant request for enumerations
@@ -15663,7 +15663,7 @@ public type Snapshot record {|
     # The time at which the snapshot was scanned
     string scanned;
     # A collection of package manifests, which are a collection of related dependencies declared in a file or representing a logical group of dependencies
-    record {} manifests?;
+    record {|Manifest...; |} manifests?;
     # Details about the CI job that generated this snapshot.
     SnapshotJob job;
     # The version of the repository snapshot submission
@@ -18176,7 +18176,7 @@ public isolated client class Client {
     # Get emojis
     # + headers - Headers to be sent with the request
     # + return - Response
-    isolated resource function get emojis(map<string|string[]> headers = {}) returns record {}|error?;
+    isolated resource function get emojis(map<string|string[]> headers = {}) returns record {|string...; |}|error?;
 
     # List Dependabot alerts for an enterprise
     # + headers - Headers to be sent with the request

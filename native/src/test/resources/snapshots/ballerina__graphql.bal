@@ -171,7 +171,7 @@ public type GenericResponse record {|
     # Meta information on protocol extensions from the GraphQL server
     map<json?> extensions?;
     # The requested data from the GraphQL server
-    record {}|map<json?> data?;
+    record {|anydata...; |}|map<json?> data?;
 |};
 
 # Represents the target type binding record with data, extensions and errors of a GraphQL response for `execute` method.

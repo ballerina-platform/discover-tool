@@ -1767,7 +1767,7 @@ public type ConversationsRepliesQueries record {
 
 # Schema for successful response from conversations.replies method
 public type ConversationsRepliesResponse record {|
-    (record {TsDef last_read; TsDef latest_reply; int reply_count; UserIdDef[] reply_users; int reply_users_count; TeamDef source_team; boolean subscribed; TeamDef team; string text; TsDef thread_ts; TsDef ts; string 'type; int unread_count; UserIdDef user; UserProfileShortObj user_profile; TeamDef user_team; }|record {boolean is_starred; UserIdDef parent_user_id; TeamDef source_team; TeamDef team; string text; TsDef thread_ts; TsDef ts; string 'type; UserIdDef user; UserProfileShortObj user_profile; TeamDef user_team; })[][] messages;
+    (record {|TsDef last_read; TsDef latest_reply; int reply_count; UserIdDef[] reply_users; int reply_users_count; TeamDef source_team; boolean subscribed; TeamDef team; string text; TsDef thread_ts; TsDef ts; string 'type; int unread_count; UserIdDef user; UserProfileShortObj user_profile; TeamDef user_team; |}|record {|boolean is_starred; UserIdDef parent_user_id; TeamDef source_team; TeamDef team; string text; TsDef thread_ts; TsDef ts; string 'type; UserIdDef user; UserProfileShortObj user_profile; TeamDef user_team; |})[][] messages;
     boolean hasMore?;
     OkTrueDef ok;
 |};
@@ -2803,7 +2803,7 @@ public type ReactionsListResponse record {|
     PagingObj paging?;
     ResponseMetadataObj responseMetadata?;
     OkTrueDef ok;
-    (record {ChannelDef channel; MessageObj message; "message" 'type; }|record {FileObj file; "file" 'type; }|record {CommentObj comment; FileObj file; "file_comment" 'type; })[][] items;
+    (record {|ChannelDef channel; MessageObj message; "message" 'type; |}|record {|FileObj file; "file" 'type; |}|record {|CommentObj comment; FileObj file; "file_comment" 'type; |})[][] items;
 |};
 
 public type ReactionsRemoveBody record {
@@ -2969,7 +2969,7 @@ public type StarsListQueries record {
 public type StarsListResponse record {|
     PagingObj paging?;
     OkTrueDef ok;
-    (record {ChannelDef channel; int date_create; MessageObj message; "message" 'type; }|record {int date_create; FileObj file; "file" 'type; }|record {CommentObj comment; int date_create; FileObj file; "file_comment" 'type; }|record {ChannelDef channel; int date_create; "channel" 'type; }|record {DmIdDef channel; int date_create; "im" 'type; }|record {GroupIdDef channel; int date_create; "group" 'type; })[][] items;
+    (record {|ChannelDef channel; int date_create; MessageObj message; "message" 'type; |}|record {|int date_create; FileObj file; "file" 'type; |}|record {|CommentObj comment; int date_create; FileObj file; "file_comment" 'type; |}|record {|ChannelDef channel; int date_create; "channel" 'type; |}|record {|DmIdDef channel; int date_create; "im" 'type; |}|record {|GroupIdDef channel; int date_create; "group" 'type; |})[][] items;
 |};
 
 public type StarsRemoveBody record {
