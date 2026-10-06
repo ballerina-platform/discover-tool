@@ -569,6 +569,13 @@ tool prints pre-quotes such a path for the shell. A selector also accepts `[stri
 looked for beneath the prefix that matched and listed rather than chosen when it occurs in several places.
 `new` addresses the constructor Ballerina spells `init` — except on a container with resource paths, where a
 path selector is tried first, so a path segment called `new` (github's `codespaces/'new`) wins over it.
+A member name is one selector. On a container with resource paths, two selectors that resolve as a path and
+its accessor, in either order, are read together and win over a member of the same name; otherwise a first
+selector naming a method, function or `new` is read alone, and any other pair is a no-match answer listing
+the path's accessors.
+A selector beyond what the container reads is a `validation` failure naming the command without it, never
+silently dropped; a path's segments go in one argument joined by `/`, which that failure suggests when they
+were typed apart.
 
 ## The contract
 
@@ -699,6 +706,7 @@ check 0 ballerinax/kafka funcs                      # an empty bucket is an answ
 check 0 ballerinax/github client gists
 check 0 ballerinax/github client "gists/'public" get
 check 0 ballerinax/github client Client zzz         # a selector that matches nothing is an answer
+check 1 ballerinax/twilio client Client createAccount extra  # a selector nothing reads
 check 0 ballerina/sql client                        # clients Central files as plain declarations
 check 1 ballerina/http:2.16.6                       # no version suffix
 check 1 ballerina/http client 2.16.6                # no version argument

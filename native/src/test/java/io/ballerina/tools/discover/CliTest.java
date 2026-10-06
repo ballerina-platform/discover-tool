@@ -22,6 +22,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
@@ -220,6 +221,142 @@ public class CliTest {
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("nosuchbucket"), capture.stderr());
         Assert.assertTrue(capture.field("suggestion").contains("client, service, class, funcs"), capture.stderr());
+    }
+
+    /**
+     * A selector the container does not read, with the command that drops it.
+     *
+     * @param slug the fixture
+     * @param argv the invocation
+     * @param unread the selector the failure names
+     * @param command the command its suggestion prints
+     */
+    private record Unread(String slug, List<String> argv, String unread, String command) { }
+
+    @Test
+    public void aSelectorNothingReadsIsAValidationFailureNamingTheCommandWithoutIt() {
+        String twilio = "bal discover ballerinax/twilio client Client createAccount";
+        String gists = "bal discover ballerinax/github client Client";
+        for (Unread unread : List.of(
+                new Unread("ballerinax__twilio", List.of("ballerinax/twilio", "client", "Client", "createAccount",
+                        "extra"), "extra", twilio),
+                new Unread("ballerinax__twilio", List.of("ballerinax/twilio", "client", "createAccount", "extra"),
+                        "extra", twilio),
+                new Unread("ballerina__log", List.of("ballerina/log", "funcs", "printInfo", "junk"), "junk",
+                        "bal discover ballerina/log funcs printInfo"),
+                new Unread("ballerina__http", List.of("ballerina/http", "class", "Cookie", "isValid", "junk"),
+                        "junk", "bal discover ballerina/http class Cookie isValid"),
+                new Unread("ballerina__http", List.of("ballerina/http", "client", "Cookie", "isValid", "junk"),
+                        "junk", "bal discover ballerina/http class Cookie isValid"),
+                new Unread("ballerina__http", List.of("ballerina/http", "service", "InterceptableService",
+                        "createInterceptors", "junk"), "junk",
+                        "bal discover ballerina/http service InterceptableService createInterceptors"),
+                new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "gists/'public",
+                        "get", "extra"), "extra", gists + " \"gists/'public\" get"),
+                new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "get",
+                        "gists/'public", "extra"), "extra", gists + " get \"gists/'public\""),
+                new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "repos", ":owner",
+                        ":repo"), ":repo", gists + " repos/:owner/:repo"),
+                new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "get", "repos",
+                        ":owner", ":repo"), ":owner", gists + " repos/:owner/:repo get"),
+                new Unread("ballerina__http", List.of("ballerina/http", "client", "forward", "extra"), "extra",
+                        "bal discover ballerina/http client forward"),
+                new Unread("ballerina__http", List.of("ballerina/http", "class", "forward", "extra"), "extra",
+                        "bal discover ballerina/http client forward"),
+                new Unread("ballerina__http", List.of("ballerina/http", "client", "forwar", "extra"), "extra",
+                        "bal discover ballerina/http client forwar"))) {
+            String label = String.join(" ", unread.argv());
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(unread.argv(), capture.streams(),
+                    centralFor(unread.slug(), FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
+            Assert.assertEquals(capture.stdout(), "", label);
+            Assert.assertEquals(capture.field("kind"), "validation", label);
+            Assert.assertTrue(capture.field("message").contains("'" + unread.unread() + "'"), capture.stderr());
+            Assert.assertTrue(capture.field("suggestion").contains("`" + unread.command() + "`"), capture.stderr());
+        }
+    }
+
+    @Test
+    public void onAContainerWithPathsAndMethodsAMemberNameReadsOneSelectorAndRejectsTheRest() {
+        String client = "bal discover ballerina/http client Client";
+        for (Unread unread : List.of(
+                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "forward", "extra"),
+                        "extra", client + " forward"),
+                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "getCookieStore",
+                        "extra"), "extra", client + " getCookieStore"),
+                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "new", "extra"),
+                        "extra", client + " new"),
+                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "forwar", "extra"),
+                        "extra", client + " forwar"),
+                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", ":...path", "get",
+                        "extra"), "extra", client + " :...path get"),
+                new Unread("ballerina__http", List.of("ballerina/http", "client", ":...path", "get", "extra"),
+                        "extra", "bal discover ballerina/http client :...path get"))) {
+            String label = String.join(" ", unread.argv());
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(unread.argv(), capture.streams(),
+                    centralFor(unread.slug(), FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
+            Assert.assertEquals(capture.stdout(), "", label);
+            Assert.assertEquals(capture.field("kind"), "validation", label);
+            Assert.assertTrue(capture.field("message").contains("'" + unread.unread() + "'"), capture.stderr());
+            Assert.assertTrue(capture.field("suggestion").contains("`" + unread.command() + "`"), capture.stderr());
+        }
+    }
+
+    @Test
+    public void aPairThatResolvesAsAPathAndAccessorOutranksAMemberOfTheSameName() {
+        for (List<String> selectors : List.of(List.of(":...path", "get"), List.of("get", ":...path"))) {
+            List<String> argv = new ArrayList<>(List.of("ballerina/http", "client", "Client"));
+            argv.addAll(selectors);
+            JsonObject json = JsonParser.parseString(
+                    run(argv, "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
+                    .getAsJsonObject();
+            Assert.assertEquals(json.get("kind").getAsString(), "resource", String.join(" ", argv));
+            Assert.assertEquals(json.get("accessor").getAsString(), "get", String.join(" ", argv));
+        }
+    }
+
+    @Test
+    public void aPathSegmentSpelledNewOutranksTheConstructorAliasSoAnUnresolvedPairIsANoMatch() {
+        List<String> argv = List.of("ballerinax/github", "client", "Client", "new", "extra");
+        JsonObject json = JsonParser.parseString(
+                run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
+                .getAsJsonObject();
+        Assert.assertEquals(json.get("requested").getAsString(), "new extra");
+        Assert.assertTrue(json.getAsJsonObject("available").getAsJsonArray("resources").asList().stream()
+                .allMatch(resource -> resource.getAsJsonObject().get("path").getAsString().endsWith("'new")),
+                json.toString());
+    }
+
+    @Test
+    public void twoSelectorsOnAPathContainerThatResolveNothingAreANoMatchNamingThePathsAccessors() {
+        for (List<String> selectors : List.of(List.of("gists/'public", "head"), List.of("gists/'public", "GET"),
+                List.of("head", "gists/'public"), List.of("gists", "gett"), List.of("gists", "zzz"))) {
+            List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
+            argv.addAll(selectors);
+            Capture capture = run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), false);
+            String label = String.join(" ", argv);
+            JsonObject json = JsonParser.parseString(capture.stdout()).getAsJsonObject();
+            Assert.assertEquals(json.get("requested").getAsString(), String.join(" ", selectors), label);
+            Assert.assertTrue(json.getAsJsonArray("candidates").contains(new JsonPrimitive("get")), label);
+            JsonArray resources = json.getAsJsonObject("available").getAsJsonArray("resources");
+            Assert.assertTrue(resources.asList().stream().allMatch(resource -> resource.getAsJsonObject()
+                    .get("path").getAsString().startsWith("gists")), label + " -> " + capture.stdout());
+        }
+    }
+
+    @Test
+    public void aPathAndItsAccessorAreBothReadInEitherOrderOrAsOneArgument() {
+        for (List<String> selectors : List.of(
+                List.of("gists/'public", "get"), List.of("get", "gists/'public"), List.of("get gists/'public"))) {
+            List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
+            argv.addAll(selectors);
+            JsonObject json = JsonParser.parseString(
+                    run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
+                    .getAsJsonObject();
+            Assert.assertEquals(json.get("path").getAsString(), "gists/'public", String.join(" ", argv));
+            Assert.assertEquals(json.get("accessor").getAsString(), "get", String.join(" ", argv));
+        }
     }
 
     @Test
