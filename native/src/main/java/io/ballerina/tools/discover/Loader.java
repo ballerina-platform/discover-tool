@@ -338,19 +338,20 @@ public final class Loader {
     }
 
     /**
-     * Every OTHER module this package publishes, name and summary only — computed off the SAME page a repository
-     * already served, never a second fetch, since every page of a package names all of its modules in
-     * {@code relatedModules}. Excludes the module already being addressed (the default module when
-     * {@code submodule} is {@code null}, otherwise the named submodule itself) so the currently-selected module
-     * never lists itself as one of the "other" ones.
+     * The submodules that belong to the module being addressed, name and summary only — computed off the SAME page
+     * a repository already served, never a second fetch, since every page of a package names all of its modules in
+     * {@code relatedModules}. For the default module ({@code submodule} is {@code null}) that is every module the
+     * package publishes; for a named submodule only its own children (ids under {@code <name>.<submodule>.}), never
+     * its siblings, which belong to the package's listing and not to this module's.
      */
     private static List<LoadedPackage.Submodule> submodulesOf(
             CentralDocs docs, QualifiedName qualified, String submodule) {
         String prefix = qualified.name() + ".";
+        String childPrefix = submodule == null ? prefix : prefix + submodule + ".";
         return FromCentral.submodulesOf(docs, qualified).stream()
+                .filter(module -> module.id().startsWith(childPrefix))
                 .map(module -> new LoadedPackage.Submodule(
                         module.id().substring(prefix.length()), module.summary().orElse("").trim()))
-                .filter(sub -> !sub.name().equals(submodule))
                 .toList();
     }
 }
