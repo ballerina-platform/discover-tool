@@ -911,6 +911,13 @@ public class CliTest {
             Assert.assertEquals(capture.field("kind"), "validation");
             Assert.assertTrue(capture.field("message").contains("publishes no readme for module dataloader"),
                     argv + " -> " + capture.stderr());
+            // Under --module the loaded submodules are that module's children, never its siblings or the
+            // default module, so their absence says nothing about what else the package publishes.
+            Assert.assertFalse(capture.field("suggestion").contains("no other module"), capture.stderr());
+            Assert.assertTrue(capture.field("suggestion").contains("`bal discover ballerina/graphql`"),
+                    capture.stderr());
+            Assert.assertTrue(capture.field("suggestion").contains("`bal discover ballerina/graphql readme`"),
+                    capture.stderr());
         }
     }
 
