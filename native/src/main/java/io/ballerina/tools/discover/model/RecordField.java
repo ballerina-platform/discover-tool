@@ -66,10 +66,6 @@ public record RecordField(
         this(name, description, type, null, false, false, false, false, Form.DECLARED);
     }
 
-    public RecordField(String name, String description, TypeRef type, String defaultValue, boolean optional) {
-        this(name, description, type, defaultValue, optional, false, false, false, Form.DECLARED);
-    }
-
     public RecordField(String name, String description, TypeRef type, String defaultValue, boolean optional,
             boolean readonly, boolean deprecated, Form form) {
         this(name, description, type, defaultValue, optional, readonly, deprecated, false, form);

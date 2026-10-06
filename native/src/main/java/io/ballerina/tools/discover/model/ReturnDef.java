@@ -34,10 +34,6 @@ public record ReturnDef(TypeRef type, String description) {
 
     private static final ReturnDef NONE = new ReturnDef(new TypeRef(""), null);
 
-    public ReturnDef(TypeRef type) {
-        this(type, null);
-    }
-
     /** A callable Central published no return parameter for. */
     public static ReturnDef none() {
         return NONE;

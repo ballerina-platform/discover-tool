@@ -121,7 +121,7 @@ public class ViewsTest {
         for (Surface.Scope scope : Surface.Scope.values()) {
             DiscoverResult listing = render(loaded, scope, List.of());
             TextRenderer.Context where = new TextRenderer.Context(
-                    loaded.qualified().qualified(), null, List.of(scope.verb()), null);
+                    loaded.qualified().qualified(), null, List.of(scope.verb()), null, null);
             text.append("== ").append(scope.verb()).append(" ==\n").append(TextRenderer.render(listing, where))
                     .append("\n");
             json.append(JsonRenderer.render(listing)).append("\n");
@@ -129,7 +129,7 @@ public class ViewsTest {
         Result<DiscoverResult> types = Types.render(loaded, new Types.Options(List.of(), null, 1));
         Assert.assertTrue(types.isOk(), slug + ": " + (types.isOk() ? "" : types.failure().describe()));
         text.append("== type ==\n").append(TextRenderer.render(types.value(), new TextRenderer.Context(
-                loaded.qualified().qualified(), null, List.of("type"), null))).append("\n");
+                loaded.qualified().qualified(), null, List.of("type"), null, null))).append("\n");
         json.append(JsonRenderer.render(types.value())).append("\n");
         FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + ".buckets.txt"),
                 text.toString(), slug + " text");
@@ -154,7 +154,7 @@ public class ViewsTest {
             text.append("== ").append(leaf[0]).append(" type ").append(leaf[1]).append(" ==\n");
             if (answer.isOk()) {
                 text.append(TextRenderer.render(answer.value(), new TextRenderer.Context(
-                        loaded.qualified().qualified(), null, List.of("type", leaf[1]), null))).append("\n");
+                        loaded.qualified().qualified(), null, List.of("type", leaf[1]), null, null))).append("\n");
                 json.append(JsonRenderer.render(answer.value())).append("\n");
             } else {
                 text.append(answer.failure().describe()).append("\n");
@@ -826,7 +826,7 @@ public class ViewsTest {
         Assert.assertEquals(json.get("omittedNext").getAsString(), "bal discover ballerina/http type");
         Assert.assertEquals(json.getAsJsonArray("omitted").size(), 40);
         String text = TextRenderer.render(status, new TextRenderer.Context(
-                http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null));
+                http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null, null));
         Assert.assertTrue(text.contains("Past the closure budget (40 of 47)"), text);
         Assert.assertTrue(text.contains("\n... 7 more, narrow further\nNext: bal discover ballerina/http type"), text);
         Assert.assertEquals(text.lines().filter(line -> line.startsWith("Past the closure budget")).count(), 1L);
@@ -903,11 +903,11 @@ public class ViewsTest {
         Library library = base.library();
         List<io.ballerina.tools.discover.model.TypeDef> declarations = new java.util.ArrayList<>(library.typeDefs());
         declarations.add(new io.ballerina.tools.discover.model.TypeDef.Rec("Holder", "", true, false, fields));
-        LoadedPackage loaded = new LoadedPackage(base.qualified(), base.version(),
-                new Library(library.name(), library.description(), declarations, library.clients(),
-                        library.functions(), library.listeners(), library.services(), library.annotations(),
-                        library.configurables()),
-                base.readme(), "sub", List.of(new LoadedPackage.Submodule("other", "")), base.warning());
+        Library withHolder = new Library(library.name(), library.description(), declarations, library.clients(),
+                library.functions(), library.listeners(), library.services(), library.annotations(),
+                library.configurables());
+        LoadedPackage loaded = new LoadedPackage(base.qualified(), base.version(), withHolder, base.readme(), "sub",
+                List.of(new LoadedPackage.Submodule("other", "")), base.warning(), null, () -> withHolder);
 
         DiscoverResult.TypeDeclaration holder = as(DiscoverResult.TypeDeclaration.class, result(
                 Types.render(loaded, new Types.Options(List.of("Holder"), null, 1)), "type Holder"));
@@ -920,7 +920,7 @@ public class ViewsTest {
                         "bal discover ballerina/http --version 2.1.0 type Thing2"),
                 new DiscoverResult.Foreign("Thing3", "ballerinax/kafka.unlisted", "1.0.0", null)));
         String text = TextRenderer.render(holder, new TextRenderer.Context(
-                loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null));
+                loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null, null));
         Assert.assertTrue(text.contains("(no command: package not known)"), text);
     }
 

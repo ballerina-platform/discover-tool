@@ -76,11 +76,11 @@ final class FakeTransport implements HttpTransport {
     }
 
     static Reply ok(String body) {
-        return new Reply.Answered(200, body);
+        return new Reply.Answered(200, body, null);
     }
 
     static Reply status(int status) {
-        return new Reply.Answered(status, "");
+        return new Reply.Answered(status, "", null);
     }
 
     /** Serve binary downloads — a package archive — through {@code download}; every one is empty otherwise. */

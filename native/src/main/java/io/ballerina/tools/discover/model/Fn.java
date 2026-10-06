@@ -70,12 +70,7 @@ public sealed interface Fn {
             ReturnDef returns,
             boolean isDeprecated,
             boolean isIsolated)
-            implements Fn {
-
-        public Constructor(String description, List<Param> params, ReturnDef returns) {
-            this(description, params, returns, false, false);
-        }
-    }
+            implements Fn { }
 
     record Remote(
             String name,
@@ -84,12 +79,7 @@ public sealed interface Fn {
             ReturnDef returns,
             boolean isDeprecated,
             boolean isIsolated)
-            implements Fn, Standalone {
-
-        public Remote(String name, String description, List<Param> params, ReturnDef returns) {
-            this(name, description, params, returns, false, false);
-        }
-    }
+            implements Fn, Standalone { }
 
     record Normal(
             String name,
@@ -98,12 +88,7 @@ public sealed interface Fn {
             ReturnDef returns,
             boolean isDeprecated,
             boolean isIsolated)
-            implements Fn, Standalone {
-
-        public Normal(String name, String description, List<Param> params, ReturnDef returns) {
-            this(name, description, params, returns, false, false);
-        }
-    }
+            implements Fn, Standalone { }
 
     record Resource(
             String accessor,
@@ -113,13 +98,7 @@ public sealed interface Fn {
             ReturnDef returns,
             boolean isDeprecated,
             boolean isIsolated)
-            implements Fn {
-
-        public Resource(String accessor, List<PathSegment> paths, String description, List<Param> params,
-                ReturnDef returns) {
-            this(accessor, paths, description, params, returns, false, false);
-        }
-    }
+            implements Fn { }
 
     /**
      * A function at module scope. A constructor belongs to a class and a resource function to a client,

@@ -41,7 +41,8 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void aBucketListRendersOneBucketPerLineInText() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "service", "funcs", "readme"));
+        DiscoverResult result = new DiscoverResult.BucketList(
+                List.of("client", "service", "funcs", "readme"), List.of(), null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "4 buckets",
                 "",
@@ -53,8 +54,8 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void aBucketListAtATerminalNamesThePackageAndTheCommandThatOpensABucket() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"));
-        TextRenderer.Context where = new TextRenderer.Context("ballerina/graphql", "subgraph", List.of(), null);
+        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"), List.of(), null);
+        TextRenderer.Context where = new TextRenderer.Context("ballerina/graphql", "subgraph", List.of(), null, null);
         Assert.assertEquals(TextRenderer.render(result, where), lines(
                 "ballerina/graphql · module subgraph",
                 "2 buckets",
@@ -67,7 +68,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void aBucketListRendersAsAJsonArrayField() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"));
+        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"), List.of(), null);
         String json = JsonRenderer.render(result);
         Assert.assertEquals(
                 JsonParser.parseString(json).getAsJsonObject().getAsJsonArray("buckets").toString(),
@@ -76,7 +77,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void anEmptyBucketListRendersAsNoneInTextAndAnEmptyArrayInJson() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of());
+        DiscoverResult result = new DiscoverResult.BucketList(List.of(), List.of(), null);
         Assert.assertEquals(TextRenderer.render(result), "No buckets.");
         Assert.assertEquals(JsonRenderer.render(result), "{\"buckets\":[]}");
     }
@@ -117,7 +118,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void noSubmodulesOmitsTheFieldEntirelyInJson() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"));
+        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"), List.of(), null);
         Assert.assertFalse(JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject().has("submodules"),
                 "a package with no submodules carries no submodules key at all");
     }
@@ -125,7 +126,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void anUnverifiedVersionsWarningAppearsInBothRenderings() {
         DiscoverResult result = new DiscoverResult.BucketList(
-                List.of("client"), "the registry was unreachable, so this version came off disk unchecked");
+                List.of("client"), List.of(), "the registry was unreachable, so this version came off disk unchecked");
         Assert.assertTrue(TextRenderer.render(result).endsWith(
                 "\n\nWarning: the registry was unreachable, so this version came off disk unchecked"));
         String json = JsonRenderer.render(result);
@@ -143,10 +144,10 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(
                         new DiscoverResult.ContainerRoster.Container(
-                                "Caller", 0, 3, 0, "bal discover ballerinax/kafka client Caller"),
+                                "Caller", 0, 3, 0, null, null, "bal discover ballerinax/kafka client Caller"),
                         new DiscoverResult.ContainerRoster.Container(
-                                "Consumer", 0, 24, 0, "bal discover ballerinax/kafka client Consumer")),
-                2, null);
+                                "Consumer", 0, 24, 0, null, null, "bal discover ballerinax/kafka client Consumer")),
+                2, null, null, null, List.of(), 0);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 containers",
                 "",
@@ -173,11 +174,11 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(
                         new DiscoverResult.ContainerRoster.Container(
-                                "Service", 0, 1, 0, "kafka:Listener",
+                                "Service", 0, 1, 0, "kafka:Listener", null,
                                 "bal discover ballerinax/kafka service Service"),
                         new DiscoverResult.ContainerRoster.Container(
-                                "Plain", 0, 1, 0, "bal discover ballerinax/kafka service Plain")),
-                2, null);
+                                "Plain", 0, 1, 0, null, null, "bal discover ballerinax/kafka service Plain")),
+                2, null, null, null, List.of(), 0);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 containers",
                 "",
@@ -200,7 +201,7 @@ public class DiscoverResultRenderingTest {
     public void aServiceTypeNoListenerAcceptsIsListedApartAndPagedWithTheRest() {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(new DiscoverResult.ContainerRoster.Container(
-                        "Service", 0, 0, 0, "http:Listener", "bal discover ballerina/http service Service")),
+                        "Service", 0, 0, 0, "http:Listener", null, "bal discover ballerina/http service Service")),
                 1, new DiscoverResult.Paging(1, 2, 2), "bal discover ballerina/http service --page 2", null,
                 List.of(new DiscoverResult.ContainerRoster.NotAttachable(
                         "RequestInterceptor", "bal discover ballerina/http service RequestInterceptor")),
@@ -231,8 +232,8 @@ public class DiscoverResultRenderingTest {
     public void aPagedContainerRosterNamesWhatWasCutInBothRenderings() {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(new DiscoverResult.ContainerRoster.Container(
-                        "A", 0, 1, 0, "bal discover pkg class A")),
-                91, new DiscoverResult.Paging(1, 3, 51), "bal discover pkg class --page 2", null);
+                        "A", 0, 1, 0, null, null, "bal discover pkg class A")),
+                91, new DiscoverResult.Paging(1, 3, 51), "bal discover pkg class --page 2", null, List.of(), 0);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "91 containers",
                 "",
@@ -338,12 +339,12 @@ public class DiscoverResultRenderingTest {
     @Test
     public void everyResourceRowCarriesOneCommandPerAccessorAndNeverAFlatCall() {
         String client = "bal discover ballerinax/github client";
-        DiscoverResult result = new DiscoverResult.ResourceList(
+        DiscoverResult result = new DiscoverResult.ResourceList(null,
                 List.of(
                         resource("gists", client + " gists", "get", "post"),
                         resource("gists/:gistId", client + " gists/:gistId", "get", "delete"),
                         resource("gists/starred", client + " gists/starred", "get")),
-                3, 3, null);
+                3, 3, null, null, DiscoverResult.Documented.NONE, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "3 resource paths",
                 "",
@@ -369,11 +370,11 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aRowWhoseCommandTheSharedShapeCannotSpellCarriesItsOwn() {
         String client = "bal discover ballerinax/github client Client";
-        DiscoverResult result = new DiscoverResult.ResourceList(
+        DiscoverResult result = new DiscoverResult.ResourceList(null,
                 List.of(resource("gists/starred", client + " gists/starred", "get"),
                         resource("gists/'public", client + " \"gists/'public\"", "get"),
                         resource("gists/'private", client + " \"gists/'private\"", "get", "post")),
-                3, 3, null);
+                3, 3, null, null, DiscoverResult.Documented.NONE, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "3 resource paths",
                 "",
@@ -472,7 +473,7 @@ public class DiscoverResultRenderingTest {
                 List.of(
                         new DiscoverResult.ReadmeChunks.Chunk(1, "Overview", 10, "bal discover pkg readme 1"),
                         new DiscoverResult.ReadmeChunks.Chunk(3, "Quickstart", 25, "bal discover pkg readme 3")),
-                2, null);
+                2, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 matching chunks",
                 "",
@@ -489,7 +490,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void noChunkMatchingTheFilterIsNoneInTextAndAnEmptyArrayInJson() {
-        DiscoverResult result = new DiscoverResult.ReadmeChunks(List.of(), 0, null);
+        DiscoverResult result = new DiscoverResult.ReadmeChunks(List.of(), 0, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), "No matching chunks.");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
@@ -674,8 +675,9 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aMissNamesTheClosestNamesAndWhatIsThereInBothRenderings() {
         DiscoverResult result = new DiscoverResult.NoMatch("sendd", "Producer", List.of("send"), List.of(),
-                new DiscoverResult.MethodList(methods("bal discover ballerinax/kafka client Producer", "close", "send"),
-                        2, 2, null),
+                new DiscoverResult.MethodList(null,
+                        methods("bal discover ballerinax/kafka client Producer", "close", "send"),
+                        2, 2, null, null, DiscoverResult.Documented.NONE, null, null),
                 "bal discover ballerinax/kafka client Producer", DiscoverResult.Documented.NONE, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Producer",

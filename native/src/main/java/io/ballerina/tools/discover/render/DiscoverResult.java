@@ -91,14 +91,6 @@ public sealed interface DiscoverResult {
      */
     record BucketList(List<String> buckets, List<Submodule> submodules, String warning) implements DiscoverResult {
 
-        public BucketList(List<String> buckets) {
-            this(buckets, List.of(), null);
-        }
-
-        public BucketList(List<String> buckets, String warning) {
-            this(buckets, List.of(), warning);
-        }
-
         /**
          * @param name the bare name {@code --module} itself takes
          * @param summary the submodule's own one-line summary, or empty when it publishes none
@@ -126,14 +118,6 @@ public sealed interface DiscoverResult {
     record ContainerRoster(List<Container> containers, int total, Paging paging, String next, String warning,
             List<NotAttachable> notAttachable, int notAttachableTotal) implements DiscoverResult {
 
-        public ContainerRoster(List<Container> containers, int total, String next) {
-            this(containers, total, null, next, null);
-        }
-
-        public ContainerRoster(List<Container> containers, int total, Paging paging, String next, String warning) {
-            this(containers, total, paging, next, warning, List.of(), 0);
-        }
-
         /**
          * A service type no listener accepts — an interceptor, or a type a service returns rather than attaches.
          *
@@ -153,16 +137,7 @@ public sealed interface DiscoverResult {
          * @param command the command that opens it
          */
         public record Container(String name, int resources, int remote, int normal, String listener,
-                String unconfirmed, String command) {
-
-            public Container(String name, int resources, int remote, int normal, String listener, String command) {
-                this(name, resources, remote, normal, listener, null, command);
-            }
-
-            public Container(String name, int resources, int remote, int normal, String command) {
-                this(name, resources, remote, normal, null, command);
-            }
-        }
+                String unconfirmed, String command) { }
     }
 
     /**
@@ -188,10 +163,6 @@ public sealed interface DiscoverResult {
     record PathGroups(
             String container, List<ResourceList.Resource> resources, List<Group> groups, Counts counts, int total,
             Paging paging, String next, String warning, String note) implements DiscoverResult {
-
-        public PathGroups(List<Group> groups, int total, String next) {
-            this(null, List.of(), groups, new Counts(0, total), total, null, next, null, null);
-        }
 
         /**
          * @param resources resource paths ending at this level
@@ -229,10 +200,6 @@ public sealed interface DiscoverResult {
     record ResourceList(
             String container, List<Resource> resources, int shown, int total, Paging paging, String next,
             Documented documented, String warning, String note) implements DiscoverResult {
-
-        public ResourceList(List<Resource> resources, int shown, int total, String next) {
-            this(null, resources, shown, total, null, next, Documented.NONE, null, null);
-        }
 
         /**
          * @param path the resource's path, {@code :name}-spelled for parameters, {@code .} for the root
@@ -273,12 +240,7 @@ public sealed interface DiscoverResult {
      */
     record MethodList(
             String container, List<Method> methods, int shown, int total, Paging paging, String next,
-            Documented documented, String warning, String note) implements DiscoverResult {
-
-        public MethodList(List<Method> methods, int shown, int total, String next) {
-            this(null, methods, shown, total, null, next, Documented.NONE, null, null);
-        }
-    }
+            Documented documented, String warning, String note) implements DiscoverResult { }
 
     /**
      * The {@code readme} bucket's own answer: the whole readme verbatim, or — when a chunk selector resolved to
@@ -315,10 +277,6 @@ public sealed interface DiscoverResult {
      */
     record ReadmeChunks(List<Chunk> chunks, int total, Paging paging, String next, String warning)
             implements DiscoverResult {
-
-        public ReadmeChunks(List<Chunk> chunks, int total, String next) {
-            this(chunks, total, null, next, null);
-        }
 
         /**
          * @param number the 1-based address a caller types

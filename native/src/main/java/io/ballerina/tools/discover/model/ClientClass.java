@@ -35,10 +35,6 @@ import java.util.List;
  */
 public record ClientClass(String name, String description, boolean isIsolated, List<Fn> functions) {
 
-    public ClientClass(String name, String description, List<Fn> functions) {
-        this(name, description, false, functions);
-    }
-
     public ClientClass withFunctions(List<Fn> replacement) {
         return new ClientClass(name, description, isIsolated, replacement);
     }

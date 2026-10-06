@@ -55,17 +55,6 @@ public record LoadedPackage(
         String pinned,
         Supplier<Library> bound) {
 
-    public LoadedPackage(QualifiedName qualified, Version version, Library library, Optional<String> readme,
-            String module, List<Submodule> submodules, String warning, Supplier<Library> bound) {
-        this(qualified, version, library, readme, module, submodules, warning, null, bound);
-    }
-
-    /** A package whose {@code library} already shows every service binding it can. */
-    public LoadedPackage(QualifiedName qualified, Version version, Library library, Optional<String> readme,
-            String module, List<Submodule> submodules, String warning) {
-        this(qualified, version, library, readme, module, submodules, warning, null, () -> library);
-    }
-
     /**
      * @param name the bare name {@code --module} itself takes, e.g. {@code dataloader}
      * @param summary the submodule's own one-line summary, or empty when it publishes none
