@@ -463,8 +463,8 @@ public class SelectionCarryTest {
 
         Run text = run("ballerinax__redis", command + " --output text");
         Assert.assertTrue(text.out().contains("\nMatched by documentation only (40 of 102)\n"), text.out());
-        Assert.assertTrue(text.out().endsWith("\n... 62 more (page 1 of 3)\nNext: " + command + " --page 2\n"),
-                text.out());
+        Assert.assertTrue(text.out().endsWith("\n... 62 more matched by documentation only (page 1 of 3)\nNext: "
+                + command + " --page 2\n"), text.out());
     }
 
     /**

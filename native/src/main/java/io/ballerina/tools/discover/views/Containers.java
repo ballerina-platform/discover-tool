@@ -994,11 +994,11 @@ public final class Containers {
      * turned a page, reaches the rest. At or under the ceiling this is page 1 whatever was asked: the answer is
      * not paged, and {@code Cli} rejects any other {@code --page} against it.
      */
-    private static Result<Page> documentedPage(List<String> documented, Options options, String command) {
-        return Page.of(documented.size() > MAX_ENTRIES ? options.page() : 1, documented.size(), command);
+    static Result<Page> documentedPage(List<String> documented, int page, String command) {
+        return Page.of(documented.size() > MAX_ENTRIES ? page : 1, documented.size(), command);
     }
 
-    private static DiscoverResult.Documented documentedOn(Page window, List<String> documented, int offset) {
+    static DiscoverResult.Documented documentedOn(Page window, List<String> documented, int offset) {
         return documented.isEmpty()
                 ? DiscoverResult.Documented.NONE
                 : new DiscoverResult.Documented(window.slice(documented, offset), documented.size());
@@ -1039,7 +1039,7 @@ public final class Containers {
         String asked = options.filtered() ? options.filter() : String.join(" ", selectors);
         String command = baseCommand(loaded, scope, container);
         String repeated = command + selectorArguments(container, selectors) + filterArgument(options);
-        Result<Page> page = documentedPage(documented, options, repeated);
+        Result<Page> page = documentedPage(documented, options.page(), repeated);
         if (!page.isOk()) {
             return page.cast();
         }
@@ -1099,7 +1099,7 @@ public final class Containers {
             Entry entry, Options options, List<String> documented, String note) {
         String command = baseCommand(loaded, scope, container) + selectorArguments(container, selectors)
                 + filterArgument(options);
-        Result<Page> page = documentedPage(documented, options, command);
+        Result<Page> page = documentedPage(documented, options.page(), command);
         if (!page.isOk()) {
             return page.cast();
         }

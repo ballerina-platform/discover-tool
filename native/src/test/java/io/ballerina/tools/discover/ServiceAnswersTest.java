@@ -115,6 +115,9 @@ public class ServiceAnswersTest {
             Assert.assertEquals(container.has("confirmed"), !target, container.toString());
             if (!target) {
                 Assert.assertFalse(container.get("confirmed").getAsBoolean());
+                Assert.assertEquals(container.get("unconfirmedReason").getAsString(), "package source unavailable");
+            } else {
+                Assert.assertFalse(container.has("unconfirmedReason"), container.toString());
             }
         }
         String text = run(central("ballerina__http", false), "ballerina/http", "service", "--output", "text");

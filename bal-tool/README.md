@@ -142,7 +142,7 @@ once per version, caching what it finds. It looks for the exact version first in
 `bal build` put packages, then in the running distribution's own repository (`<ballerina.home>/repo/bala/...`,
 the standard library it ships), and only then downloads the bala Central publishes. If the source cannot be
 read, a type it would have settled is listed under the listener marked as not confirmed — `"confirmed":false`
-in JSON — and opening one says why. With http's source unavailable:
+in JSON, with the reason in `unconfirmedReason` — and opening one says why. With http's source unavailable:
 
 ```
 $ bal discover ballerina/http service
@@ -501,19 +501,19 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | bare package                         | `buckets`, `submodules` (`name`, `summary`, `command`)                                                              |
-| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `confirmed`, `command`), `shown`, `total`, `page`, `pages`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
-| resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `next` |
-| resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
-| methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `next`, `documented`                 |
-| more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `next`, `documented` |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`), `documented`, `page`, `pages`, `next` |
-| type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `next`, `documented` |
+| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `confirmed`, `unconfirmedReason`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
+| resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
+| resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` |
+| methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented`                 |
+| more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`), `documented`, `page`, `pages`, `remaining`, `next` |
+| type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` |
 | one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`) |
-| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented`, `page`, `pages` |
-| member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `page`, `pages`, `next`                    |
+| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented`, `page`, `pages`, `remaining` |
+| member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`                    |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
 | readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
-| readme sections                      | `chunks` (`number`, `title`, `lines`, `command`), `shown`, `total`, `page`, `pages`, `next`                       |
+| readme sections                      | `chunks` (`number`, `title`, `lines`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`                       |
 
 Any answer can also carry `warning` (the version could not be confirmed against the registry) and most can
 carry `note` (the symbol was found in a different bucket than the one asked, the path selector was relocated
@@ -552,9 +552,11 @@ No listing shows more than **40 entries**. Over that:
   matches (opened whole, since a container with no methods has nothing else to match) as well as one with a
   matching member (opened narrowed).
 
-A cut listing always says so: `shown`/`total`, `page`/`pages` and `next` (the `--page` command that continues
-it) in JSON, or a `... N more (page P of Q)` line followed by `Next: <command>` in text, where `N` counts what
-comes after this page. In text, a listing that continues also ends with the command that narrows it by keyword,
+A cut listing always says so: `shown`/`total`, `page`/`pages`, `remaining` (everything after this page,
+documentation-only matches included) and `next` (the `--page` command that continues it) in JSON, or a
+`... N more (page P of Q)` line followed by `Next: <command>` in text, where `N` counts what comes after this page
+(`... N more matched by documentation only (page P of Q)` when only those are paged, beside one signature or a
+miss). In text, a listing that continues also ends with the command that narrows it by keyword,
 `Next: bal discover <package> <bucket> --filter <keyword>`, which is usually shorter than paging.
 
 ### Paths
