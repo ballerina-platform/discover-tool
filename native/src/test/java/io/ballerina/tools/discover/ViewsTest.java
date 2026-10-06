@@ -874,7 +874,8 @@ public class ViewsTest {
         List<DiscoverResult.Foreign> foreignProxies = config.foreign().stream()
                 .filter(each -> each.name().equals("ProxyConfig")).toList();
         Assert.assertEquals(foreignProxies, List.of(new DiscoverResult.Foreign(
-                "ProxyConfig", "ballerina/http", "2.14.10", "bal discover ballerina/http type ProxyConfig")));
+                "ProxyConfig", "ballerina/http", "2.14.10",
+                "bal discover ballerina/http --version 2.14.10 type ProxyConfig")));
 
         DiscoverResult.TypeRoster roster = as(DiscoverResult.TypeRoster.class, type(slug));
         List<DiscoverResult.Method> localRows = roster.sections().stream()
@@ -916,7 +917,7 @@ public class ViewsTest {
                 new DiscoverResult.Foreign("Thing1", "ballerinax/kafka", "4.6.5",
                         "bal discover ballerinax/kafka type Thing1"),
                 new DiscoverResult.Foreign("Thing2", "ballerina/http", "2.1.0",
-                        "bal discover ballerina/http type Thing2"),
+                        "bal discover ballerina/http --version 2.1.0 type Thing2"),
                 new DiscoverResult.Foreign("Thing3", "ballerinax/kafka.unlisted", "1.0.0", null)));
         String text = TextRenderer.render(holder, new TextRenderer.Context(
                 loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null));
@@ -967,7 +968,7 @@ public class ViewsTest {
                 .filter(each -> each.name().equals("BearerTokenConfig")).findFirst().orElseThrow();
         Assert.assertEquals(bearer.module(), "ballerina/http");
         Assert.assertEquals(bearer.version(), "2.15.5");
-        Assert.assertEquals(bearer.command(), "bal discover ballerina/http type BearerTokenConfig");
+        Assert.assertEquals(bearer.command(), "bal discover ballerina/http --version 2.15.5 type BearerTokenConfig");
     }
 
     @Test
