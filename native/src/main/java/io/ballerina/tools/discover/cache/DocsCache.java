@@ -100,7 +100,7 @@ public interface DocsCache {
 
     void writeDocs(DocsKey key, JsonElement payload);
 
-    /** Best-effort. Used to make a corrupt entry self-healing and by {@code --refresh}. */
+    /** Best-effort. Used to make a corrupt entry self-healing. */
     void removeDocs(DocsKey key);
 
     /**
