@@ -218,12 +218,12 @@ public class ClientTest {
 
     /** A version the caller pinned. */
     private static CentralClient.ResolvedVersion supplied(String version) {
-        return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, true);
+        return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, true, false);
     }
 
     /** A version the reader resolved on the caller's behalf. */
     private static CentralClient.ResolvedVersion resolved(String version) {
-        return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, false);
+        return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, false, false);
     }
 
     @Test

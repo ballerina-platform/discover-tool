@@ -47,11 +47,12 @@ import java.util.Optional;
 public class RenderTest {
 
     private static final Library EMPTY = new Library(
-            "test/pkg", "", List.of(), List.of(), List.of(), List.of(), List.of());
+            "test/pkg", "", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
 
-    private static final TypeDef.Rec RECORD = new TypeDef.Rec("Stars", "A star count.", List.of(
+    private static final TypeDef.Rec RECORD = new TypeDef.Rec("Stars", "A star count.", false, false, List.of(
             new RecordField("owner", "", new TypeRef("string")),
-            new RecordField("count", "", new TypeRef("int"), "0", true)));
+            new RecordField("count", "", new TypeRef("int"), "0", true, false, false, false,
+                    RecordField.Form.DECLARED)));
 
     @Test
     public void aModuleAliasIsTheLastDottedSegmentOfThePackagePath() {
@@ -75,12 +76,12 @@ public class RenderTest {
     @Test
     public void aForeignNameIsQualifiedOncePerMentionAndCarriesNoNote() {
         Assert.assertEquals(
-                TypeDefs.renderTypeDef(new TypeDef.Rec("Message", "", List.of(
+                TypeDefs.renderTypeDef(new TypeDef.Rec("Message", "", false, false, List.of(
                         new RecordField("attachments", "", new TypeRef(
                                 "Entity|Attachment|(Entity|Attachment)[]",
                                 List.of(new TypeRef.Link.External(new ModuleRef("ballerina", "mime"), "Entity"),
                                         new TypeRef.Link.External(new ModuleRef("ballerina", "mime"), "Entity"))),
-                                null, true)))),
+                                null, true, false, false, false, RecordField.Form.DECLARED)))),
                 "public type Message record {\n"
                         + "    mime:Entity|Attachment|(mime:Entity|Attachment)[] attachments?;\n};");
     }
@@ -95,7 +96,7 @@ public class RenderTest {
         // qualifiers` postgresql's value classes produced from `*sql:TypedValue`.
         RecordField field = new RecordField("value", "", new TypeRef("string"));
         Assert.assertEquals(
-                TypeDefs.renderTypeDef(new TypeDef.Rec("Row", "", List.of(field))),
+                TypeDefs.renderTypeDef(new TypeDef.Rec("Row", "", false, false, List.of(field))),
                 "public type Row record {\n    string value;\n};");
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.ObjectDef(
@@ -127,7 +128,7 @@ public class RenderTest {
         // A module-level function is the one callable that carries visibility of its own.
         Assert.assertEquals(
                 Signatures.renderStandaloneFunction(new Fn.Normal(
-                        "getDefaultListener", "", List.of(), new ReturnDef(new TypeRef("Listener")),
+                        "getDefaultListener", "", List.of(), new ReturnDef(new TypeRef("Listener"), null),
                         false, true)),
                 "public isolated function getDefaultListener() returns Listener;");
         // And the client class, which is the first thing an isolated caller has to construct.
@@ -146,7 +147,8 @@ public class RenderTest {
         Fn.Remote send = new Fn.Remote(
                 "send",
                 "Post a message.",
-                List.of(new Param("channel", "The channel ID, not its name.", new TypeRef("string"))),
+                List.of(new Param("channel", "The channel ID, not its name.", new TypeRef("string"), null,
+                        Param.Form.NORMAL, false)),
                 new ReturnDef(new TypeRef("error?"), "nil on success"),
                 false,
                 false);
@@ -167,7 +169,7 @@ public class RenderTest {
         // 'service_function'` is what the compiler says about it; Central's own string is the source's `on`
         // clause for all twelve annotations in the corpus.
         String rendered = Documents.toSyntaxString(new Library(
-                "test/pkg", "", List.of(), List.of(), List.of(), List.of(),
+                "test/pkg", "", List.of(), List.of(), List.of(), List.of(), List.of(),
                 List.of(new Library.AnnotationDef(
                                 "Payload", "Defines the payload.",
                                 Optional.of(new TypeRef("HttpPayload")), "parameter, return"),
@@ -176,7 +178,7 @@ public class RenderTest {
                                 "object function"),
                         // A marker annotation takes no argument, so printing a type here would be a guess.
                         new Library.AnnotationDef("ID", "", Optional.empty(),
-                                "record field, parameter, return"))));
+                                "record field, parameter, return")), List.of()));
         Assert.assertTrue(rendered.contains(
                 "# Defines the payload.\npublic annotation HttpPayload Payload on parameter, return;"),
                 rendered);
@@ -206,7 +208,7 @@ public class RenderTest {
         // Spacing is uniform across kinds: a doc comment is adjacent to what it documents, and a declaration
         // with no description starts at its first line. Records were the one form that did neither (IO-03).
         Assert.assertEquals(
-                TypeDefs.renderTypeDef(new TypeDef.Rec(RECORD.name(), "", RECORD.fields())),
+                TypeDefs.renderTypeDef(new TypeDef.Rec(RECORD.name(), "", false, false, RECORD.fields())),
                 "public type Stars record {\n    string owner;\n    int count? = 0;\n};");
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Enumeration("Colour", "", List.of(
@@ -233,7 +235,9 @@ public class RenderTest {
                 TypeDefs.renderTypeDef(new TypeDef.Constant("NAME", "", "aep", new TypeRef("string"))),
                 "public const string NAME = \"aep\";");
         Assert.assertEquals(
-                TypeDefs.renderTypeDef(new TypeDef.ObjectDef("Engine", "")), "public class Engine {\n}");
+                TypeDefs.renderTypeDef(new TypeDef.ObjectDef("Engine", "", TypeDef.ObjectDef.Form.CLASS,
+                        TypeDef.ObjectDef.Role.PLAIN, false, false, false, false, List.of(), List.of())),
+                "public class Engine {\n}");
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.ErrorDef(
                         "ClientError", "", true, Optional.of(new TypeRef("Error")))),
@@ -310,14 +314,14 @@ public class RenderTest {
     @Test
     public void pathParametersAreDeclaredInThePathAndNotRepeatedInTheParameterList() {
         String rendered = Documents.toSyntaxString(EMPTY.withClients(List.of(
-                new ClientClass("Client", "", List.of(new Fn.Resource(
+                new ClientClass("Client", "", false, List.of(new Fn.Resource(
                         "get",
                         List.of(new Fn.PathSegment.Literal("repos"),
                                 new Fn.PathSegment.Parameter("string", "owner")),
                         "",
-                        List.of(new Param("owner", "", new TypeRef("string")),
-                                new Param("page", "", new TypeRef("int"), "1")),
-                        new ReturnDef(new TypeRef("json"))))))));
+                        List.of(new Param("owner", "", new TypeRef("string"), null, Param.Form.NORMAL, false),
+                                new Param("page", "", new TypeRef("int"), "1", Param.Form.NORMAL, false)),
+                        new ReturnDef(new TypeRef("json"), null), false, false))))));
         Assert.assertTrue(rendered.contains(
                 "resource function get repos/[string owner](int page = 1) returns json;"), rendered);
     }
@@ -333,8 +337,9 @@ public class RenderTest {
                 List.of(),
                 List.of(new Fn.Remote(
                         "query", "",
-                        List.of(new Param("sqlQuery", "", new TypeRef("ParameterizedQuery"))),
-                        new ReturnDef(new TypeRef("stream<rowType, Error?>")))));
+                        List.of(new Param("sqlQuery", "", new TypeRef("ParameterizedQuery"), null, Param.Form.NORMAL,
+                                false)),
+                        new ReturnDef(new TypeRef("stream<rowType, Error?>"), null), false, false)));
         Assert.assertEquals(TypeDefs.renderTypeDef(contract), """
                 # A database client.
                 public type Client isolated client object {
@@ -363,7 +368,7 @@ public class RenderTest {
         // http's declarations named a type the compiler does not have.
         Assert.assertEquals(
                 Signatures.renderSignature(new Fn.Normal(
-                        "circuitBreakerForceClose", "", List.of(), ReturnDef.none())),
+                        "circuitBreakerForceClose", "", List.of(), ReturnDef.none(), false, false)),
                 "function circuitBreakerForceClose();");
     }
 
@@ -374,9 +379,9 @@ public class RenderTest {
         Assert.assertEquals(
                 Signatures.renderSignature(new Fn.Normal(
                         "init", "",
-                        List.of(new Param("serviceUrl", "", new TypeRef("string"), "BASE_URL")
+                        List.of(new Param("serviceUrl", "", new TypeRef("string"), "BASE_URL", Param.Form.NORMAL, false)
                                 .withUnwritableDefault()),
-                        ReturnDef.none())),
+                        ReturnDef.none(), false, false)),
                 "function init(string serviceUrl = BASE_URL); // the default BASE_URL is "
                         + "not exported by this package; omit the argument rather than repeating it");
         // Two of them, and a foreign type name as well, all in ONE trailing comment — a second `//` would
@@ -384,10 +389,13 @@ public class RenderTest {
         String rendered = Signatures.renderSignature(new Fn.Normal(
                 "init", "",
                 List.of(new Param("config", "", new TypeRef("Config", List.of(
-                                new TypeRef.Link.External(new ModuleRef("ballerina", "http"), "Config")))),
-                        new Param("a", "", new TypeRef("string"), "BASE_URL").withUnwritableDefault(),
-                        new Param("b", "", new TypeRef("string"), "DRIVE_BASE_URL").withUnwritableDefault()),
-                ReturnDef.none()));
+                                new TypeRef.Link.External(new ModuleRef("ballerina", "http"), "Config"))), null,
+                                Param.Form.NORMAL, false),
+                        new Param("a", "", new TypeRef("string"), "BASE_URL", Param.Form.NORMAL, false)
+                                .withUnwritableDefault(),
+                        new Param("b", "", new TypeRef("string"), "DRIVE_BASE_URL", Param.Form.NORMAL, false)
+                                .withUnwritableDefault()),
+                ReturnDef.none(), false, false));
         Assert.assertEquals(rendered,
                 "function init(http:Config config, string a = BASE_URL, string b = DRIVE_BASE_URL); "
                         + "// the defaults BASE_URL, "
@@ -409,7 +417,7 @@ public class RenderTest {
                         List.of(new Fn.Constructor(
                                 "",
                                 List.of(new Param("config", "", new TypeRef("Config"), null, Param.Form.INCLUSION)),
-                                ReturnDef.none())))),
+                                ReturnDef.none(), false, false)))),
                 List.of(), List.of(), List.of()));
         Assert.assertTrue(rendered.contains("""
                 // --- Listeners ---

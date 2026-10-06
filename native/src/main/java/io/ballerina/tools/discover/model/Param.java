@@ -49,14 +49,6 @@ public record Param(
     /** How a parameter is written: {@code T p}, {@code *T p} or {@code T... p}. */
     public enum Form { NORMAL, INCLUSION, REST }
 
-    public Param(String name, String description, TypeRef type) {
-        this(name, description, type, null, Form.NORMAL, false);
-    }
-
-    public Param(String name, String description, TypeRef type, String defaultValue) {
-        this(name, description, type, defaultValue, Form.NORMAL, false);
-    }
-
     public Param(String name, String description, TypeRef type, String defaultValue, Form form) {
         this(name, description, type, defaultValue, form, false);
     }

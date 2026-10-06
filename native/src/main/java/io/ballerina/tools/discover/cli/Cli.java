@@ -25,6 +25,7 @@ import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.Version;
+import io.ballerina.tools.discover.central.CentralRepository;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
@@ -147,7 +148,8 @@ public final class Cli {
         // `--refresh` is only known once arguments are parsed. The transport and the cache arrive from the process
         // wrapper, so the options are rebuilt here rather than there.
         HttpOptions resolved = http.withRefresh(root.refresh);
-        Loader.LoadOptions options = new Loader.LoadOptions(resolved, projectDir, root.module, root.version);
+        Loader.LoadOptions options = new Loader.LoadOptions(
+                resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, root.version);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified.value(), options);
         if (!loaded.isOk()) {
             return fail(loaded.failure(), streams);

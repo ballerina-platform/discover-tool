@@ -243,14 +243,17 @@ public final class FixtureCorpus {
             throw new AssertionError("fixture " + slug + " has no module named after it: "
                     + module.failure().describe());
         }
+        Library library = libraryFor(slug);
         return new LoadedPackage(
                 qualifiedForSlug(slug),
                 FIXTURE_VERSION,
-                libraryFor(slug),
+                library,
                 Readmes.of(module.value()),
                 null,
                 List.of(),
-                Loader.unverifiedWarning(false));
+                Loader.unverifiedWarning(false),
+                null,
+                () -> library);
     }
 
     /**

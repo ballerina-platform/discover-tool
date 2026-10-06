@@ -59,10 +59,6 @@ public sealed interface TypeDef {
             boolean isDeprecated,
             List<RecordField> fields) implements TypeDef {
 
-        public Rec(String name, String description, List<RecordField> fields) {
-            this(name, description, false, false, fields);
-        }
-
         /**
          * The same record with different members.
          *
@@ -186,10 +182,6 @@ public sealed interface TypeDef {
 
         /** How the object's methods are called: plain, {@code ->} on a client, or attached as a service. */
         public enum Role { PLAIN, CLIENT, SERVICE }
-
-        public ObjectDef(String name, String description) {
-            this(name, description, Form.CLASS, Role.PLAIN, false, false, false, false, List.of(), List.of());
-        }
     }
 
     /**

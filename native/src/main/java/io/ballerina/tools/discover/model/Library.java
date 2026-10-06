@@ -51,20 +51,6 @@ public record Library(
         List<Configurable> configurables) {
 
     /**
-     * The listener-less, configurable-less shape, for a test that is about something else.
-     *
-     * <p>Only ONE convenience constructor, and only for tests. There were two, and the wider of them is what
-     * silently zeroed {@code configurables} the day the field was added: {@link Defaults} rebuilt the library
-     * through it, so a category that parsed correctly and rendered correctly arrived empty in every view. A
-     * production site now has to name every component, which is what makes adding one a compile error at each
-     * place that has to decide about it.
-     */
-    public Library(String name, String description, List<TypeDef> typeDefs, List<ClientClass> clients,
-            List<Fn.Standalone> functions, List<Service> services, List<AnnotationDef> annotations) {
-        this(name, description, typeDefs, clients, functions, List.of(), services, annotations, List.of());
-    }
-
-    /**
      * A {@code configurable} the package declares, which a DEPLOYER sets and a caller cannot reference.
      *
      * <p>Held apart from {@link #typeDefs()} because it is not a declaration a caller can write against, and

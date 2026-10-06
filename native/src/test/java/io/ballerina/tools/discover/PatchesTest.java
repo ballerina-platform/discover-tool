@@ -364,8 +364,8 @@ public class PatchesTest {
      */
     @Test
     public void aReservedWordInAModulePathIsQuotedInTheImportHeader() {
-        Library library = new Library("ballerinax/client.config", "", List.of(), List.of(), List.of(),
-                List.of(), List.of());
+        Library library = new Library("ballerinax/client.config", "", List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of());
         Assert.assertEquals(Patches.applyPatches(library).name(), "ballerinax/'client.config");
         // The quoting is the module path's, not every package's: an ordinary name is left alone.
         Assert.assertEquals(

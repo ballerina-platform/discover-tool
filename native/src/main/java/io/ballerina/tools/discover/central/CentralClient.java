@@ -89,10 +89,6 @@ public final class CentralClient {
         public ResolvedVersion(Version version, boolean stale) {
             this(version, stale, false, false);
         }
-
-        public ResolvedVersion(Version version, boolean stale, boolean supplied) {
-            this(version, stale, supplied, false);
-        }
     }
 
     // -----------------------------------------------------------------------

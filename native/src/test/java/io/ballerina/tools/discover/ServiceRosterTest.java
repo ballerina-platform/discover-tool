@@ -59,7 +59,7 @@ public class ServiceRosterTest {
         }
         Library library = Pipeline.build(payload.module(), Optional.of(new ObjectInclusions(inclusions)));
         return new LoadedPackage(QualifiedName.parse("test/pkg").value(), FixtureCorpus.FIXTURE_VERSION, library,
-                Optional.empty(), null, List.of(), null);
+                Optional.empty(), null, List.of(), null, null, () -> library);
     }
 
     private static DiscoverResult.ContainerRoster page(int number) {

@@ -58,10 +58,6 @@ public interface HttpTransport {
          */
         record Answered(int status, String body, String retryAfter) implements Reply {
 
-            public Answered(int status, String body) {
-                this(status, body, null);
-            }
-
             public boolean isOk() {
                 return status >= 200 && status < 300;
             }

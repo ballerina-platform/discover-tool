@@ -127,7 +127,7 @@ public class PackageRepositoryTest {
                 Result.ok(new CentralClient.ResolvedVersion(version, false)),
                 Result.ok(FixtureCorpus.loadFixture(SLUG)));
         Loader.LoadOptions options =
-                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository));
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null);
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
@@ -140,7 +140,7 @@ public class PackageRepositoryTest {
 
     private static Result<LoadedPackage> loadHttp(FakeRepository repository) {
         Result<LoadedPackage> loaded = Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
-                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository)));
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null));
         return loaded.isOk() ? Result.ok(loaded.value().withBindings()) : loaded;
     }
 
@@ -171,7 +171,7 @@ public class PackageRepositoryTest {
         FakeRepository repository = http(FixtureCorpus.recordedSources("ballerina__http"));
 
         Result<LoadedPackage> loaded = Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
-                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository)));
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null));
 
         Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
         Assert.assertEquals(repository.sourceCalls, 0);
@@ -203,7 +203,7 @@ public class PackageRepositoryTest {
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "not on this repository")),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")));
         Loader.LoadOptions options =
-                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository));
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null);
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
@@ -219,7 +219,7 @@ public class PackageRepositoryTest {
                 Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka:4.6.5", "gone from this repository")));
         Loader.LoadOptions options =
-                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository));
+                new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null);
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
@@ -240,7 +240,7 @@ public class PackageRepositoryTest {
                 Result.ok(new CentralClient.ResolvedVersion(version, false)),
                 Result.ok(FixtureCorpus.loadFixture(SLUG)));
         Loader.LoadOptions options = new Loader.LoadOptions(
-                httpThatMustNotReachTheNetwork(), null, List.of(first, second));
+                httpThatMustNotReachTheNetwork(), null, List.of(first, second), null, null);
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
@@ -265,7 +265,7 @@ public class PackageRepositoryTest {
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "second repository has no answer")),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")));
         Loader.LoadOptions options = new Loader.LoadOptions(
-                httpThatMustNotReachTheNetwork(), null, List.of(resolvesButFailsToFetch, second));
+                httpThatMustNotReachTheNetwork(), null, List.of(resolvesButFailsToFetch, second), null, null);
 
         Result<LoadedPackage> loaded = Loader.loadPackage(PKG, options);
 
@@ -292,7 +292,7 @@ public class PackageRepositoryTest {
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "must not be reached")));
         Loader.LoadOptions options = new Loader.LoadOptions(
-                httpThatMustNotReachTheNetwork(), null, List.of(answersButWrongModule, second));
+                httpThatMustNotReachTheNetwork(), null, List.of(answersButWrongModule, second), null, null);
 
         Result<LoadedPackage> loaded = Loader.loadPackage(QualifiedName.parse("ballerinax/nosuchmodule").value(),
                 options);
@@ -327,7 +327,7 @@ public class PackageRepositoryTest {
 
     private static Result<LoadedPackage> loadSubgraph(FakeRepository... repositories) {
         return Loader.loadPackage(GRAPHQL, new Loader.LoadOptions(
-                httpThatMustNotReachTheNetwork(), null, List.of(repositories), "subgraph"));
+                httpThatMustNotReachTheNetwork(), null, List.of(repositories), "subgraph", null));
     }
 
     @Test
@@ -411,7 +411,7 @@ public class PackageRepositoryTest {
         FakeRepository first = graphqlRepository("first", noModulePage());
         FakeRepository second = graphqlRepository("second", subgraphPage());
         Result<LoadedPackage> loaded = Loader.loadPackage(GRAPHQL, new Loader.LoadOptions(
-                httpThatMustNotReachTheNetwork(), project.toString(), List.of(first, second), "subgraph"));
+                httpThatMustNotReachTheNetwork(), project.toString(), List.of(first, second), "subgraph", null));
         Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
         Assert.assertEquals(loaded.value().version().text(), "1.17.0");
         Assert.assertEquals(first.resolveCalls + second.resolveCalls, 0, "the lock, not the repositories, names it");

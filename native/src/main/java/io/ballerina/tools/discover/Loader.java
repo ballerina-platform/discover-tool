@@ -78,31 +78,6 @@ public final class Loader {
                 throw new IllegalArgumentException("at least one repository is required");
             }
         }
-
-        public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
-                String module) {
-            this(http, projectDir, repositories, module, null);
-        }
-
-        public LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories) {
-            this(http, projectDir, repositories, null, null);
-        }
-
-        public LoadOptions(HttpOptions http, String projectDir) {
-            this(http, projectDir, List.of(CentralRepository.INSTANCE), null, null);
-        }
-
-        public LoadOptions(HttpOptions http, String projectDir, String module) {
-            this(http, projectDir, List.of(CentralRepository.INSTANCE), module, null);
-        }
-
-        public LoadOptions(HttpOptions http, String projectDir, String module, String version) {
-            this(http, projectDir, List.of(CentralRepository.INSTANCE), module, version);
-        }
-
-        public static LoadOptions of(HttpOptions http) {
-            return new LoadOptions(http, null, List.of(CentralRepository.INSTANCE), null, null);
-        }
     }
 
     /**

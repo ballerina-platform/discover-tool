@@ -59,11 +59,7 @@ public final class TextRenderer {
      */
     public record Context(String pkg, String module, List<String> trail, String filter, String version) {
 
-        public static final Context NONE = new Context(null, null, List.of(), null);
-
-        public Context(String pkg, String module, List<String> trail, String filter) {
-            this(pkg, module, trail, filter, null);
-        }
+        public static final Context NONE = new Context(null, null, List.of(), null, null);
 
         public Context {
             trail = trail == null ? List.of() : List.copyOf(trail);

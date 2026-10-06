@@ -26,6 +26,7 @@ import io.ballerina.tools.discover.cli.Cli;
 import io.ballerina.tools.discover.constructs.Decl;
 import io.ballerina.tools.discover.constructs.Node;
 import io.ballerina.tools.discover.constructs.Payload;
+import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
@@ -224,9 +225,11 @@ public class ServiceAnswersTest {
     private static LoadedPackage attachingIn(String name, Node serviceType, String module, String... submodules) {
         Payload payload = Payload.pkg("test", module == null ? name : name + "." + module)
                 .with("listeners", Decl.listenerAttaching(serviceType, "Listener"));
+        Library library = Pipeline.build(payload.module());
         return new LoadedPackage(QualifiedName.parse("test/" + name).value(), FixtureCorpus.FIXTURE_VERSION,
-                Pipeline.build(payload.module()), Optional.empty(), module,
-                Arrays.stream(submodules).map(submodule -> new LoadedPackage.Submodule(submodule, "")).toList(), null);
+                library, Optional.empty(), module,
+                Arrays.stream(submodules).map(submodule -> new LoadedPackage.Submodule(submodule, "")).toList(), null,
+                null, () -> library);
     }
 
     private static DiscoverResult.ContainerRoster roster(LoadedPackage loaded) {
