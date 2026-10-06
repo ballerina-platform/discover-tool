@@ -243,12 +243,13 @@ public record PathTree(
     public record Located(Resolution resolution, List<List<String>> alternatives, boolean relocated) { }
 
     /**
-     * Resolve a path, and — only when the LAST segment is the one that missed — look for it deeper.
+     * Resolve a path, and — when it misses — look for the REST of it deeper, under the prefix that did match.
      *
      * <p>{@code repos/owner/repo/caches} is a real request against github: {@code caches} exists, at
-     * {@code repos/&#123;owner&#125;/&#123;repo&#125;/actions/caches}. Anchored resolution answers honestly that
-     * there is no {@code caches} under {@code repos/&#123;owner&#125;/&#123;repo&#125;} — correct, and it costs a
-     * round trip. So the trailing segment is located under the prefix that DID match:
+     * {@code repos/&#123;owner&#125;/&#123;repo&#125;/actions/caches}. So is {@code repos/actions/runs}, which
+     * leaves out the parameters between the segments it names. Anchored resolution answers honestly that
+     * there is no such path — correct, and it costs a round trip. So the tokens that missed are located, in
+     * order, under the prefix that DID match:
      *
      * <ol>
      *   <li>exactly one occurrence → answer it, and say where it was found;
@@ -258,13 +259,15 @@ public record PathTree(
      *
      * <p>ANCHORING ITSELF IS UNTOUCHED, and that is the point. Unanchored matching of
      * {@code repos/&#123;owner&#125;/&#123;repo&#125;} on github returns NINE operations rather than three,
-     * pulling in two unrelated team-access subtrees with nothing in the output to say so. Locating one named
-     * segment under a matched prefix is a different operation from matching a suffix anywhere.
+     * pulling in two unrelated team-access subtrees with nothing in the output to say so. Locating the missed
+     * segments under a matched prefix is a different operation from matching a suffix anywhere: the first
+     * token must match directly, and a request that missed on its first token is only searched for when it is
+     * that one token.
      */
     public static Located locate(PathTree root, List<String> tokens) {
         Resolution direct = resolve(root, tokens);
         if (!(direct instanceof Resolution.Missing missing)
-                || missing.matched().size() + 1 != tokens.size()) {
+                || missing.matched().isEmpty() && tokens.size() != 1) {
             return new Located(direct, List.of(), false);
         }
         if (!(resolve(root, missing.matched()) instanceof Resolution.Found prefix)) {
@@ -272,7 +275,8 @@ public record PathTree(
         }
 
         List<List<String>> found = new ArrayList<>();
-        findSegment(prefix.node(), missing.token(), new ArrayList<>(), found);
+        findSegments(prefix.node(), tokens.subList(missing.matched().size(), tokens.size()),
+                new ArrayList<>(), true, found);
         List<List<String>> full = found.stream()
                 .map(relative -> {
                     List<String> path = new ArrayList<>(missing.matched());
@@ -287,17 +291,27 @@ public record PathTree(
         return new Located(direct, List.copyOf(full), false);
     }
 
-    /** Every path under a node whose last segment answers to the token. */
-    private static void findSegment(
-            PathTree node, String token, List<String> prefix, List<List<String>> into) {
+    /**
+     * Every path under a node whose segments answer to the tokens in order.
+     *
+     * <p>Only the first token may sit at any depth. Each later one must follow the previous directly or across
+     * parameter segments alone, which is what lets {@code actions/runs} mean {@code actions/runs} without also
+     * claiming {@code actions/workflows/:workflowId/runs}.
+     */
+    private static void findSegments(
+            PathTree node, List<String> tokens, List<String> prefix, boolean anyDepth, List<List<String>> into) {
         for (PathTree child : node.children()) {
             List<String> path = new ArrayList<>(prefix);
             path.add(child.segment());
-            if (tokenMatches(token, child)) {
+            if (!tokenMatches(tokens.get(0), child)) {
+                if (anyDepth || child.isParam()) {
+                    findSegments(child, tokens, path, anyDepth, into);
+                }
+            } else if (tokens.size() == 1) {
                 into.add(List.copyOf(path));
-                continue;
+            } else {
+                findSegments(child, tokens.subList(1, tokens.size()), path, false, into);
             }
-            findSegment(child, token, path, into);
         }
     }
 

@@ -749,7 +749,7 @@ public final class Containers {
         List<String> parts = new ArrayList<>();
         if (located.relocated() && !located.alternatives().isEmpty()) {
             parts.add("relocated to " + String.join("/", node.path())
-                    + " — the only match for that segment under the requested prefix");
+                    + " — the only match for that path under the requested prefix");
         }
         for (PathTree.Descent.Sibling other : node.alsoMatched()) {
             parts.add("also matched " + String.join("/", other.path()) + " ("

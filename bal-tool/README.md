@@ -268,6 +268,10 @@ Next: bal discover ballerinax/github client Client repos --page 2
 Next: bal discover ballerinax/github client repos --filter <keyword>
 ```
 
+A path may leave out its parameter segments: `repos/actions/runs` opens `repos/:owner/:repo/actions/runs`, with
+a `note` saying where it was relocated to. When several real paths fit the shorthand, none is picked: the answer
+lists each full path with the command that opens it.
+
 In JSON, every resource entry carries a `commands` object keyed by accessor, in `accessors` order: for each
 accessor, the ready-to-run command that opens that signature. A path with one accessor has the same shape with
 one key, so a caller reads every resource row the same way, and a path with several gets a command for each
