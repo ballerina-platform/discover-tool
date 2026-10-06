@@ -923,13 +923,14 @@ public class CliTest {
     }
 
     @Test
-    public void theSelectedModuleNeverListsItselfAmongItsOwnOtherSubmodules() {
+    public void aSubmoduleViewNeverListsItselfOrItsSiblingsAmongItsOwnSubmodules() {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader"), capture.streams(),
                 options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertFalse(capture.stdout().contains("\"name\":\"dataloader\""), capture.stdout());
-        Assert.assertTrue(capture.stdout().contains("\"name\":\"subgraph\""), capture.stdout());
+        Assert.assertFalse(capture.stdout().contains("subgraph"), capture.stdout());
+        Assert.assertFalse(capture.stdout().contains("submodules"), capture.stdout());
     }
 
     @Test
