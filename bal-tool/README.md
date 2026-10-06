@@ -591,7 +591,8 @@ to `Ballerina.toml` and uses the version `Dependencies.toml` locks, so a lookup 
 against, and outside one it uses Central's latest. A version is a flag, never a positional: `bal discover
 ballerina/http client 2.16.6` and `ballerina/http:2.16.6` are `validation` failures that name `--version`. Under
 `--version` every command the answer prints carries it (`bal discover ballerina/http --version 2.15.0 client
-Client`), so drilling in stays on that version; without it the printed commands are unpinned.
+Client`), so drilling in stays on that version; without it the printed commands are unpinned, except one that opens a
+declaration another package owns, which pins the version that declaration was generated against.
 
 ## Caching
 

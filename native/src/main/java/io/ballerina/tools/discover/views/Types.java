@@ -401,6 +401,7 @@ public final class Types {
                             new DiscoverResult.Foreign(external.recordName(), module.coordinate(),
                                     module.pinnedVersion().orElse(null),
                                     loaded.argumentFor(module)
+                                            .map(target -> pinnedTo(loaded, module, target))
                                             .map(target -> "bal discover " + target + " type "
                                                     + Texts.shellWord(external.recordName()))
                                             .orElse(null)));
@@ -408,5 +409,12 @@ public final class Types {
             }
         }
         return List.copyOf(foreign.values());
+    }
+
+    /** A command for another package reads the version its declaration was generated against, not the latest. */
+    private static String pinnedTo(LoadedPackage loaded, ModuleRef module, String target) {
+        return target.equals(module.coordinate()) && !module.coordinate().equals(loaded.qualified().qualified())
+                ? target + module.pinnedVersion().map(version -> " --version " + version).orElse("")
+                : target;
     }
 }
