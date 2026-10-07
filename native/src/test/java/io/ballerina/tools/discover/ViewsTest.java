@@ -1075,6 +1075,58 @@ public class ViewsTest {
         Assert.assertFalse(text.contains("No types."), text);
         Assert.assertTrue(text.contains("Nothing matches 'server'.\n"), text);
         Assert.assertTrue(text.contains("\nMatched by documentation only\n  ClientHttp1Settings\n"), text);
+        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/googleapis.sheets type <name>\n"
+                + "Next: bal discover ballerinax/googleapis.sheets type"), text);
+        Assert.assertEquals(JsonParser.parseString(JsonRenderer.render(answer)).getAsJsonObject()
+                .getAsJsonArray("documented").get(0).toString(), "{\"name\":\"ClientHttp1Settings\","
+                + "\"command\":\"bal discover ballerinax/googleapis.sheets type ClientHttp1Settings\"}");
+    }
+
+    @Test
+    public void theLastPageOfADocumentationOnlyTypeMissStillEndsWithACommand() {
+        LoadedPackage twilio = FixtureCorpus.loadedFixture("ballerinax__twilio");
+        DiscoverResult.NoMatch last = as(DiscoverResult.NoMatch.class, result(
+                Types.render(twilio, new Types.Options(List.of(), "which", 2)), "type --filter which --page 2"));
+        Assert.assertEquals(last.paging().page(), last.paging().pages());
+        Assert.assertEquals(last.next(), "bal discover ballerinax/twilio type");
+        String text = TextRenderer.render(last, new TextRenderer.Context("ballerinax/twilio", null, List.of("type"),
+                "which", null));
+        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/twilio type <name>\n"
+                + "Next: bal discover ballerinax/twilio type"), text);
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(last)).getAsJsonObject();
+        Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerinax/twilio type");
+        json.getAsJsonArray("documented").forEach(entry -> Assert.assertEquals(
+                entry.getAsJsonObject().get("command").getAsString(),
+                "bal discover ballerinax/twilio type " + entry.getAsJsonObject().get("name").getAsString()));
+    }
+
+    @Test
+    public void aContainerRelocatedFromAnotherBucketIsNarrowedAndNamedByItsCanonicalCommand() {
+        LoadedPackage twilio = FixtureCorpus.loadedFixture("ballerinax__twilio");
+        DiscoverResult answer = result(Containers.render(twilio, Surface.Scope.CLASS,
+                new Containers.Options(List.of("client"))), "class client");
+        String text = TextRenderer.render(answer, new TextRenderer.Context("ballerinax/twilio", null,
+                List.of("class", "client"), null, null));
+        Assert.assertTrue(text.contains("Canonical: bal discover ballerinax/twilio client Client\n"), text);
+        Assert.assertTrue(text.contains("\nNext: bal discover ballerinax/twilio client Client --page 2\n"), text);
+        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/twilio client Client --filter <keyword>"),
+                text);
+    }
+
+    @Test
+    public void aMemberTypedInAnotherCaseIsNamedAsItResolved() {
+        LoadedPackage twilio = FixtureCorpus.loadedFixture("ballerinax__twilio");
+        DiscoverResult method = result(Containers.render(twilio, Surface.Scope.CLIENT,
+                new Containers.Options(List.of("client", "createaccount"))), "client client createaccount");
+        Assert.assertTrue(TextRenderer.render(method, new TextRenderer.Context("ballerinax/twilio", null,
+                List.of("client", "client", "createaccount"), null, null))
+                .startsWith("ballerinax/twilio · client · Client · createAccount\n"));
+
+        LoadedPackage log = FixtureCorpus.loadedFixture("ballerina__log");
+        DiscoverResult function = result(Containers.render(log, Surface.Scope.MODULE,
+                new Containers.Options(List.of("printinfo"))), "funcs printinfo");
+        Assert.assertTrue(TextRenderer.render(function, new TextRenderer.Context("ballerina/log", null,
+                List.of("funcs", "printinfo"), null, null)).startsWith("ballerina/log · funcs · printInfo\n"));
     }
 
     @Test

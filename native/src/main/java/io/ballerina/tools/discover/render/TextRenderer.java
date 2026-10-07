@@ -26,6 +26,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * {@link DiscoverResult} → the human-oriented text {@code --output text} prints at an interactive terminal.
@@ -45,6 +47,7 @@ public final class TextRenderer {
     private static final String INDENT = "  ";
     private static final String SEPARATOR = " · ";
     private static final String DOCUMENTED = "matched by documentation only";
+    private static final Pattern PAGE_ARGUMENT = Pattern.compile(" --page \\d+$");
 
     private TextRenderer() {
     }
@@ -80,27 +83,33 @@ public final class TextRenderer {
         if (result instanceof DiscoverResult.Readme readme && readme.chunk() == null) {
             return verbatimReadme(readme);
         }
-        String container = containerOf(result);
         Layout layout = new Layout();
-        layout.top(header(where, container));
+        layout.top(header(where, containerOf(result), memberOf(result)));
         fill(layout, result, where);
         if (layout.hasLaterPages && where.filter() == null && where.pkg() != null) {
-            layout.next(filterCommand(where, container));
+            layout.next(filterCommand(result));
         }
         return layout.render();
     }
 
-    /** The command that narrows the listing just shown by a keyword, which is what most callers want over a page. */
-    private static String filterCommand(Context where, String container) {
-        StringBuilder command = new StringBuilder("bal discover ").append(Texts.shellWord(where.pkg()));
-        if (where.module() != null) {
-            command.append(" --module ").append(Texts.shellWord(where.module()));
-        }
-        if (where.version() != null) {
-            command.append(" --version ").append(Texts.shellWord(where.version()));
-        }
-        resolvedTrail(where, container).forEach(word -> command.append(' ').append(Texts.shellWord(word)));
-        return command.append(" --filter <keyword>").toString();
+    /**
+     * The command that narrows the listing just shown by a keyword, which is what most callers want over a page:
+     * its own page command — the canonical one, whatever bucket and spelling were typed — with a filter for the
+     * page.
+     */
+    private static String filterCommand(DiscoverResult result) {
+        String next = switch (result) {
+            case DiscoverResult.ContainerRoster roster -> roster.next();
+            case DiscoverResult.PathGroups groups -> groups.next();
+            case DiscoverResult.ResourceList resources -> resources.next();
+            case DiscoverResult.MethodList methods -> methods.next();
+            case DiscoverResult.MixedListing mixed -> mixed.next();
+            case DiscoverResult.TypeRoster roster -> roster.next();
+            case DiscoverResult.Owners owners -> owners.next();
+            default -> null;
+        };
+        Matcher page = next == null ? null : PAGE_ARGUMENT.matcher(next);
+        return page == null || !page.find() ? null : next.substring(0, page.start()) + " --filter <keyword>";
     }
 
     private static void fill(Layout layout, DiscoverResult result, Context where) {
@@ -254,10 +263,11 @@ public final class TextRenderer {
         layout.top(counted(resources.total(), "resource path", "resource paths"));
         Drill drill = resourceDrill(resources.resources());
         layout.block(resourceTable(resources.resources(), drill).lines(INDENT));
-        documented(layout, resources.documented());
+        String documentedDrill = documented(layout, resources.documented());
         layout.notices(resources.note(), resources.warning());
         layout.more(remaining(resources.shown(), resources.total(), resources.paging()), resources.paging());
         layout.next(drill.pattern());
+        layout.next(documentedDrill);
         layout.next(resources.next());
     }
 
@@ -267,10 +277,11 @@ public final class TextRenderer {
                 : counted(methods.total(), "method", "methods"));
         Drill drill = methodDrill(methods.methods());
         layout.block(methodTable(methods.methods(), drill).lines(INDENT));
-        documented(layout, methods.documented());
+        String documentedDrill = documented(layout, methods.documented());
         layout.notices(methods.note(), methods.warning());
         layout.more(remaining(methods.shown(), methods.total(), methods.paging()), methods.paging());
         layout.next(drill.pattern());
+        layout.next(documentedDrill);
         layout.next(methods.next());
     }
 
@@ -318,10 +329,11 @@ public final class TextRenderer {
         }
         closureTail(layout, signature.omitted(), signature.omittedTotal(), signature.omittedNext(),
                 signature.foreign());
-        documented(layout, signature.documented());
+        String documentedDrill = documented(layout, signature.documented());
         layout.notices(signature.note(), signature.warning());
         layout.more(remaining(signature.documented().names().size(), signature.documented().total(),
                 signature.paging()), signature.paging(), DOCUMENTED);
+        layout.next(documentedDrill);
         layout.next(signature.next());
     }
 
@@ -345,11 +357,12 @@ public final class TextRenderer {
         Drill methodDrill = methodDrill(methods);
         layout.section("Remote (->)", methodTable(mixed.remote(), methodDrill, 0));
         layout.section("Normal (.)", methodTable(mixed.normal(), methodDrill, mixed.remote().size()));
-        documented(layout, mixed.documented());
+        String documentedDrill = documented(layout, mixed.documented());
         layout.notices(mixed.note(), mixed.warning());
         layout.more(remaining(mixed.shown(), mixed.total(), mixed.paging()), mixed.paging());
         layout.next(drill.pattern());
         layout.next(methodDrill.pattern());
+        layout.next(documentedDrill);
         layout.next(mixed.next());
     }
 
@@ -360,7 +373,7 @@ public final class TextRenderer {
         TextTable paths = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
         noMatch.paths().forEach(alternative -> paths.row(alternative.path(), alternative.command()));
         layout.section(noMatch.paths().size() + " paths carry that segment; pick one", paths);
-        documented(layout, noMatch.documented());
+        String documentedDrill = documented(layout, noMatch.documented());
         if (noMatch.available() != null) {
             Layout available = new Layout();
             fill(available, noMatch.available(), where);
@@ -370,6 +383,7 @@ public final class TextRenderer {
             layout.block(block);
         }
         layout.notices(noMatch.note(), noMatch.warning());
+        layout.next(documentedDrill);
         if (noMatch.paging() != null) {
             layout.more(noMatch.paging().remaining(), noMatch.paging(), DOCUMENTED);
             layout.next(noMatch.next());
@@ -415,10 +429,11 @@ public final class TextRenderer {
             layout.section(heading, methodTable(section.entries(), drill, offset));
             offset += section.entries().size();
         }
-        documented(layout, roster.documented());
+        String documentedDrill = documented(layout, roster.documented());
         layout.notices(roster.note(), roster.warning());
         layout.more(remaining(roster.shown(), roster.total(), roster.paging()), roster.paging());
         layout.next(drill.pattern());
+        layout.next(documentedDrill);
         layout.next(roster.next());
     }
 
@@ -472,7 +487,7 @@ public final class TextRenderer {
     // -----------------------------------------------------------------------
 
     /** {@code org/name · module m · bucket · Container · selectors · --filter k}, from what was asked. */
-    private static String header(Context where, String container) {
+    private static String header(Context where, String container, String member) {
         List<String> parts = new ArrayList<>();
         if (where.pkg() != null) {
             parts.add(where.pkg());
@@ -480,7 +495,7 @@ public final class TextRenderer {
         if (where.module() != null) {
             parts.add("module " + where.module());
         }
-        List<String> trail = new ArrayList<>(resolvedTrail(where, container));
+        List<String> trail = resolvedTrail(where, container, member);
         if (container != null && !trail.contains(container)) {
             trail.add(Math.min(1, trail.size()), container);
         }
@@ -491,16 +506,22 @@ public final class TextRenderer {
         return parts.isEmpty() ? null : String.join(SEPARATOR, parts);
     }
 
-    /** The trail as typed, its container selector spelled as the container it resolved to. */
-    private static List<String> resolvedTrail(Context where, String container) {
-        List<String> trail = where.trail();
-        if (container == null || trail.size() < 2 || trail.get(1).equals(container)
-                || !Names.normalise(trail.get(1)).equals(Names.normalise(container))) {
-            return trail;
+    /** The trail as typed, each selector that resolved to the container or member spelled as it resolved. */
+    private static List<String> resolvedTrail(Context where, String container, String member) {
+        List<String> trail = new ArrayList<>(where.trail());
+        for (int i = 1; i < trail.size(); i++) {
+            String typed = Names.normalise(trail.get(i));
+            if (container != null && typed.equals(Names.normalise(container))) {
+                trail.set(i, container);
+            } else if (member != null && typed.equals(Names.normalise(member))) {
+                trail.set(i, member);
+            }
         }
-        List<String> resolved = new ArrayList<>(trail);
-        resolved.set(1, container);
-        return resolved;
+        return trail;
+    }
+
+    private static String memberOf(DiscoverResult result) {
+        return result instanceof DiscoverResult.Signature signature ? signature.name() : null;
     }
 
     private static String containerOf(DiscoverResult result) {
@@ -584,16 +605,21 @@ public final class TextRenderer {
     /**
      * Documentation-only matches on this page — or, on a page that holds none of them while a later one does,
      * one line saying how many are coming, so they are never silently absent.
+     *
+     * @return the command shape that opens one of them, for the footer, or {@code null}
      */
-    private static void documented(Layout layout, DiscoverResult.Documented documented) {
-        int shown = documented.names().size();
-        if (shown == 0 && documented.total() > 0) {
+    private static String documented(Layout layout, DiscoverResult.Documented documented) {
+        List<DiscoverResult.Method> entries = documented.entries();
+        if (entries.isEmpty() && documented.total() > 0) {
             layout.block(List.of("Matched by documentation only: " + documented.total() + ", on a later page"));
-            return;
+            return null;
         }
+        Drill drill = methodDrill(entries);
+        int shown = entries.size();
         layout.section("Matched by documentation only"
                 + (shown < documented.total() ? " (" + shown + " of " + documented.total() + ")" : ""),
-                names(documented.names()));
+                methodTable(entries, drill));
+        return drill.pattern();
     }
 
     private static List<String> indented(List<String> lines) {
@@ -753,7 +779,7 @@ public final class TextRenderer {
         }
 
         void next(String command) {
-            if (command != null) {
+            if (command != null && !next.contains("Next: " + command)) {
                 next.add("Next: " + command);
             }
         }

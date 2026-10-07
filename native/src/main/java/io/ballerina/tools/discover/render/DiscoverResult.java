@@ -71,12 +71,16 @@ public sealed interface DiscoverResult {
      * {@code --page} like any listing: after the listing's own entries when the answer is a listing, on their own
      * otherwise.
      *
-     * @param names the names on this page
+     * @param entries the entries on this page, each with the command that opens it
      * @param total how many matched that way, every page included
      */
-    record Documented(List<String> names, int total) {
+    record Documented(List<Method> entries, int total) {
 
         public static final Documented NONE = new Documented(List.of(), 0);
+
+        public List<String> names() {
+            return entries.stream().map(Method::name).toList();
+        }
     }
 
     /**
