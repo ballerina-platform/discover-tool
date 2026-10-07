@@ -686,7 +686,7 @@ public final class Containers {
         String where = container.isModule() ? scope.verb() : container.name();
         String base = baseCommand(loaded, scope, container);
         Optional<String> joined = joinedPath(container, selectors)
-                .map(path -> "Join the path's segments with `/` in one argument: `" + base + path
+                .map(path -> "Join the path's segments with `/` in one argument: `" + base + path.arguments()
                         + filterArgument(options) + "`.");
         List<String> read = selectors.subList(0, consumed);
         List<Entry> selected = select(container, read);
@@ -721,7 +721,23 @@ public final class Containers {
                 + "`.";
     }
 
-    private static Optional<String> joinedPath(Surface.Container container, List<String> selectors) {
+    /**
+     * A path typed as separate words, joined into the one argument that resolves, with its accessor when one was
+     * typed first or last: {@code repos :owner :repo} is {@code "repos/:owner/:repo"}.
+     *
+     * @param path the path it resolved to, spelled as listings print it ({@code gists/'public} for
+     *     {@code gists public})
+     * @param accessor the accessor typed with it, or {@code null}
+     */
+    private record JoinedPath(String path, String accessor) {
+
+        /** The arguments that reach it, each with its leading space. */
+        String arguments() {
+            return " " + shellWord(path) + (accessor == null ? "" : " " + accessor);
+        }
+    }
+
+    private static Optional<JoinedPath> joinedPath(Surface.Container container, List<String> selectors) {
         if (!container.hasPaths()) {
             return Optional.empty();
         }
@@ -737,12 +753,11 @@ public final class Containers {
         if (segments.size() < 2) {
             return Optional.empty();
         }
-        String path = String.join("/", segments);
-        if (!(PathTree.locate(PathTree.build(container.operations()), PathTree.splitPath(path)).resolution()
-                instanceof PathTree.Resolution.Found)) {
+        if (!(PathTree.locate(PathTree.build(container.operations()), PathTree.splitPath(String.join("/", segments)))
+                .resolution() instanceof PathTree.Resolution.Found found)) {
             return Optional.empty();
         }
-        return Optional.of(" " + shellWord(path) + (accessor == null ? "" : " " + accessor));
+        return Optional.of(new JoinedPath(pathName(found.path()), accessor));
     }
 
     /**
@@ -978,12 +993,12 @@ public final class Containers {
                         .toList()
                 : List.of();
 
-        Optional<String> joined = selectors.size() == 2 ? joinedPath(container, selectors) : Optional.empty();
+        Optional<JoinedPath> joined = selectors.size() == 2 ? joinedPath(container, selectors) : Optional.empty();
         if (joined.isPresent()) {
             return Result.ok(new DiscoverResult.NoMatch(asked, containerName(container),
-                    List.of(String.join("/", selectors)), List.of(), null,
-                    command + joined.get() + filterArgument(options), DiscoverResult.Documented.NONE, null,
-                    loaded.warning(), note));
+                    List.of(joined.get().path()), List.of(), null,
+                    command + joined.get().arguments() + filterArgument(options), DiscoverResult.Documented.NONE,
+                    null, loaded.warning(), note));
         }
         Optional<UnresolvedPair> pair = unresolvedPair(container, selectors);
         if (pair.isPresent()) {

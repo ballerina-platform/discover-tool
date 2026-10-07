@@ -362,6 +362,23 @@ public class CliTest {
             Assert.assertTrue(text.contains("Did you mean\n  " + path + "\n"), text);
             Assert.assertTrue(text.endsWith("Next: " + joined + "\n"), text);
         }
+
+        // Spelled as the listings spell the path it resolved to, not as typed: `public` is a keyword segment.
+        List<String> argv = List.of("ballerinax/github", "client", "Client", "gists", "public");
+        JsonObject json = JsonParser.parseString(
+                run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
+                .getAsJsonObject();
+        Assert.assertEquals(json.getAsJsonArray("candidates").asList().stream()
+                .map(JsonElement::getAsString).toList(), List.of("gists/'public"));
+        Assert.assertEquals(json.get("next").getAsString(),
+                "bal discover ballerinax/github client Client \"gists/'public\"");
+
+        Capture three = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "gists", "public", "get"),
+                three.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1);
+        Assert.assertEquals(three.field("kind"), "validation", three.stderr());
+        Assert.assertEquals(three.field("suggestion"), "Join the path's segments with `/` in one argument: "
+                + "`bal discover ballerinax/github client Client \"gists/'public\" get`.");
     }
 
     @Test
