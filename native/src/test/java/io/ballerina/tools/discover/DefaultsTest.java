@@ -73,6 +73,13 @@ public class DefaultsTest {
     }
 
     @Test
+    public void aTemplatePrefixIsTheLanguagesOwn() {
+        Assert.assertTrue(writable("re `[a-z]+`"));
+        Assert.assertTrue(writable("base16 `aeeecdefabcd12345567888822`"));
+        Assert.assertTrue(writable("base64 `aGVsbG8=`"));
+    }
+
+    @Test
     public void aNumericLiteralHoldsNoName() {
         Assert.assertTrue(writable("1e10"));
         Assert.assertTrue(writable("0x1F"));

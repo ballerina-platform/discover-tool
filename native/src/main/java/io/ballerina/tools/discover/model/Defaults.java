@@ -87,7 +87,7 @@ public final class Defaults {
             "string", "int", "float", "decimal", "boolean", "byte", "json", "xml", "anydata", "any", "error",
             "never", "readonly", "handle", "future", "typedesc", "map", "table", "stream", "function",
             "object", "record", "true", "false", "new", "null", "check", "checkpanic", "from", "in", "is",
-            "let", "isolated", "transactional");
+            "let", "isolated", "transactional", "select", "where", "var", "re", "base16", "base64");
 
     private Defaults() {
     }
