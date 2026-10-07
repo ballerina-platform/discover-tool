@@ -451,20 +451,27 @@ public class SelectionCarryTest {
         List<String> documented = new ArrayList<>();
         JsonObject page = miss;
         while (true) {
-            page.getAsJsonArray("documented").forEach(name -> documented.add(name.getAsString()));
-            if (!page.has("next")) {
+            page.getAsJsonArray("documented")
+                    .forEach(entry -> documented.add(entry.getAsJsonObject().get("name").getAsString()));
+            if (page.get("page").getAsInt() == page.get("pages").getAsInt()) {
                 break;
             }
             page = answer("ballerinax__redis", page.get("next").getAsString());
         }
         Assert.assertEquals(page.get("page").getAsInt(), 3, page.toString());
+        Assert.assertEquals(page.get("next").getAsString(), "bal discover ballerinax/redis client Client",
+                "the last page of a miss still ends with a command");
+        Assert.assertEquals(page.getAsJsonArray("documented").get(0).getAsJsonObject().get("command").getAsString(),
+                "bal discover ballerinax/redis client Client "
+                        + page.getAsJsonArray("documented").get(0).getAsJsonObject().get("name").getAsString());
         Assert.assertEquals(documented.size(), 102);
         Assert.assertEquals(documented.stream().distinct().count(), 102L, "a page repeated or skipped a name");
 
         Run text = run("ballerinax__redis", command + " --output text");
         Assert.assertTrue(text.out().contains("\nMatched by documentation only (40 of 102)\n"), text.out());
-        Assert.assertTrue(text.out().endsWith("\n... 62 more matched by documentation only (page 1 of 3)\nNext: "
-                + command + " --page 2\n"), text.out());
+        Assert.assertTrue(text.out().endsWith("\n... 62 more matched by documentation only (page 1 of 3)\n"
+                + "Next: bal discover ballerinax/redis client Client <name>\nNext: " + command + " --page 2\n"),
+                text.out());
     }
 
     /**
@@ -486,7 +493,8 @@ public class SelectionCarryTest {
         while (true) {
             methods.addAll(strings(page, "methods"));
             int names = page.getAsJsonArray("documented").size();
-            page.getAsJsonArray("documented").forEach(name -> documented.add(name.getAsString()));
+            page.getAsJsonArray("documented")
+                    .forEach(entry -> documented.add(entry.getAsJsonObject().get("name").getAsString()));
             Assert.assertTrue(page.get("shown").getAsInt() + names <= 40, "over the ceiling: " + page);
             if (!page.has("next")) {
                 break;

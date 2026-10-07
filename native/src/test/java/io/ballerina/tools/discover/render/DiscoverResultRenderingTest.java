@@ -554,12 +554,13 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
                 false, List.of(), List.of(), 0, null, List.of(),
-                new DiscoverResult.Documented(List.of("ping", "auth"), 82), new DiscoverResult.Paging(2, 3, 2),
+                new DiscoverResult.Documented(methods("bal discover pkg client Client", "ping", "auth"), 82),
+                new DiscoverResult.Paging(2, 3, 2),
                 command + " --page 3", null, null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.contains("\nMatched by documentation only (2 of 82)\n  ping\n  auth\n"), text);
-        Assert.assertTrue(text.endsWith("\n... 2 more matched by documentation only (page 2 of 3)\nNext: " + command
-                + " --page 3"), text);
+        Assert.assertTrue(text.endsWith("\n... 2 more matched by documentation only (page 2 of 3)\n"
+                + "Next: bal discover pkg client Client <name>\nNext: " + command + " --page 3"), text);
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("documentedTotal").getAsInt(), 82);
@@ -575,13 +576,15 @@ public class DiscoverResultRenderingTest {
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
                 false, List.of(), List.of(new DiscoverResult.Method("Gist", "bal discover pkg type Gist")), 3,
                 "bal discover pkg type", List.of(),
-                new DiscoverResult.Documented(List.of("ping"), 41), new DiscoverResult.Paging(1, 2, 1),
+                new DiscoverResult.Documented(methods("bal discover pkg client Client", "ping"), 41),
+                new DiscoverResult.Paging(1, 2, 1),
                 command + " --page 2", null, null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.endsWith(lines(
                 "... 2 more past the closure budget, listed by the type roster",
                 "... 1 more matched by documentation only (page 1 of 2)",
                 "Next: bal discover pkg type",
+                "Next: bal discover pkg client Client <name>",
                 "Next: " + command + " --page 2")), text);
         Assert.assertFalse(text.contains("narrow further"), text);
     }
@@ -705,7 +708,8 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MixedListing(null,
                 List.of(), methods("bal discover pkg client Client", "execute"),
                 methods("bal discover pkg client Client", "'close"), new DiscoverResult.MixedListing.Counts(0, 2, 2),
-                2, 4, new DiscoverResult.Paging(1, 2, 2), next, new DiscoverResult.Documented(List.of("forward"), 3),
+                2, 4, new DiscoverResult.Paging(1, 2, 2), next,
+                new DiscoverResult.Documented(methods("bal discover pkg client Client", "forward"), 3),
                 null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 remote methods, 2 normal methods",
@@ -728,7 +732,8 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.get("page").getAsInt(), 1);
         Assert.assertEquals(json.get("pages").getAsInt(), 2);
         Assert.assertEquals(json.get("remaining").getAsInt(), 2);
-        Assert.assertEquals(json.getAsJsonArray("documented").get(0).getAsString(), "forward");
+        Assert.assertEquals(json.getAsJsonArray("documented").get(0).toString(),
+                "{\"name\":\"forward\",\"command\":\"bal discover pkg client Client forward\"}");
         Assert.assertEquals(json.get("documentedTotal").getAsInt(), 3);
         Assert.assertFalse(json.has("resources"), "a section with nothing on this page is omitted");
         Assert.assertEquals(json.getAsJsonObject("counts").toString(), "{\"remote\":2,\"normal\":2}",
