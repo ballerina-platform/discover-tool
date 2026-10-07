@@ -355,13 +355,19 @@ public class CliTest {
             List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
             argv.addAll(selectors);
             String label = String.join(" ", argv);
-            Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(argv, capture.streams(),
-                    centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
-            Assert.assertEquals(capture.field("kind"), "validation", label);
-            Assert.assertTrue(capture.field("message").contains("'" + selectors.get(1) + "'"), capture.stderr());
-            Assert.assertEquals(capture.field("suggestion"), "Join the path's segments with `/` in one argument: "
-                    + "`bal discover ballerinax/github client Client " + String.join("/", selectors) + "`.", label);
+            String path = String.join("/", selectors);
+            String joined = "bal discover ballerinax/github client Client " + path;
+            JsonObject json = JsonParser.parseString(
+                    run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
+                    .getAsJsonObject();
+            Assert.assertEquals(json.get("requested").getAsString(), String.join(" ", selectors), label);
+            Assert.assertEquals(json.getAsJsonArray("candidates").asList().stream()
+                    .map(JsonElement::getAsString).toList(), List.of(path), label);
+            Assert.assertFalse(json.has("available"), label);
+            Assert.assertEquals(json.get("next").getAsString(), joined, label);
+            String text = run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), true).stdout();
+            Assert.assertTrue(text.contains("Did you mean\n  " + path + "\n"), text);
+            Assert.assertTrue(text.endsWith("Next: " + joined + "\n"), text);
         }
     }
 

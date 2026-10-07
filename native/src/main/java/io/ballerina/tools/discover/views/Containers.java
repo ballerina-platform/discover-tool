@@ -754,12 +754,7 @@ public final class Containers {
     private static Failure unread(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options) {
-        return unread(loaded, scope, container, selectors, consumed(container, selectors), options);
-    }
-
-    private static Failure unread(
-            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            int consumed, Options options) {
+        int consumed = consumed(container, selectors);
         String takes = container.hasPaths()
                 ? "a member name, or a resource path and its accessor"
                 : "one " + (container.isModule() ? "function" : "member") + " name";
@@ -1088,8 +1083,12 @@ public final class Containers {
                         .toList()
                 : List.of();
 
-        if (selectors.size() == 2 && joinedPath(container, selectors).isPresent()) {
-            return Result.err(unread(loaded, scope, container, selectors, 1, options));
+        Optional<String> joined = selectors.size() == 2 ? joinedPath(container, selectors) : Optional.empty();
+        if (joined.isPresent()) {
+            return Result.ok(new DiscoverResult.NoMatch(asked, containerName(container),
+                    List.of(String.join("/", selectors)), List.of(), null,
+                    command + joined.get() + filterArgument(options), DiscoverResult.Documented.NONE, null,
+                    loaded.warning(), note));
         }
         Optional<UnresolvedPair> pair = unresolvedPair(container, selectors);
         if (pair.isPresent()) {
