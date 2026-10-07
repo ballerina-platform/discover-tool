@@ -1136,7 +1136,8 @@ public class ViewsTest {
                 List.of("client", "Client"), "entity", null));
         Assert.assertTrue(text.contains("\nMatched by documentation only\n  :...path  get, post"), text);
         Assert.assertTrue(text.endsWith("\nNext: bal discover ballerina/http client Client <path> <accessor>\n"
-                + "Next: bal discover ballerina/http client Client <name>"), text);
+                + "Next: bal discover ballerina/http client Client <name>\n"
+                + "Next: bal discover ballerina/http client Client"), text);
 
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
         DiscoverResult.NoMatch escaped = as(DiscoverResult.NoMatch.class, result(Containers.render(github,
@@ -1274,6 +1275,26 @@ public class ViewsTest {
                         new Containers.Options(List.of("Client"), "send", 2)), "client Client --filter send --page 2"));
         Assert.assertEquals(JsonParser.parseString(JsonRenderer.render(second)).getAsJsonObject()
                 .get("remaining").getAsInt(), 0);
+    }
+
+    @Test
+    public void owningContainersThatReadDifferentlyManySelectorsAreOfferedTheCommandBothRead() {
+        Payload payload = Payload.pkg();
+        payload.with("clients",
+                Decl.client("Paths", Decl.method("get").on("isResource").with("accessor", "get")
+                        .with("resourcePath", "foo")),
+                Decl.client("Methods", Decl.method("foo").on("isRemote")));
+        LoadedPackage loaded = fromPayload(payload);
+        Result<DiscoverResult> extra = Containers.render(loaded, Surface.Scope.CLIENT,
+                new Containers.Options(List.of("foo", "get", "extra")));
+        Assert.assertFalse(extra.isOk());
+        Failure.Validation unread = (Failure.Validation) extra.failure();
+        Assert.assertTrue(unread.message().contains("none of them reads all of 'foo get extra'"), unread.message());
+        Assert.assertEquals(unread.suggestion(), "Drop them: `bal discover test/pkg client foo`.");
+
+        DiscoverResult.Owners both = as(DiscoverResult.Owners.class, result(Containers.render(loaded,
+                Surface.Scope.CLIENT, new Containers.Options(List.of("foo"))), "client foo"));
+        Assert.assertEquals(both.total(), 2);
     }
 
     /** Sanity: the corpus still has the path shapes these tests reason about. */
