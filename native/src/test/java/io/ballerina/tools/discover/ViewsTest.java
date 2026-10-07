@@ -357,8 +357,8 @@ public class ViewsTest {
         Assert.assertTrue(get.note().contains("is addressed by client — showing it. "
                 + "Canonical: bal discover ballerina/http client Client get path"), get.note());
         // Quoted from what the tool prints, not re-spelled from memory: the rest-parameter form is
-        // `[PathParamType ...path]`, with the ellipsis bound to the NAME.
-        Assert.assertTrue(get.declaration().contains("resource function get [PathParamType ...path]"),
+        // `[PathParamType... path]`, the ellipsis on the type, however Central spaced it.
+        Assert.assertTrue(get.declaration().contains("resource function get [PathParamType... path]"),
                 get.declaration());
 
         // And on a container WITHOUT resource functions the same token is a member name, finds none, and the
@@ -740,6 +740,7 @@ public class ViewsTest {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         for (String selector : List.of(
                 "get [PathParamType ...path]",
+                "get [PathParamType... path]",
                 "get [path]",
                 "get {...path}")) {
             DiscoverResult answer = render(http, Surface.Scope.CLIENT, List.of("Client", selector));

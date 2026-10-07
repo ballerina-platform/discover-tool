@@ -3302,7 +3302,7 @@ public type ClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function post [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function post [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP PUT requests to HTTP endpoints.
     # + message - An HTTP outbound request or any allowed payload
@@ -3312,7 +3312,7 @@ public type ClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function put [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function put [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP PATCH requests to HTTP endpoints.
     # + message - An HTTP outbound request or any allowed payload
@@ -3322,7 +3322,7 @@ public type ClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function patch [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function patch [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP DELETE requests to HTTP endpoints.
     # + message - An optional HTTP outbound request or any allowed payload
@@ -3332,13 +3332,13 @@ public type ClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function delete [PathParamType ...path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function delete [PathParamType... path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP HEAD requests to HTTP endpoints.
     # + headers - The entity headers
     # + params - The query parameters
     # + return - The response or an `http:ClientError` if failed to establish the communication with the upstream server
-    isolated resource function head [PathParamType ...path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
+    isolated resource function head [PathParamType... path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
 
     # The client resource function to send HTTP GET requests to HTTP endpoints.
     # + headers - The entity headers
@@ -3346,7 +3346,7 @@ public type ClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function get [PathParamType ...path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function get [PathParamType... path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP OPTIONS requests to HTTP endpoints.
     # + headers - The entity headers
@@ -3354,7 +3354,7 @@ public type ClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function options [PathParamType ...path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function options [PathParamType... path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The `Client.post()` function can be used to send HTTP POST requests to HTTP endpoints.
     # + path - Resource path
@@ -3521,7 +3521,7 @@ public type StatusCodeClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function post [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function post [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP PUT requests to HTTP endpoints.
     # + message - An HTTP outbound request or any allowed payload
@@ -3531,7 +3531,7 @@ public type StatusCodeClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function put [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function put [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP PATCH requests to HTTP endpoints.
     # + message - An HTTP outbound request or any allowed payload
@@ -3541,7 +3541,7 @@ public type StatusCodeClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function patch [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function patch [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP DELETE requests to HTTP endpoints.
     # + message - An optional HTTP outbound request or any allowed payload
@@ -3551,13 +3551,13 @@ public type StatusCodeClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function delete [PathParamType ...path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function delete [PathParamType... path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP HEAD requests to HTTP endpoints.
     # + headers - The entity headers
     # + params - The query parameters
     # + return - The response or an `http:ClientError` if failed to establish the communication with the upstream server
-    isolated resource function head [PathParamType ...path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
+    isolated resource function head [PathParamType... path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
 
     # The client resource function to send HTTP GET requests to HTTP endpoints.
     # + headers - The entity headers
@@ -3565,7 +3565,7 @@ public type StatusCodeClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function get [PathParamType ...path](map<string|string[]>? headers = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function get [PathParamType... path](map<string|string[]>? headers = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The client resource function to send HTTP OPTIONS requests to HTTP endpoints.
     # + headers - The entity headers
@@ -3573,7 +3573,7 @@ public type StatusCodeClientObject client object {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function options [PathParamType ...path](map<string|string[]>? headers = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function options [PathParamType... path](map<string|string[]>? headers = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The `Client.post()` function can be used to send HTTP POST requests to HTTP endpoints.
     # + path - Resource path
@@ -4121,7 +4121,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function get [PathParamType ...path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function get [PathParamType... path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # Retrieve a representation of a specified resource from an HTTP endpoint.
     # + path - Request path
@@ -4149,7 +4149,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function post [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function post [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # Create a new resource or submit data to a resource for processing.
     # + path - Resource path
@@ -4179,7 +4179,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function put [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function put [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # Create a new resource or replace a representation of a specified resource.
     # + path - Resource path
@@ -4209,7 +4209,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function delete [PathParamType ...path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function delete [PathParamType... path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # Remove a specified resource from an HTTP endpoint.
     # + path - Resource path
@@ -4239,7 +4239,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function patch [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function patch [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # Partially update an existing resource in an HTTP endpoint.
     # + path - Resource path
@@ -4260,7 +4260,7 @@ public isolated client class Client {
     # + headers - The entity headers
     # + params - The query parameters
     # + return - The response or an `http:ClientError` if failed to establish the communication with the upstream server
-    isolated resource function head [PathParamType ...path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
+    isolated resource function head [PathParamType... path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
 
     # Get the metadata of a resource in the form of headers without the body. Often used for testing the resource existence or finding recent modifications.
     # + path - Resource path
@@ -4279,7 +4279,7 @@ public isolated client class Client {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function options [PathParamType ...path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function options [PathParamType... path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # Get the communication options for a specified resource.
     # + path - Request path
@@ -4408,7 +4408,7 @@ public isolated client class FailoverClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function post [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function post [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The POST remote function implementation of the Failover Connector.
     # + path - Resource path
@@ -4428,7 +4428,7 @@ public isolated client class FailoverClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function put [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function put [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The PUT remote function  implementation of the Failover Connector.
     # + path - Resource path
@@ -4448,7 +4448,7 @@ public isolated client class FailoverClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function patch [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function patch [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The PATCH remote function implementation of the Failover Connector.
     # + path - Resource path
@@ -4468,7 +4468,7 @@ public isolated client class FailoverClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function delete [PathParamType ...path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function delete [PathParamType... path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The DELETE remote function implementation of the Failover Connector.
     # + path - Resource path
@@ -4484,7 +4484,7 @@ public isolated client class FailoverClient {
     # + headers - The entity headers
     # + params - The query parameters
     # + return - The response or an `http:ClientError` if failed to establish the communication with the upstream server
-    isolated resource function head [PathParamType ...path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
+    isolated resource function head [PathParamType... path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
 
     # The HEAD remote function implementation of the Failover Connector.
     # + path - Resource path
@@ -4498,7 +4498,7 @@ public isolated client class FailoverClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function get [PathParamType ...path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function get [PathParamType... path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The GET remote function implementation of the Failover Connector.
     # + path - Resource path
@@ -4514,7 +4514,7 @@ public isolated client class FailoverClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function options [PathParamType ...path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function options [PathParamType... path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The OPTIONS remote function implementation of the Failover Connector.
     # + path - Resource path
@@ -4631,7 +4631,7 @@ public isolated client class LoadBalanceClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function post [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function post [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The POST remote function implementation of the LoadBalancer Connector.
     # + path - Resource path
@@ -4651,7 +4651,7 @@ public isolated client class LoadBalanceClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function put [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function put [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The PUT remote function implementation of the Load Balance Connector.
     # + path - Resource path
@@ -4671,7 +4671,7 @@ public isolated client class LoadBalanceClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function patch [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function patch [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The PATCH remote function implementation of the LoadBalancer Connector.
     # + path - Resource path
@@ -4691,7 +4691,7 @@ public isolated client class LoadBalanceClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function delete [PathParamType ...path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function delete [PathParamType... path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The DELETE remote function implementation of the LoadBalancer Connector.
     # + path - Resource path
@@ -4707,7 +4707,7 @@ public isolated client class LoadBalanceClient {
     # + headers - The entity headers
     # + params - The query parameters
     # + return - The response or an `http:ClientError` if failed to establish the communication with the upstream server
-    isolated resource function head [PathParamType ...path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
+    isolated resource function head [PathParamType... path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
 
     # The HEAD remote function implementation of the LoadBalancer Connector.
     # + path - Resource path
@@ -4721,7 +4721,7 @@ public isolated client class LoadBalanceClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function get [PathParamType ...path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function get [PathParamType... path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The GET remote function implementation of the LoadBalancer Connector.
     # + path - Request path
@@ -4737,7 +4737,7 @@ public isolated client class LoadBalanceClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function options [PathParamType ...path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function options [PathParamType... path](map<string|string[]>? headers = (), TargetType targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The OPTIONS remote function implementation of the LoadBalancer Connector.
     # + path - Request path
@@ -4820,7 +4820,7 @@ public isolated client class StatusCodeClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function post [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function post [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The `Client.post()` function can be used to send HTTP POST requests to HTTP endpoints.
     # + path - Resource path
@@ -4840,7 +4840,7 @@ public isolated client class StatusCodeClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function put [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function put [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The `Client.put()` function can be used to send HTTP PUT requests to HTTP endpoints.
     # + path - Resource path
@@ -4860,7 +4860,7 @@ public isolated client class StatusCodeClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function patch [PathParamType ...path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function patch [PathParamType... path](RequestMessage message, map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The `Client.patch()` function can be used to send HTTP PATCH requests to HTTP endpoints.
     # + path - Resource path
@@ -4880,7 +4880,7 @@ public isolated client class StatusCodeClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function delete [PathParamType ...path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function delete [PathParamType... path](RequestMessage message = (), map<string|string[]>? headers = (), string? mediaType = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The `Client.delete()` function can be used to send HTTP DELETE requests to HTTP endpoints.
     # + path - Resource path
@@ -4896,7 +4896,7 @@ public isolated client class StatusCodeClient {
     # + headers - The entity headers
     # + params - The query parameters
     # + return - The response or an `http:ClientError` if failed to establish the communication with the upstream server
-    isolated resource function head [PathParamType ...path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
+    isolated resource function head [PathParamType... path](map<string|string[]>? headers = (), *QueryParams params) returns Response|ClientError;
 
     # The `Client.head()` function can be used to send HTTP HEAD requests to HTTP endpoints.
     # + path - Resource path
@@ -4910,7 +4910,7 @@ public isolated client class StatusCodeClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function get [PathParamType ...path](map<string|string[]>? headers = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function get [PathParamType... path](map<string|string[]>? headers = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The `Client.get()` function can be used to send HTTP GET requests to HTTP endpoints.
     # + path - Request path
@@ -4926,7 +4926,7 @@ public isolated client class StatusCodeClient {
     # + params - The query parameters
     # + return - The response or the payload (if the `targetType` is configured) or an `http:ClientError` if failed to
     # establish the communication with the upstream server or a data binding failure
-    isolated resource function options [PathParamType ...path](map<string|string[]>? headers = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
+    isolated resource function options [PathParamType... path](map<string|string[]>? headers = (), typedesc<StatusCodeResponse> targetType = <>, *QueryParams params) returns targetType|ClientError;
 
     # The `Client.options()` function can be used to send HTTP OPTIONS requests to HTTP endpoints.
     # + path - Request path

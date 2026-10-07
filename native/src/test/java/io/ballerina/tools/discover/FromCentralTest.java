@@ -169,6 +169,23 @@ public class FromCentralTest {
     }
 
     @Test
+    public void aRestPathParameterIsOneShapeWhicheverWayCentralSpacesIt() {
+        Fn.PathSegment rest = new Fn.PathSegment.Parameter("PathParamType...", "path");
+        Assert.assertEquals(FromCentral.createPaths(Optional.of("[PathParamType ...path]")), List.of(rest));
+        Assert.assertEquals(FromCentral.createPaths(Optional.of("[PathParamType... path]")), List.of(rest));
+        Assert.assertEquals(FromCentral.createPaths(Optional.of("[http:PathParamType... path]")),
+                List.of(new Fn.PathSegment.Parameter("http:PathParamType...", "path")));
+        Assert.assertEquals(FromCentral.createPaths(Optional.of("[string ... path]")),
+                List.of(new Fn.PathSegment.Parameter("string...", "path")));
+    }
+
+    @Test
+    public void aPathParameterOfAnIntersectionTypeIsNamedByItsLastWord() {
+        Assert.assertEquals(FromCentral.createPaths(Optional.of("items/[readonly & string id]")), List.of(
+                new Fn.PathSegment.Literal("items"), new Fn.PathSegment.Parameter("readonly & string", "id")));
+    }
+
+    @Test
     public void aBracketedSegmentWithNoSpaceInsideIsNotAParameter() {
         // Central emits an odd bracketed form without a type, and it stays a literal.
         Assert.assertEquals(FromCentral.createPaths(Optional.of("[\"quoted\"]")),
