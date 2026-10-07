@@ -81,7 +81,6 @@ public class SelectionCarryTest {
         return run.json();
     }
 
-    /** A printed command as argv, honouring the quoting {@link Texts#shellWord} produces. */
     private static List<String> argv(String command) {
         List<String> tokens = new ArrayList<>();
         Matcher token = Pattern.compile("'([^']*)'|\"([^\"]*)\"|(\\S+)").matcher(command);
@@ -285,12 +284,6 @@ public class SelectionCarryTest {
 
     private static final String HTTP = "bal discover ballerina/http client Client";
 
-    /**
-     * http's {@code Client} with 45 more remote and 26 more normal methods: 1 resource path, 60 remote and 30
-     * normal, 91 entries on three pages — page 1 spans resources into remote, page 2 remote into normal. The
-     * recorded redis {@code Client} pages over the ceiling too, but has no resources and crosses into normal only
-     * on its last page; this edited payload crosses both boundaries, one of them on a middle page.
-     */
     private static HttpOptions bulkyHttp() {
         JsonObject docs = FixtureCorpus.loadRawFixture("ballerina__http").deepCopy().getAsJsonObject();
         JsonObject client = null;

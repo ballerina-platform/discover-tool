@@ -134,28 +134,8 @@ public final class Patches {
         return current;
     }
 
-    /**
-     * The error detail type Central drops on the way out — eleven declarations across three packages.
-     *
-     * <p>The real declaration is {@code distinct (ClientError & error<Detail>)}, and Central publishes the
-     * intersection while dropping the type ARGUMENT. Restoring it is what lets an agent reach
-     * {@code e.detail().statusCode}, which is the most-traced lookup in the recorded corpus. Without it the
-     * detail is not merely undocumented but unreachable: field access on the erased shape fails to compile
-     * with {@code type 'map<(…Cloneable & readonly)> & readonly' does not support field access}.
-     *
-     * <p>Two things this reaches that its {@code ballerina/http}-only predecessor did not. Kafka's and
-     * graphql's six were excluded by the library-name gate alone — same category, same IR shape, same
-     * rendered spelling. Http's other two were excluded twice over: Central files them under
-     * {@code intersectionTypes}, so they arrive as {@link TypeDef.Alias} rather than
-     * {@link TypeDef.ErrorDef}, and it publishes them unparenthesised, so a pattern anchored on brackets
-     * missed them even where the guard let them through.
-     *
-     * <p>The table gates on the declaration name, so the pattern is a shape CHECK on eleven known rows
-     * rather than a search. That is what keeps the widening from over-reaching: http's
-     * {@code StatusCodeBindingClientRequestError} is also an unparenthesised intersection alias, and its
-     * members are two named errors rather than a bare {@code error}, so a rule keyed on shape alone would
-     * hand it an argument its source never gave it.
-     */
+    // Central publishes `distinct (ClientError & error<Detail>)` without the type argument. Gated on the
+    // declaration name: a shape-only rule would also hit http's StatusCodeBindingClientRequestError.
     private static Library restoreErrorDetailArguments(Library library) {
         Map<String, String> arguments = ERROR_DETAIL_ARGUMENTS.stream()
                 .filter(row -> row.library().equals(library.name()))
@@ -186,11 +166,6 @@ public final class Patches {
         return typeDef;
     }
 
-    /**
-     * The same intersection with the argument put back, or empty when the descriptor is not the shape this
-     * corrects — which is also what makes the correction idempotent, since a restored member no longer ends
-     * in a bare {@code error}.
-     */
     private static Optional<TypeRef> withArgument(TypeRef base, String argument) {
         Matcher matcher = TRAILING_BARE_ERROR.matcher(base.name());
         if (!matcher.find()) {
@@ -201,27 +176,7 @@ public final class Patches {
         return Optional.of(new TypeRef(restored, base.links()));
     }
 
-    /**
-     * {@code ballerinax/slack} — the one declaration Central omits and 179 of its records reference.
-     *
-     * <p>{@code OkTrueDef} is how Slack's schema names "this call succeeded", and the package declares it:
-     * {@code types.bal:1146}, {@code public type OkTrueDef true;}. Central publishes no declaration for it —
-     * it is in none of the module's 33 list-valued categories, because there is no category for a singleton
-     * {@code true} alias — while sending it 179 times as a record field's type. So the document referenced a
-     * name it never defined, 179 times.
-     *
-     * <p>This used to be repaired from the other end: rewrite all 179 field types to the literal
-     * {@code true}, on the premise that the alias "sends the agent looking for a type that is not worth
-     * finding". Two things were wrong with that. It is a style judgement about someone else's public API
-     * rather than a correction of Central — the source writes {@code OkTrueDef ok;} 179 times and
-     * {@code true ok;} zero times — and it made the name unaddressable, so
-     * {@code bal discover type ballerinax/slack OkTrueDef} denied a declaration the package really has. Both
-     * repairs are hand-maintained facts of the same size; this one matches the source at 180 lines where the
-     * other diverged at 179.
-     *
-     * <p>No description, because the declaration has no doc comment. Inventing one would be the same
-     * category of error as the injection this replaces.
-     */
+    // Central publishes no declaration for OkTrueDef (`public type OkTrueDef true;`) yet references it 179 times.
     private static Library declareSlackOkTrue(Library library) {
         if (!"ballerinax/slack".equals(library.name())
                 || library.typeDefs().stream().anyMatch(typeDef -> "OkTrueDef".equals(typeDef.name()))) {
@@ -233,18 +188,7 @@ public final class Patches {
         return library.withTypeDefs(List.copyOf(combined));
     }
 
-    /**
-     * {@code ballerinax/client.config} — the module path needs quoting in an import, and the unquoted form
-     * does not parse.
-     *
-     * <p>The token the parser rejects is {@code client}, which is a keyword — it prefixes
-     * {@code client class} and {@code client object}. {@code config} is an ordinary identifier and needs
-     * nothing. Verified with the compiler rather than argued: {@code import ballerinax/client.config;} fails
-     * with {@code invalid token 'client'} and {@code import ballerinax/'client.config;} builds.
-     *
-     * <p>The same fact is encoded once more, for foreign references, in {@code FromCentral}. Both are needed:
-     * that one spells the link, this one spells the document's own {@code import} header.
-     */
+    // `client` is a keyword, so the import needs `'client.config`; FromCentral encodes the same fact for links.
     private static Library changeClientConfigName(Library library) {
         return "ballerinax/client.config".equals(library.name())
                 ? library.withName("ballerinax/'client.config")

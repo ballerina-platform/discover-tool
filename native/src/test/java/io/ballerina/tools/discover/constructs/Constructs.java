@@ -1088,31 +1088,20 @@ public final class Constructs {
         return Payload.pkg().with(RECORDS, Decl.record("Config", fields));
     }
 
-    /** The body {@link #record} renders to, given the field lines. */
     private static String body(String... fieldLines) {
         return "// --- Types ---\n\npublic type Config record {\n"
                 + String.join("\n", fieldLines) + "\n};";
     }
 
-    /** A payload holding one client named {@code Client} with the given methods. */
     private static Payload client(Decl... methods) {
         return Payload.pkg().with("clients", Decl.client("Client", methods));
     }
 
-    /**
-     * The body {@link #client} renders to, given the member lines.
-     *
-     * <p>A blank line separates members from each other and nothing separates the first from the header —
-     * the rule a record body and an object body both follow. It used to separate every member except a
-     * constructor from what preceded it, which left a blank line under the header of the clients that
-     * declare none.
-     */
     private static String clientBody(String... memberLines) {
         return "// --- Client ---\n\npublic client class Client {\n"
                 + String.join("\n\n", memberLines) + "\n}";
     }
 
-    /** The body a single error declaration renders to. */
     private static String errorBody(String declaration) {
         return "// --- Types ---\n\n" + declaration;
     }

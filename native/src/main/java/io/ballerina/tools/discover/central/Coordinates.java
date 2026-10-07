@@ -99,12 +99,7 @@ public final class Coordinates {
         return false;
     }
 
-    /**
-     * Does the page's {@code relatedModules} name this package's default module — or, when it has no readable entry
-     * at all (absent, not an array, every entry missing a string {@code id} or {@code orgName}), is there nothing to
-     * check? Drift in that list must not reject every real module page; the exact id and the explicit
-     * {@code isDefaultModule: false} still stand on their own, and still reject a separately published package.
-     */
+    // No readable entries counts as a match: drift in relatedModules must not reject every real module page.
     private static boolean namesDefaultModule(JsonObject module, QualifiedName qualified) {
         List<JsonObject> readable = objectsIn(module, Schema.RELATED_MODULES).orElse(List.of()).stream()
                 .filter(entry -> Json.string(entry, Schema.ID) != null
@@ -116,7 +111,6 @@ public final class Coordinates {
                         && flagged(entry, Schema.IS_DEFAULT_MODULE, true));
     }
 
-    /** Is the value exactly this boolean? Absent and non-boolean values are neither. */
     private static boolean flagged(JsonObject owner, String key, boolean expected) {
         JsonElement value = owner.get(key);
         return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean()
@@ -148,11 +142,6 @@ public final class Coordinates {
         return objectsIn(docsData, Schema.MODULES).orElse(List.of());
     }
 
-    /**
-     * The objects in {@code owner}'s {@code field} array, skipping any entry that is not an object — or empty when
-     * {@code owner} is not an object or {@code field} is not an array. The one shape question every reader here
-     * asks of a payload it does not trust, so its leniency is decided in one place.
-     */
     private static Optional<List<JsonObject>> objectsIn(JsonElement owner, String field) {
         if (owner == null || !owner.isJsonObject()) {
             return Optional.empty();

@@ -72,7 +72,6 @@ public class ServiceAnswersTest {
         }
     }
 
-    /** Central replayed for {@code slug}, serving http's archive only when {@code withSource}. */
     private static HttpOptions central(String slug, boolean withSource) {
         String docs = FixtureCorpus.loadRawFixture(slug).toString();
         JsonObject entry = new JsonObject();
@@ -224,7 +223,6 @@ public class ServiceAnswersTest {
         return attachingIn("pkg", serviceType, module, submodules);
     }
 
-    /** {@code test/<name>}, read at {@code module} (the default when {@code null}), publishing {@code submodules}. */
     private static LoadedPackage attachingIn(String name, Node serviceType, String module, String... submodules) {
         Payload payload = Payload.pkg("test", module == null ? name : name + "." + module)
                 .with("listeners", Decl.listenerAttaching(serviceType, "Listener"));

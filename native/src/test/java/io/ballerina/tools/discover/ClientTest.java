@@ -42,7 +42,6 @@ public class ClientTest {
 
     private static final QualifiedName GITHUB = QualifiedName.parse("ballerinax/github").value();
 
-    /** Fast enough that the retry path costs a test run nothing. */
     private static HttpOptions.Builder fast(HttpTransport transport) {
         return HttpOptions.builder()
                 .transport(transport)
@@ -216,12 +215,10 @@ public class ClientTest {
         }
     }
 
-    /** A version the caller pinned. */
     private static CentralClient.ResolvedVersion supplied(String version) {
         return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, true, false);
     }
 
-    /** A version the reader resolved on the caller's behalf. */
     private static CentralClient.ResolvedVersion resolved(String version) {
         return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, false, false);
     }
@@ -277,7 +274,6 @@ public class ClientTest {
 
     private static final QualifiedName AWS_AUTH = QualifiedName.parse("ballerinax/aws.auth").value();
 
-    /** Routes the registry by coordinate, which is the only thing these tests need to tell calls apart. */
     private static FakeTransport registry(Map<String, String> versionsByCoordinate) {
         return FakeTransport.routing(url -> {
             for (Map.Entry<String, String> entry : versionsByCoordinate.entrySet()) {
@@ -302,7 +298,6 @@ public class ClientTest {
         Assert.assertEquals(transport.calls(), 1);
     }
 
-    /** One version's registry row, listing the modules it publishes. */
     private static String modules(String... names) {
         StringBuilder rows = new StringBuilder();
         for (String name : names) {

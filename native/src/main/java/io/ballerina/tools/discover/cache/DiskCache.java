@@ -149,21 +149,8 @@ public final class DiskCache implements DocsCache {
         }
     }
 
-    /**
-     * Whether the current user owns the directory.
-     *
-     * <p>There is no {@code getuid()} on the JVM, so on a POSIX filesystem this asks for the owner principal
-     * and compares its name to {@code user.name} — the same account name spelling on both sides of a POSIX
-     * {@code stat()}. Checked only there: on a non-POSIX filesystem (Windows), the same {@link
-     * PosixFilePermissions} feature test {@link #createDirectories} already uses to skip setting a mode is
-     * used here to skip this check too, and for the matching reason — {@code createDirectories}'s own javadoc
-     * notes Windows inherits the parent's ACL, which for a user's own profile directory already restricts it
-     * to that user, so the ACL is doing this job already. The owner name Windows hands back for that ACL is
-     * not one specific spelling of the account — the observed domain-qualification and case both vary by
-     * runner — so comparing it against {@code user.name} would be guessing at a format rather than checking
-     * an identity, and refusing every root that guess gets wrong would disable caching wholesale on a
-     * platform the installers support.
-     */
+    // Checked on POSIX only: Windows owner names vary in domain-qualification and case by runner, and the
+    // inherited profile ACL already restricts the directory to its user.
     private static boolean isOurs(Path root) throws IOException {
         if (!root.getFileSystem().supportedFileAttributeViews().contains(POSIX)) {
             return true;
@@ -181,13 +168,6 @@ public final class DiskCache implements DocsCache {
         return owner == null || owner.getName().equals(expected);
     }
 
-    /**
-     * {@code mkdir -p} with a mode where the platform has one.
-     *
-     * <p>{@link PosixFilePermissions} throws on a filesystem with no POSIX view, and the installers support
-     * Windows, so the mode is applied only when it means something. Windows inherits the parent's ACL, which
-     * for a user's own profile directory is already private.
-     */
     private static void createDirectories(Path directory, int mode) throws IOException {
         if (Files.isDirectory(directory)) {
             return;
@@ -218,19 +198,7 @@ public final class DiskCache implements DocsCache {
         return SAFE_SEGMENT.matcher(segment).matches() && !".".equals(segment) && !"..".equals(segment);
     }
 
-    /**
-     * The path of an entry, or {@code null} if any part of it is not obviously safe.
-     *
-     * <p>Three independent checks, because the first is a regex someone could later loosen: every COORDINATE
-     * is validated raw, every path segment is validated again after a suffix is attached, and then the
-     * RESOLVED path has to still start with the root. {@code QualifiedName} and {@code Version} already
-     * reject {@code .} and {@code ..}, which makes all of this the inner guard rather than the only one.
-     *
-     * <p>The raw check is not redundant with the segment check: {@code ..} with {@code .json} attached
-     * becomes {@code ...json}, which is a perfectly ordinary filename and passes. That is harmless in itself
-     * — it traverses nothing — but a coordinate this store would not accept as a directory name should not be
-     * accepted as a file name either, or the two guards disagree about what a valid key is.
-     */
+    // The raw coordinate check is not redundant: `..` plus `.json` is `...json`, which passes the segment check.
     private Path entryPath(List<String> coordinates, List<String> segments) {
         for (String coordinate : coordinates) {
             if (!isSafeSegment(coordinate)) {
@@ -287,7 +255,6 @@ public final class DiskCache implements DocsCache {
     // Reading and writing
     // -----------------------------------------------------------------------
 
-    /** ENOENT, EACCES, a truncated file, a file that is not JSON: all one thing, which is "no entry". */
     private static JsonElement readJson(Path path) {
         try {
             String text = Files.readString(path, StandardCharsets.UTF_8);
@@ -298,7 +265,7 @@ public final class DiskCache implements DocsCache {
         }
     }
 
-    /** Temp name in the SAME directory as its target, so the move stays on one filesystem. */
+    // Same directory as the target, so the move stays on one filesystem.
     private Path tempPathFor(Path target) {
         String suffix = Long.toHexString((long) (random.getAsDouble() * 0xffffffffL));
         return target.resolveSibling(target.getFileName() + "." + pid + "-" + suffix + ".tmp");
@@ -328,13 +295,6 @@ public final class DiskCache implements DocsCache {
         }
     }
 
-    /**
-     * The last-writer-wins move, atomic where the platform offers one.
-     *
-     * <p>A POSIX rename replaces the target and is atomic, which is the whole concurrency story: no third
-     * process can observe a partial file. Windows has no rename-over, so the fallback is a replacing move —
-     * not atomic, but the only thing available, and the content two writers race with is equivalent.
-     */
     private static void move(Path temp, Path target) throws IOException {
         try {
             Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE);

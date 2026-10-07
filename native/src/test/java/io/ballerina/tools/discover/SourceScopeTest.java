@@ -39,7 +39,6 @@ public class SourceScopeTest {
 
     private static final String VERSION_ENTRY = "/registry/packages/ballerina/http/2.16.6";
 
-    /** Central replayed, recording every request for the version entry or an archive. */
     private static FakeTransport central(List<String> sourceRequests) {
         String docs = FixtureCorpus.loadRawFixture("ballerina__http").toString();
         return FakeTransport.routing(url -> {

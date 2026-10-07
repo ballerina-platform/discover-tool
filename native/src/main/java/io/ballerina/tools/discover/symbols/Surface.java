@@ -239,24 +239,10 @@ public final class Surface {
         return alphabetical(containers);
     }
 
-    /** Containers by name, so a roster reads the same whatever order the payload declared them in. */
     private static List<Container> alphabetical(List<Container> containers) {
         return containers.stream().sorted(Comparator.comparing(Container::name, Texts.LOCALE_ORDER)).toList();
     }
 
-    /**
-     * Every service type, each with the listener(s) it binds to — {@link Library#services()} already holds the
-     * pairings, so this only has to group them back by service type name.
-     *
-     * <p>Sourced from {@link Library#typeDefs()} for the name, description and methods (the same declaration
-     * {@code type} and the code register quote), and from {@link Library#services()} only for the listener
-     * pairing.
-     *
-     * <p>A listener whose {@code attach} takes another module's type adds that type too, under the name a caller
-     * writes it by ({@code cdc:Service}) and with no members of its own: its contract is the other module's.
-     * A type no listener accepts is still here, with no pairing — addressable by name; see
-     * {@link #isUnattachable}.
-     */
     private static List<Container> serviceContainers(Library library) {
         Map<String, List<Service>> pairingsByName = new LinkedHashMap<>();
         Map<String, List<Service>> foreignByName = new LinkedHashMap<>();

@@ -191,11 +191,6 @@ public final class Cli {
         return Containers.render(loaded, scope, new Containers.Options(selectors, filter, page));
     }
 
-    /**
-     * {@code --page} against an answer that does not page — a bare package, one signature, a whole readme, a
-     * no-match answer. Served as page 1 it would read as a page that exists; a listing's own range check is what
-     * rejects a page past the end of one that does page.
-     */
     private static Failure notPaged(Commands.Root root, String filter) {
         StringBuilder command = new StringBuilder("bal discover ").append(root.pkg);
         if (root.module != null) {
@@ -215,7 +210,6 @@ public final class Cli {
                 "Drop --page: `" + command + "`.");
     }
 
-    /** Renders a result with whichever of the two renderers {@code --output} (or the TTY default) selects. */
     private static void emit(
             DiscoverResult result, TextRenderer.Context where, Streams streams, String output, boolean interactive) {
         boolean json = jsonOutput(output, interactive);
@@ -232,7 +226,6 @@ public final class Cli {
                 "The buckets are " + String.join(", ", Commands.BUCKETS) + ".");
     }
 
-    /** No bucket: which of them this package (or the targeted module) actually has, and its other modules. */
     private static DiscoverResult.BucketList bucketList(LoadedPackage loaded) {
         List<String> buckets = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
@@ -256,7 +249,6 @@ public final class Cli {
         return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
     }
 
-    /** {@code --output}, or the TTY default when it was not passed. */
     private static boolean jsonOutput(String output, boolean interactive) {
         return output != null ? Commands.JSON_OUTPUT.equals(output) : !interactive;
     }
@@ -303,13 +295,6 @@ public final class Cli {
     private static final Pattern VERSION_SHAPED =
             Pattern.compile("^\\d+\\.\\d+\\.\\d+([-+.].*)?$");
 
-    /**
-     * A version passed as a positional argument; it is a flag, {@code --version}.
-     *
-     * <p>Left alone, a version-shaped token after the package would be read as a bucket or a selector and
-     * reported as {@code validation}/{@code symbol-not-found} on a "bucket" called {@code 4.6.5}, which names
-     * neither the mistake nor what to do.
-     */
     private static Failure rejectVersionArguments(Commands.Root root) {
         List<String> tokens = root.rest;
         if (tokens == null) {
@@ -329,10 +314,6 @@ public final class Cli {
                         + "against, or outside a project Central's latest.");
     }
 
-    /**
-     * picocli's parse errors, as this command's contract. Every one of them is {@code validation} with a
-     * {@code suggestion}, because the recovery is always an edit to the argument list.
-     */
     private static Failure describeParseError(CommandLine.ParameterException cause) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();
@@ -363,7 +344,6 @@ public final class Cli {
         return message.split("\n", -1)[0];
     }
 
-    /** One code for every failure. The JSON is where a caller reads what happened and what to do about it. */
     private static int fail(Failure failure, Streams streams) {
         streams.errorOut().accept(failure.describe() + "\n");
         return 1;

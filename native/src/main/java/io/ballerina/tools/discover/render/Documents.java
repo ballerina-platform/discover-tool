@@ -75,20 +75,7 @@ public final class Documents {
         return String.join("\n", output);
     }
 
-    /**
-     * The {@code configurable} declarations, as COMMENTS, because they are not declarations a caller may write.
-     *
-     * <p>A {@code configurable} is module-private: {@code http:maxActiveConnections} from another module is
-     * {@code attempt to refer to non-accessible symbol}, measured. So it cannot be printed as source in the code
-     * register, where a declaration is something to copy — the same reason an unconfirmed service attachment is a
-     * note here rather than a template.
-     *
-     * <p>It is here at all because {@code overview} stopped carrying it and this is the register that
-     * still can. The entry document's section was addressed to a DEPLOYER rather than to someone writing a
-     * {@code .bal} file, which is who that document is for; but the fact is real, {@code type} cannot reach it —
-     * a configurable is not a declaration to resolve — and a fact reachable from no verb has been deleted rather
-     * than moved. Expensive to reach is the intended cost. Unreachable was not.
-     */
+    // As comments: a configurable is module-private, so another module cannot refer to it.
     private static List<String> configurableSection(Library library) {
         if (library.configurables().isEmpty()) {
             return List.of();

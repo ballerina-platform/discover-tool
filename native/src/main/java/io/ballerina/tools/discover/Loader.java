@@ -80,14 +80,8 @@ public final class Loader {
         }
     }
 
-    /**
-     * Every repository in priority order, first success wins — the shared shape both {@link #resolveVersion} and
-     * {@link #loadPackage} try candidates with.
-     *
-     * <p>When every repository fails, the LAST failure is returned rather than the first: a fast local source
-     * (a "Local Central" cache) is expected to sit ahead of a slower authoritative one in the list, so the final
-     * attempt is usually the one whose answer is worth reporting.
-     */
+    // The LAST failure is returned: a fast local source sits ahead of the slower authoritative one, so the final
+    // attempt's answer is the one worth reporting.
     private static <T> Result<T> tryEachRepository(
             List<PackageRepository> repositories, Function<PackageRepository, Result<T>> attempt) {
         Result<T> last = null;
@@ -122,7 +116,6 @@ public final class Loader {
                 repository -> repository.resolveVersion(qualified, options.http()));
     }
 
-    /** The version the caller named, else the one a project locked, else {@code null}: resolve one. */
     private static String chosenVersion(QualifiedName qualified, LoadOptions options) {
         if (options.version() != null) {
             return options.version();
@@ -130,7 +123,6 @@ public final class Loader {
         return options.projectDir() == null ? null : DependenciesToml.lockedVersion(options.projectDir(), qualified);
     }
 
-    /** A version a build already locked, taken as given rather than confirmed against the registry. */
     private static Result<CentralClient.ResolvedVersion> fixed(String input, boolean pinned) {
         Result<Version> parsed = Version.parse(input);
         return parsed.isOk()
@@ -312,13 +304,6 @@ public final class Loader {
         };
     }
 
-    /**
-     * The submodules that belong to the module being addressed, name and summary only — computed off the SAME page
-     * a repository already served, never a second fetch, since every page of a package names all of its modules in
-     * {@code relatedModules}. For the default module ({@code submodule} is {@code null}) that is every module the
-     * package publishes; for a named submodule only its own children (ids under {@code <name>.<submodule>.}), never
-     * its siblings, which belong to the package's listing and not to this module's.
-     */
     private static List<LoadedPackage.Submodule> submodulesOf(
             CentralDocs docs, QualifiedName qualified, String submodule) {
         String prefix = qualified.name() + ".";

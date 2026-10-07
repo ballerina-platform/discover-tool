@@ -81,15 +81,8 @@ public final class Schema {
     // The shapes
     // -----------------------------------------------------------------------
 
-    /**
-     * The module.
-     *
-     * <p>Two of Central's own module keys are deliberately NOT read: {@code types} and {@code resources} are
-     * empty in every fixture, so their item shape is unknown and inventing one would put a guess inside the
-     * file whose whole job is to describe what Central actually sends. Both are watched by {@code KeySpaceTest},
-     * which snapshots the payload's key space — the first package to populate one shows up there as a
-     * reviewable diff instead of being silently dropped.
-     */
+    // `types` and `resources` are deliberately not read: empty in every fixture, so their shape is unknown;
+    // KeySpaceTest flags the first package that populates one.
     private static CentralDocs.Module module(Cursor cursor, JsonObject json, String path) {
         return new CentralDocs.Module(
                 cursor.requiredString(json, path, ID),
@@ -129,15 +122,7 @@ public final class Schema {
                 relatedModules(json));
     }
 
-    /**
-     * The module's {@code relatedModules}, read leniently and never reported as drift.
-     *
-     * <p>Every page carries them, so a strict read would turn one reshaped entry into a failed lookup for every
-     * bucket — {@code client} included — and a failed parse is never cached, so every run would pay it again. They
-     * only list the package's other modules, so an entry without a string {@code id} and {@code orgName} is
-     * skipped, a summary that is not a string is dropped, and a flag that is not a boolean reads as unset: drift
-     * here can only shorten the submodule list.
-     */
+    // Lenient and never drift: every page carries this list, so a strict read would fail every lookup.
     private static List<CentralDocs.RelatedModule> relatedModules(JsonObject json) {
         JsonElement related = json.get(RELATED_MODULES);
         if (related == null || !related.isJsonArray()) {
@@ -273,7 +258,6 @@ public final class Schema {
                 cursor.flag(json, path, "isDeprecated"));
     }
 
-    /** A name bound to a type descriptor — the one shape all fourteen alias categories use. */
     private static CentralDocs.AliasDecl aliasDecl(Cursor cursor, JsonObject json, String path) {
         return new CentralDocs.AliasDecl(
                 cursor.requiredString(json, path, "name"),
@@ -281,7 +265,6 @@ public final class Schema {
                 typeNode(cursor, json, path));
     }
 
-    /** A class, object type or service type — the one shape all three use. */
     private static CentralDocs.ObjectDecl objectDecl(Cursor cursor, JsonObject json, String path) {
         return new CentralDocs.ObjectDecl(
                 cursor.requiredString(json, path, "name"),
@@ -385,7 +368,6 @@ public final class Schema {
             issues.add(new Failure.SchemaIssue(path, message));
         }
 
-        /** What a value is, for a message a reader can act on. */
         private static String describe(JsonElement value) {
             if (value == null) {
                 return "nothing";

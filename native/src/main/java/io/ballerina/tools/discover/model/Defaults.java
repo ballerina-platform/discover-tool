@@ -114,12 +114,6 @@ public final class Defaults {
                 library.configurables());
     }
 
-    /**
-     * Every name the document declares, including enum members.
-     *
-     * <p>Enum members are module-level symbols in Ballerina — {@code sql:COLUMNS_ONLY} is written that way —
-     * so a default naming one is resolvable even though the member is not a declaration of its own.
-     */
     private static Set<String> declaredNames(Library library) {
         Set<String> names = new HashSet<>();
         for (TypeDef typeDef : library.declarations()) {

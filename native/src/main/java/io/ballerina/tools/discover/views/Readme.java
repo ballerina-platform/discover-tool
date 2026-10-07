@@ -103,12 +103,6 @@ public final class Readme {
         return Result.ok(new DiscoverResult.Readme(markdown, lineCount(markdown), loaded.warning()));
     }
 
-    /**
-     * A resolved module that simply publishes no readme — a real, addressable module, distinct from a bad
-     * {@code --module} value ({@link io.ballerina.tools.discover.model.FromCentral#selectModule} rejects those
-     * before this class ever sees them), so this fails loudly rather than the old silent exit-0-empty-body this
-     * class used to answer with.
-     */
     private static Failure noReadme(LoadedPackage loaded) {
         return new Failure.Validation(
                 loaded.label() + " publishes no readme"
@@ -131,18 +125,6 @@ public final class Readme {
         return chunksOf(loaded.readme().orElse(""));
     }
 
-    /**
-     * Split the readme on its headings, keeping only the sections that hold code.
-     *
-     * <p>A section with no fenced block is prose about the project — a badge row, a licence, a "report an issue"
-     * paragraph — and addressing it would spend a number on something no caller will ask for. A section WITH one
-     * keeps all of its prose: the setup narration around a call is what makes it reproducible, not decoration
-     * around it — "you must also enable the Google Drive API in the same project" is not inferable from any
-     * signature, and is the difference between a connector that works and one that 403s on a single operation.
-     *
-     * <p>Fences are tracked so a {@code #} inside a code block cannot start a section: it is a shell comment or a
-     * Ballerina doc comment, not a heading, and treating it as one would cut a snippet in half.
-     */
     private static List<Chunk> chunksOf(String markdown) {
         List<Chunk> chunks = new ArrayList<>();
         String title = null;
@@ -221,11 +203,6 @@ public final class Readme {
         }
     }
 
-    /**
-     * A number because that is what a chunk listing prints, and a title because that is what an agent reading
-     * one will type when it means one thing rather than "the third one". Title matching goes through {@link
-     * Names}' normalisation, so punctuation and casing in a heading are not a trap.
-     */
     private static Optional<Chunk> byTitle(List<Chunk> chunks, String requested) {
         String wanted = Names.normalise(requested);
         if (wanted.isEmpty()) {
@@ -256,12 +233,6 @@ public final class Readme {
     // --filter
     // -----------------------------------------------------------------------
 
-    /**
-     * Narrows to the chunks whose title or body mentions the keyword — exactly one is answered in full, the
-     * same rule every other bucket applies to an exact one-of-many match; more than one is a roster to choose
-     * from, paginated past {@value Containers#MAX_ENTRIES} like any other listing this tool ceilings; none is the
-     * same no-match answer every other bucket gives, pointing back at the whole readme.
-     */
     private static Result<DiscoverResult> filtered(LoadedPackage loaded, List<Chunk> chunks, Options options) {
         List<Chunk> matched = chunks.stream().filter(chunk -> matches(chunk, options.filter())).toList();
         String pkg = loaded.pkgArgument();

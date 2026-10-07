@@ -77,7 +77,6 @@ public class CliTest {
             return err.toString();
         }
 
-        /** The one JSON object a failing run writes to stderr. */
         private JsonObject failure() {
             JsonElement parsed = JsonParser.parseString(err.toString());
             Assert.assertTrue(parsed.isJsonObject(), "stderr is not one JSON object: " + err);
@@ -90,7 +89,6 @@ public class CliTest {
         }
     }
 
-    /** Central, replayed: the versions endpoint then the docs endpoint. */
     private static HttpOptions centralFor(String slug, String version) {
         String docs = FixtureCorpus.loadRawFixture(slug).toString();
         return options(FakeTransport.routing(url -> url.contains("/docs/")
@@ -104,11 +102,6 @@ public class CliTest {
             + " cannot be confirmed as a submodule of this package. Drop --module for the default module, or pass "
             + "another of the candidates.";
 
-    /**
-     * Central, replayed for ballerina/graphql from recorded pages only: the package's page, which carries its
-     * default module alone and names the rest in {@code relatedModules}, and one page per submodule. Anything
-     * else is a 404, as Central answers a module the package does not publish.
-     */
     private static FakeTransport graphqlCentral(Map<String, JsonElement> modulePages) {
         return graphqlCentral(FixtureCorpus.loadRawFixture("ballerina__graphql"), modulePages);
     }
@@ -586,10 +579,6 @@ public class CliTest {
         Assert.assertTrue(names.size() > 1);
     }
 
-    /**
-     * A transport that answers the docs endpoint and FAILS the registry, which is what a locked version has to
-     * make unnecessary.
-     */
     private static HttpOptions docsOnlyFor(String slug) {
         String docs = FixtureCorpus.loadRawFixture(slug).toString();
         return options(FakeTransport.routing(url -> url.contains("/docs/")
@@ -767,7 +756,6 @@ public class CliTest {
         }
     }
 
-    /** A printed command as argv: {@code bal discover} dropped, double quotes honoured. */
     private static List<String> argv(String command) {
         List<String> tokens = new java.util.ArrayList<>();
         java.util.regex.Matcher token = java.util.regex.Pattern.compile("\"([^\"]*)\"|(\\S+)").matcher(command);

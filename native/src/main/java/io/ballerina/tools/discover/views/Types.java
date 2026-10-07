@@ -158,7 +158,6 @@ public final class Types {
         return List.copyOf(entries);
     }
 
-    /** The plural section a declaration lists under, or {@code null} for a class, client or service type. */
     private static String kindOf(TypeDef typeDef) {
         return switch (typeDef) {
             case TypeDef.Rec ignored -> RECORDS;
@@ -175,7 +174,6 @@ public final class Types {
         return "bal discover " + loaded.pkgArgument() + " " + BUCKET;
     }
 
-    /** Every declaration, in {@link #KINDS} sections, each alphabetical, paged as one listing over the ceiling. */
     private static Result<DiscoverResult> roster(LoadedPackage loaded, Options options) {
         List<Entry> all = entries(loaded.library());
         if (all.isEmpty()) {
@@ -234,10 +232,6 @@ public final class Types {
                 window.paging(), window.next(command), documentedHere, loaded.warning(), options.note()));
     }
 
-    /**
-     * A {@code --filter} no name, type or member matched — answered as every bucket answers it, with the
-     * documentation-only matches, if any, paged on their own as a container's are.
-     */
     private static Result<DiscoverResult> noMatch(
             LoadedPackage loaded, Options options, List<Entry> all, List<DiscoverResult.Documented.Entry> documented,
             String base, String command) {
@@ -304,10 +298,6 @@ public final class Types {
                 note));
     }
 
-    /**
-     * The enums declaring a member called {@code requested}, which may be spelled {@code module:Member} — but only
-     * with this package's own prefix, so another package's member is never taken for a local one.
-     */
     private static List<TypeDef.Enumeration> enumsWithMember(LoadedPackage loaded, String requested) {
         int colon = requested.lastIndexOf(':');
         if (colon >= 0 && !requested.substring(0, colon).equals(loaded.qualified().moduleAlias())) {
@@ -326,7 +316,6 @@ public final class Types {
         return bare.startsWith("'") ? bare.substring(1) : bare;
     }
 
-    /** An annotation inlines the record its attachment must carry, like a signature inlines its parameters. */
     private static DiscoverResult annotationLeaf(LoadedPackage loaded, Declarations index, String name, String note) {
         Library.AnnotationDef annotation = annotationNamed(loaded.library(), name).orElseThrow();
         List<String> roots = annotation.type().map(type -> Closure.rootsOf(type, index)).orElse(List.of());
@@ -354,10 +343,6 @@ public final class Types {
         };
     }
 
-    /**
-     * A class, client, service type or listener the caller addressed by {@code type}: answered by the bucket that
-     * holds it, with the same one-line routing note every other kind guess gets.
-     */
     private static Result<DiscoverResult> routed(LoadedPackage loaded, TypeDef.ObjectDef object) {
         boolean listener = loaded.library().listeners().stream().anyMatch(each -> each.name().equals(object.name()));
         Surface.Scope scope = listener ? Surface.Scope.SERVICE : Surface.scopeOf(object);
@@ -404,7 +389,6 @@ public final class Types {
         return closure.omitted().size() > Containers.MAX_ENTRIES ? baseCommand(loaded) : null;
     }
 
-    /** The command that opens a name this package declares: its own bucket when it is a container. */
     private static String commandFor(LoadedPackage loaded, String name) {
         for (Surface.Scope scope : Surface.Scope.values()) {
             if (Surface.of(loaded.library(), scope).stream().anyMatch(container -> container.name().equals(name))) {
@@ -444,7 +428,6 @@ public final class Types {
         return List.copyOf(foreign.values());
     }
 
-    /** A command for another package reads the version its declaration was generated against, not the latest. */
     private static String pinnedTo(LoadedPackage loaded, ModuleRef module, String target) {
         return target.equals(module.coordinate()) && !module.coordinate().equals(loaded.qualified().qualified())
                 ? target + module.pinnedVersion().map(version -> " --version " + version).orElse("")

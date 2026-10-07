@@ -50,10 +50,7 @@ public class ReadmeTest {
      */
     private record Stub(String id, String readme) { }
 
-    /**
-     * One module's worth of payload, built by taking a real module and replacing only its readme — the schema
-     * requires every array, so a hand-written stub could not be parsed.
-     */
+    // Built from a real module because the schema requires every array; a hand-written stub would not parse.
     private static CentralDocs.Module moduleWith(Stub stub) {
         JsonObject template = FixtureCorpus.loadRawFixture("ballerinax__kafka")
                 .getAsJsonObject().getAsJsonObject("docsData").getAsJsonArray("modules")

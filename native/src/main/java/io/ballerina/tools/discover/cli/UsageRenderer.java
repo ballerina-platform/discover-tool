@@ -85,7 +85,6 @@ final class UsageRenderer {
                 + " and " + names.get(names.size() - 1) + ".";
     }
 
-    /** Each positional, then each option, as the synopsis spells it; {@code --help} is not among them. */
     private static List<String> slots(Commands.Grammar grammar) {
         CommandSpec spec = grammar.line().getCommandSpec();
         List<String> slots = new ArrayList<>();
@@ -98,17 +97,6 @@ final class UsageRenderer {
         return slots;
     }
 
-    /**
-     * {@code <org/name>}, {@code [bucket] [args...]} — repetition and required-ness, from the spec.
-     *
-     * <p>Repetition is read off the index range rather than the arity, the same rule this tool's earlier grammar
-     * used: a positional occupying an unbounded index repeats, and none of them declares a minimum arity — that
-     * is what would let picocli swallow a foreign flag as a value.
-     *
-     * <p>A label that is already bracketed is a hand-written synopsis fragment in its own right — {@code rest}'s
-     * {@code [bucket] [args...]} spells its own optionality and repetition — so it is printed as-is rather than
-     * wrapped again, which would otherwise double the brackets.
-     */
     private static String slot(PositionalParamSpec positional) {
         String label = positional.paramLabel();
         if (label.startsWith("[")) {
@@ -121,7 +109,6 @@ final class UsageRenderer {
         return positional.arity().min() == 0 ? "[" + label + "]" : label;
     }
 
-    /** Always optional, so always bracketed, and named by its SHORTEST spelling. */
     private static String slot(OptionSpec option) {
         String name = shortestName(option);
         return "[" + (option.arity().max() == 0 ? name : name + " " + option.paramLabel()) + "]";
@@ -168,7 +155,6 @@ final class UsageRenderer {
 
     private record Row(String label, String text) { }
 
-    /** A two-column block: labels padded to the widest, prose wrapped and hanging under itself. */
     private static String table(List<Row> rows) {
         int labelWidth = rows.stream().mapToInt(row -> row.label().length()).max().orElse(0);
         int indent = 2 + labelWidth + GAP;
@@ -189,7 +175,6 @@ final class UsageRenderer {
         return wrap(lead, List.of(body.trim().split("\\s+")), indent);
     }
 
-    /** {@code lead} followed by {@code tokens}, wrapped to {@link #WIDTH}, continuing at {@code indent}. */
     private static String wrap(String lead, List<String> tokens, int indent) {
         StringBuilder text = new StringBuilder(lead);
         int column = lead.length();

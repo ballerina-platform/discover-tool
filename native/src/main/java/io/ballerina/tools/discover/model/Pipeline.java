@@ -54,14 +54,6 @@ public final class Pipeline {
                 Patches.applyPatches(FromCentral.fromCentral(module, inclusions)), publishedButUnrendered(module));
     }
 
-    /**
-     * Names Central publishes that no section of the document prints.
-     *
-     * <p>Module-level {@code variables} and {@code configurables} are parsed and have no rendering yet, so a
-     * default that names one — http has eight — is a name the caller CAN write and cannot find here. Feeding
-     * them to {@link Defaults} keeps it from claiming the package does not export them. When they gain a
-     * rendering this set collapses to nothing and the argument disappears with it.
-     */
     private static Set<String> publishedButUnrendered(CentralDocs.Module module) {
         return Stream.concat(module.variables().stream(), module.configurables().stream())
                 .map(CentralDocs.VariableDecl::name)

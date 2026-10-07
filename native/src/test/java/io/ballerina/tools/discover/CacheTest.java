@@ -673,7 +673,6 @@ public class CacheTest {
     private static final DocsCache.DocsKey AWS_AUTH_DOCS =
             new DocsCache.DocsKey(CentralClient.REPOSITORY_ID, "ballerinax", "aws.auth", "1.0.2");
 
-    /** What Central's docs endpoint serves for a module path: the module alone, flagged as not the default. */
     private static JsonElement awsAuthModulePage() {
         JsonObject raw = FixtureCorpus.loadRawFixture(SLUG).getAsJsonObject();
         JsonObject module = raw.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject();

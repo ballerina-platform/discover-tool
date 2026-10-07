@@ -291,13 +291,6 @@ public record PathTree(
         return new Located(direct, List.copyOf(full), false);
     }
 
-    /**
-     * Every path under a node whose segments answer to the tokens in order.
-     *
-     * <p>Only the first token may sit at any depth. Each later one must follow the previous directly or across
-     * parameter segments alone, which is what lets {@code actions/runs} mean {@code actions/runs} without also
-     * claiming {@code actions/workflows/:workflowId/runs}.
-     */
     private static void findSegments(
             PathTree node, List<String> tokens, List<String> prefix, boolean anyDepth, List<List<String>> into) {
         for (PathTree child : node.children()) {
@@ -315,16 +308,6 @@ public record PathTree(
         }
     }
 
-    /**
-     * Does one path token address this node?
-     *
-     * <p>{@code *} is the wildcard, so {@code repos/*} addresses a level whose segment is a parameter
-     * without spelling the parameter's name. A parameter also answers to its bare name, its brace-wrapped
-     * form, or a colon prefix, because an agent reading {@code :owner} off a tree will type any of the three —
-     * {@code {owner}} is this tool's own earlier display spelling, tolerated as an input even though it is no
-     * longer printed. The escaped and quoted spellings both answer too, because an agent that copied a path out
-     * of a fenced signature will type {@code code\-scanning} or {@code 'import}.
-     */
     private static boolean tokenMatches(String token, PathTree node) {
         if ("*".equals(token)) {
             return true;
@@ -349,19 +332,6 @@ public record PathTree(
                 || declaredName(token).equals(bare);
     }
 
-    /**
-     * The parameter name inside a bracketed declaration: {@code [string owner]}, {@code [PathParamType ...path]}
-     * and {@code [owner]} all yield {@code owner} / {@code path}.
-     *
-     * <p>The LAST word inside the brackets, with any leading ellipsis removed — rather than a pattern that
-     * spells out type-then-name. The type is optional because {@code [owner]} is what half-remembering
-     * {@code [string owner]} produces, and an agent typed exactly that against github's 903 resource functions
-     * and matched nothing.
-     *
-     * <p>The previous pattern required something before the name, and on {@code [owner]} it did not simply fail
-     * — it backtracked, matched {@code owne} as the type and read the parameter's name as {@code r}. A rule that
-     * mis-parses is worse than one that declines, because the caller gets "no such path" for a path that exists.
-     */
     private static String declaredName(String token) {
         Matcher declared = DECLARED_PARAM.matcher(token);
         if (!declared.matches()) {
@@ -410,13 +380,6 @@ public record PathTree(
         return new Descent(current, List.copyOf(walked), List.copyOf(skipped));
     }
 
-    /**
-     * The full path of a sibling branch, followed through its own parameter-only levels.
-     *
-     * <p>{@code repos/{templateOwner}} on its own is not an address a caller can use — the operation is at
-     * {@code repos/{templateOwner}/{templateRepo}}. Naming the branch without naming where it goes makes
-     * the skipped operation harder to reach than before it was mentioned.
-     */
     private static List<String> fullSiblingPath(PathTree node, List<String> path) {
         List<String> walked = new ArrayList<>(path);
         PathTree current = node;
@@ -440,12 +403,6 @@ public record PathTree(
             this.isParam = isParam;
         }
 
-        /**
-         * Children ordered by how many operations they lead to, then alphabetically.
-         *
-         * <p>Descending count because the tree is read to choose where to go next, and the busiest subtree
-         * is the likeliest answer. Alphabetical ties because the order has to be stable enough to snapshot.
-         */
         private PathTree freeze() {
             List<PathTree> frozen = new ArrayList<>();
             for (MutableNode child : children.values()) {

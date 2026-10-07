@@ -114,7 +114,6 @@ public final class Names {
                 .toList();
     }
 
-    /** The longest run of characters two strings share, case-insensitively. */
     private static int longestCommonSubstring(String left, String right) {
         String a = left.toLowerCase(Locale.ROOT);
         String b = right.toLowerCase(Locale.ROOT);

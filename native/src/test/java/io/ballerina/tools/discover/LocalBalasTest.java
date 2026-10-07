@@ -97,7 +97,6 @@ public class LocalBalasTest {
         return FixtureCorpus.recordedSources("ballerina__http").orElseThrow();
     }
 
-    /** {@code ballerina/http}'s module unpacked under {@code baladir}, as {@code bal pull} or a distribution has it. */
     private static void unpack(Path baladir, String version, String platform, String module) throws IOException {
         Path moduleDir = baladir.resolve("ballerina/http").resolve(version).resolve(platform).resolve("modules")
                 .resolve(module);
