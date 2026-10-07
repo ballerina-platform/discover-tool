@@ -74,6 +74,20 @@ public class RenderTest {
     }
 
     @Test
+    public void aParameterTypesForeignNameDoesNotQualifyALocalReturnOfTheSameName() {
+        // ballerina/ftp 2.21.0 `Client.put`: an `io:Error` stream in, the module's own `Error?` out.
+        Fn.Remote put = new Fn.Remote("put", "",
+                List.of(new Param("content", "", new TypeRef("stream<byte[], io:Error?>",
+                        List.of(new TypeRef.Link.External(new ModuleRef("ballerina", "io"), "Error"))),
+                        null, Param.Form.NORMAL)),
+                new ReturnDef(new TypeRef("Error?", List.of(new TypeRef.Link.Internal("Error"))), ""),
+                false, true);
+        Assert.assertEquals(Signatures.renderSignature(put),
+                "isolated remote function put(stream<byte[], io:Error?> content) returns Error?;");
+        Assert.assertEquals(Signatures.returnType(put), "Error?");
+    }
+
+    @Test
     public void aForeignNameIsQualifiedOncePerMentionAndCarriesNoNote() {
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Rec("Message", "", false, false, List.of(
