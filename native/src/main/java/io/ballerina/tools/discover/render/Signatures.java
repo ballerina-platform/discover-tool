@@ -157,16 +157,6 @@ public final class Signatures {
                 .collect(Collectors.joining("\n")) + "\n";
     }
 
-    // Not deduplicated: applyPrefixToTypeName is idempotent, so a repeated link qualifies a name once.
-    private static List<ExternalLink> collectSignatureLinks(List<Param> params, TypeRef returns) {
-        List<ExternalLink> links = new ArrayList<>();
-        for (Param param : params) {
-            links.addAll(collectExternalLinks(param.type()));
-        }
-        links.addAll(collectExternalLinks(returns));
-        return List.copyOf(links);
-    }
-
     private static String renderParam(Param param) {
         String type = paramType(param);
         String name = Identifiers.write(param.name());
@@ -186,14 +176,13 @@ public final class Signatures {
     /** A callable's return type as its declaration spells it, or {@code null} when it returns nothing. */
     public static String returnType(Fn fn) {
         return fn.returns().hasType()
-                ? applyPrefixToTypeName(fn.returns().type().name(),
-                        collectSignatureLinks(fn.params(), fn.returns().type()))
+                ? applyPrefixToTypeName(fn.returns().type().name(), collectExternalLinks(fn.returns().type()))
                 : null;
     }
 
-    private static String renderReturns(ReturnDef returns, List<ExternalLink> links) {
+    private static String renderReturns(ReturnDef returns) {
         return returns.hasType()
-                ? " returns " + applyPrefixToTypeName(returns.type().name(), links)
+                ? " returns " + applyPrefixToTypeName(returns.type().name(), collectExternalLinks(returns.type()))
                 : "";
     }
 
@@ -277,7 +266,6 @@ public final class Signatures {
     }
 
     public static String renderMemberFunction(Fn fn, String indent, Detail detail) {
-        List<ExternalLink> links = collectSignatureLinks(fn.params(), fn.returns().type());
         String params = fn.params().stream().map(Signatures::renderParam).collect(Collectors.joining(", "));
         String note = trailingNote(unwritableDefaults(fn.params()));
         String docs = renderCallableDocs(fn, indent, detail);
@@ -293,10 +281,10 @@ public final class Signatures {
             // breaking)" and that "Caching is enabled always", neither of which is inferable from its parameters.
             case Fn.Constructor constructor -> docs + deprecated
                     + indent + isolated + "function init(" + params + ")"
-                    + renderReturns(constructor.returns(), links) + ";" + note;
+                    + renderReturns(constructor.returns()) + ";" + note;
             case Fn.Remote remote -> docs + deprecated
                     + indent + isolated + "remote function " + Identifiers.write(remote.name())
-                    + "(" + params + ")" + renderReturns(remote.returns(), links) + ";" + note;
+                    + "(" + params + ")" + renderReturns(remote.returns()) + ";" + note;
             case Fn.Resource resource -> {
                 // Path parameters are declared in the path, so repeating them in the parameter list would
                 // be a signature no caller can write.
@@ -311,11 +299,11 @@ public final class Signatures {
                 yield docs + deprecated
                         + indent + isolated + "resource function " + resource.accessor() + " "
                         + renderResourcePath(resource) + "(" + rest + ")"
-                        + renderReturns(resource.returns(), links) + ";" + note;
+                        + renderReturns(resource.returns()) + ";" + note;
             }
             case Fn.Normal normal -> docs + deprecated
                     + indent + isolated + "function " + Identifiers.write(normal.name()) + "(" + params + ")"
-                    + renderReturns(normal.returns(), links) + ";" + note;
+                    + renderReturns(normal.returns()) + ";" + note;
         };
     }
 
@@ -329,7 +317,6 @@ public final class Signatures {
      * the same way — through the same {@link #addDocRow}.
      */
     public static String renderStandaloneFunction(Fn.Standalone fn) {
-        List<ExternalLink> links = collectSignatureLinks(fn.params(), fn.returns().type());
         List<String> lines = new ArrayList<>();
         if (!fn.description().isEmpty()) {
             for (String line : fn.description().split("\n", -1)) {
@@ -349,7 +336,7 @@ public final class Signatures {
         }
         String params = fn.params().stream().map(Signatures::renderParam).collect(Collectors.joining(", "));
         lines.add("public " + isolatedQualifier(fn) + "function " + Identifiers.write(fn.name())
-                + "(" + params + ")" + renderReturns(fn.returns(), links) + ";"
+                + "(" + params + ")" + renderReturns(fn.returns()) + ";"
                 + trailingNote(unwritableDefaults(fn.params())));
         return String.join("\n", lines);
     }
