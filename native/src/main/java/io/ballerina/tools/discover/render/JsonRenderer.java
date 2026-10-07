@@ -480,7 +480,14 @@ public final class JsonRenderer {
 
     private static void addDocumented(JsonObject json, DiscoverResult.Documented documented) {
         if (documented.total() > 0) {
-            json.add("documented", methods(documented.entries()));
+            JsonArray entries = new JsonArray();
+            for (DiscoverResult.Documented.Entry entry : documented.entries()) {
+                entries.add(switch (entry) {
+                    case DiscoverResult.Method method -> methods(List.of(method)).get(0);
+                    case DiscoverResult.ResourceList.Resource resource -> resources(List.of(resource)).get(0);
+                });
+            }
+            json.add("documented", entries);
             json.addProperty("documentedTotal", documented.total());
         }
     }

@@ -503,13 +503,13 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | bare package                         | `buckets`, `submodules` (`name`, `summary`, `command`)                                                              |
 | several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `confirmed`, `unconfirmedReason`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
-| resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`) |
-| methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`)                 |
-| more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`) |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`), `documented` (`name`, `command`), `page`, `pages`, `remaining`, `next` |
-| type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`) |
+| resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
+| methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`)                 |
+| more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
+| type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`) |
-| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented` (`name`, `command`), `page`, `pages`, `remaining` |
+| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining` |
 | member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`                    |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
 | readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
@@ -518,11 +518,12 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 Any answer can also carry `warning` (the version could not be confirmed against the registry) and most can
 carry `note` (the symbol was found in a different bucket than the one asked, the path selector was relocated
 or a wildcard skipped a branch, or the service's listener). `documented` lists entries a `--filter` matched
-only in their documentation, each with the command that opens it, held to the same ceiling and paged with the
-same `--page`, with `documentedTotal` giving how many there are (in text, a `Matched by documentation only
-(40 of 102)` heading and a `Next:` line with the command's shape). Beside a listing they are its last section,
-after every entry the filter matched by name; beside one signature, or as all a filter found, they page on
-their own, and `next` turns that page — on a miss's last page, `next` is the command that opens what is there.
+only in their documentation, alphabetically and shaped as their listing rows are — a method, function or type
+with its `command`, a resource path once with every matching accessor's `commands` — held to the same ceiling
+and paged with the same `--page`, with `documentedTotal` giving how many there are (in text, a `Matched by
+documentation only (40 of 102)` heading and a `Next:` line with the command's shape). Beside a listing they are
+its last section, after every entry the filter matched by name; beside one signature, or as all a filter found,
+they page on their own, and `next` turns that page — absent on the last page, as on every paged answer.
 
 ### Order
 

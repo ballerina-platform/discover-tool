@@ -63,7 +63,13 @@ public sealed interface DiscoverResult {
      * @param name its name, as declared
      * @param command the command that opens its signature
      */
-    record Method(String name, String command) { }
+    record Method(String name, String command) implements Documented.Entry {
+
+        @Override
+        public String key() {
+            return name;
+        }
+    }
 
     /**
      * Entries a {@code --filter} matched only in their documentation, not in any name, path, parameter or type —
@@ -71,15 +77,22 @@ public sealed interface DiscoverResult {
      * {@code --page} like any listing: after the listing's own entries when the answer is a listing, on their own
      * otherwise.
      *
-     * @param entries the entries on this page, each with the command that opens it
+     * @param entries the entries on this page, in the listings' order, each shaped as its listing row is
      * @param total how many matched that way, every page included
      */
-    record Documented(List<Method> entries, int total) {
+    record Documented(List<Entry> entries, int total) {
 
         public static final Documented NONE = new Documented(List.of(), 0);
 
+        /** A method, function or type by name, or one resource path with every accessor that matched. */
+        public sealed interface Entry permits Method, ResourceList.Resource {
+
+            /** What a listing sorts it by: its name, or its path. */
+            String key();
+        }
+
         public List<String> names() {
-            return entries.stream().map(Method::name).toList();
+            return entries.stream().map(Entry::key).toList();
         }
     }
 
@@ -211,7 +224,8 @@ public sealed interface DiscoverResult {
          * @param commands the exact next-step command per accessor, in {@code accessors} order — one shape whether a
          *     path answers to one accessor or several, and every accessor gets its own, so none is preferred
          */
-        public record Resource(String path, List<String> accessors, Map<String, String> commands) {
+        public record Resource(String path, List<String> accessors, Map<String, String> commands)
+                implements Documented.Entry {
 
             public Resource {
                 accessors = List.copyOf(accessors);
@@ -219,6 +233,11 @@ public sealed interface DiscoverResult {
                 if (accessors.isEmpty() || !List.copyOf(commands.keySet()).equals(accessors)) {
                     throw new IllegalArgumentException("one command per accessor, in order: " + path);
                 }
+            }
+
+            @Override
+            public String key() {
+                return path;
             }
         }
     }

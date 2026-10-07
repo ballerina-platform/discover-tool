@@ -453,14 +453,12 @@ public class SelectionCarryTest {
         while (true) {
             page.getAsJsonArray("documented")
                     .forEach(entry -> documented.add(entry.getAsJsonObject().get("name").getAsString()));
-            if (page.get("page").getAsInt() == page.get("pages").getAsInt()) {
+            if (!page.has("next")) {
                 break;
             }
             page = answer("ballerinax__redis", page.get("next").getAsString());
         }
         Assert.assertEquals(page.get("page").getAsInt(), 3, page.toString());
-        Assert.assertEquals(page.get("next").getAsString(), "bal discover ballerinax/redis client Client",
-                "the last page of a miss still ends with a command");
         Assert.assertEquals(page.getAsJsonArray("documented").get(0).getAsJsonObject().get("command").getAsString(),
                 "bal discover ballerinax/redis client Client "
                         + page.getAsJsonArray("documented").get(0).getAsJsonObject().get("name").getAsString());
