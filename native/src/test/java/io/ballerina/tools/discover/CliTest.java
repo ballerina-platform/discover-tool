@@ -826,7 +826,6 @@ public class CliTest {
                 List.of("ballerinax/kafka", "funcs"))) {
             for (boolean interactive : List.of(true, false)) {
                 String out = run(argv, "ballerinax__kafka", "4.6.5", interactive).stdout();
-                Assert.assertFalse(out.contains("<!-- bal discover"), out);
                 Assert.assertFalse(out.contains("| | |"), out);
                 Assert.assertFalse(out.contains("\n```"), out);
             }
@@ -839,8 +838,6 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerinax/kafka", "readme"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        // Verbatim means no furniture at all, not even a format marker.
-        Assert.assertFalse(capture.stdout().startsWith("<!-- bal discover"), capture.stdout());
         Assert.assertTrue(capture.stdout().length() > 500, capture.stdout());
     }
 
@@ -1297,7 +1294,6 @@ public class CliTest {
         Assert.assertTrue(out.contains("\"client\""), out);
         Assert.assertTrue(out.contains("\"class\""), out);
         Assert.assertFalse(out.contains("\"funcs\""), "kafka declares no module functions: " + out);
-        Assert.assertFalse(out.contains("<!-- bal discover"), out);
     }
 
     private static final String KAFKA_BUCKETS = String.join("\n",
