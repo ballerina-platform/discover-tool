@@ -250,7 +250,7 @@ public final class Signatures {
                 .map(segment -> switch (segment) {
                     case Fn.PathSegment.Literal literal -> literal.text();
                     case Fn.PathSegment.Parameter parameter ->
-                            "[" + parameter.type() + " " + parameter.name() + "]";
+                            "[" + parameter.type() + " " + Identifiers.write(parameter.name()) + "]";
                 })
                 .collect(Collectors.joining("/"));
     }
