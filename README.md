@@ -525,7 +525,9 @@ with its `command`, a resource path once with every matching accessor's `command
 and paged with the same `--page`, with `documentedTotal` giving how many there are (in text, a `Matched by
 documentation only (40 of 102)` heading and a `Next:` line with the command's shape). Beside a listing they are
 its last section, after every entry the filter matched by name; beside one signature, or as all a filter found,
-they page on their own, and `next` turns that page — absent on the last page, as on every paged answer.
+they page on their own, and `next` turns that page — absent on the last page, as on every paged answer. A miss
+that has them lists them in place of `available`, and when they fit on one page its `next` opens the whole
+container.
 
 ### Order
 

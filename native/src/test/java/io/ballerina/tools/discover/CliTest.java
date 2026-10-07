@@ -38,6 +38,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -242,6 +243,10 @@ public class CliTest {
                         "extra"), "extra", twilio),
                 new Unread("ballerinax__twilio", List.of("ballerinax/twilio", "client", "createAccount", "extra"),
                         "extra", twilio),
+                new Unread("ballerinax__twilio", List.of("ballerinax/twilio", "client", "createaccount", "extra"),
+                        "extra", twilio),
+                new Unread("ballerinax__kafka", List.of("ballerinax/kafka", "client", "close", "extra"), "extra",
+                        "bal discover ballerinax/kafka client close"),
                 new Unread("ballerina__log", List.of("ballerina/log", "funcs", "printInfo", "junk"), "junk",
                         "bal discover ballerina/log funcs printInfo"),
                 new Unread("ballerina__http", List.of("ballerina/http", "class", "Cookie", "isValid", "junk"),
@@ -326,6 +331,8 @@ public class CliTest {
         Assert.assertTrue(json.getAsJsonObject("available").getAsJsonArray("resources").asList().stream()
                 .allMatch(resource -> resource.getAsJsonObject().get("path").getAsString().endsWith("'new")),
                 json.toString());
+        Assert.assertTrue(json.getAsJsonObject("available").get("note").getAsString()
+                .contains("codespaces/'new "), json.toString());
     }
 
     @Test
@@ -343,6 +350,53 @@ public class CliTest {
             Assert.assertTrue(resources.asList().stream().allMatch(resource -> resource.getAsJsonObject()
                     .get("path").getAsString().startsWith("gists")), label + " -> " + capture.stdout());
         }
+        for (List<String> selectors : List.of(List.of("gists", "starred"), List.of("gists", ":gistId"),
+                List.of("repos", ":owner"))) {
+            List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
+            argv.addAll(selectors);
+            String label = String.join(" ", argv);
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(argv, capture.streams(),
+                    centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
+            Assert.assertEquals(capture.field("kind"), "validation", label);
+            Assert.assertTrue(capture.field("message").contains("'" + selectors.get(1) + "'"), capture.stderr());
+            Assert.assertEquals(capture.field("suggestion"), "Join the path's segments with `/` in one argument: "
+                    + "`bal discover ballerinax/github client Client " + String.join("/", selectors) + "`.", label);
+        }
+    }
+
+    @Test
+    public void aResolvingPathWithAnAccessorOnlyAnotherPathDeclaresAnswersWithThatPathsAccessors() {
+        for (List<String> selectors : List.of(List.of("user/keys/:keyId", "post"),
+                List.of("post", "user/keys/:keyId"))) {
+            List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
+            argv.addAll(selectors);
+            String label = String.join(" ", argv);
+            Capture capture = run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), false);
+            JsonObject json = JsonParser.parseString(capture.stdout()).getAsJsonObject();
+            Assert.assertEquals(json.getAsJsonArray("candidates").asList().stream()
+                    .map(JsonElement::getAsString).toList(), List.of("get", "delete"), label);
+            JsonArray resources = json.getAsJsonObject("available").getAsJsonArray("resources");
+            Assert.assertEquals(resources.size(), 1, label);
+            Assert.assertEquals(resources.get(0).getAsJsonObject().get("path").getAsString(), "user/keys/:keyId",
+                    label);
+        }
+    }
+
+    @Test
+    public void aMissWithDocumentationOnlyMatchesListsThoseInsteadOfEverythingThere() {
+        List<String> argv = List.of("ballerina/http", "client", "Client", "--filter", "payload");
+        JsonObject json = JsonParser.parseString(
+                run(argv, "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
+                .getAsJsonObject();
+        Assert.assertFalse(json.has("available"), json.toString());
+        Assert.assertFalse(json.getAsJsonArray("documented").isEmpty(), json.toString());
+        Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerina/http client Client");
+
+        String text = run(argv, "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), true).stdout();
+        Assert.assertFalse(text.contains("Available"), text);
+        List<String> next = text.lines().filter(line -> line.strip().startsWith("Next:")).toList();
+        Assert.assertEquals(next.size(), new HashSet<>(next).size(), text);
     }
 
     @Test

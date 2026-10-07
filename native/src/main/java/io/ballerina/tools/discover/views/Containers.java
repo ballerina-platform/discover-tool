@@ -754,7 +754,12 @@ public final class Containers {
     private static Failure unread(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options) {
-        int consumed = consumed(container, selectors);
+        return unread(loaded, scope, container, selectors, consumed(container, selectors), options);
+    }
+
+    private static Failure unread(
+            LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
+            int consumed, Options options) {
         String takes = container.hasPaths()
                 ? "a member name, or a resource path and its accessor"
                 : "one " + (container.isModule() ? "function" : "member") + " name";
@@ -763,8 +768,11 @@ public final class Containers {
         Optional<String> joined = joinedPath(container, selectors)
                 .map(path -> "Join the path's segments with `/` in one argument: `" + base + path
                         + filterArgument(options) + "`.");
+        List<String> read = selectors.subList(0, consumed);
+        List<Entry> selected = select(container, read);
+        List<String> kept = selected.size() == 1 ? spelled(selected.get(0), read) : read;
         return unread(selectors, consumed, where + " takes " + takes,
-                joined.orElse(drop(selectors, consumed, base, options)));
+                joined.orElse(drop(kept, selectors.size() - consumed, base, options)));
     }
 
     /**
@@ -777,8 +785,10 @@ public final class Containers {
         String names = owners.keySet().stream().map(Surface.Container::name).collect(Collectors.joining(", "));
         int consumed = Collections.min(owners.values());
         return unread(selectors, consumed, "'" + String.join(" ", selectors.subList(0, consumed))
-                        + "' selects a member of " + names + "; name the container to select anything after it",
-                drop(selectors, consumed, "bal discover " + loaded.pkgArgument() + " " + scope.verb(), options));
+                        + "' is declared on " + names + ", and none of them reads all of '"
+                        + String.join(" ", selectors) + "'",
+                drop(selectors.subList(0, consumed), selectors.size() - consumed,
+                        "bal discover " + loaded.pkgArgument() + " " + scope.verb(), options));
     }
 
     private static Failure unread(List<String> selectors, int consumed, String reason, String suggestion) {
@@ -790,9 +800,9 @@ public final class Containers {
                 suggestion);
     }
 
-    private static String drop(List<String> selectors, int consumed, String base, Options options) {
-        return "Drop " + (selectors.size() - consumed == 1 ? "it" : "them") + ": `" + base
-                + shellWords(selectors.subList(0, consumed)) + filterArgument(options) + "`.";
+    private static String drop(List<String> kept, int dropped, String base, Options options) {
+        return "Drop " + (dropped == 1 ? "it" : "them") + ": `" + base + shellWords(kept) + filterArgument(options)
+                + "`.";
     }
 
     /**
@@ -839,8 +849,18 @@ public final class Containers {
     }
 
     private static Optional<UnresolvedPair> unresolvedPair(Surface.Container container, List<String> selectors) {
-        if (!container.hasPaths() || selectors.size() != 2 || pathRequest(container, selectors).isPresent()) {
+        if (!container.hasPaths() || selectors.size() != 2) {
             return Optional.empty();
+        }
+        Optional<PathRequest> request = pathRequest(container, selectors);
+        if (request.isPresent()) {
+            if (!selectByPath(container, selectors).isEmpty()) {
+                return Optional.empty();
+            }
+            // A path that resolves, with an accessor only another path declares.
+            String path = selectors.get(selectors.get(0).equals(request.get().accessor()) ? 1 : 0);
+            List<Entry> entries = selectByPath(container, List.of(path));
+            return entries.isEmpty() ? Optional.empty() : Optional.of(new UnresolvedPair(path, entries));
         }
         for (String token : selectors) {
             List<Entry> entries = selectByPath(container, List.of(token));
@@ -899,11 +919,11 @@ public final class Containers {
         PathTree.Located located = found.get();
         List<String> parts = new ArrayList<>();
         if (located.relocated() && !located.alternatives().isEmpty()) {
-            parts.add("relocated to " + String.join("/", node.path())
+            parts.add("relocated to " + pathName(node.path())
                     + " — the only match for that path under the requested prefix");
         }
         for (PathTree.Descent.Sibling other : node.alsoMatched()) {
-            parts.add("also matched " + String.join("/", other.path()) + " ("
+            parts.add("also matched " + pathName(other.path()) + " ("
                     + Texts.count(other.total()) + "), not included here");
         }
         return parts.isEmpty() ? null : String.join("; ", parts);
@@ -1068,6 +1088,9 @@ public final class Containers {
                         .toList()
                 : List.of();
 
+        if (selectors.size() == 2 && joinedPath(container, selectors).isPresent()) {
+            return Result.err(unread(loaded, scope, container, selectors, 1, options));
+        }
         Optional<UnresolvedPair> pair = unresolvedPair(container, selectors);
         if (pair.isPresent()) {
             DiscoverResult forPath = listing(loaded, scope, container, List.of(pair.get().path()),
@@ -1085,7 +1108,7 @@ public final class Containers {
                 names.add(name);
             }
         }
-        DiscoverResult available = alternatives.isEmpty() && !all.isEmpty()
+        DiscoverResult available = alternatives.isEmpty() && documented.isEmpty() && !all.isEmpty()
                 ? listing(loaded, scope, container, List.of(), all, Options.bare(), List.of(), null, null).value()
                 : null;
         return Result.ok(new DiscoverResult.NoMatch(asked, containerName(container),

@@ -402,7 +402,7 @@ public sealed interface DiscoverResult {
      * @param candidates the closest names that do exist
      * @param paths where a trailing path segment occurs, when it occurs in several places and none was picked
      * @param available the listing the same command gives without the selector, or {@code null} when
-     *     {@code paths} already names the way forward
+     *     {@code paths} or {@code documented} already names the way forward
      * @param next the command that lists everything there — or, once {@code documented} pages, the command that
      *     turns its page, {@code null} on the last
      * @param documented entries a {@code --filter} matched only in their documentation
