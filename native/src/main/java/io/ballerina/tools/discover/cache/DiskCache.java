@@ -79,6 +79,18 @@ public final class DiskCache implements DocsCache {
 
     private static final String FORMAT = "v2";
 
+    /** The directory under {@link #FORMAT} for each kind of entry. */
+    private static final String DOCS = "docs";
+    private static final String MODULES = "modules";
+    private static final String INCLUSIONS = "inclusions";
+    private static final String LATEST = "latest";
+
+    /** The keys of a latest-version entry, which this class both writes and reads back. */
+    private static final String VERSION_KEY = "version";
+    private static final String AT_MS_KEY = "atMs";
+
+    private static final String POSIX = "posix";
+
     /** Every path segment has to be one of these before it can reach a join. */
     private static final Pattern SAFE_SEGMENT = Pattern.compile("^[A-Za-z0-9_.-]+$");
 
@@ -153,7 +165,7 @@ public final class DiskCache implements DocsCache {
      * platform the installers support.
      */
     private static boolean isOurs(Path root) throws IOException {
-        if (!root.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+        if (!root.getFileSystem().supportedFileAttributeViews().contains(POSIX)) {
             return true;
         }
         String expected = System.getProperty("user.name");
@@ -180,7 +192,7 @@ public final class DiskCache implements DocsCache {
         if (Files.isDirectory(directory)) {
             return;
         }
-        if (directory.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+        if (directory.getFileSystem().supportedFileAttributeViews().contains(POSIX)) {
             Files.createDirectories(
                     directory, PosixFilePermissions.asFileAttribute(permissions(mode)));
             return;
@@ -242,33 +254,33 @@ public final class DiskCache implements DocsCache {
     private Path docsPath(DocsKey key) {
         return entryPath(
                 List.of(key.repository(), key.org(), key.name(), key.version()),
-                List.of(FORMAT, "docs", key.repository(), key.org(), key.name(), key.version() + ".json"));
+                List.of(FORMAT, DOCS, key.repository(), key.org(), key.name(), key.version() + ".json"));
     }
 
     private Path moduleDocsPath(ModuleKey key) {
         return entryPath(
                 List.of(key.repository(), key.org(), key.name(), key.module(), key.version()),
-                List.of(FORMAT, "modules", key.repository(), key.org(), key.name(), key.module(),
+                List.of(FORMAT, MODULES, key.repository(), key.org(), key.name(), key.module(),
                         key.version() + ".json"));
     }
 
     private Path docsDir(PackageKey key) {
         return entryPath(
                 List.of(key.repository(), key.org(), key.name()),
-                List.of(FORMAT, "docs", key.repository(), key.org(), key.name()));
+                List.of(FORMAT, DOCS, key.repository(), key.org(), key.name()));
     }
 
     private Path inclusionsPath(DocsKey key, String module, String derivation) {
         return entryPath(
                 List.of(key.repository(), key.org(), key.name(), key.version(), module, derivation),
-                List.of(FORMAT, "inclusions", derivation, key.repository(), key.org(), key.name(), key.version(),
+                List.of(FORMAT, INCLUSIONS, derivation, key.repository(), key.org(), key.name(), key.version(),
                         module + ".json"));
     }
 
     private Path latestPath(PackageKey key) {
         return entryPath(
                 List.of(key.repository(), key.org(), key.name()),
-                List.of(FORMAT, "latest", key.repository(), key.org(), key.name() + ".json"));
+                List.of(FORMAT, LATEST, key.repository(), key.org(), key.name() + ".json"));
     }
 
     // -----------------------------------------------------------------------
@@ -332,7 +344,7 @@ public final class DiskCache implements DocsCache {
     }
 
     private static void restrict(Path file) {
-        if (!file.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+        if (!file.getFileSystem().supportedFileAttributeViews().contains(POSIX)) {
             return;
         }
         try {
@@ -432,8 +444,8 @@ public final class DiskCache implements DocsCache {
             return null;
         }
         JsonObject entry = raw.getAsJsonObject();
-        JsonElement version = entry.get("version");
-        JsonElement atMs = entry.get("atMs");
+        JsonElement version = entry.get(VERSION_KEY);
+        JsonElement atMs = entry.get(AT_MS_KEY);
         boolean valid = version != null && version.isJsonPrimitive() && version.getAsJsonPrimitive().isString()
                 && !version.getAsString().isEmpty()
                 && atMs != null && atMs.isJsonPrimitive() && atMs.getAsJsonPrimitive().isNumber();
@@ -447,8 +459,8 @@ public final class DiskCache implements DocsCache {
             return;
         }
         JsonObject json = new JsonObject();
-        json.addProperty("version", entry.version());
-        json.addProperty("atMs", entry.atMs());
+        json.addProperty(VERSION_KEY, entry.version());
+        json.addProperty(AT_MS_KEY, entry.atMs());
         writeAtomically(path, json.toString(), 0700);
     }
 

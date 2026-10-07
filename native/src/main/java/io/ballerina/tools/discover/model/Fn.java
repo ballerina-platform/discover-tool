@@ -70,7 +70,11 @@ public sealed interface Fn {
             ReturnDef returns,
             boolean isDeprecated,
             boolean isIsolated)
-            implements Fn { }
+            implements Fn {
+
+        /** The name Ballerina declares every constructor under. */
+        public static final String NAME = "init";
+    }
 
     record Remote(
             String name,

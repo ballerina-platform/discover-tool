@@ -58,6 +58,9 @@ public final class FromCentral {
     private static final String INLINE_RECORD = "inline_record";
     private static final String INLINE_CLOSED_RECORD = "inline_closed_record";
 
+    /** Central's category for a {@code detailType} that is a supertype error rather than a detail record. */
+    private static final String ERRORS = "errors";
+
     private static final String OPEN_RECORD = "record {%s}";
     private static final String CLOSED_RECORD = "record {|%s|}";
     private static final String FIELD = "%s %s%s; ";
@@ -469,7 +472,7 @@ public final class FromCentral {
         boolean deprecated = method.isDeprecated();
         boolean isolated = method.isIsolated();
 
-        if ("init".equals(method.name())) {
+        if (Fn.Constructor.NAME.equals(method.name())) {
             return new Fn.Constructor(description, params, returns, deprecated, isolated);
         }
         if (method.isResource()) {
@@ -1038,7 +1041,7 @@ public final class FromCentral {
      * {@code ballerinax/health.clients.fhir} stops printing a declaration that is not an error type.
      */
     private static boolean isDetailRecord(Optional<CentralDocs.TypeNode> detailType) {
-        return detailType.flatMap(CentralDocs.TypeNode::category).filter(c -> !"errors".equals(c)).isPresent();
+        return detailType.flatMap(CentralDocs.TypeNode::category).filter(c -> !ERRORS.equals(c)).isPresent();
     }
 
     private static void addAliases(List<TypeDef> typeDefs, List<CentralDocs.AliasDecl> aliases, Scope scope) {

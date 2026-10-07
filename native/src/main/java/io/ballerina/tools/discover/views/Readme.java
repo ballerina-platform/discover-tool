@@ -48,7 +48,14 @@ import java.util.Optional;
  */
 public final class Readme {
 
+    /** The bucket a caller types to reach a readme. */
+    public static final String BUCKET = "readme";
+
     private Readme() {
+    }
+
+    private static String command(String pkg) {
+        return "bal discover " + pkg + " " + BUCKET;
     }
 
     /**
@@ -107,8 +114,8 @@ public final class Readme {
                 loaded.label() + " publishes no readme"
                         + (loaded.module() == null ? "." : " for module " + loaded.module() + "."),
                 loaded.module() != null
-                        ? "Read the default module's instead: `bal discover " + loaded.pkgArgument(null)
-                                + " readme`. Or find another module's: `bal discover " + loaded.pkgArgument(null)
+                        ? "Read the default module's instead: `" + command(loaded.pkgArgument(null))
+                                + "`. Or find another module's: `bal discover " + loaded.pkgArgument(null)
                                 + "` lists the default module's buckets and its submodules."
                         : loaded.submodules().isEmpty()
                                 ? "This package publishes no other module either."
@@ -183,7 +190,7 @@ public final class Readme {
         if (chunks.isEmpty()) {
             return Result.err(new Failure.Validation(
                     loaded.label() + " publishes no readme chunk — no section carries code.",
-                    "Read the readme whole: `bal discover " + loaded.pkgArgument() + " readme`."));
+                    "Read the readme whole: `" + command(loaded.pkgArgument()) + "`."));
         }
         Optional<Chunk> found = byNumber(chunks, requested).or(() -> byTitle(chunks, requested));
         if (found.isEmpty()) {
@@ -192,15 +199,14 @@ public final class Readme {
                     List.of(requested),
                     chunks.stream().map(chunk -> chunk.number() + ". " + chunk.title()).toList(),
                     "No chunk answers to that. The candidates are every chunk this readme publishes; pass one "
-                            + "of the numbers, or read the readme whole: `bal discover "
-                            + loaded.pkgArgument() + " readme`."));
+                            + "of the numbers, or read the readme whole: `" + command(loaded.pkgArgument()) + "`."));
         }
         Chunk chunk = found.get();
         if (filter != null && !matches(chunk, filter)) {
             return Result.err(new Failure.Validation(
                     "Chunk " + requested + " (\"" + chunk.title() + "\") does not match --filter \""
                             + filter + "\".",
-                    "Drop --filter to read it anyway: `bal discover " + loaded.pkgArgument() + " readme "
+                    "Drop --filter to read it anyway: `" + command(loaded.pkgArgument()) + " "
                             + Texts.shellWord(requested) + "`."));
         }
         return Result.ok(toResult(chunk, chunks.size(), loaded));
@@ -263,7 +269,7 @@ public final class Readme {
         if (matched.isEmpty()) {
             return Result.ok(new DiscoverResult.NoMatch(options.filter(), null,
                     Names.nearMisses(options.filter(), chunks.stream().map(Chunk::title).toList()), List.of(), null,
-                    "bal discover " + pkg + " readme", DiscoverResult.Documented.NONE, null, loaded.warning(),
+                    command(pkg), DiscoverResult.Documented.NONE, null, loaded.warning(),
                     null));
         }
         if (matched.size() == 1) {
@@ -273,9 +279,9 @@ public final class Readme {
         List<DiscoverResult.ReadmeChunks.Chunk> items = matched.stream()
                 .map(chunk -> new DiscoverResult.ReadmeChunks.Chunk(
                         chunk.number(), chunk.title(), chunk.lines(),
-                        "bal discover " + pkg + " readme " + chunk.number()))
+                        command(pkg) + " " + chunk.number()))
                 .toList();
-        String command = "bal discover " + pkg + " readme --filter " + Texts.shellWord(options.filter());
+        String command = command(pkg) + " --filter " + Texts.shellWord(options.filter());
         Result<Containers.Page> page = Containers.Page.of(options.page(), items.size(), command);
         if (!page.isOk()) {
             return page.cast();

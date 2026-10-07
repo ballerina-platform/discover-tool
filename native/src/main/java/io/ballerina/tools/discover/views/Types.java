@@ -54,8 +54,20 @@ import java.util.Set;
  */
 public final class Types {
 
+    /** The bucket a caller types to reach a type declaration. */
+    public static final String BUCKET = "type";
+
+    private static final String RECORDS = "records";
+    private static final String ENUMS = "enums";
+    private static final String ERRORS = "errors";
+    private static final String ALIASES = "aliases";
+    private static final String CONSTANTS = "constants";
+    private static final String VARIABLES = "variables";
+    private static final String ANNOTATIONS = "annotations";
+
+    /** The roster's sections, in the order it lists them. */
     private static final List<String> KINDS =
-            List.of("records", "enums", "errors", "aliases", "constants", "variables", "annotations");
+            List.of(RECORDS, ENUMS, ERRORS, ALIASES, CONSTANTS, VARIABLES, ANNOTATIONS);
 
     private Types() {
     }
@@ -107,7 +119,7 @@ public final class Types {
         if (options.selectors().size() > 1) {
             return Result.err(new Failure.Validation(
                     "type takes one declaration name; got " + options.selectors().size() + ".",
-                    "Name one declaration, or list them all: `bal discover " + loaded.pkgArgument() + " type`."));
+                    "Name one declaration, or list them all: `" + baseCommand(loaded) + "`."));
         }
         if (options.selectors().isEmpty()) {
             return roster(loaded, options);
@@ -115,7 +127,7 @@ public final class Types {
         if (options.filtered()) {
             return Result.err(new Failure.Validation(
                     "--filter narrows a listing, and '" + options.selectors().get(0) + "' names one declaration.",
-                    "Drop --filter, or drop the name: `bal discover " + loaded.pkgArgument() + " type "
+                    "Drop --filter, or drop the name: `" + baseCommand(loaded) + " "
                             + "--filter " + Texts.shellWord(options.filter()) + "`."));
         }
         return leaf(loaded, options.selectors().get(0), options.note());
@@ -137,7 +149,7 @@ public final class Types {
         }
         for (Library.AnnotationDef annotation : library.annotations()) {
             if (seenAnnotations.add(annotation.name())) {
-                entries.add(new Entry("annotations", annotation.name(),
+                entries.add(new Entry(ANNOTATIONS, annotation.name(),
                         annotation.name() + " " + annotation.type().map(TypeRef::name).orElse("") + " "
                                 + annotation.attachmentPoints(),
                         annotation.description()));
@@ -149,25 +161,25 @@ public final class Types {
     /** The plural section a declaration lists under, or {@code null} for a class, client or service type. */
     private static String kindOf(TypeDef typeDef) {
         return switch (typeDef) {
-            case TypeDef.Rec ignored -> "records";
-            case TypeDef.Enumeration ignored -> "enums";
-            case TypeDef.ErrorDef ignored -> "errors";
-            case TypeDef.Alias alias -> alias.type().name().startsWith("distinct ") ? "errors" : "aliases";
-            case TypeDef.Constant ignored -> "constants";
-            case TypeDef.Variable ignored -> "variables";
+            case TypeDef.Rec ignored -> RECORDS;
+            case TypeDef.Enumeration ignored -> ENUMS;
+            case TypeDef.ErrorDef ignored -> ERRORS;
+            case TypeDef.Alias alias -> alias.type().name().startsWith("distinct ") ? ERRORS : ALIASES;
+            case TypeDef.Constant ignored -> CONSTANTS;
+            case TypeDef.Variable ignored -> VARIABLES;
             case TypeDef.ObjectDef ignored -> null;
         };
     }
 
     private static String baseCommand(LoadedPackage loaded) {
-        return "bal discover " + loaded.pkgArgument() + " type";
+        return "bal discover " + loaded.pkgArgument() + " " + BUCKET;
     }
 
     /** Every declaration, in {@link #KINDS} sections, each alphabetical, paged as one listing over the ceiling. */
     private static Result<DiscoverResult> roster(LoadedPackage loaded, Options options) {
         List<Entry> all = entries(loaded.library());
         if (all.isEmpty()) {
-            return Result.ok(Containers.emptyBucket(loaded, "type"));
+            return Result.ok(Containers.emptyBucket(loaded, BUCKET));
         }
         String base = baseCommand(loaded);
         String command = base + (options.filtered() ? " --filter " + Texts.shellWord(options.filter()) : "");
@@ -258,7 +270,7 @@ public final class Types {
             if (owners.size() == 1) {
                 String enumName = owners.get(0).name();
                 String routing = "'" + memberName(requested) + "' is a member of the enum " + enumName
-                        + " — showing it. Canonical: bal discover " + loaded.pkgArgument() + " type "
+                        + " — showing it. Canonical: " + baseCommand(loaded) + " "
                         + Texts.shellWord(enumName);
                 return leaf(loaded, enumName, note == null ? routing : routing + " " + note);
             }
@@ -332,12 +344,12 @@ public final class Types {
 
     private static String singular(TypeDef typeDef) {
         return switch (kindOf(typeDef)) {
-            case "records" -> "record";
-            case "enums" -> "enum";
-            case "errors" -> "error";
-            case "aliases" -> "alias";
-            case "constants" -> "constant";
-            case "variables" -> "variable";
+            case RECORDS -> "record";
+            case ENUMS -> "enum";
+            case ERRORS -> "error";
+            case ALIASES -> "alias";
+            case CONSTANTS -> "constant";
+            case VARIABLES -> "variable";
             default -> throw new IllegalStateException("not a type-bucket declaration: " + typeDef.name());
         };
     }
@@ -366,11 +378,11 @@ public final class Types {
                 "'" + object.name() + "' is " + (listener ? "a listener" : "an object") + " this package declares, "
                         + "but `" + scope.verb() + "` has nothing to show for it, and `type` holds only what is not "
                         + "callable. List the buckets with `bal discover " + loaded.pkgArgument() + "`, or search "
-                        + "declarations with `bal discover " + loaded.pkgArgument() + " type --filter <keyword>`."));
+                        + "declarations with `" + baseCommand(loaded) + " --filter <keyword>`."));
     }
 
     private static String missSuggestion(LoadedPackage loaded, boolean ambiguous) {
-        String search = "`bal discover " + loaded.pkgArgument() + " type --filter <keyword>`";
+        String search = "`" + baseCommand(loaded) + " --filter <keyword>`";
         return (ambiguous
                 ? "Several declarations normalise to the same name, so this reader will not choose between them. "
                         + "Re-run with one of the candidates exactly as spelled"
@@ -423,7 +435,7 @@ public final class Types {
                                     module.pinnedVersion().orElse(null),
                                     loaded.argumentFor(module)
                                             .map(target -> pinnedTo(loaded, module, target))
-                                            .map(target -> "bal discover " + target + " type "
+                                            .map(target -> "bal discover " + target + " " + BUCKET + " "
                                                     + Texts.shellWord(external.recordName()))
                                             .orElse(null)));
                 }
