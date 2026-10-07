@@ -18,10 +18,12 @@
 
 package io.ballerina.tools.discover.model;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.MatchResult;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -51,17 +53,29 @@ import java.util.regex.Pattern;
 public final class Defaults {
 
     /**
+     * Where a name can begin: not inside a word or a numeric literal ({@code 1e10}, {@code 0x1F}), and not after
+     * the {@code .} of a field access ({@code a.b}, {@code a?.b}) — though after a spread's {@code ...} it can.
+     */
+    private static final String NAME_START = "(?<![\\w'])(?<![\\w)\\]}?]\\.)";
+
+    /**
      * A module-qualified reference — {@code http:HTTP_2_0}, {@code time:utcNow()}.
      *
      * <p>Removed before the scan rather than resolved: the prefix names an import, and the tool does
-     * not fetch a foreign package to check one identifier.
+     * not fetch a foreign package to check one identifier. No whitespace around the colon: {@code a ? b : c}
+     * and a spaced record key are not module references, and their right-hand side is still a name to resolve.
      */
-    private static final Pattern QUALIFIED = Pattern.compile("'?[A-Za-z_][\\w.']*\\s*:\\s*[A-Za-z_]\\w*");
+    private static final Pattern QUALIFIED =
+            Pattern.compile(NAME_START + "'?[A-Za-z_][\\w.']*:'?[A-Za-z_]\\w*");
 
-    /** A string or backtick-template literal, whose contents are text and not identifiers. */
-    private static final Pattern LITERAL = Pattern.compile("\"(?:[^\"\\\\]|\\\\.)*\"|`(?:[^`\\\\]|\\\\.)*`");
+    /** A string or backtick-template literal, or a line comment, whose contents are text and not identifiers. */
+    private static final Pattern LITERAL =
+            Pattern.compile("\"(?:[^\"\\\\]|\\\\.)*\"|`(?:[^`\\\\]|\\\\.)*`|//[^\\n]*");
 
-    private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_]\\w*");
+    /** A mapping constructor's field name, from just after the opening brace or comma that precedes it. */
+    private static final Pattern RECORD_KEY = Pattern.compile("\\s*'?[A-Za-z_]\\w*\\s*:");
+
+    private static final Pattern IDENTIFIER = Pattern.compile(NAME_START + "'?([A-Za-z_]\\w*)");
 
     /**
      * Words in a default expression that are the language's, not the package's.
@@ -192,9 +206,34 @@ public final class Defaults {
      * module-qualified references, and the language's own words.
      */
     public static boolean isWritable(String expression, Set<String> declared) {
-        String scanned = QUALIFIED.matcher(LITERAL.matcher(expression).replaceAll(" ")).replaceAll(" ");
+        String scanned = QUALIFIED.matcher(withoutRecordKeys(LITERAL.matcher(expression).replaceAll(" ")))
+                .replaceAll(" ");
         return IDENTIFIER.matcher(scanned).results()
-                .map(MatchResult::group)
+                .map(match -> match.group(1))
                 .allMatch(word -> LANGUAGE.contains(word) || declared.contains(word));
+    }
+
+    // A record key is a field name, not an export (HL7 defaults to `[{obx: {}}]`). The innermost open bracket
+    // decides what follows a `,`: inside `f(a, b:c)` it is an argument list, so `b:c` is a reference, not a key.
+    private static String withoutRecordKeys(String expression) {
+        StringBuilder result = new StringBuilder(expression);
+        Deque<Character> open = new ArrayDeque<>();
+        Matcher key = RECORD_KEY.matcher(expression);
+        for (int index = 0; index < expression.length(); index++) {
+            char c = expression.charAt(index);
+            switch (c) {
+                case '{', '[', '(' -> open.push(c);
+                case '}', ']', ')' -> open.poll();
+                default -> {
+                }
+            }
+            boolean keyMayFollow = c == '{' || (c == ',' && Character.valueOf('{').equals(open.peek()));
+            if (keyMayFollow && key.region(index + 1, expression.length()).lookingAt()) {
+                for (int blank = key.start(); blank < key.end() - 1; blank++) {
+                    result.setCharAt(blank, ' ');
+                }
+            }
+        }
+        return result.toString();
     }
 }
