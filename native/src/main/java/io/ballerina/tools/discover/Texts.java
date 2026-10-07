@@ -61,17 +61,12 @@ public final class Texts {
         return collated != 0 ? collated : left.compareTo(right);
     }
 
-    /**
-     * How many bytes a string occupies as UTF-8.
-     *
-     * <p>The closure budget a single signature inlines its types under depends on this being bytes rather
-     * than {@code length()}, which counts UTF-16 units.
-     */
+    /** UTF-8 bytes, not UTF-16 units: the closure budget a signature inlines its types under is in bytes. */
     public static int byteLength(String text) {
         return text.getBytes(StandardCharsets.UTF_8).length;
     }
 
-    /** {@code 1234} → {@code 1,234}. Byte counts and operation counts are quoted a lot. */
+    /** {@code 1234} → {@code 1,234}. */
     public static String count(long value) {
         return String.format(Locale.US, "%,d", value);
     }

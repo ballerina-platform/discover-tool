@@ -21,10 +21,8 @@ package io.ballerina.tools.discover.model;
 /**
  * What a callable returns. {@code description} is {@code null} when Central published none.
  *
- * <p>An empty type name is "returns nothing", and it renders as no {@code returns} clause at all. The
- * previous stand-in was the word {@code nil}, which is the ENGLISH name of the basic type — Ballerina spells
- * it {@code ()} — so twelve of http's declarations named a type the compiler does not have. Saying nothing is
- * both correct and what the source says: a function with no return has no clause.
+ * <p>An empty type name is "returns nothing" and renders as no {@code returns} clause at all, as the source
+ * writes it. Not {@code nil}: that is the English name of the type Ballerina spells {@code ()}.
  *
  * @param type the returned type, or empty for "returns nothing"
  * @param description the return's own documentation, or {@code null} when Central published none

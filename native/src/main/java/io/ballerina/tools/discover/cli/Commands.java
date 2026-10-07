@@ -18,7 +18,6 @@
 
 package io.ballerina.tools.discover.cli;
 
-import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.Types;
@@ -31,18 +30,9 @@ import java.util.stream.Stream;
 /**
  * The argument grammar, declared once: {@code bal discover <org/name> [bucket] [args...] [flags]}.
  *
- * <p>Positional drill-down, package first — a different shape from the tool's earlier verb-first grammar
- * ({@code bal discover <verb> <org/name> [args]}), not a rename of it. There is exactly one picocli command now:
- * {@code bucket} is a plain positional value rather than a subcommand keyword, because in the RFC's design a
- * package resolves to its buckets, a bucket resolves to its members, and neither step is a mode switch.
- *
- * <p>{@code --module}/{@code -m} applies uniformly across every bucket including {@code readme} — it is read once,
- * by {@link Cli} itself before any bucket is dispatched, since which module a coordinate resolves to is a fact
- * about the PACKAGE lookup, not about any one bucket. {@code --filter} and {@code --page} are here now that
- * {@code Containers} and {@code Readme} both read them. {@code --output} applies to every response, since every
- * one is a {@link DiscoverResult}. {@code -s/--search}, {@code -r/--resolve-types} and
- * {@code --all} are gone for good: the RFC has no equivalent for any of them (see the RFC-alignment plan's
- * "Decisions locked in").
+ * <p>{@code --module}/{@code -m} applies uniformly across every bucket including {@code readme}: {@link Cli} reads
+ * it once before any bucket is dispatched, since which module a coordinate resolves to is a fact about the package
+ * lookup, not about any one bucket.
  *
  * @since 0.1.0
  */
@@ -51,12 +41,6 @@ final class Commands {
     private Commands() {
     }
 
-    /**
-     * The parser and the one holder it fills.
-     *
-     * @param line the picocli parser
-     * @param root the argument holder
-     */
     record Grammar(CommandLine line, Root root) {
 
         static Grammar create() {
@@ -66,12 +50,10 @@ final class Commands {
         }
     }
 
-    /** Every bucket wired into dispatch. */
     static final List<String> BUCKETS = Stream.concat(
             Arrays.stream(Surface.Scope.values()).map(Surface.Scope::verb),
             Stream.of(Types.BUCKET, Readme.BUCKET)).toList();
 
-    /** The two {@code --output} values. */
     static final String JSON_OUTPUT = "json";
     static final String TEXT_OUTPUT = "text";
 
@@ -124,9 +106,8 @@ final class Commands {
         /**
          * The bucket, then whatever it takes: a container name, a member, an accessor and a path.
          *
-         * <p>No minimum arity, for the reason recorded across this grammar already: picocli 4.0.1 lets a
-         * variable-arity positional with a minimum consume an unrecognised flag as its value, so an empty list is
-         * legal here and {@link Cli} tells a bare package from a package with a bucket.
+         * <p>No minimum arity: picocli 4.0.1 lets a variable-arity positional with a minimum consume an
+         * unrecognised flag as its value, so {@link Cli} tells a bare package from a package with a bucket.
          */
         @CommandLine.Parameters(index = "1..*", paramLabel = "[bucket] [args...]")
         List<String> rest;

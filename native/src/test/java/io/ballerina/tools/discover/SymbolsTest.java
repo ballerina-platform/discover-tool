@@ -35,20 +35,17 @@ import java.util.Optional;
 /**
  * The two indexes, and the discovery corpus.
  *
- * <p>The path corpus at the bottom is built from the lookup terms the nine recorded playground runs actually
- * used, each pinned with its hit count. That makes a regression a reviewable diff — and, more importantly, makes
- * a ZERO-hit pin impossible to mistake for a working index, which is how the earlier grep loop failed silently
- * for five runs in a row.
+ * <p>The path corpus at the bottom is built from lookup terms agents actually used, each pinned with its hit
+ * count. That makes a regression a reviewable diff, and a ZERO-hit pin impossible to mistake for a working index.
  *
  * @since 0.1.0
  */
 public class SymbolsTest {
 
-    /** Every distinct lookup the nine recorded runs made, as this design addresses it. */
+    /** Real lookups, each with the number of operations it addresses. */
     @DataProvider(name = "recordedLookups")
     public Object[][] recordedLookups() {
         return new Object[][] {
-                // The golden run: a repository's star count.
                 {"ballerinax__github", "repos", 421},
                 {"ballerinax__github", "repos/*/*", 420},
                 {"ballerinax__github", "repos/*/*/issues", 30},
@@ -57,7 +54,6 @@ public class SymbolsTest {
                 {"ballerinax__github", "user", 93},
                 {"ballerinax__github", "orgs", 200},
                 {"ballerinax__github", "search", 7},
-                // Connectors the other runs reached for.
                 {"ballerinax__googleapis.gmail", "users", 32},
                 {"ballerinax__slack", "chat.postMessage", 1},
                 {"ballerinax__slack", "conversations.list", 1},
@@ -81,10 +77,6 @@ public class SymbolsTest {
         return PathTree.build(PathTree.operationsOf(clientOf("ballerinax__github")));
     }
 
-    // -----------------------------------------------------------------------
-    // Ballerina's identifier escaping
-    // -----------------------------------------------------------------------
-
     @Test
     public void aSegmentReadsInProseWithoutTheEscapingItNeedsInSource() {
         // Central publishes github's paths as Ballerina writes them. Those spellings are right inside a fence
@@ -106,10 +98,6 @@ public class SymbolsTest {
             Assert.assertTrue(resolution instanceof PathTree.Resolution.Found, spelling);
         }
     }
-
-    // -----------------------------------------------------------------------
-    // The tree
-    // -----------------------------------------------------------------------
 
     @Test
     public void theTreeAccountsForEveryOperationExactlyOnce() {
@@ -164,10 +152,6 @@ public class SymbolsTest {
                     + current.segment() + "(" + current.total() + ")");
         }
     }
-
-    // -----------------------------------------------------------------------
-    // Anchoring
-    // -----------------------------------------------------------------------
 
     @Test
     public void aPathIsMatchedFromTheFirstSegmentNeverAsASuffix() {
@@ -243,10 +227,6 @@ public class SymbolsTest {
                     ((PathTree.Resolution.Found) resolution).node().operations().size(), 3, spelling);
         }
     }
-
-    // -----------------------------------------------------------------------
-    // Auto-descent
-    // -----------------------------------------------------------------------
 
     /**
      * Locating a trailing segment deeper than it was asked for, which is the ONE relaxation of anchoring.
@@ -355,10 +335,6 @@ public class SymbolsTest {
         Assert.assertEquals(descent.node().operations().size(), 1);
     }
 
-    // -----------------------------------------------------------------------
-    // The declaration index
-    // -----------------------------------------------------------------------
-
     @Test
     public void aDuplicateNameKeepsTheFirstDeclaration() {
         // So a collision cannot pass unnoticed.
@@ -372,16 +348,12 @@ public class SymbolsTest {
     @Test
     public void githubsDeclarationRosterIs1227NamesAndItsOperationsAreNotInIt() {
         Declarations index = Declarations.index(FixtureCorpus.libraryFor("ballerinax__github").typeDefs());
-        // 1227 and not 1224: reading `anyDataTypes` added github's three, which used to be dropped.
+        // Including github's three `anyDataTypes` declarations.
         Assert.assertEquals(index.names().size(), 1227);
         // Operations are addressed by path, not by name, which is why the oracle's bijection is scoped to
         // declarations.
         Assert.assertNull(index.get("repos"));
     }
-
-    // -----------------------------------------------------------------------
-    // Name matching
-    // -----------------------------------------------------------------------
 
     @Test
     public void normalisationIsWhatStatusAcceptedSpellingsHaveInCommon() {
@@ -427,7 +399,7 @@ public class SymbolsTest {
 
     @Test
     public void candidatesAreCapped() {
-        // Because the alternative is the whole roster on stderr: 33,431 bytes for github's 1,224 names.
+        // Because the alternative is github's whole roster of names on stderr.
         Declarations index = Declarations.index(FixtureCorpus.libraryFor("ballerinax__github").typeDefs());
         Assert.assertTrue(Names.nearMisses("Repository", index.names()).size() <= Names.MAX_CANDIDATES);
     }
@@ -438,10 +410,6 @@ public class SymbolsTest {
         Assert.assertTrue(match instanceof Names.Match.Missing);
         Assert.assertEquals(((Names.Match.Missing) match).candidates(), List.of());
     }
-
-    // -----------------------------------------------------------------------
-    // The discovery corpus
-    // -----------------------------------------------------------------------
 
     @Test(dataProvider = "recordedLookups")
     public void theRecordedLookupResolves(String fixture, String path, int operations) {
@@ -455,9 +423,8 @@ public class SymbolsTest {
 
     @Test
     public void everyOperationInTheCorpusCarriesAReturnType() {
-        // Which is what the lookup came for. Two of the golden run's twelve turns went to learning what an
-        // operation returns; if a signature can render without one, the verb that replaces those turns is
-        // sometimes silently useless.
+        // The return type is what a lookup usually comes for; a signature rendered without one is silently
+        // useless.
         for (String slug : new String[] {
                 "ballerinax__github", "ballerinax__slack", "ballerinax__googleapis.gmail"}) {
             for (ClientClass client : FixtureCorpus.libraryFor(slug).clients()) {
@@ -471,7 +438,7 @@ public class SymbolsTest {
 
     @Test
     public void httpsFourResourceClientsEachCarrySeven() {
-        // The measurement `ops` refuses to guess between, and the reason --client exists.
+        // Several clients carry the same resource paths, so a path alone never picks a client.
         for (String name : new String[] {"Client", "FailoverClient", "LoadBalanceClient", "StatusCodeClient"}) {
             Assert.assertEquals(PathTree.operationsOf(clientOf("ballerina__http", name)).size(), 7, name);
         }

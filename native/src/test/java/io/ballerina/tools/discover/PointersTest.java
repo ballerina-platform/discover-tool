@@ -44,18 +44,10 @@ import java.util.regex.Pattern;
 /**
  * Every command a document prints is RUN, and has to answer.
  *
- * <p>"A pointer that cannot answer is worse than no pointer" was a rule enforced by three separate
- * assertions about three separate bugs, each written after the fact: {@code overview} offered
- * {@code ops <pkg> <path>} to a package with no paths and got "none in any client" back, a two-call loop;
- * {@code ops}' signature bullet interpolated {@code (root)} — a DISPLAY token — into a command, so following the
- * tool's own instruction produced "the first segment is already wrong" under exit 0; and a
- * {@code symbol-not-found} suggestion rebuilt the command WITHOUT the argument that had failed, so an agent that
- * followed it ran the same wrong shape again.
- *
- * <p>All three are the same defect, and this is the general form of the test: extract every {@code bal discover}
- * command a bucket can print — read off every answer's own {@code command}/{@code commands}/{@code next} fields — run
- * it through the real CLI against the recorded payload, and require exit 0 with something other than "nothing
- * matched". A new pointer cannot be added wrong.
+ * <p>A pointer that cannot answer is worse than no pointer: following it loops or dead-ends. So this extracts every
+ * {@code bal discover} command a bucket can print — read off every answer's own
+ * {@code command}/{@code commands}/{@code next} fields — runs it through the real CLI against the recorded payload,
+ * and requires exit 0 with something other than "nothing matched". A new pointer cannot be added wrong.
  *
  * <p>Two exclusions, both principled. A command containing an angle-bracket slot is a TEMPLATE — {@code <Name>} or
  * {@code <keyword>} is the grammar, not an argument — and a command naming a DIFFERENT package is a cross-package
@@ -160,8 +152,6 @@ public class PointersTest {
         List<String> commands = new ArrayList<>();
         switch (result) {
             case DiscoverResult.BucketList bucketList ->
-                    // Empty for every recorded fixture — all single-module — but not for a package with
-                    // submodules, so this is wired correctly rather than left for whenever one is added.
                     bucketList.submodules().forEach(submodule -> commands.add(submodule.command()));
             case DiscoverResult.ContainerRoster roster -> {
                 roster.containers().forEach(entry -> commands.add(entry.command()));
@@ -344,7 +334,7 @@ public class PointersTest {
     /**
      * One method row and where it was listed.
      *
-     * @param method the row
+     * @param method the method
      * @param container the listing's container, {@code null} for module-level functions
      * @param form the call form its section names, or {@code null} for a single-form listing
      */

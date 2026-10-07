@@ -53,14 +53,10 @@ public record Library(
     /**
      * A {@code configurable} the package declares, which a DEPLOYER sets and a caller cannot reference.
      *
-     * <p>Held apart from {@link #typeDefs()} because it is not a declaration a caller can write against, and
-     * that is measured rather than assumed: {@code http:maxActiveConnections} is
-     * {@code attempt to refer to non-accessible symbol} from another module, because a {@code configurable} is
-     * module-private — Central publishes it anyway, and it is the one category it publishes that is not part
-     * of the public API. So it belongs in the report register, where the fact is "set this in
-     * {@code Config.toml}", and NOT in the code register, where a declaration is something to copy.
-     *
-     * <p>It must never gain the blanket {@code public} the other declarations carry, for the same reason.
+     * <p>Held apart from {@link #typeDefs()} because a {@code configurable} is module-private: Central publishes
+     * it anyway, but {@code http:maxActiveConnections} from another module is
+     * {@code attempt to refer to non-accessible symbol}. So it is rendered as "set this in {@code Config.toml}",
+     * never as a declaration to copy, and must never gain the blanket {@code public} the other declarations carry.
      *
      * @param name the configurable's name
      * @param description its own documentation, verbatim
@@ -73,12 +69,9 @@ public record Library(
      * An annotation the module declares, with the two facts that make one usable.
      *
      * <p>{@code attachmentPoints} is Central's own comma-separated clause, carried through rather than mapped:
-     * checked against the published sources for all twelve annotations in the corpus, the string IS the source's
-     * {@code on} clause, down to the order — {@code "record field, parameter, return"} for {@code graphql:ID},
-     * {@code "service, type"} for {@code http:ServiceConfig}. What preceded it was a two-value enum whose
-     * {@code OBJECT_METHOD} printed {@code service_function}, a token the compiler rejects, and whose closed set
-     * silently dropped the nine annotations that attach anywhere else — {@code @http:Payload},
-     * {@code @http:Header} and {@code @http:Query} among them.
+     * checked against published sources, the string IS the source's {@code on} clause, down to the order —
+     * {@code "record field, parameter, return"} for {@code graphql:ID}, {@code "service, type"} for
+     * {@code http:ServiceConfig}.
      *
      * <p>{@code type} is the record an attachment's argument must be, absent for the marker annotations that
      * take none. Without it {@code @http:ResourceConfig { … }} has no discoverable field set, even though the
@@ -95,10 +88,8 @@ public record Library(
     /**
      * Every declaration the document contains, by name.
      *
-     * <p>Listeners are held apart from {@link #typeDefs()} because they print in their own section — a
-     * listener is the entry point to a package's service half, and burying it among postgresql's 125 value
-     * classes is how it went unnoticed that it printed nowhere at all. They are declarations for every other
-     * purpose, though: a signature's type closure resolves them like any other declaration.
+     * <p>Listeners are held apart from {@link #typeDefs()} only because they print in their own section; a
+     * signature's type closure resolves them like any other declaration.
      */
     public List<TypeDef> declarations() {
         List<TypeDef> all = new java.util.ArrayList<>(typeDefs);
@@ -109,10 +100,8 @@ public record Library(
     /**
      * Every declaration a caller can address by name, clients included.
      *
-     * <p>Separate from {@link #declarations()} because the two answer different questions and one list cannot.
-     * The API document prints clients in their own section, so folding them into {@link #declarations()} would
-     * print them twice; resolving a name by declaration, though, has to find a client — it is the name asked for
-     * first, and {@code ballerinax/sap}'s client is 1 of the 4 things that package publishes.
+     * <p>Separate from {@link #declarations()} because the API document prints clients in their own section, so
+     * folding them in would print them twice, while resolving a name has to find a client.
      */
     public List<TypeDef> addressable() {
         List<TypeDef> all = new java.util.ArrayList<>(declarations());

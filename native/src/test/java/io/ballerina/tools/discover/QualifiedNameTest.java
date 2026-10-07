@@ -22,11 +22,10 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 /**
- * The parsed coordinates, and the one class of input that used to pass.
+ * The parsed coordinates.
  *
- * <p>{@code .} and {@code ..} satisfy both patterns and are legal path traversal. Nothing derived a filesystem
- * path from these values until the docs cache did, so this is the guard that keeps the parsed type itself from
- * ever holding one.
+ * <p>{@code .} and {@code ..} satisfy both patterns and are legal path traversal. The docs cache derives filesystem
+ * paths from these values, so the parsed type itself must never hold one.
  *
  * @since 0.1.0
  */
@@ -74,8 +73,7 @@ public class QualifiedNameTest {
 
     @Test
     public void theVersionedLabelIsOneSpelling() {
-        // One method because it was hand-built at four sites, and a label that differs between a document header
-        // and the failure about that document is a label an agent cannot correlate.
+        // One label for a document header and the failure about that document, so an agent can correlate them.
         QualifiedName qualified = QualifiedName.parse("ballerina/http").value();
         Assert.assertEquals(qualified.versioned(Version.parse("2.16.6").value()), "ballerina/http:2.16.6");
     }

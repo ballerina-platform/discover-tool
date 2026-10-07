@@ -97,7 +97,6 @@ public final class Bala {
         return bytes.toString(StandardCharsets.UTF_8);
     }
 
-    /** A stream that fails once more than {@code limit} bytes have been read from it. */
     private static final class Capped extends FilterInputStream {
 
         private final long limit;

@@ -31,21 +31,15 @@ import java.util.Optional;
 /**
  * Does this payload actually describe the package and version we asked for?
  *
- * <p>A cache keyed by coordinates is only as good as its answer to that question. The key comes from our own
- * argv, so a mismatch means the file on disk is not what its path claims — a partially-written entry from an
- * older layout, a hand-copied file, a rename that went wrong. Any of those would otherwise serve one package's
- * signatures under another package's name, which is the single worst thing this reader could do.
+ * <p>A mismatch means a cached file is not what its path claims (a partial write, a hand-copied file), and would
+ * otherwise serve one package's signatures under another package's name.
  *
- * <p>It runs on the RAW JSON rather than the schema's output because the schema strips the fields it needs: a
- * module has no {@code version} or {@code isDefaultModule} in the IR. Adding them to the schema instead would make
- * them required reads and turn a cosmetic upstream change into a failed lookup, which is the trade the schema
- * deliberately does not make.
+ * <p>It runs on the RAW JSON because the schema strips {@code version} and {@code isDefaultModule}; making them
+ * schema reads would turn a cosmetic upstream change into a failed lookup.
  *
  * <p>The cache-side and live-side rules ask the same of a page. {@code apiDocsVersion} is not part of either:
  * Central's pages from before it existed ({@code ballerina/graphql} 1.8.0) carry only {@code docsData} and
- * {@code searchData}, and requiring it of a cached entry made every such page a miss that was refetched, written
- * and deleted again on each run. A foreign or partial file is still rejected — by these coordinate checks, by the
- * parse that follows, and by writes that are atomic in the first place.
+ * {@code searchData}, and requiring it made every such cached page a miss, refetched on each run.
  *
  * <p>Module matching uses the REQUESTED name, for the same reason module selection does: a check that verifies
  * one module while the renderer reads another verifies nothing.
@@ -191,13 +185,7 @@ public final class Coordinates {
         return all.isEmpty() ? null : all.get(0);
     }
 
-    /**
-     * Every version Central lists, newest first.
-     *
-     * <p>T10. {@code package-not-found} used to say "verify the version is published" while no verb could list
-     * what was published — advice naming a step the caller had no way to take. Naming them in the failure is why
-     * no {@code versions} verb is needed, and it is the only place they are ever printed.
-     */
+    /** Every version Central lists, newest first — named in a {@code package-not-found} failure. */
     static List<String> publishedVersions(JsonElement raw) {
         if (raw == null || !raw.isJsonArray()) {
             return List.of();

@@ -109,7 +109,6 @@ public record LoadedPackage(
         return module.moduleName().contains(".") ? Optional.empty() : Optional.of(module.coordinate());
     }
 
-    /** The same package with a different IR, which is what a test that removes every client needs. */
     public LoadedPackage withLibrary(Library replacement) {
         return new LoadedPackage(qualified, version, replacement, readme, module, submodules, modules, warning,
                 pinned, () -> replacement);

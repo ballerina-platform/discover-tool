@@ -44,13 +44,8 @@ public final class Version {
     }
 
     /**
-     * {@code .} and {@code ..} pass every pattern above and are legal path traversal.
-     *
-     * <p>Nothing derived a filesystem path from these values until the docs cache did, and a cache
-     * keyed {@code <root>/v1/docs/<org>/<name>/<version>.json} turns a {@code ..} that reaches a
-     * segment into a write outside its own root. The cache checks its segments again before joining
-     * them — this is the outer of two independent guards, kept here so the parsed value itself cannot
-     * hold one.
+     * {@code .} and {@code ..} pass the pattern but are path traversal once the docs cache joins a segment
+     * into a file path. The cache re-checks its segments; this is the outer of two independent guards.
      */
     static boolean isTraversal(String segment) {
         return ".".equals(segment) || "..".equals(segment);

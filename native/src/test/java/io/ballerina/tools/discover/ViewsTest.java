@@ -60,8 +60,8 @@ import java.util.Set;
 public class ViewsTest {
 
     /**
-     * What shape a fixture's bare {@code client} listing answers with. Real shapes, not estimates — surveyed
-     * directly against every fixture's own {@code Surface.Container} entries.
+     * What shape a fixture's bare {@code client} listing answers with, surveyed against every fixture's own
+     * {@code Surface.Container} entries.
      *
      * <p>Grouping ({@link Shape#PATH_GROUPS}) and pagination ({@link Shape#METHOD_LIST} with a {@code next}) are
      * what engage once a listing is actually over {@value Containers#MAX_ENTRIES}; under it, the same shapes still
@@ -113,10 +113,6 @@ public class ViewsTest {
     private static DiscoverResult.Signature signature(LoadedPackage loaded, Surface.Scope scope, String... selectors) {
         return as(DiscoverResult.Signature.class, render(loaded, scope, List.of(selectors)));
     }
-
-    // -----------------------------------------------------------------------
-    // Snapshots
-    // -----------------------------------------------------------------------
 
     /**
      * Every bucket's bare listing, in both renderings — one file per fixture per renderer, one section per bucket,
@@ -175,10 +171,6 @@ public class ViewsTest {
         FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve("type-leaves.json"), json.toString(),
                 "type leaves json");
     }
-
-    // -----------------------------------------------------------------------
-    // The entry ceiling
-    // -----------------------------------------------------------------------
 
     /**
      * Every bucket listing stays inside the RFC's {@value Containers#MAX_ENTRIES}-entry ceiling, whatever shape it
@@ -247,7 +239,6 @@ public class ViewsTest {
         return paging == null ? 0 : total - shown - paging.remaining();
     }
 
-    /** Every fixture's bare {@code client} listing answers with the shape surveyed — see {@link #CLIENT_SHAPE}. */
     @Test(dataProvider = "fixtures")
     public void clientListingsMatchTheSurveyedShape(String slug) {
         DiscoverResult result = render(FixtureCorpus.loadedFixture(slug), Surface.Scope.CLIENT, List.of());
@@ -264,15 +255,10 @@ public class ViewsTest {
         as(shape, result);
     }
 
-    // -----------------------------------------------------------------------
-    // Resolution and tolerance
-    // -----------------------------------------------------------------------
-
     @Test
     public void aSingleResultIsAnsweredInFullRatherThanByPrintingItsNameBack() {
-        // T15. An exact one-of-many name match printed the name and forced a second call for the signature the
-        // caller had already identified. `send` is an EXACT member name, so it wins over the substring pass that
-        // would also have matched `sendWithMetadata` — which is what makes "exactly one result" reachable at all.
+        // `send` is an EXACT member name, so it wins over the substring pass that would also match
+        // `sendWithMetadata` — which is what makes "exactly one result" reachable at all.
         DiscoverResult.Signature send =
                 signature(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, "Producer", "send");
         Assert.assertEquals(send.container(), "Producer");
@@ -304,8 +290,7 @@ public class ViewsTest {
 
     @Test
     public void aMemberNameResolvesAndNamesItsOwnerRatherThanFailing() {
-        // T3, the sweep's most-hit ergonomic bug: a name that was not a container was discarded, and the
-        // suggestion rebuilt the command WITHOUT it, so following the advice looped.
+        // A name that is not a container must not be discarded: a suggestion rebuilt WITHOUT it loops.
         DiscoverResult.Signature answer =
                 signature(FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLASS, "toStringValue");
         Assert.assertTrue(answer.note().contains("'toStringValue' is declared on Cookie"), answer.note());
@@ -315,7 +300,7 @@ public class ViewsTest {
 
     @Test
     public void aMemberOnSeveralContainersIsARosterOfOwnersNotAFailure() {
-        // The other half of T3. Picking one owner silently is what the path side refuses to do, so the answer is
+        // Picking one owner silently is what the path side refuses to do, so the answer is
         // the owners with counts and the command that opens each.
         DiscoverResult.Owners owners = as(DiscoverResult.Owners.class,
                 render(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, List.of("commit")));
@@ -329,8 +314,7 @@ public class ViewsTest {
 
     @Test
     public void aVerbGivenAnotherKindsSymbolStillAnswersAndNamesTheCanonicalVerb() {
-        // T6. `ops <pkg> <constant>` failed with a client-ambiguity error for a name the package declares plainly.
-        // Without tolerance every kind guess risks a wasted round trip; with it the split costs one printed line.
+        // Without tolerance every bucket guess risks a wasted round trip; with it the redirect costs one line.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
 
         DiscoverResult.MethodList cookie =
@@ -350,8 +334,7 @@ public class ViewsTest {
 
     @Test
     public void aClientIsALegalArgumentToClassAndItsSelectorGrammarFollowsIt() {
-        // The claim a design revision got wrong: HTTP-verb parsing cannot be confined to one verb, because in
-        // Ballerina a client IS a class. `ballerina/http:Client` declares seven resource functions either way.
+        // Resource-path parsing cannot be confined to the client bucket, because in Ballerina a client IS a class.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         DiscoverResult.Signature get = signature(http, Surface.Scope.CLASS, "Client", "get", "path");
         Assert.assertTrue(get.note().contains("is addressed by client — showing it. "
@@ -371,7 +354,7 @@ public class ViewsTest {
 
     @Test
     public void aConstructorIsPartOfTheContainerAndIsReachable() {
-        // T14: `init` is the one method every caller has to write, so it is individually addressable even though
+        // `init` is the one method every caller has to write, so it is individually addressable even though
         // a listing never counts it.
         DiscoverResult.Signature init = signature(
                 FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"), Surface.Scope.CLIENT, "Client", "init");
@@ -382,9 +365,8 @@ public class ViewsTest {
 
     @Test
     public void aClientWithBothHalvesIsAnsweredWithBothSplitByCallForm() {
-        // `ballerina/http`'s `Client` declares 7 resource functions and 19 named ones. The shipped view printed
-        // the 7 and said nothing about `execute`, `forward`, `submit`, the promise set or the circuit-breaker
-        // controls — reachable from no verb in the tool.
+        // `ballerina/http`'s `Client` declares resource functions AND named ones (`execute`, `forward`, `submit`,
+        // …); listing only the resources would leave the rest unreachable.
         DiscoverResult.MixedListing mixed = as(DiscoverResult.MixedListing.class,
                 render(FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLIENT, List.of("Client")));
         Assert.assertFalse(mixed.resources().isEmpty(), mixed.toString());
@@ -415,7 +397,7 @@ public class ViewsTest {
 
     @Test
     public void aModuleFunctionCarriesPublicAndAMemberDoesNot() {
-        // The renderer is chosen by SCOPE rather than by shape, which is the same split the API document draws.
+        // The renderer is chosen by SCOPE rather than by shape.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         DiscoverResult.Signature funcs = signature(http, Surface.Scope.MODULE, "getDefaultListener");
         Assert.assertNull(funcs.container());
@@ -462,8 +444,7 @@ public class ViewsTest {
     /**
      * {@code new} addresses the constructor, which Ballerina spells {@code init}.
      *
-     * <p>Measured twice, in two separate sweeps: an agent asked for {@code client ballerinax/redis Client new}, was
-     * told nothing matched on a container declaring 112 members, and found it on the next call as {@code init}.
+     * <p>Agents ask for {@code client ballerinax/redis Client new}, the spelling of the call site.
      *
      * <p>An INPUT alias, not an output one — the answer still prints {@code init}, because it prints what the
      * package declares. <b>A REAL {@code new} wins.</b> github declares
@@ -547,17 +528,13 @@ public class ViewsTest {
         Assert.assertTrue(TextRenderer.render(miss).contains("\n\nDid you mean\n  send\n"), TextRenderer.render(miss));
     }
 
-    // -----------------------------------------------------------------------
-    // Anchored paths, and locating one segment under a matched prefix
-    // -----------------------------------------------------------------------
-
     @Test
     public void aWildcardNamesEveryBranchItAlsoMatchedRatherThanTakingTheBusiestSilently() {
-        // GITHUB-02. `*` matches any child and children are ordered busiest-first, so `repos/*/*` meant "the
-        // busiest branch" and returned 420 of 421 under exit 0 with nothing to say so.
+        // `*` matches any child and children are ordered busiest-first, so without the note `repos/*/*` would
+        // silently answer with the busiest branch only.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
         String note = clientNote(github, "repos/*/*");
-        // Named by where it GOES, not where it forks: `repos/{templateOwner}` alone is not an address.
+        // Named by where it GOES, not where it forks: `repos/:templateOwner` alone is not an address.
         Assert.assertNotNull(note, "repos/*/* should name the branch it did not take");
         Assert.assertTrue(note.contains("also matched repos/:templateOwner/:templateRepo/generate (1), "
                 + "not included here"), note);
@@ -606,8 +583,8 @@ public class ViewsTest {
 
     @Test
     public void aTrailingSegmentFoundInSeveralPlacesIsListedRatherThanPicked() {
-        // Rule 2, and it is the whole reason anchoring exists: picking one of several is the failure the anchored
-        // walk was built to prevent, so the answer stops at the list, each with the command that opens it.
+        // Picking one of several is the failure the anchored walk exists to prevent, so the answer stops at the
+        // list, each with the command that opens it.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
         // `secrets` exists under `actions`, `codespaces` AND `dependabot`, and they are three different APIs.
         DiscoverResult.NoMatch miss =
@@ -678,8 +655,7 @@ public class ViewsTest {
                 new Containers.Options(List.of(), "caches", 1)), "caches");
         Assert.assertFalse(resourcePaths(answer).isEmpty(), "caches should match at least one resource path");
 
-        // A query that is genuinely absent still reports nothing, or the fix would just be a match-everything —
-        // answered with what IS there, never an empty listing.
+        // A query that is genuinely absent is answered with what IS there, never an empty listing.
         DiscoverResult absent = result(Containers.render(github, Surface.Scope.CLIENT,
                 new Containers.Options(List.of(), "zzznopealsonope", 1)), "zzznopealsonope");
         DiscoverResult.NoMatch miss = as(DiscoverResult.NoMatch.class, absent);
@@ -714,8 +690,8 @@ public class ViewsTest {
     /**
      * A path parameter answers to brackets WITHOUT the type, which is what half-remembering produces.
      *
-     * <p>Measured: an agent typed {@code repos/[owner]/[repo]/issues} — the declaration form
-     * {@code [string owner]} with the type dropped — and matched nothing on 903 resource functions.
+     * <p>Agents type {@code repos/[owner]/[repo]/issues} — the declaration form {@code [string owner]} with the
+     * type dropped.
      */
     @Test
     public void aPathParameterAnswersToBracketsWithoutTheType() {
@@ -754,15 +730,11 @@ public class ViewsTest {
         Assert.assertTrue(send.declaration().contains("function send("), send.declaration());
     }
 
-    // -----------------------------------------------------------------------
-    // The readme
-    // -----------------------------------------------------------------------
-
     @Test
     public void aReadmeChunkIsASectionWithItsProseAndIsAddressableTwoWays() {
-        // A code-only extract would have discarded about 85% of `googleapis.sheets`' 178-line readme — including
-        // "if you intend to use deleteSpreadsheet you must also enable the Google Drive API", which is not
-        // inferable from any signature and is the difference between a connector that works and one that 403s.
+        // Chunks keep their prose: a code-only extract would discard most of `googleapis.sheets`' readme —
+        // including "if you intend to use deleteSpreadsheet you must also enable the Google Drive API", which is
+        // not inferable from any signature.
         LoadedPackage sheets = FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets");
         List<Readme.Chunk> chunks = Readme.chunksOf(sheets);
         Assert.assertFalse(chunks.isEmpty(), "sheets' readme carries code in several sections");
@@ -797,10 +769,6 @@ public class ViewsTest {
         Assert.assertTrue(view.failure().describe().contains("1. "), view.failure().describe());
     }
 
-    // -----------------------------------------------------------------------
-    // The code register
-    // -----------------------------------------------------------------------
-
     private static DiscoverResult type(String slug, String... names) {
         return result(Types.render(FixtureCorpus.loadedFixture(slug), new Types.Options(List.of(names), null, 1)),
                 "type " + List.of(names));
@@ -808,7 +776,6 @@ public class ViewsTest {
 
     @Test
     public void anErrorIsADeclarationOfKindErrorPrintedWithItsSubtypeChain() {
-        // Unlearnable before the detail patch: all 56 rendered as `type X error;`.
         DiscoverResult.TypeDeclaration request =
                 as(DiscoverResult.TypeDeclaration.class, type("ballerina__http", "ClientRequestError"));
         Assert.assertEquals(request.kind(), "error");
@@ -881,7 +848,7 @@ public class ViewsTest {
 
     @Test
     public void aLocalDeclarationAndAForeignOneSharingANameAreOpenedByDifferentCommands() {
-        // SHEETS-03. `ProxyConfig` is declared here AND by ballerina/http, two records with the same name and
+        // `ProxyConfig` is declared here AND by ballerina/http, two records with the same name and
         // different fields. Each is opened by its own package's command, and the foreign row says which module
         // and version it was generated against.
         String slug = "ballerinax__googleapis.sheets";
@@ -1001,7 +968,7 @@ public class ViewsTest {
 
     @Test
     public void aPredeclaredLanglibIsNeitherAnImportNorAnEdge() {
-        // GMAIL-01. `int:Signed32` needs no import, and the command for it would answer nothing.
+        // `int:Signed32` needs no import, and the command for it would answer nothing.
         DiscoverResult.TypeDeclaration profile = as(DiscoverResult.TypeDeclaration.class,
                 type("ballerinax__googleapis.gmail", "Profile"));
         Assert.assertTrue(profile.declaration().contains("int:Signed32 messagesTotal?;\n"), profile.declaration());
@@ -1021,7 +988,7 @@ public class ViewsTest {
 
     @Test
     public void anObjectNamedToTypeIsAnsweredByTheBucketThatHoldsItWithANoteSayingWhich() {
-        // SAP-09. The name index must hold a client, since it is 1 of the 4 things that package publishes.
+        // The name index must hold a client: it is one of the four things sap publishes.
         Assert.assertEquals(routedTo(type("ballerinax__sap", "Client")), new Routed("Client",
                 "'Client' is addressed by client — showing it. Canonical: bal discover ballerinax/sap client Client"));
         Assert.assertEquals(routedTo(type("ballerina__http", "Response")), new Routed("Response",
@@ -1216,10 +1183,8 @@ public class ViewsTest {
     @Test
     public void configurablesAreCommentsInTheApiDocumentNotDeclarations() {
         // A `configurable` is what a DEPLOYMENT sets in Config.toml, and it is module-private:
-        // `http:maxActiveConnections` from another module is `attempt to refer to non-accessible symbol`,
-        // measured — so it is not a declaration a caller can reference and does not belong in a callable listing.
-        // The fact is not lost, only made expensive: `api` is the register that carries it, as comments rather
-        // than as declarations.
+        // `http:maxActiveConnections` from another module is `attempt to refer to non-accessible symbol` — so it
+        // is not a declaration a caller can reference. The rendered document carries it as comments instead.
         String api = FixtureCorpus.renderFixture("ballerina__http");
         Assert.assertTrue(api.contains("\n// --- Configurables ---\n"), "api carries them");
         Assert.assertTrue(api.contains("// maxActiveConnections = -1    # int"), "with its default and type");
@@ -1228,8 +1193,8 @@ public class ViewsTest {
         Result<DiscoverResult> byName = Types.render(FixtureCorpus.loadedFixture("ballerina__http"),
                 new Types.Options(List.of("maxActiveConnections"), null, 1));
         Assert.assertFalse(byName.isOk(), "a configurable is not a declaration `type` can resolve");
-        // Eight of http's parameter defaults name a configurable, and their "not exported by this package" note
-        // is TRUE.
+        // http's parameter defaults that name a configurable keep their "not exported by this package" note,
+        // which is TRUE.
         Assert.assertTrue(FixtureCorpus.readSnapshot("ballerina__http")
                 .contains("not exported by this package"), "the note stands");
     }

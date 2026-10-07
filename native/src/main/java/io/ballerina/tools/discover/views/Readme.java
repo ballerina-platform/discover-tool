@@ -37,18 +37,14 @@ import java.util.Optional;
  * rather than "what can I call", so it shares no code with {@link Containers} and carries no {@link
  * io.ballerina.tools.discover.symbols.Surface.Scope} of its own.
  *
- * <p>Bare, it is the RFC's own base case — the whole readme, verbatim, with no entry ceiling: the RFC's text for
- * this bucket says "returns that module's README, verbatim", and unlike every listing elsewhere in this tool, it
- * states no size limit at all. A trailing selector (a chunk number, or a title) and {@code --filter} are this
- * tool's own addition on top of that base case, not an RFC shape — a readme section WITH its prose, addressed the
- * same way an oversized listing elsewhere narrows, because a package's guide can be tens of kilobytes and
- * "the whole thing, always" is not always the answer an agent needs.
+ * <p>Bare, it is the RFC's base case — the whole readme, verbatim, with no entry ceiling. A trailing selector (a
+ * chunk number, or a title) and {@code --filter} are this tool's own addition, not an RFC shape: a package's guide
+ * can be tens of kilobytes.
  *
  * @since 0.1.0
  */
 public final class Readme {
 
-    /** The bucket a caller types to reach a readme. */
     public static final String BUCKET = "readme";
 
     private Readme() {
@@ -73,8 +69,8 @@ public final class Readme {
     }
 
     /**
-     * One addressable section of the readme: the heading it sits under, and everything down to the next heading
-     * of that depth.
+     * One addressable section of the readme: a heading and everything down to the next heading of any depth,
+     * addressable only when it carries a fenced block.
      *
      * @param number the 1-based address a caller types
      * @param title the heading it sits under, or a generated one when the readme opens with prose
@@ -115,10 +111,6 @@ public final class Readme {
                                 ? "This package publishes no other module either."
                                 : "Check its other modules: `bal discover " + loaded.pkgArgument(null) + "`.");
     }
-
-    // -----------------------------------------------------------------------
-    // Chunks
-    // -----------------------------------------------------------------------
 
     /** Every addressable chunk of the resolved module's readme, in the readme's own order. */
     public static List<Chunk> chunksOf(LoadedPackage loaded) {
@@ -162,10 +154,6 @@ public final class Readme {
     private static int lineCount(String markdown) {
         return markdown.isEmpty() ? 0 : markdown.split("\n", -1).length;
     }
-
-    // -----------------------------------------------------------------------
-    // One chunk, by number or by title
-    // -----------------------------------------------------------------------
 
     private static Result<DiscoverResult> oneChunk(
             LoadedPackage loaded, List<Chunk> chunks, String requested, String filter) {
@@ -228,10 +216,6 @@ public final class Readme {
         return new DiscoverResult.Readme(
                 chunk.markdown(), chunk.lines(), chunk.number(), total, chunk.title(), loaded.warning());
     }
-
-    // -----------------------------------------------------------------------
-    // --filter
-    // -----------------------------------------------------------------------
 
     private static Result<DiscoverResult> filtered(LoadedPackage loaded, List<Chunk> chunks, Options options) {
         List<Chunk> matched = chunks.stream().filter(chunk -> matches(chunk, options.filter())).toList();

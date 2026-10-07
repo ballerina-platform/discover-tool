@@ -40,15 +40,11 @@ public final class Identifiers {
     /**
      * The words the compiler rejects as a declared name.
      *
-     * <p>DERIVED, not recalled. Each of 94 candidates was compiled on its own as
-     * {@code public type T record {| int <word>; |};} and kept only if {@code bal build} rejected it. The list
-     * written from memory first was wrong in both directions: it included {@code channel}, {@code catch},
-     * {@code finally} and {@code try}, which are legal identifiers — quoting {@code channel} moved 60 lines of
-     * {@code ballerinax/slack}, and the corpus caught it — and it omitted the query keywords
-     * {@code from}, {@code where}, {@code select}, {@code order}, {@code by}, {@code ascending},
-     * {@code descending}, {@code equals}, {@code outer} and {@code conflict}, every one of which the compiler
-     * does reject. The seven candidates it accepts are {@code catch}, {@code channel}, {@code collect},
-     * {@code finally}, {@code group}, {@code key} and {@code try}.
+     * <p>Derived, not recalled: each of 94 candidates was compiled on its own as
+     * {@code public type T record {| int <word>; |};} and kept only if {@code bal build} rejected it. The query
+     * keywords ({@code from}, {@code where}, {@code select}, {@code order}, {@code by}, ...) are rejected; the
+     * seven candidates it accepts are {@code catch}, {@code channel}, {@code collect}, {@code finally},
+     * {@code group}, {@code key} and {@code try}.
      */
     private static final Set<String> RESERVED = Set.of(
             "annotation", "any", "anydata", "as", "ascending", "base16", "base64", "boolean", "break", "by",

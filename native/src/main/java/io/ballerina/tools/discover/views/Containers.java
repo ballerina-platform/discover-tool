@@ -70,13 +70,9 @@ import java.util.stream.Collectors;
  * saying which bucket is canonical; and an exact one-of-many name match prints the SIGNATURE rather than the name
  * back.
  *
- * <p><b>OUTPUT SIZE IS AN ENTRY/LINE CEILING NOW, NOT A BYTE BUDGET.</b> The RFC replaces this tool's earlier
- * byte-budget tier ladder (bytes of quoted Ballerina, degrading through four tiers) with a hard ceiling of
- * {@value #MAX_ENTRIES} entries per listing: under it, everything is shown; over it, resource paths selected by a
- * path GROUP by segment, and every listing — a roster, a level of groups, methods, a mixed listing, a resource
- * selection that cannot group, and documentation-only matches — PAGES with {@code --page}, all honestly
- * disclosing {@code shown}/{@code total} and the exact next command rather than silently degrading. Every answer
- * is a {@link DiscoverResult}, so {@code --output} renders all of them the same way.
+ * <p><b>OUTPUT SIZE IS AN ENTRY CEILING, NOT A BYTE BUDGET.</b> The RFC caps a listing at {@value #MAX_ENTRIES}
+ * entries: over it, resource paths selected by a path GROUP by segment, and every listing PAGES with
+ * {@code --page}, disclosing {@code shown}/{@code total} and the exact next command rather than silently degrading.
  *
  * <p><b>THE VIEWS QUOTE, THEY NEVER RE-SPELL.</b> Every declaration printed here comes from
  * {@link Signatures} or {@link TypeDefs} byte-for-byte. That is what {@code ViewsAgreeTest} pins, and the reason
@@ -95,9 +91,8 @@ public final class Containers {
     public static final int MAX_ENTRIES = 40;
 
     /**
-     * The {@code number}-th {@value #MAX_ENTRIES}-wide window into a {@code total}-sized list — the page-clamping
-     * arithmetic every paginated listing in this tool shares (every listing here, a filtered readme-chunk listing
-     * in {@link Readme}), so a future fix to the page-boundary rule only has to be made once.
+     * The {@code number}-th {@value #MAX_ENTRIES}-wide window into a {@code total}-sized list, shared by every
+     * paginated listing, {@link Readme}'s included.
      *
      * <p>A page outside the listing is a usage failure naming the valid range, never an empty answer: an empty
      * page with no {@code next} reads exactly like a listing that has nothing in it.
@@ -219,9 +214,7 @@ public final class Containers {
             return answer(loaded, scope, containers.get(0), selectors, options, note);
         }
 
-        // 3. An EXACT member name or a resolving path, across every container in scope. A bare validation
-        //    failure here used to rebuild its own suggestion WITHOUT the name that failed, so following it
-        //    looped.
+        // 3. An EXACT member name or a resolving path, across every container in scope.
         Result<DiscoverResult> exact = byOwner(loaded, scope, containers, selectors, options, note, true);
         if (exact != null) {
             return exact;
@@ -309,10 +302,6 @@ public final class Containers {
         }
         return null;
     }
-
-    // -----------------------------------------------------------------------
-    // Kind tolerance
-    // -----------------------------------------------------------------------
 
     private static Result<DiscoverResult> elsewhere(
             LoadedPackage loaded, Surface.Scope scope, Options options) {
@@ -448,10 +437,6 @@ public final class Containers {
         return new DiscoverResult.EmptyBucket(bucket, List.copyOf(elsewhere), loaded.warning());
     }
 
-    // -----------------------------------------------------------------------
-    // Rosters
-    // -----------------------------------------------------------------------
-
     private static Result<DiscoverResult> roster(
             LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers, Options options) {
         String pkg = loaded.pkgArgument();
@@ -546,10 +531,6 @@ public final class Containers {
                 window.paging(), window.next(command), loaded.warning(), note));
     }
 
-    // -----------------------------------------------------------------------
-    // Selection inside one container
-    // -----------------------------------------------------------------------
-
     /**
      * One callable, with the path it is reached by when it has one.
      *
@@ -567,9 +548,6 @@ public final class Containers {
             };
         }
 
-        /**
-         * {@code ->}, {@code .} or {@code new} — DERIVED and always printed.
-         */
         public String callForm() {
             return switch (fn) {
                 case Fn.Remote ignored -> "->";
@@ -624,7 +602,6 @@ public final class Containers {
                 .filter(entry -> entry.label().equals(token) || entry.label().equals(readable))
                 .toList();
         if (exactly || !exact.isEmpty()) {
-            // AN EXACT NAME NEVER LOSES TO A SUBSTRING.
             return exact;
         }
         return all.stream().filter(entry -> matchesName(entry, token)).toList();
@@ -633,7 +610,7 @@ public final class Containers {
     /**
      * A path request, split into the accessor that filters it and the path that anchors it.
      *
-     * @param accessor the accessor that filters it, empty when none was given
+     * @param accessor the accessor that filters it, {@code null} when none was given
      * @param tokens the path tokens that anchor it
      */
     private record PathRequest(String accessor, List<String> tokens) { }
@@ -650,13 +627,9 @@ public final class Containers {
             return Optional.of(new PathRequest(selectors.get(1), PathTree.splitPath(selectors.get(0))));
         }
         if (selectors.size() == 1) {
-            // An accessor and a path in ONE argument, which is what copying a whole line out of a fenced
-            // signature produces: `get [PathParamType ...path]`. Split across two arguments every path spelling
-            // already resolved; as one token only the display spelling did, because a one-token selector was
-            // compared against an entry's LABEL and never reached the walk that understands the rest.
-            //
-            // Safe because a member name cannot contain whitespace, and gated on the container actually
-            // declaring the accessor — otherwise `Producer send` would parse `Producer` as one.
+            // An accessor and a path in ONE argument, as copying a line out of a fenced signature produces:
+            // `get [PathParamType ...path]`. Safe because a member name cannot contain whitespace, and gated on the
+            // container declaring the accessor — otherwise `Producer send` would parse `Producer` as one.
             String[] words = selectors.get(0).trim().split("\\s+", 2);
             if (words.length == 2 && isAccessor(container, words[0])) {
                 return Optional.of(new PathRequest(words[0], PathTree.splitPath(words[1])));
@@ -892,10 +865,6 @@ public final class Containers {
                 entry -> Filter.surfaceOf(entry.fn()), entry -> Filter.docsOf(entry.fn()));
     }
 
-    // -----------------------------------------------------------------------
-    // The answer
-    // -----------------------------------------------------------------------
-
     private static Result<DiscoverResult> answer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, String note) {
@@ -1026,10 +995,6 @@ public final class Containers {
                 documentedOn(window, documented, 0), window.paging(), loaded.warning(), note));
     }
 
-    // -----------------------------------------------------------------------
-    // Exactly one result, and the mixed case
-    // -----------------------------------------------------------------------
-
     private static Result<DiscoverResult> signature(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Entry entry, Options options, List<DiscoverResult.Documented.Entry> documented, String note) {
@@ -1138,10 +1103,6 @@ public final class Containers {
                 .toList();
     }
 
-    // -----------------------------------------------------------------------
-    // Remote / normal methods — flat under the ceiling, paginated over it
-    // -----------------------------------------------------------------------
-
     private static Result<DiscoverResult> methodAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
@@ -1160,10 +1121,6 @@ public final class Containers {
                 documentedOn(window, documented, methods.size()), warning, note));
     }
 
-    // -----------------------------------------------------------------------
-    // Resource paths — flat under the ceiling, grouped by segment over it
-    // -----------------------------------------------------------------------
-
     private static Result<DiscoverResult> resourceAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
@@ -1171,11 +1128,8 @@ public final class Containers {
         String base = baseCommand(loaded, scope, container);
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
         List<DiscoverResult.ResourceList.Resource> merged = mergedResources(callable, base);
-        // A kind-tolerance note and a path advisory DO co-occur: `elsewhereIfKnown` re-invokes `render` with the
-        // whole original selector list still attached, so a container reached across buckets can go on to
-        // resolve a wildcard or a relocation in that same call. Concatenated rather than one outranking the
-        // other, for the same reason `pathNote` itself joins a relocation and a skipped sibling instead of
-        // picking one — losing either fact silently is what this mechanism exists to prevent.
+        // A kind-tolerance note and a path advisory DO co-occur (`elsewhereIfKnown` re-renders with the original
+        // selectors), so both are kept rather than one outranking the other.
         String combinedNote = mergeNotes(note, pathNote(container, selectors));
 
         Optional<List<String>> prefix = selectors.isEmpty()
@@ -1308,10 +1262,6 @@ public final class Containers {
                 .map(segment -> ModuleRef.isKeyword(segment) ? "'" + segment : segment)
                 .collect(Collectors.joining("/"));
     }
-
-    // -----------------------------------------------------------------------
-    // Shared
-    // -----------------------------------------------------------------------
 
     private static Optional<List<String>> resolvedPath(Surface.Container container, List<String> selectors) {
         if (selectByPath(container, selectors).isEmpty()) {

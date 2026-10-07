@@ -40,25 +40,17 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * THE test that makes the addressed verbs safe, and a reviewer should refuse them without it.
+ * The gate that keeps every view from showing a signature the package does not have.
  *
- * <p>The risk the verbs introduce is not that a document looks wrong — it is that one of them shows a signature the
- * package does not have, while {@code api} shows the right one, and nothing in either document says they disagree.
- * An agent then writes code against a signature that came from a summariser's shortcut. The committed {@code api}
- * snapshots are the oracle: they are byte-exact against the recorded payloads, so anything a view emits has to be
- * findable in them verbatim.
- *
- * <p>This is a GATE, not a suite. A summariser permitted to invent a shorter spelling must pick one, and no test
- * written afterwards can catch a spelling nothing else in the tool produces — which is exactly what a hand-written
- * design sample did four times in one snippet: {@code 'key} lost its apostrophe, a type name was shortened to one
- * that does not exist, an included-record parameter became two invented ones, and {@code isolated resource
- * function} was dropped along with the {@code ->} call form it implies.
+ * <p>The committed document snapshots are the oracle: they are byte-exact against the recorded payloads, so anything
+ * a view emits has to be findable in them verbatim. A view permitted to invent a shorter spelling would produce one
+ * nothing else in the tool produces, and no test written afterwards could catch it.
  *
  * <p>Five properties, over every fixture:
  *
  * <ol>
  *   <li>every declaration a single-result answer quotes — its own, and every type it names — appears in that
- *       fixture's {@code api} snapshot;
+ *       fixture's document snapshot;
  *   <li>every {@code type <Name>} body is {@code renderTypeDef} of that declaration exactly;
  *   <li>every declaration resolves through {@code type}, and every name {@code type} resolves is in the index —
  *       in both directions;
@@ -99,10 +91,6 @@ public class ViewsAgreeTest {
                 + (view.isOk() ? "" : view.failure().describe()));
         return view.value();
     }
-
-    // -----------------------------------------------------------------------
-    // 1. Signatures agree with the API document
-    // -----------------------------------------------------------------------
 
     /** Across every fixture — a single fixture legitimately checks zero, see below. */
     private static final AtomicInteger TOTAL_CHECKED = new AtomicInteger();
@@ -175,10 +163,6 @@ public class ViewsAgreeTest {
                 SIGNATURES.get() + " single-callable answers checked, fewer than " + MINIMUM_SIGNATURES);
     }
 
-    // -----------------------------------------------------------------------
-    // 3 and 4. Declarations resolve by name, and print exactly
-    // -----------------------------------------------------------------------
-
     @Test(dataProvider = "fixtures")
     public void everyDeclarationResolvesThroughTypeAndPrintsIdentically(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
@@ -207,7 +191,7 @@ public class ViewsAgreeTest {
         Declarations index = Declarations.index(context.library().typeDefs());
         Set<String> held = new HashSet<>(index.names());
         // The other direction. Scoped to DECLARATIONS deliberately: operations are addressed by path and `type`
-        // does not take one, so demanding a bijection over all of github's 8,837 symbols would be unsatisfiable.
+        // does not take one, so demanding a bijection over every symbol would be unsatisfiable.
         for (String invented : new String[] {"NoSuchDeclarationAnywhere", "zzzz", "__", "Client Name"}) {
             if (held.contains(invented)) {
                 continue;
@@ -220,7 +204,7 @@ public class ViewsAgreeTest {
 
     @Test
     public void aNameThatNormalisesOntoSeveralDeclarationsIsAFailureNeverASilentPick() {
-        // Real, not theoretical: `ballerina/http` has 61 constant-versus-class collisions of the
+        // Real, not theoretical: `ballerina/http` has constant-versus-class collisions of the
         // STATUS_ACCEPTED / StatusAccepted shape.
         Declarations index = Declarations.index(FixtureCorpus.libraryFor("ballerina__http").typeDefs());
         List<String> collisions = index.names().stream()
@@ -254,14 +238,9 @@ public class ViewsAgreeTest {
         Assert.assertFalse(failure.suggestion().contains("normalise to the same name"));
     }
 
-    // -----------------------------------------------------------------------
-    // 5. Every path the tree offers is reachable
-    // -----------------------------------------------------------------------
-
     @Test(dataProvider = "fixtures")
     public void everyPathTheTreeOffersIsReachableByAContainerVerb(String slug) {
-        // Hoisted: the view takes the loaded package, and building it inside the per-path loop would re-derive a
-        // 12.4MB fixture once for each of github's 900-odd tree paths.
+        // Hoisted: building it inside the per-path loop would re-derive github's fixture once per tree path.
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         for (Surface.Container container : Surface.of(context.library(), Surface.Scope.CLIENT)) {
             List<PathTree.Operation> operations = container.operations();
@@ -270,7 +249,6 @@ public class ViewsAgreeTest {
             }
             PathTree tree = PathTree.build(operations);
             for (List<String> path : allPaths(tree, List.of())) {
-                // A navigation affordance that dead-ends is a test failure, not a wasted agent turn.
                 Assert.assertTrue(PathTree.resolve(tree, path) instanceof PathTree.Resolution.Found,
                         container.name() + ": " + String.join("/", path) + " is offered but unreachable");
                 expectAnswer(Containers.render(context, Surface.Scope.CLIENT, new Containers.Options(
@@ -282,9 +260,7 @@ public class ViewsAgreeTest {
 
     @Test(dataProvider = "fixtures")
     public void everyPathTheTreeAcceptsIsOneItOffers(String slug) {
-        // The OTHER direction of the same property. Tree→verb proves no affordance dead-ends; verb→tree proves
-        // nothing is reachable that the tree never showed, which is what would make a path an agent could stumble
-        // into but never be told about.
+        // The OTHER direction: nothing is reachable that the tree never showed.
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         for (Surface.Container container : Surface.of(context.library(), Surface.Scope.CLIENT)) {
             List<PathTree.Operation> operations = container.operations();
@@ -332,10 +308,6 @@ public class ViewsAgreeTest {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // 5. Closures terminate, do not repeat, and stay bounded
-    // -----------------------------------------------------------------------
-
     @Test(dataProvider = "fixtures")
     public void leafClosuresTerminateAndNeverRepeatForEveryDeclaration(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
@@ -354,8 +326,7 @@ public class ViewsAgreeTest {
     /**
      * The closure is BOUNDED, and anything it dropped is NAMED.
      *
-     * <p>T7. {@code ClientConfiguration}'s closure was 38 declarations and 24,183 bytes handed back whole, with no
-     * bound at all. A budget that dropped names silently would be worse than the dump; a name is a legal
+     * <p>A budget that dropped names silently would be worse than an unbounded dump; a name is a legal
      * {@code type} argument, so naming them keeps a truncated closure actionable.
      */
     @Test(dataProvider = "fixtures")
@@ -398,8 +369,8 @@ public class ViewsAgreeTest {
     @Test
     public void aSingleResultReachesTheIncludedRecordParameterItNames() {
         // The caches DELETE on github takes `*ActionsDeleteActionsCacheByKeyQueries` — an included record whose
-        // FIELDS are the call's named arguments — and no signature line spells those out, so the flow used to cost
-        // two calls and the design sample that skipped it invented two parameters instead.
+        // FIELDS are the call's named arguments — and no signature line spells those out, so the answer must
+        // carry the record.
         LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__github");
         DiscoverResult view = expectAnswer(Containers.render(context, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("Client", "delete", "repos/{owner}/{repo}/actions/caches"))),
@@ -416,8 +387,7 @@ public class ViewsAgreeTest {
                 .reduce("", (left, right) -> left + "\n" + right);
         Assert.assertTrue(types.contains("public type ActionsDeleteActionsCacheByKeyQueries record"), types);
         Assert.assertTrue(types.contains("public type ActionsCacheList record"), types);
-        // And the field the design sample re-spelled as `key` keeps its apostrophe, because it is quoted rather
-        // than re-written: `key` is a Ballerina keyword.
+        // `'key` keeps its apostrophe, because it is quoted rather than re-written: `key` is a Ballerina keyword.
         Assert.assertTrue(types.contains("'key?;"), types);
     }
 
@@ -427,7 +397,7 @@ public class ViewsAgreeTest {
                 Types.render(FixtureCorpus.loadedFixture("ballerina__http"),
                         new Types.Options(List.of("ClientRequestError"), null, 1)), "type ClientRequestError");
         List<String> order = error.types().stream().map(DiscoverResult.Signature.Type::name).toList();
-        // The root, then everything it names: a shallow field can no longer be pushed past the budget by a deep
+        // The root, then everything it names: a shallow field cannot be pushed past the budget by a deep
         // one, and the chain a reader needs is complete.
         Assert.assertTrue(order.contains("ApplicationResponseError"), order.toString());
         Assert.assertFalse(order.contains("ClientRequestError"), "the root is the declaration, not a named type");

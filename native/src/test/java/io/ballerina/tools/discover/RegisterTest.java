@@ -52,12 +52,7 @@ public class RegisterTest {
         return FixtureCorpus.fixtureRows();
     }
 
-    /**
-     * An answer plus what produced it, for a failure message that names the query.
-     *
-     * @param label what produced the answer
-     * @param result the answer itself
-     */
+    // An answer plus what produced it, for a failure message that names the query.
     private record Answer(String label, DiscoverResult result) { }
 
     private static List<Answer> answers(String slug) {
@@ -125,10 +120,6 @@ public class RegisterTest {
         answers.add(new Answer(label, view.value()));
     }
 
-    // -----------------------------------------------------------------------
-    // Both renderings
-    // -----------------------------------------------------------------------
-
     @Test(dataProvider = "fixtures")
     public void everyAnswerRendersAsOneJsonObject(String slug) {
         for (Answer answer : answers(slug)) {
@@ -157,8 +148,7 @@ public class RegisterTest {
     }
 
     /**
-     * No text rendering carries the furniture of the Markdown report this tool used to print: a format marker,
-     * a facts table, a heading. Those were answers of their own register, which {@code --output text} replaced.
+     * No text rendering carries Markdown-report furniture: a format marker, a facts table, a heading.
      */
     @Test(dataProvider = "fixtures")
     public void noTextRenderingCarriesReportFurniture(String slug) {
@@ -179,8 +169,8 @@ public class RegisterTest {
     }
 
     /**
-     * A note is plain prose in both renderings: a Markdown backtick in it is a leftover of the report register,
-     * and in JSON it is two characters a caller has to strip before the command inside can run.
+     * A note is plain prose in both renderings: in JSON a Markdown backtick is two characters a caller has to strip
+     * before the command inside can run.
      */
     @Test(dataProvider = "fixtures")
     public void noNoteCarriesMarkdown(String slug) {
@@ -204,10 +194,6 @@ public class RegisterTest {
             Assert.assertTrue(notes > 0, slug + ": no answer carried a note, so this checked nothing");
         }
     }
-
-    // -----------------------------------------------------------------------
-    // Text layout
-    // -----------------------------------------------------------------------
 
     /** Each entry on a line of its own, in order — never a comma-joined run that wraps mid-word in a terminal. */
     @Test(dataProvider = "fixtures")
@@ -392,10 +378,6 @@ public class RegisterTest {
             default -> null;
         };
     }
-
-    // -----------------------------------------------------------------------
-    // The Ballerina an answer quotes
-    // -----------------------------------------------------------------------
 
     /**
      * Quoted Ballerina is nothing but declarations: no fence, no report marker, no table. A fence inside a

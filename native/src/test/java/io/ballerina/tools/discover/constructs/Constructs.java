@@ -26,7 +26,7 @@ import java.util.List;
  *
  * <p>Read this as a table of claims about the language, not about any package. Each case is the smallest
  * Central payload that describes one construct, and its two expectations are what we print and what the
- * construct's own declaration is. The payload shapes are copied from the recorded corpus — the flag on the
+ * construct's own declaration is. The payload shapes are copied from real Central payloads — the flag on the
  * node Central really sets, at the depth Central really sets it — so a case cannot pass by testing a shape
  * Central never sends.
  *
@@ -57,10 +57,6 @@ public final class Constructs {
         cases.addAll(annotations());
         return List.copyOf(cases);
     }
-
-    // -----------------------------------------------------------------------
-    // Records
-    // -----------------------------------------------------------------------
 
     private static List<Construct> records() {
         return List.of(
@@ -103,9 +99,7 @@ public final class Constructs {
                             string name;
                         };"""),
 
-                // The declaration-level doc path, which was ALREADY right where the field-level one was not.
-                // Pinned so a shared helper cannot fix one and break the other, and so SLACK-08 is placed at
-                // the render site rather than in the description the reader carries.
+                // Pinned beside the field-level doc path so a shared helper cannot fix one and break the other.
                 Construct.faithful(
                         "records/multi-line-doc-comment",
                         "a description that spans lines commits every line to a `#`, at declaration level too",
@@ -146,10 +140,6 @@ public final class Constructs {
                         };"""));
     }
 
-    // -----------------------------------------------------------------------
-    // Record fields
-    // -----------------------------------------------------------------------
-
     private static List<Construct> fields() {
         return List.of(
                 Construct.faithful(
@@ -184,9 +174,8 @@ public final class Constructs {
                         record(Decl.field("status", Node.builtin("int")).on("isReadOnly")),
                         body("    readonly int status;")),
 
-                // Central publishes `isClosed: false` for all four rest-field records in the corpus while
-                // their sources are all `record {| … |}`, so this case asserts BOTH halves: the member form
-                // and the closed braces the grammar requires around it.
+                // Central publishes `isClosed: false` for rest-field records whose sources are `record {| … |}`,
+                // so this case asserts BOTH halves: the member form and the closed braces the grammar requires.
                 Construct.faithful(
                         "fields/rest",
                         "a rest field is `T...;`, and a record that has one is closed by the grammar",
@@ -198,9 +187,8 @@ public final class Constructs {
 
                 // `T...;` is legal only as the LAST member, so a rest field with declarations after it is
                 // something no source wrote — it is Central copying an included record's implicit
-                // `anydata...` in along with its members. ballerina/time:Civil (`*Date; *TimeOfDay;`) arrives
-                // with TWO, at positions 3 and 7 of 11; rendering them emitted `anydata...;` twice
-                // mid-record, which the compiler rejects with `more record fields after rest field`.
+                // `anydata...` in along with its members (ballerina/time:Civil arrives with two). Rendered, the
+                // compiler rejects it with `more record fields after rest field`.
                 Construct.faithful(
                         "fields/rest-stranded",
                         "a rest field that is not last was spliced in by a flattened inclusion, not declared",
@@ -250,9 +238,8 @@ public final class Constructs {
                         record(Decl.field("'type", Node.named("\"message\" ", "other"))),
                         body("    \"message\" 'type;")),
 
-                // The nested half of SLACK-09: 13 of slack's 21 padded names sit inside a union or an inline
-                // record, where the padding lands mid-expression instead of in front of the indentation.
-                // Trimming at the field's own type would leave every one of them.
+                // Most of slack's padded names sit inside a union or an inline record, where the padding lands
+                // mid-expression; trimming only at the field's own type would leave them.
                 Construct.faithful(
                         "fields/padded-union-member",
                         "padding inside a union member is trimmed too, or the type expression carries it "
@@ -278,9 +265,7 @@ public final class Constructs {
                         };"""),
 
                 // Order is Central's, which is the SOURCE's: psql writes `database` and then
-                // `*cdc:ListenerConfiguration`, and Central lists them that way. Reordering the members
-                // would be a second, unasked-for change to a declaration that is already correct once the
-                // inclusion stops being spliced.
+                // `*cdc:ListenerConfiguration`, and Central lists them that way.
                 Construct.faithful(
                         "fields/inclusion-overwrites-declaration",
                         "a record's own field survives an inclusion, and both keep the position Central "
@@ -331,10 +316,6 @@ public final class Constructs {
                         record(Decl.field("auth", Node.external("ballerinax", "aws.auth", "AuthConfig"))),
                         body("    auth:AuthConfig auth;")));
     }
-
-    // -----------------------------------------------------------------------
-    // Type expressions
-    // -----------------------------------------------------------------------
 
     private static List<Construct> types() {
         return List.of(
@@ -515,8 +496,8 @@ public final class Constructs {
                                         .elementType(Node.builtin("anydata")))))),
                         body("    record {|string name; anydata...; |} meta;")),
 
-                // ballerinax/github's rest-only inline records (`record {|string...;|}`), which the reader
-                // used to collapse to `record {}` — a record accepting any field of any anydata type.
+                // ballerinax/github's rest-only inline records (`record {|string...;|}`): collapsed to
+                // `record {}`, it would accept any field of any anydata type.
                 Construct.faithful(
                         "types/inline-record-rest-only",
                         "an inline record holding only a rest member is `record {|T...; |}`, not `record {}`",
@@ -532,9 +513,8 @@ public final class Constructs {
                                 + "`record {}` is a claim about the type, not an admission of ignorance",
                         // `const MAX = 100;` and not `const int MAX = 100;`: Central sends a type node with
                         // a category and no name for exactly the constants whose source declares no type
-                        // either, because Ballerina infers it. The register measured that on sql's two, and
-                        // the source's own form needs nothing Central withheld — inventing `int` from the
-                        // value would be a second guess dressed as a fact.
+                        // either, because Ballerina infers it. Inventing `int` from the value would be a
+                        // guess dressed as a fact.
                         Payload.pkg().with("constants",
                                 Decl.constant("MAX", "100", Node.structural())),
                         """
@@ -542,10 +522,6 @@ public final class Constructs {
 
                         public const MAX = 100;"""));
     }
-
-    // -----------------------------------------------------------------------
-    // Errors
-    // -----------------------------------------------------------------------
 
     private static List<Construct> errors() {
         return List.of(
@@ -578,11 +554,9 @@ public final class Constructs {
                                         .detail(Decl.detailIntersection(Node.named("Error", "errors")))),
                         errorBody("public type Wrapped distinct (Error & error);")),
 
-                // KAFKA-05, and the reason it is named after a package rather than a syntax. The argument is
-                // not in the payload — an `errors[]` item has no key for it and nothing links an error to its
-                // detail record — so no reader can recover it and this case can only ever be answered by the
-                // correction table. It is pointed at `ballerinax/kafka` for the same reason the http case
-                // below is pointed at `ballerina/http`: the table keys on the package.
+                // Named after a package rather than a syntax: the argument is not in the payload — an
+                // `errors[]` item has no key for it and nothing links an error to its detail record — so only
+                // the correction table, which keys on the package, can answer it.
                 Construct.faithful(
                         "errors/detail-type-argument",
                         "the detail record is the type argument `error<Detail>`, and it is what makes "
@@ -606,10 +580,6 @@ public final class Constructs {
                         .inSection("Types"));
     }
 
-    // -----------------------------------------------------------------------
-    // Enums and constants
-    // -----------------------------------------------------------------------
-
     private static List<Construct> enumsAndConstants() {
         return List.of(
                 Construct.faithful(
@@ -625,7 +595,7 @@ public final class Constructs {
                             GREEN
                         }"""),
 
-                // The half of PSQL-04 that was ours: the description Central does publish for a member.
+                // The description Central does publish for a member.
                 Construct.faithful(
                         "enums/member-description",
                         "a described member carries its doc comment, which is the only thing Central "
@@ -643,11 +613,10 @@ public final class Constructs {
                             DECODERBUFS
                         }"""),
 
-                // The half that is Central's, and stays open because no amount of reading fixes it. The strings
-                // `VERIFY-CA`, `pgoutput` and `all_tables` appear zero times in postgresql's 1.2MB payload and
-                // zero times on Central's own rendered page, so this row exists to say the gap is real and not
-                // to be closed — read literally, `enum SSLMode { … VERIFY_CA }` says the singleton is
-                // "VERIFY_CA", and it is "VERIFY-CA".
+                // Stays open because no amount of reading fixes it: the strings `VERIFY-CA`, `pgoutput` and
+                // `all_tables` appear nowhere in postgresql's payload or on Central's own rendered page. Read
+                // literally, `enum SSLMode { … VERIFY_CA }` says the singleton is "VERIFY_CA", and it is
+                // "VERIFY-CA".
                 Construct.broken(
                         "enums/member-values",
                         "an enum member's value is not its name, and Central publishes no member's value",
@@ -691,10 +660,6 @@ public final class Constructs {
                         public const int PORT = 9092;"""));
     }
 
-    // -----------------------------------------------------------------------
-    // Classes and object types
-    // -----------------------------------------------------------------------
-
     private static List<Construct> objects() {
         return List.of(
                 Construct.faithful(
@@ -734,7 +699,7 @@ public final class Constructs {
                             function query() returns error?;
                         };"""),
 
-                // SQL-02. Central publishes no `isClient` key at all, so the fact comes from the grammar: a
+                // Central publishes no `isClient` key at all, so the fact comes from the grammar: a
                 // `remote` method is legal only in a client or service object. Without it the document says
                 // `db.query()` where the language requires `db->query()`.
                 Construct.faithful(
@@ -752,9 +717,8 @@ public final class Constructs {
                             remote function query(Query q) returns error?;
                         };"""),
 
-                // Central's `isService` is present and FALSE on all 230 objects in the corpus, including the
-                // seven http service types whose own source says `distinct service object`. The category is
-                // the fact.
+                // Central's `isService` is present and FALSE even on http service types whose own source says
+                // `distinct service object`. The category is the fact.
                 Construct.faithful(
                         "objects/service-type",
                         "a service type is a `service object`, and `distinct` is why two service types with "
@@ -799,8 +763,7 @@ public final class Constructs {
                             public int code;
                         }"""),
 
-                // SQL-01's largest single loss: 50 of sql's class constructors, which are the only statement
-                // anywhere of how a value class is built.
+                // A class constructor is the only statement anywhere of how a value class is built.
                 Construct.faithful(
                         "objects/constructor",
                         "a class's `init` is its constructor and belongs in its body; Central publishes it "
@@ -818,10 +781,6 @@ public final class Constructs {
                             function init(int? value = ()) returns error?;
                         }"""));
     }
-
-    // -----------------------------------------------------------------------
-    // Callables
-    // -----------------------------------------------------------------------
 
     private static List<Construct> callables() {
         return List.of(
@@ -890,8 +849,8 @@ public final class Constructs {
                                 .returns(Node.builtin("error?"))),
                         clientBody("    isolated remote function send() returns error?;")),
 
-                // SLACK-04. Central marks the parameter's own type node `isInclusion`, which is the one place
-                // the fact appears; 74 of slack's 174 resource functions take one.
+                // Central marks the parameter's own type node `isInclusion`, which is the one place the fact
+                // appears.
                 Construct.faithful(
                         "callables/inclusion-parameter",
                         "an included-record parameter is `*T name` — the caller passes the record's fields "
@@ -949,7 +908,7 @@ public final class Constructs {
 
                 // Central publishes a rest PARAMETER the way it publishes a rest field: `isRestParam` on the
                 // type node, the parameter's own name repeated as that node's name, and the real type under
-                // `elementType`. One instance in the corpus, and reading the node's name gave
+                // `elementType`. Reading the node's name gives
                 // `removeCookiesFromRemoteStore(cookiesToRemove cookiesToRemove)`.
                 Construct.faithful(
                         "callables/rest-parameter",
@@ -962,9 +921,9 @@ public final class Constructs {
                                 .returns(Node.builtin("error?"))),
                         clientBody("    function removeAll(Cookie... cookies) returns error?;")),
 
-                // SHEETS-02, at the site the register measured it. The expression stays on the line because a
-                // defaultable parameter printed without its default reads as required — a worse claim than an
-                // unwritable default — and the note is what keeps it from reading as copyable syntax.
+                // The expression stays on the line because a defaultable parameter printed without its default
+                // reads as required — a worse claim than an unwritable default — and the note is what keeps it
+                // from reading as copyable syntax.
                 Construct.faithful(
                         "callables/unwritable-default",
                         "a printed default that names something the package does not export is flagged, not "
@@ -978,17 +937,9 @@ public final class Constructs {
                                 + "package; omit the argument rather than repeating it")));
     }
 
-    // -----------------------------------------------------------------------
-    // Listeners and services
-    // -----------------------------------------------------------------------
-
     private static List<Construct> services() {
         return List.of(
-                // The expectation this case carried named the listener `public class Listener` and gave its
-                // `init` a `returns error?`. Both were corrected against the payload: no declaration in this
-                // document says `public` yet (SLACK-11 owns that, uniformly, in a later stage), and the case's
-                // own payload publishes no return parameter — so a `returns` clause here would be inventing
-                // one, which is the defect next door (HTTP-05).
+                // The payload publishes no return parameter, so a `returns` clause on `init` would be invented.
                 Construct.faithful(
                         "services/listener-only",
                         "a listener is a declaration in its own right — `new Listener(config)` is how a "
@@ -1003,10 +954,6 @@ public final class Constructs {
                         }""")
                         .inSection("Listeners"));
     }
-
-    // -----------------------------------------------------------------------
-    // Annotations
-    // -----------------------------------------------------------------------
 
     private static List<Construct> annotations() {
         return List.of(
@@ -1035,9 +982,8 @@ public final class Constructs {
                         # Marks the payload parameter.
                         public annotation Payload on parameter;"""),
 
-                // The attach point that used to print as `service_function`, which is `invalid token
-                // 'service_function'` followed by `missing attach point name`. Central's own spelling is the
-                // language's, on all twelve.
+                // Printed as `service_function`, the attach point fails to parse. Central's own spelling is the
+                // language's.
                 Construct.faithful(
                         "annotations/object-function-attachment",
                         "`object function` is the language's attach point for a method annotation; "
@@ -1079,11 +1025,6 @@ public final class Constructs {
                         public annotation ID on record field, parameter, return;"""));
     }
 
-    // -----------------------------------------------------------------------
-    // Shorthands, so a case reads as its claim rather than as its assembly
-    // -----------------------------------------------------------------------
-
-    /** A payload holding one record named {@code Config} with the given fields. */
     private static Payload record(Decl... fields) {
         return Payload.pkg().with(RECORDS, Decl.record("Config", fields));
     }

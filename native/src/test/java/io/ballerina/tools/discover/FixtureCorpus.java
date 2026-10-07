@@ -57,11 +57,6 @@ import java.util.zip.GZIPInputStream;
  * a nested record default, a resource path with a quoted identifier, an annotation), the agent writes code
  * against a wrong signature, and {@code bal build} fails for reasons nobody traces back here.
  *
- * <p>The payloads and the {@code .bal} snapshots are the SAME BYTES the TypeScript reader was verified against.
- * They are language-agnostic by construction — a recorded HTTP response and the Ballerina it renders to — which
- * is what makes them an oracle for this port rather than a fresh set of expectations written to match whatever
- * it happens to produce.
- *
  * @since 0.1.0
  */
 public final class FixtureCorpus {
@@ -74,14 +69,14 @@ public final class FixtureCorpus {
      */
     public static final Version FIXTURE_VERSION = Version.parse("0.0.0-fixture").value();
 
-    /** Set to {@code 1} to rewrite the report snapshots after an intentional rendering change. */
+    /** Set to {@code 1} to rewrite the snapshots after an intentional rendering change. */
     private static final String UPDATE_SNAPSHOTS = "UPDATE_SNAPSHOTS";
 
     private static final String UPDATE_KEYSPACE = "BAL_DISCOVER_UPDATE_KEYSPACE";
 
     /**
      * Resolved against the module directory rather than the classpath, because the snapshot tests can WRITE
-     * here — a 45KB report is not something a reviewer hand-edits after an intentional change.
+     * here.
      */
     private static final Path RESOURCES = Path.of("src", "test", "resources");
 
@@ -108,9 +103,8 @@ public final class FixtureCorpus {
      * Fixtures are immutable on disk and the pipeline above them is pure, so a fixture is decoded and
      * transformed once per test process.
      *
-     * <p>Not a micro-optimisation: {@code ballerinax/github} is 12.4MB of JSON, and the oracle tests ask for its
-     * library once per tree path. Re-deriving it each time is the difference between a suite that runs in
-     * seconds and one that runs in minutes.
+     * <p>Not a micro-optimisation: {@code ballerinax/github} is megabytes of JSON, and the oracle tests ask for
+     * its library once per tree path.
      */
     private static final Map<String, JsonElement> RAW_CACHE = new ConcurrentHashMap<>();
 
@@ -265,10 +259,6 @@ public final class FixtureCorpus {
         return Documents.toSyntaxString(libraryFor(slug));
     }
 
-    // -----------------------------------------------------------------------
-    // Snapshots
-    // -----------------------------------------------------------------------
-
     public static Path snapshotPath(String slug) {
         return SNAPSHOTS_DIR.resolve(slug + ".bal");
     }
@@ -288,8 +278,8 @@ public final class FixtureCorpus {
     /**
      * Compare against the committed document, or write it when {@code UPDATE_SNAPSHOTS=1}.
      *
-     * <p>The escape hatch is deliberate and narrow: these documents are 8 to 45KB and hand-editing them after an
-     * intentional change is not review, it is transcription.
+     * <p>The escape hatch is deliberate: hand-editing these documents after an intentional change is not review,
+     * it is transcription.
      */
     public static void matchesSnapshot(Path path, String rendered, String label) {
         if ("1".equals(System.getenv(UPDATE_SNAPSHOTS))) {
@@ -317,8 +307,8 @@ public final class FixtureCorpus {
     /**
      * The first place two texts differ, as {@code line N: expected … / actual …}.
      *
-     * <p>Worth the twenty lines: the snapshots run to 20,000 lines and a bare "strings are not equal" from the
-     * assertion library would print both of them.
+     * <p>The snapshots run to thousands of lines, and a bare "strings are not equal" from the assertion library
+     * would print both of them.
      */
     public static String firstDifference(String expected, String actual) {
         if (expected.equals(actual)) {
@@ -343,10 +333,6 @@ public final class FixtureCorpus {
     private static String quote(String line) {
         return line == null ? "null" : new com.google.gson.JsonPrimitive(line).toString();
     }
-
-    // -----------------------------------------------------------------------
-    // The drift detector
-    // -----------------------------------------------------------------------
 
     /**
      * Every distinct object shape in a payload, as sorted key lists.
@@ -375,7 +361,7 @@ public final class FixtureCorpus {
         }
         List<String> keys = new ArrayList<>(node.getAsJsonObject().keySet());
         if (!keys.isEmpty()) {
-            // Natural order, matching the bare `.sort()` the recorded snapshot was generated with.
+            // Natural order, not a collator: the recorded snapshot was generated with it.
             keys.sort(String::compareTo);
             signatures.add(String.join(",", keys));
         }

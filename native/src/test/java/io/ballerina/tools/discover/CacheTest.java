@@ -141,10 +141,6 @@ public class CacheTest {
         return JsonParser.parseString(FixtureCorpus.read(docsEntry(root)));
     }
 
-    // -----------------------------------------------------------------------
-    // Hit and miss
-    // -----------------------------------------------------------------------
-
     @Test
     public void aMissFetchesAHitDoesNotAndBothProduceTheSameDocument() {
         Path root = freshRoot();
@@ -161,9 +157,7 @@ public class CacheTest {
         Assert.assertEquals(central.docs, 1, "the second run must not fetch the docs again");
         Assert.assertEquals(central.versions, 1, "nor re-resolve the version inside the TTL");
 
-        // Byte-identical, with nothing stripped first. A hit and a miss are the same answer, and since the
-        // provenance row went away there is no longer a line that says which one this was — so the document is
-        // run-order-independent and a test can compare the whole of it.
+        // Byte-identical, with nothing stripped first: no line says whether this was a hit or a miss.
         Assert.assertEquals(warm.stdout(), cold.stdout());
     }
 
@@ -221,14 +215,8 @@ public class CacheTest {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(), http), 0, String.join(" ", argv));
         }
-        // This is the whole point of the cache. At 4.9 to 6.6 seconds per invocation the CLI can only be asked
-        // once, which is what forced a 22,829-line document to be navigated by hand.
         Assert.assertEquals(central.docs, 1);
     }
-
-    // -----------------------------------------------------------------------
-    // Every way an entry can be wrong
-    // -----------------------------------------------------------------------
 
     @Test
     public void eachCorruptionModeFallsThroughToTheNetworkSilently() {
@@ -321,8 +309,7 @@ public class CacheTest {
                     cache.listVersions(new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, org, "kafka")),
                     List.of(), "listVersions " + org);
         }
-        // The repository dimension is as much a coordinate as org/name/version now — a repository id is never
-        // read off anything but PackageRepository.id() in real code, but this proves the same guard covers it.
+        // Real code only reads a repository id off PackageRepository.id(), but the same guard covers it.
         for (String repository : new String[] {"..", ".", "../..", "a/b"}) {
             DocsCache.DocsKey key = new DocsCache.DocsKey(repository, "ballerinax", "kafka", VERSION);
             cache.writeDocs(key, anything);
@@ -332,10 +319,6 @@ public class CacheTest {
         }
         Assert.assertEquals(children(root).size(), 0, "not even the format directory should exist");
     }
-
-    // -----------------------------------------------------------------------
-    // Concurrency
-    // -----------------------------------------------------------------------
 
     @Test
     public void twoConcurrentWritersLeaveOneEntryAndNoTempFiles() {
@@ -353,10 +336,6 @@ public class CacheTest {
                 "one entry, and nothing ending in .tmp");
         Assert.assertEquals(readEntry(root), payload);
     }
-
-    // -----------------------------------------------------------------------
-    // The versions list: TTL, refresh, offline
-    // -----------------------------------------------------------------------
 
     @Test
     public void theVersionsListIsBelievedForTenMinutesAndReAskedAfter() {
@@ -411,8 +390,8 @@ public class CacheTest {
         Assert.assertEquals(central.docs, 1, "without the flag the second run is a hit");
 
         Capture refreshed = new Capture();
-        // Unconditional on purpose. An earlier draft made the re-download conditional on the version having
-        // changed, which made the flag a no-op in exactly the case its own error message recommends it for.
+        // Unconditional on purpose: a re-download conditional on the version having changed would make the flag
+        // a no-op in exactly the case its own error message recommends it for.
         Assert.assertEquals(Cli.run(List.of(PKG, "--refresh"), refreshed.streams(), http), 0);
         Assert.assertEquals(central.docs, 2, "--refresh must re-download");
         Assert.assertEquals(central.versions, 2, "and re-resolve");
@@ -442,8 +421,7 @@ public class CacheTest {
 
     @Test
     public void withTheRegistryUnreachableAndAPayloadOnDiskTheLookupStillAnswers() {
-        // And says it is unverified. Without this, a warm cached payload plus one blip is a hard failure that
-        // can burn the client's whole budget — four times over in a four-verb episode.
+        // And says it is unverified. Without this, a warm cached payload plus one blip is a hard failure.
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
@@ -580,10 +558,6 @@ public class CacheTest {
         Assert.assertEquals(cache.readLatest(key), new DocsCache.LatestEntry("4.6.5", 42));
     }
 
-    // -----------------------------------------------------------------------
-    // Where it lives
-    // -----------------------------------------------------------------------
-
     private static CacheLocation.Environment env(Map<String, String> variables) {
         return new CacheLocation.Environment(variables, "/home/aep", "/tmp", "aep");
     }
@@ -661,12 +635,8 @@ public class CacheTest {
         Assert.assertEquals(DocsCache.NULL.describe(), "disabled");
     }
 
-    // -----------------------------------------------------------------------
-    // Module entries an older build wrote
-    //
     // Earlier builds read a module coordinate at its containing package's version and cached the answer under
     // the module's own key. Neither entry may now answer `ballerinax/aws.auth` as if it were a package.
-    // -----------------------------------------------------------------------
 
     private static final DocsCache.PackageKey AWS_AUTH_PACKAGE =
             new DocsCache.PackageKey(CentralClient.REPOSITORY_ID, "ballerinax", "aws.auth");
@@ -885,8 +855,6 @@ public class CacheTest {
         Capture offline = new Capture();
         Assert.assertEquals(Cli.run(argv, offline.streams(), http), 0, offline.stderr());
     }
-
-    // -----------------------------------------------------------------------
 
     private static void write(Path path, String contents) {
         try {

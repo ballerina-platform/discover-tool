@@ -30,9 +30,7 @@ import java.util.Optional;
  * <p>{@link Alias} carries every one of Central's seventeen alias categories, because a Ballerina type
  * alias is one shape however Central files it, and {@link ObjectDef} carries its four object categories for
  * the same reason. A name whose descriptor the reader could not encode is an {@code Alias} with an empty
- * type — it renders as a comment naming itself. There used to be a separate {@code Other} case for that,
- * produced by one patch injecting one name no oracle declares; when the injection went, so did the case,
- * since two spellings of "no descriptor" is one more than the renderer needs.
+ * type — it renders as a comment naming itself.
  *
  * @since 0.1.0
  */
@@ -62,9 +60,8 @@ public sealed interface TypeDef {
         /**
          * The same record with different members.
          *
-         * <p>Exists so a patch cannot lose {@code isClosed} by rebuilding: two of them did, and an inclusive
-         * record descriptor holding a rest field is a syntax error, so the loss showed up as a document that
-         * stopped compiling at exactly the declaration a patch had rewritten.
+         * <p>Exists so a patch cannot lose {@code isClosed} by rebuilding: an inclusive record descriptor
+         * holding a rest field is a syntax error.
          */
         public Rec withFields(List<RecordField> replacement) {
             return new Rec(name, description, isClosed, isDeprecated, replacement);
@@ -74,12 +71,9 @@ public sealed interface TypeDef {
     /**
      * An enum, whose members carry a description each.
      *
-     * <p>A member is a name and a description rather than a bare name, because Central publishes both and 13 of
-     * the corpus's 65 members are described — including the two that say which PostgreSQL logical-decoding
-     * plugin is the standard one. What Central publishes for NO member is its VALUE: 10 of postgresql's 14 have
-     * an explicit one and 6 of those differ from the member name in more than case, so
-     * {@code enum SSLMode { … VERIFY_CA }} is a legal declaration that is not quite the real one. The
-     * description is the only part of that gap either page can close.
+     * <p>What Central publishes for NO member is its VALUE: most of postgresql's members have an explicit one
+     * that differs from the member name, so {@code enum SSLMode { … VERIFY_CA }} is a legal declaration that is
+     * not quite the real one.
      *
      * @param name the enum type's name
      * @param description the type's own documentation, verbatim
@@ -119,9 +113,8 @@ public sealed interface TypeDef {
      *
      * <p>Distinct from {@link Constant}, which is {@code const} — a compile-time constant whose value is part
      * of its type. These are not: {@code public final readonly & Continue CONTINUE = {};} has a value the
-     * package builds, so its initialiser is not something a caller can be given. Central publishes 64 of them
-     * across the corpus under {@code variables}, and they were parsed and rendered nowhere, so
-     * {@code http:CONTINUE} — which compiles from another module, measured — appeared in no verb.
+     * package builds, so its initialiser is not something a caller can be given. Central publishes them under
+     * {@code variables}; {@code http:CONTINUE} compiles from another module.
      *
      * @param name the variable's name
      * @param description the variable's own documentation, verbatim
@@ -196,12 +189,9 @@ public sealed interface TypeDef {
      *   category "records"  detail record   type FHIRServerError distinct error&lt;FHIRServerErrorDetails&gt;;
      * </pre>
      *
-     * <p>{@code base} therefore cannot be named for the wire, and {@code detailRecord} is the flag that
-     * says which reading applies. This used to be a single field documented as "never a detail record",
-     * generalised from nine fixtures in which every {@code detailType} happens to be an error. It is not
-     * a safe generalisation: {@code ballerinax/health.clients.fhir} publishes records, and the document
-     * printed {@code distinct FHIRServerErrorDetails} — which is not an error type, does not compile as
-     * one, and quietly contradicts the promise that a signature from here is the source for what does.
+     * <p>{@code base} therefore cannot be named for the wire, and {@code detailRecord} says which reading
+     * applies. Assuming a supertype is not safe: {@code ballerinax/health.clients.fhir} publishes records, and
+     * {@code distinct FHIRServerErrorDetails} does not compile.
      *
      * @param name the error type's name
      * @param description the type's own documentation, verbatim

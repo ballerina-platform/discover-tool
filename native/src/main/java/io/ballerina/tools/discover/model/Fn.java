@@ -23,11 +23,10 @@ import java.util.List;
 /**
  * A function on a client, or at module scope.
  *
- * <p>A sealed hierarchy rather than one record with nullable fields, and both halves of that are
- * load-bearing. A resource function's accessor and its path are SEPARATE fields, so the mistake the
- * language-server reader warns about in prose ("never merge them into one string") has no field to live
- * in; and the renderer switches over the cases with no {@code default}, so a callable shape nobody
- * renders is a compile error rather than a silently dropped function.
+ * <p>A sealed hierarchy rather than one record with nullable fields: a resource function's accessor and its
+ * path are SEPARATE fields, so they cannot be merged into one string, and the renderer switches over the cases
+ * with no {@code default}, so a callable shape nobody renders is a compile error rather than a silently
+ * dropped function.
  *
  * <p>{@code accessor} is a plain string rather than a closed set of HTTP methods: Ballerina's resource
  * accessor is an identifier, and {@code subscribe} (websub, graphql) is as legal as {@code get}.
@@ -44,21 +43,15 @@ public sealed interface Fn {
     ReturnDef returns();
 
     /**
-     * Whether calling this is discouraged.
-     *
-     * <p>On the interface rather than on each case, because a caller asking "should I use this?" asks it of
-     * every callable form. Central publishes {@code isDeprecated} on all of them; the renderer was wired to
-     * service methods only, so github's 37 deprecated operations read as live API.
+     * Whether calling this is discouraged. Central publishes {@code isDeprecated} on every callable form.
      */
     boolean isDeprecated();
 
     /**
      * Whether the callable is {@code isolated}.
      *
-     * <p>On the interface for the same reason {@code isDeprecated} is: Central publishes {@code isIsolated} on
-     * every callable form, and the fact belongs to the declaration rather than to one of its shapes. It matters
-     * to a caller that is itself {@code isolated} — an isolated function may only call isolated ones — and it is
-     * load-bearing when a service contract has to be matched exactly, because the compiler's
+     * <p>It matters to a caller that is itself {@code isolated} — an isolated function may only call isolated
+     * ones — and when a service contract has to be matched exactly, because the compiler's
      * {@code mismatched function signatures} message does not print the qualifier: it reports an expected and a
      * found signature that are textually identical.
      */

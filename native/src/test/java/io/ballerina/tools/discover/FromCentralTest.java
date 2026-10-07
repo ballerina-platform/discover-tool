@@ -110,11 +110,8 @@ public class FromCentralTest {
     }
 
     /**
-     * T10's audit target. An earlier reader matched a module whose id merely STARTED WITH
-     * {@code qualified.name() + "."}, meant to catch the hierarchical-package-name form — but that also matches
-     * a genuine submodule's id, and the loop returned on whichever candidate iteration happened to reach first.
-     * A payload listing the submodule before the exact default module used to render the wrong one for a caller
-     * who asked for neither {@code --module} nor anything but the default.
+     * A submodule's id starts with {@code qualified.name() + "."}, so a prefix match would render whichever module
+     * the payload listed first; only the exact default module answers a caller who gave no {@code --module}.
      */
     @Test
     public void anExactDefaultModuleWinsOverAPrefixedSubmoduleWhicheverComesFirst() {
@@ -157,8 +154,6 @@ public class FromCentralTest {
 
     @Test
     public void aResourcePathKeepsAParametersTypeAndNameApart() {
-        // The mistake the language-server reader warns about in prose ("never merge them into one string") has no
-        // field to live in.
         List<Fn.PathSegment> paths = FromCentral.createPaths(
                 Optional.of("repos/[string owner]/[string repo]/code\\-scanning"));
         Assert.assertEquals(paths, List.of(

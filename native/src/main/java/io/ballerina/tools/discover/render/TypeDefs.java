@@ -31,14 +31,12 @@ import java.util.regex.Pattern;
  * One module-level declaration, as Ballerina.
  *
  * <p>{@link #renderTypeDef} switches over every case with no {@code default}: adding a Ballerina shape to
- * the IR fails the build here until it has a rendering. It is also the whole of the {@code type} verb's
- * output — that verb selects declarations and prints them, so a declaration read by name is
- * byte-identical to the same declaration inside the API document.
+ * the IR fails the build here until it has a rendering. The {@code type} bucket prints its declarations through
+ * it too, so a declaration read by name is byte-identical to the same declaration in the whole-package document.
  *
- * <p>Spacing is uniform across kinds and that is deliberate: a doc comment is adjacent to the declaration it
- * documents, and a declaration without one starts at its first line. Every renderer therefore concatenates
- * {@link Signatures#renderDescription}'s output instead of joining it, because that output already ends in a
- * newline. Records did not, which is what put a blank line inside nine of email's seventeen declarations.
+ * <p>A doc comment is adjacent to the declaration it documents, and a declaration without one starts at its first
+ * line. Every renderer therefore concatenates {@link Signatures#renderDescription}'s output instead of joining it,
+ * because that output already ends in a newline.
  *
  * @since 0.1.0
  */
@@ -47,41 +45,28 @@ public final class TypeDefs {
     /**
      * A string constant's value as Central sends it: WITH its quotes.
      *
-     * <p>Adding another pair produced {@code const string AUTH_SASL_PLAIN = ""PLAIN"";}, which is not
-     * valid Ballerina. It affected all 108 string constants in the corpus, with zero counter-examples.
-     * The quotes are still added when they are absent rather than dropped outright, because "already
-     * quoted" is an observation about today's payload and an unquoted value would otherwise render as a
-     * bare identifier — a worse failure, since it would look like a reference to something rather than
-     * like a typo.
+     * <p>Quotes are still added when absent: "already quoted" is an observation about today's payload, and an
+     * unquoted value would otherwise render as a bare identifier that reads like a reference.
      */
     private static final Pattern QUOTED = Pattern.compile("^\".*\"$", Pattern.DOTALL);
 
     /**
      * Every declaration in this document is {@code public}, and that is measured rather than assumed.
      *
-     * <p>Central's docs payload carries no declaration-level visibility at all — the one {@code isPublic} key it
-     * sets lives on TYPE REFERENCE nodes, where it describes the referent — so the fact has to come from what
-     * Central chooses to publish. Across the seven fixtures whose sources are on disk it publishes 2,085 public
-     * type declarations, 229 classes, 178 constants, 13 enums, 10 annotations and 9 module functions, and withholds
-     * all 708 module-private declarations: 42 classes, 118 constants, 5 enums, 459 functions and 84 types. Zero
-     * counter-examples. The one published category that is NOT public in the source is {@code configurable}
-     * (12 of 14), and configurables are not rendered.
-     *
-     * <p>Without it the document is not a declaration a caller can copy: a type lifted into their own module comes
-     * out module-private, which compiles until something outside the module needs it.
+     * <p>Central's docs payload carries no declaration-level visibility — its {@code isPublic} key lives on type
+     * reference nodes, describing the referent — but it publishes only public declarations: checked against the
+     * fixtures' sources, every module-private declaration is withheld. The one published exception,
+     * {@code configurable}, is not rendered.
      */
     private static final String PUBLIC = "public ";
 
     /**
      * Which body a field is being written into, because the language spells the two differently.
      *
-     * <p>A class or object-type field takes {@code public}; a RECORD field cannot — {@code public} there is
-     * {@code invalid token 'public'}, checked by compiling it. Central publishes only the public fields of an
-     * object (185 of 185 across the corpus, with all 61 private ones withheld), so every field that reaches this
-     * renderer from an object body is one, and omitting the qualifier is not cosmetic: an including class must
-     * repeat the visibility of the field it overrides, so the 82 fields postgresql's value classes take from
-     * {@code *sql:TypedValue} each produced {@code mismatched visibility qualifiers for field 'value' with object
-     * type inclusion}.
+     * <p>A class or object-type field takes {@code public}; a record field cannot ({@code invalid token 'public'}).
+     * Central publishes only an object's public fields, and the qualifier is not cosmetic: an including class must
+     * repeat the visibility of the field it overrides ({@code mismatched visibility qualifiers}, e.g. postgresql's
+     * value classes including {@code *sql:TypedValue}).
      */
     private enum Owner { RECORD, OBJECT }
 
@@ -112,9 +97,6 @@ public final class TypeDefs {
             lines.add(renderRecordField(field, Owner.RECORD));
         }
         lines.add(close);
-        // Concatenated rather than newline-joined, for the reason `renderEnum` gives below: joining a
-        // description that already ends in a newline put a blank line between a record's doc comment and the
-        // declaration it documents, and a leading blank line in front of an undescribed one.
         return Signatures.renderDescription(typeDef.description()) + String.join("\n", lines);
     }
 
@@ -177,15 +159,8 @@ public final class TypeDefs {
     /**
      * The members of an object body: its fields, then its methods.
      *
-     * <p>Shared with the client class renderer, because a client class is an object like any other and two
-     * copies of "how an object body is laid out" is where the two would drift. Fields are contiguous, as a
-     * record's are; a blank line separates each method from what precedes it, so a 20-method client stays
-     * scannable.
-     *
-     * <p>BETWEEN members, not before each one. The old rule exempted the constructor, which amounted to the
-     * same thing for the clients that declare one and left a blank line under the header of the ones that do
-     * not — {@code http:Caller} among them. That is the spacing rule this file's own header states, applied
-     * where it had not been.
+     * <p>Fields are contiguous, as a record's are; a blank line separates each method from what precedes it —
+     * between members, never under the header.
      */
     public static List<String> renderMembers(List<RecordField> fields, List<Fn> methods) {
         List<String> lines = new ArrayList<>();
@@ -208,8 +183,6 @@ public final class TypeDefs {
             // name it documents rather than after the previous member's separator.
             members.add(Signatures.renderDocComment(member.description(), "    ") + "    " + member.name());
         }
-        // Concatenated rather than newline-joined: `renderDescription` already ends in a newline, and an
-        // enum with no description must not gain a leading blank line.
         return Signatures.renderDescription(typeDef.description())
                 + PUBLIC + "enum " + typeDef.name() + " {\n" + String.join(",\n", members) + "\n}";
     }
@@ -226,14 +199,6 @@ public final class TypeDefs {
         return description + PUBLIC + "type " + typeDef.name() + " " + type + ";";
     }
 
-    /**
-     * A constant, with or without a declared type.
-     *
-     * <p>Central sends a type node with no name for a constant whose source declares no type either —
-     * {@code public const EXECUTION_FAILED = -3;}, where Ballerina infers it. Printing a type there is
-     * printing a guess: it used to come out as {@code const record {} EXECUTION_FAILED = -3;}, which does
-     * not compile and typed an integer as a record. The inferred form is what the source says.
-     */
     // The initialiser is required (`public final T X;` does not compile); Central's value is the source's own.
     private static String renderVariable(TypeDef.Variable typeDef) {
         List<Signatures.ExternalLink> links = Signatures.collectExternalLinks(typeDef.varType());
@@ -243,6 +208,8 @@ public final class TypeDefs {
                 + PUBLIC + "final " + type + " " + typeDef.name() + initialiser + ";";
     }
 
+    // Central sends a nameless type node for a constant the source declares untyped
+    // (`public const EXECUTION_FAILED = -3;`); printing a type there would be a guess.
     private static String renderConstant(TypeDef.Constant typeDef) {
         String type = typeDef.varType().name();
         boolean needsQuotes = "string".equals(type) && !QUOTED.matcher(typeDef.value()).matches();

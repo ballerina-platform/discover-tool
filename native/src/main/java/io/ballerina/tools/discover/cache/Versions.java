@@ -45,7 +45,6 @@ public final class Versions {
         if (a.prerelease().equals(b.prerelease())) {
             return 0;
         }
-        // A release outranks any prerelease of the same core version.
         if (a.prerelease().isEmpty()) {
             return 1;
         }

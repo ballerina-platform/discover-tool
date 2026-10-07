@@ -31,30 +31,17 @@ import java.util.function.Function;
 /**
  * {@code --filter} — a linear scan over the package that is already in memory.
  *
- * <p>NO INDEX IS BUILT AND NO CACHE TIER IS ADDED. {@code Loader.loadPackage} holds the whole package, and
- * {@link Declarations}, {@link Names} and {@link PathTree} are already constructed per load;
- * {@code ballerinax/github} is about 900 operations and 700 declarations, so a scan over them is free beside the
- * fetch it rides on. The payload cache — 8.0s cold against 1.2s warm — is the entire performance story, and a
- * second cache would be a second thing to invalidate for no measured gain.
+ * <p>NO INDEX AND NO SECOND CACHE: {@code ballerinax/github} is about 900 operations and 700 declarations, so a
+ * scan is free beside the fetch it rides on, and a second cache would be a second thing to invalidate.
  *
- * <p><b>TWO TIERS, AND THE SPLIT IS THE WHOLE DESIGN.</b> Measured on {@code ballerinax/github}: {@code upload} is
- * 7 matches by name or type against 12 in documentation alone, and {@code pagination} is 0 against 14. Ranking
- * documentation hits below surface hits is not enough — 19 results push a 7-result query past a tier threshold, so
- * the agent receives counts where it should receive seven signatures. Dropping documentation instead loses
- * {@code pagination} entirely, and that is the query shape a caller uses when they know the capability and not the
- * vocabulary. So a documentation-only match is NEVER RENDERED and ALWAYS NAMED, which costs one line and leaves
- * every one of them promotable by name in a single follow-up call. Kept from this tool's earlier {@code -s} flag,
- * which the RFC's {@code --filter} replaces — the RFC does not contradict this split.
+ * <p><b>SURFACE AND DOCUMENTATION MATCHES ARE SPLIT.</b> A documentation-only match is NEVER RENDERED and ALWAYS
+ * NAMED. Measured on {@code ballerinax/github}: {@code upload} is 7 matches by name or type against 12 in
+ * documentation alone, and {@code pagination} is 0 against 14. Rendering documentation hits would bury the seven
+ * signatures; dropping them would lose {@code pagination}, the query of a caller who knows the capability but not
+ * the vocabulary. The split also removes the need for a cross-kind relevance score.
  *
- * <p>That split is also what removes the need for a cross-kind relevance score — the part of a search design
- * hardest to test and easiest to rot silently, since nothing fails when a weight drifts.
- *
- * <p><b>MATCHING ITSELF IS THE PART {@code --filter} CHANGES.</b> {@code -s} required every whitespace/slash-split
- * token of the query to appear (an unordered AND), which is what let it also narrow a query written as a path.
- * {@code --filter} is deliberately simpler — the RFC's own "keyword-facet approach Ballerina Central's own search
- * already uses" — a single case-insensitive substring match of the whole argument, no splitting. A caller who
- * wants a path narrowed uses the positional selector, which already does that anchored, ordered walk; this flag
- * is for a keyword, not a shape.
+ * <p>Matching is the RFC's keyword facet: one case-insensitive substring match of the whole argument, no
+ * splitting. A path is narrowed by the positional selector, not by this flag.
  *
  * @since 0.1.0
  */
@@ -67,7 +54,7 @@ public final class Filter {
      * What a query selected: the entries whose SURFACE matched, and the ones only their prose did.
      *
      * @param <T> the kind of entry being split
-     * @param surface rendered at whatever tier the budget allows
+     * @param surface rendered
      * @param documented named, never rendered
      */
     public record Split<T>(List<T> surface, List<T> documented) {
@@ -120,10 +107,6 @@ public final class Filter {
         return PathTree.readableSelector(query).trim().toLowerCase(Locale.ROOT);
     }
 
-    // -----------------------------------------------------------------------
-    // What counts as surface
-    // -----------------------------------------------------------------------
-
     /**
      * A callable's addressable text: how it is named, and every name inside its declaration.
      *
@@ -159,8 +142,8 @@ public final class Filter {
      * Everything a callable DOCUMENTS: its own prose plus every parameter's and the return's.
      *
      * <p>A return with no description is {@code null} rather than empty, so it is guarded here: the alternative
-     * is the four literal characters {@code null} in the haystack, which would make {@code -s "null"} match every
-     * undocumented callable in the package.
+     * is the four literal characters {@code null} in the haystack, which would make {@code --filter null} match
+     * every undocumented callable in the package.
      */
     public static String docsOf(Fn fn) {
         StringBuilder text = new StringBuilder(fn.description()).append(' ');
@@ -201,8 +184,7 @@ public final class Filter {
             case TypeDef.ObjectDef object ->
                     object.fields().forEach(field -> text.append(field.description()).append(' '));
             default -> {
-                // An alias, a constant, a variable and an error carry their own description and nothing else
-                // that documents anything separately.
+                // An alias, a constant, a variable and an error document nothing beyond their own description.
             }
         }
         return text.toString();

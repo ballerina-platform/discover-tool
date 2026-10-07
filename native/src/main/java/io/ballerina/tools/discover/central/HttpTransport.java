@@ -50,7 +50,7 @@ public interface HttpTransport {
     sealed interface Reply {
 
         /**
-         * Central answered. {@code retryAfter} is the raw header, or {@code null}.
+         * Central answered.
          *
          * @param status the HTTP status Central answered with
          * @param body the response body

@@ -25,17 +25,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@link Library} → the whole-package Ballerina document the {@code api} verb prints.
+ * {@link Library} → the whole-package Ballerina document.
  *
  * <p>The output is not a compilable module and is not meant to be: it is the package's whole public
  * surface written in the language the caller is about to write, so a signature can be read straight off it
  * instead of inferred from prose. Function bodies are {@code ;}, and a declaration the reader has no
  * Ballerina form for becomes a comment naming it.
- *
- * <p>Since the addressed verbs landed, this is the fallback rather than the default: {@code overview},
- * {@code ops} and {@code type} answer by name or by path, and {@code api} exists for the question none of
- * them answered, and so that a stale instruction telling an agent to grep one file is recoverable rather
- * than fatal.
  *
  * @since 0.1.0
  */
@@ -46,9 +41,7 @@ public final class Documents {
 
     /**
      * Section order is the output's contract with the caller: types, clients, functions, listeners,
-     * annotations. Reordering it was proposed and rejected — it moves every declaration in all nine
-     * snapshots and does not solve the motivating case, since {@code ballerinax/github}'s client section is
-     * 2,715 lines on its own. The addressed verbs are the answer to "the client is at the bottom".
+     * annotations, configurables.
      */
     public static String toSyntaxString(Library library) {
         List<String> output = new ArrayList<>();
@@ -106,18 +99,11 @@ public final class Documents {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Annotations
-    // -----------------------------------------------------------------------
-
     /**
      * An annotation declaration: its config record, its name, and every point it attaches to.
      *
-     * <p>{@code public annotation HttpPayload Payload on parameter, return;} — the config record comes before the
-     * name, which is the order the language reads it in and the reason the type can be dropped without the line
-     * ceasing to parse. That is how {@code ResourceConfig} and {@code ServiceConfig} came to print as
-     * {@code public annotation ResourceConfig on service_function;}: valid-looking, attached to a token the
-     * compiler rejects, and giving no way to discover the field set of the record the attachment must carry.
+     * <p>The config record comes before the name ({@code public annotation HttpPayload Payload on parameter, return;}),
+     * so a dropped type still parses — and hides the record the attachment must carry.
      */
     public static String renderAnnotation(Library.AnnotationDef annotation) {
         List<String> lines = new ArrayList<>();

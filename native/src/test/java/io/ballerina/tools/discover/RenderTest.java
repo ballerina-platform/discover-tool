@@ -102,12 +102,10 @@ public class RenderTest {
 
     @Test
     public void aDeclarationIsPublicAndAnObjectFieldIsTooButARecordFieldCannotBe() {
-        // SLACK-11. Central publishes no declaration-level visibility at all, so this comes from what it
-        // publishes AT ALL: 2,085 public type declarations, 229 classes, 178 constants, 13 enums and 9 module
-        // functions across the corpus, with all 708 module-private declarations withheld and no exception.
-        // `public` on a RECORD field is `invalid token 'public'`; on a class field it is required, because an
-        // including class must repeat the visibility of the field it overrides — the 82 `mismatched visibility
-        // qualifiers` postgresql's value classes produced from `*sql:TypedValue`.
+        // Central publishes no declaration-level visibility, but it withholds every module-private declaration,
+        // so everything it does publish is public. `public` on a RECORD field is `invalid token 'public'`; on a
+        // class field it is required, because an including class must repeat the visibility of the field it
+        // overrides (postgresql's value classes, from `*sql:TypedValue`).
         RecordField field = new RecordField("value", "", new TypeRef("string"));
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Rec("Row", "", false, false, List.of(field))),
@@ -124,9 +122,8 @@ public class RenderTest {
 
     @Test
     public void isolatedIsRenderedOnEveryCallableFormAndOnTheClientClass() {
-        // SLACK-11's other half: 1,615 of the corpus's 1,617 methods carry `isIsolated` and none of them said
-        // so. The qualifier sits between visibility and `remote`/`resource`, which is where the language puts
-        // it — verified by compiling each form.
+        // The qualifier sits between visibility and `remote`/`resource`, which is where the language puts it —
+        // verified by compiling each form.
         Assert.assertEquals(
                 Signatures.renderSignature(new Fn.Remote(
                         "send", "", List.of(), ReturnDef.none(), false, true)),
@@ -156,8 +153,7 @@ public class RenderTest {
 
     @Test
     public void theApiDocumentDocumentsAParameterAndACompactViewQuotesTheSignature() {
-        // SLACK-12, and the reason it is not wired into the quoted form: `overview` and `ops` answer inside a
-        // byte budget. The DECLARATION is identical either way, which is what keeps the views honest.
+        // The DECLARATION is identical with or without the parameter docs, which is what keeps the views honest.
         Fn.Remote send = new Fn.Remote(
                 "send",
                 "Post a message.",
@@ -179,9 +175,8 @@ public class RenderTest {
 
     @Test
     public void anAnnotationCarriesItsConfigRecordAndEveryAttachmentPoint() {
-        // HTTP-07. `service_function` was a label invented for a two-value enum, and `invalid token
-        // 'service_function'` is what the compiler says about it; Central's own string is the source's `on`
-        // clause for all twelve annotations in the corpus.
+        // Central's own attach-point string is the source's `on` clause; a label like `service_function` is
+        // `invalid token 'service_function'`.
         String rendered = Documents.toSyntaxString(new Library(
                 "test/pkg", "", List.of(), List.of(), List.of(), List.of(), List.of(),
                 List.of(new Library.AnnotationDef(
@@ -205,8 +200,8 @@ public class RenderTest {
 
     @Test
     public void anEnumMemberKeepsTheDescriptionCentralPublishesForIt() {
-        // PSQL-04's recoverable half. The VALUE is not recoverable — `pgoutput` appears zero times in
-        // postgresql's payload — so the description is the whole of what distinguishes one member from another.
+        // Central does not publish an enum member's VALUE (`pgoutput` appears nowhere in postgresql's payload), so
+        // the description is the whole of what distinguishes one member from another.
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Enumeration("Plugin", "The plugins.", List.of(
                         new TypeDef.Enumeration.Member("PGOUTPUT", "The standard plug-in."),
@@ -220,7 +215,7 @@ public class RenderTest {
         Assert.assertEquals(TypeDefs.renderTypeDef(RECORD),
                 "# A star count.\npublic type Stars record {\n    string owner;\n    int count? = 0;\n};");
         // Spacing is uniform across kinds: a doc comment is adjacent to what it documents, and a declaration
-        // with no description starts at its first line. Records were the one form that did neither (IO-03).
+        // with no description starts at its first line.
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Rec(RECORD.name(), "", false, false, RECORD.fields())),
                 "public type Stars record {\n    string owner;\n    int count? = 0;\n};");
@@ -260,9 +255,8 @@ public class RenderTest {
 
     @Test
     public void aStringConstantIsQuotedExactlyOnce() {
-        // Central sends a string constant's value WITH its quotes — `"\"PLAIN\""` for AUTH_SASL_PLAIN — and
-        // adding another pair produced `const string X = ""PLAIN"";`, which is not valid Ballerina. It affected
-        // all 108 string constants in the corpus, with zero counter-examples.
+        // Central sends a string constant's value WITH its quotes — `"\"PLAIN\""` for AUTH_SASL_PLAIN — so
+        // adding another pair would print `const string X = ""PLAIN"";`, which is not valid Ballerina.
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(
                         new TypeDef.Constant("AUTH", "", "\"PLAIN\"", new TypeRef("string"))),
@@ -300,11 +294,9 @@ public class RenderTest {
 
     @Test
     public void aDetailRecordBaseIsWrappedInErrorRatherThanPrintedAsASupertype() {
-        // Central publishes one key, `detailType`, for two different things. Printed bare, a detail
-        // record produced `public type FHIRServerError distinct FHIRServerErrorDetails;` — a declaration
-        // naming a RECORD where an error type has to be. It does not compile, it cannot be `is`-tested,
-        // and it contradicts the tool's own promise that a signature from here is the source for what
-        // compiles. Published source: `distinct error<FHIRServerErrorDetails>`.
+        // Central publishes one key, `detailType`, for two different things. Printed bare, a detail record
+        // gives `public type FHIRServerError distinct FHIRServerErrorDetails;`, which names a RECORD where an
+        // error type has to be and does not compile. Published source: `distinct error<FHIRServerErrorDetails>`.
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.ErrorDef(
                         "FHIRServerError", "", true, Optional.of(new TypeRef("FHIRServerErrorDetails")), true)),
@@ -342,7 +334,7 @@ public class RenderTest {
 
     @Test
     public void anObjectDeclarationSaysWhetherItCanBeConstructedAndHowItIsCalled() {
-        // SQL-01/SQL-02. `class` is instantiable and an `object` type is a contract, so printing the one as
+        // `class` is instantiable and an `object` type is a contract, so printing the one as
         // the other tells a caller to `new` an abstract type; `client` is why the call is `->` and not `.`.
         TypeDef.ObjectDef contract = new TypeDef.ObjectDef(
                 "Client", "A database client.",
@@ -378,8 +370,7 @@ public class RenderTest {
 
     @Test
     public void aCallableWithNoReturnHasNoReturnsClause() {
-        // HTTP-05: `nil` is the ENGLISH name of the basic type — Ballerina spells it `()` — so twelve of
-        // http's declarations named a type the compiler does not have.
+        // `nil` is the ENGLISH name of the basic type, which Central sends; Ballerina spells it `()`.
         Assert.assertEquals(
                 Signatures.renderSignature(new Fn.Normal(
                         "circuitBreakerForceClose", "", List.of(), ReturnDef.none(), false, false)),
@@ -388,7 +379,7 @@ public class RenderTest {
 
     @Test
     public void aDefaultTheDocumentCannotNameSaysSoOnTheLine() {
-        // SHEETS-02. The expression stays: a defaultable parameter printed without its default reads as
+        // The expression stays: a defaultable parameter printed without its default reads as
         // required, which is a worse claim than an unwritable default.
         Assert.assertEquals(
                 Signatures.renderSignature(new Fn.Normal(
@@ -419,8 +410,7 @@ public class RenderTest {
 
     @Test
     public void aListenerIsADeclarationInItsOwnSection() {
-        // PSQL-03/KAFKA-04/EMAIL-01: the listener is the entry point to a package's service half, and it
-        // printed nowhere at all — `type ballerinax/postgresql CdcListener` failed.
+        // The listener is the entry point to a package's service half.
         String rendered = Documents.toSyntaxString(new Library(
                 "test/pkg", "", List.of(), List.of(), List.of(),
                 List.of(new TypeDef.ObjectDef(
@@ -456,17 +446,16 @@ public class RenderTest {
 
     @Test
     public void aModuleLevelVariableIsADeclarationAndCarriesItsInitialiser() {
-        // The open half of SLACK-02/SLACK-13. Central publishes 64 module-level `public final` variables across
-        // the corpus under `variables`; they were parsed and rendered nowhere, so `http:CONTINUE` — which
-        // compiles from another module, measured — appeared in no verb.
+        // Central publishes module-level `public final` variables under `variables`; `http:CONTINUE` compiles
+        // from another module (measured).
         String rendered = TypeDefs.renderTypeDef(new TypeDef.Variable(
                 "CONTINUE",
                 "The common status code response constant of `Continue`.",
                 new TypeRef("readonly & Continue"),
                 "{}",
                 true));
-        // The initialiser is not decoration: `public final T X;` is `uninitialized variable 'X'`, and all 64 of
-        // these are written `= {}` in their published sources, so this line is the source's own.
+        // The initialiser is not decoration: `public final T X;` is `uninitialized variable 'X'`, and these are
+        // written `= {}` in their published sources, so this line is the source's own.
         Assert.assertEquals(rendered,
                 "# The common status code response constant of `Continue`.\n"
                         + "public final readonly & Continue CONTINUE = {};");
@@ -482,12 +471,8 @@ public class RenderTest {
     public void aConfigurableIsNamedInTheCodeRegisterButNeverAsADeclaration() {
         // Measured, not assumed: `http:maxActiveConnections` from another module is `attempt to refer to
         // non-accessible symbol`, because a `configurable` is module-private. So it must never be printed as
-        // source and must never pick up the blanket `public` the other declarations carry.
-        //
-        // It is NAMED here all the same, as comments. `overview` used to carry the fact and stopped;
-        // `type` cannot reach it, because a configurable is not a declaration to resolve. With no
-        // section here the cut would have deleted the fact from every verb rather than moved it — expensive to
-        // reach was the intended cost, unreachable was not.
+        // source and must never pick up the blanket `public` the other declarations carry. It is NAMED here all
+        // the same, as comments: `type` cannot reach it, because a configurable is not a declaration to resolve.
         Library library = new Library(
                 "test/pkg", "", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
                 List.of(new Library.Configurable("maxActive", "Max connections.", new TypeRef("int"), "-1")));

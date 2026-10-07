@@ -55,8 +55,7 @@ import java.util.Optional;
  * on — compiled against, never bundled.
  *
  * <p>Everything here degrades to empty rather than failing: an unreachable archive, an unreadable one, a parser
- * missing from the classpath. The caller then answers from the docs payload alone, which is what it did before
- * the source was read at all.
+ * missing from the classpath. The caller then answers from the docs payload alone.
  *
  * @since 0.1.0
  */

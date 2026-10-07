@@ -24,14 +24,9 @@ import com.google.gson.JsonObject;
 /**
  * Reading a string off an untyped object, for the two places that walk raw JSON without the schema.
  *
- * <p>{@link Coordinates} and the registry-search reader both need this, and they need it for different reasons:
- * the coordinate check runs on fields the schema deliberately strips, and search reads a response shape that is
- * not the docs payload at all. Neither is worth a second schema, but two near-identical private copies is where
- * one of them quietly starts accepting a number.
- *
- * <p>Two spellings because the callers differ on what absence means. A missing coordinate must fail the check, so
- * {@link #string} says {@code null}; a missing summary is just a package that wrote none, so {@link #text} says
- * empty.
+ * <p>{@link Coordinates} reads fields the schema strips, and registry search reads a response that is not the docs
+ * payload. Two spellings because absence differs: a missing coordinate must fail the check ({@link #string} says
+ * {@code null}); a missing summary is a package that wrote none ({@link #text} says empty).
  *
  * @since 0.1.0
  */

@@ -134,10 +134,6 @@ public final class TextRenderer {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Shapes
-    // -----------------------------------------------------------------------
-
     private static void bucketList(Layout layout, DiscoverResult.BucketList bucketList, Context where) {
         layout.top(counted(bucketList.buckets().size(), "bucket", "buckets"));
         TextTable buckets = new TextTable(TextTable.Column.LEFT);
@@ -480,10 +476,6 @@ public final class TextRenderer {
                 type.command() == null ? "(no command: package not known)" : type.command()));
         layout.section("From other packages (" + foreign.size() + ")", table);
     }
-
-    // -----------------------------------------------------------------------
-    // Shared pieces
-    // -----------------------------------------------------------------------
 
     private static String header(Context where, String container, String member) {
         List<String> parts = new ArrayList<>();

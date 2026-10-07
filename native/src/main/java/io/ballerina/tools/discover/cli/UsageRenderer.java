@@ -29,9 +29,8 @@ import java.util.List;
 /**
  * The synopsis and the flag list, rendered from {@link Commands}' picocli model rather than hand-written.
  *
- * <p>The grammar is one flat command now, so there is exactly one synopsis and one flag table — the drift this
- * class used to prevent across eight verb pages is gone with the pages, but the principle stays: a flag's name,
- * its label and its description are declared once, on {@link Commands.Root}, and rendered rather than repeated.
+ * <p>A flag's name, label and description are declared once, on {@link Commands.Root}, and rendered rather than
+ * repeated.
  *
  * @since 0.1.0
  */
@@ -40,7 +39,6 @@ final class UsageRenderer {
     /** The widest line the text may reach. Chosen to fit an 80-column terminal with a little slack. */
     private static final int WIDTH = 84;
 
-    /** The gap between a label column and its prose. */
     private static final int GAP = 3;
 
     private UsageRenderer() {
@@ -148,10 +146,6 @@ final class UsageRenderer {
     private static String description(OptionSpec option) {
         return String.join(" ", option.description());
     }
-
-    // -----------------------------------------------------------------------
-    // Layout
-    // -----------------------------------------------------------------------
 
     private record Row(String label, String text) { }
 

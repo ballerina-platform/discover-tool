@@ -21,11 +21,9 @@ package io.ballerina.tools.discover.cli;
 /**
  * The PROSE of the usage text: everything a reader cannot derive from the grammar.
  *
- * <p>One page now, not eight: the grammar collapsed from a verb-per-subcommand model to one flat command, so
- * there is one synopsis and one flag list instead of a root page plus a page per verb. What is taught here is
- * only "what can I ask, and how" — the grammar and a worked session. The rules a caller carries INTO a lookup
- * (a truncated listing means narrow further, a failure's {@code kind} is the branch to read) are the agent's
- * standing instructions rather than this command's usage.
+ * <p>It teaches only "what can I ask, and how". The rules a caller carries INTO a lookup (a truncated listing
+ * means narrow further, a failure's {@code kind} is the branch to read) are the agent's standing instructions,
+ * not this command's usage.
  *
  * @since 0.1.0
  */

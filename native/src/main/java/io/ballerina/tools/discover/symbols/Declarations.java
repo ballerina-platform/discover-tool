@@ -29,9 +29,7 @@ import java.util.Map;
  * Declarations by name.
  *
  * <p>A duplicate name keeps the FIRST declaration, because {@code Patches} prepends its injections and
- * those are corrections of what Central got wrong. There should be no duplicates left — the sap
- * {@code ClientError} collision was the only one and it is fixed — but a silent last-wins would make the
- * next one impossible to notice.
+ * those are corrections of what Central got wrong.
  *
  * @since 0.1.0
  */

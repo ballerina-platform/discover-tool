@@ -35,15 +35,9 @@ import java.util.stream.Collectors;
 /**
  * Every Ballerina syntax dimension, one construct at a time.
  *
- * <p>The recorded corpus answers "did anything move?" for nine real packages. This answers the two
- * questions it cannot: WHICH construct moved, and what about constructs no package in the corpus happens
- * to use. Both matter because the fidelity register's fixes are staged — a stage changes how one family of
- * types renders and must leave the rest untouched, and a 20,000-line snapshot diff cannot show that.
- *
- * <p>Coverage tooling does not help here and is worth being explicit about: the suite already reaches 93%
- * of instructions, and most of the register's defects are on covered lines. {@code Schema.java:88} reading
- * a class as a bare name is executed by every fixture and is the cause of 340 hollow declarations. What was
- * missing was never reachability — it was an assertion about the language.
+ * <p>The recorded corpus answers "did anything move?". This answers the two questions it cannot: WHICH
+ * construct moved, and what about constructs no recorded package happens to use. Line coverage does not
+ * stand in for this: a defect on a covered line needs an assertion about the language to be caught.
  *
  * <p>Failures come in two kinds and the message says which:
  *
@@ -83,8 +77,7 @@ public class ConstructTest {
      * The regression net. One construct, one payload, one exact expected document body.
      *
      * <p>Per-case rather than one big snapshot on purpose: a fix to closed records fails
-     * {@code records/closed} and nothing else, which is what makes "we did not break the others" a thing
-     * the suite states rather than a thing the author hopes.
+     * {@code records/closed} and nothing else.
      */
     @Test(dataProvider = "constructs")
     public void aConstructRendersExactlyAsRecorded(Construct construct) {
@@ -128,10 +121,6 @@ public class ConstructTest {
         return text.lines().map(line -> "  | " + line).collect(Collectors.joining("\n")) + "\n";
     }
 
-    // -----------------------------------------------------------------------
-    // The matrix's own invariants
-    // -----------------------------------------------------------------------
-
     @Test
     public void everySyntaxFamilyHasAtLeastOneCase() {
         Set<String> covered = Constructs.all().stream()
@@ -170,26 +159,13 @@ public class ConstructTest {
     /**
      * Which findings have a construct-level test, by name.
      *
-     * <p>A set rather than a count, so that landing a stage of the fix plan produces a reviewable diff
-     * instead of a number nobody can check. This is also the honest statement of the suite's reach: ONE of
-     * the register's defects is still open and pinned at the language level here. The rest of what remains is
-     * about the addressed verbs, the cross-package footer, {@code overview}'s counts and the readmes —
-     * properties of a view rather than of a construct — and they belong to {@code ViewsTest} and
-     * {@code ViewsAgreeTest}.
+     * <p>A set rather than a count, so a change produces a reviewable diff. A finding LEAVES this list when it
+     * is fixed; its cases then assert the right answer as {@code renders}.
      *
-     * <p>A finding LEAVES this list when it is fixed. Stage 0 cleared IO-03, SLACK-08, SLACK-09 and SQL-08;
-     * stage 2 cleared GITHUB-01, HTTP-01, HTTP-04, HTTP-06, HTTP-08, HTTP-13, KAFKA-01, PSQL-01, SAP-01,
-     * SLACK-01, SLACK-03, SLACK-04, SLACK-05, SLACK-06, SLACK-07, SQL-04 and SQL-05; stage 3 cleared EMAIL-01,
-     * HTTP-05, KAFKA-02, KAFKA-10, PSQL-03, SHEETS-02 and SQL-01; stage 4 cleared HTTP-03 and KAFKA-05; and
-     * stage 5 cleared HTTP-07, SAP-05, SLACK-11 and SLACK-12. Their cases now assert the right answer as
-     * {@code renders} and keep guarding it as a regression net. The register is where a cleared finding is
-     * ticked off; this list only tracks what is still owed.
-     *
-     * <p>PSQL-04 stays, on the half of it that is not ours. Stage 5 rendered the member DESCRIPTIONS Central
-     * publishes — 13 of the corpus's 65 members carry one. No member anywhere in the payload carries its
-     * VALUE, and {@code VERIFY-CA}, {@code pgoutput} and {@code all_tables} appear zero times in
-     * postgresql's payload and zero times on Central's own page, so {@code enums/member-values} pins a gap
-     * that reading Central more carefully cannot close. It is here to keep saying so.
+     * <p>The one left is not ours to close: Central publishes enum member descriptions but never a member's
+     * VALUE ({@code VERIFY-CA}, {@code pgoutput} and {@code all_tables} appear nowhere in postgresql's payload
+     * or on Central's own page), so {@code enums/member-values} pins a gap that reading Central more carefully
+     * cannot close.
      */
     private static final List<String> PINNED = List.of("PSQL-04");
 

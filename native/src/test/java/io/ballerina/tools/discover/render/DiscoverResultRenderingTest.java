@@ -135,10 +135,6 @@ public class DiscoverResultRenderingTest {
                 "the registry was unreachable, so this version came off disk unchecked");
     }
 
-    // -----------------------------------------------------------------------
-    // ContainerRoster
-    // -----------------------------------------------------------------------
-
     @Test
     public void aContainerRosterListsNamesInTextAndCommandsInJson() {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
@@ -292,10 +288,6 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.get("pages").getAsInt(), 3);
     }
 
-    // -----------------------------------------------------------------------
-    // PathGroups — pinned against ballerinax/github's real fixture numbers
-    // -----------------------------------------------------------------------
-
     @Test
     public void pathGroupsRenderTheRfcsGroupsShape() {
         DiscoverResult result = new DiscoverResult.PathGroups(null, List.of(),
@@ -376,10 +368,6 @@ public class DiscoverResultRenderingTest {
                 .getAsJsonObject("counts").toString(), "{\"resources\":45,\"groups\":3}");
     }
 
-    // -----------------------------------------------------------------------
-    // ResourceList
-    // -----------------------------------------------------------------------
-
     @Test
     public void everyResourceRowCarriesOneCommandPerAccessorAndNeverAFlatCall() {
         String client = "bal discover ballerinax/github client";
@@ -429,10 +417,6 @@ public class DiscoverResultRenderingTest {
                 "Next: " + client + " <path> <accessor>"));
     }
 
-    // -----------------------------------------------------------------------
-    // MethodList — pinned against ballerinax/twilio's real fixture number (199)
-    // -----------------------------------------------------------------------
-
     @Test
     public void aPaginatedMethodListNamesTheNextPageInBothRenderings() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
@@ -474,10 +458,6 @@ public class DiscoverResultRenderingTest {
         Assert.assertTrue(TextRenderer.render(last).endsWith("Last page (page 5 of 5)\nNext: " + TWILIO + " <name>"));
         Assert.assertFalse(JsonParser.parseString(JsonRenderer.render(last)).getAsJsonObject().has("next"));
     }
-
-    // -----------------------------------------------------------------------
-    // Readme — no entry ceiling, unlike every listing above
-    // -----------------------------------------------------------------------
 
     @Test
     public void theWholeReadmeIsPrintedVerbatimWithNoWrappingInText() {
@@ -531,10 +511,6 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.getAsJsonArray("chunks").size(), 0);
         Assert.assertEquals(json.get("total").getAsInt(), 0);
     }
-
-    // -----------------------------------------------------------------------
-    // Signature
-    // -----------------------------------------------------------------------
 
     private static DiscoverResult.Signature getPublicGists(List<DiscoverResult.Signature.Type> types,
             List<DiscoverResult.Method> omitted, String note) {
@@ -672,10 +648,6 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.get("note").getAsString(), "relocated to gists/'public");
     }
 
-    // -----------------------------------------------------------------------
-    // MixedListing
-    // -----------------------------------------------------------------------
-
     @Test
     public void aMixedListingIsSectionedByCallFormInTextAndThreeArraysInJson() {
         DiscoverResult result = new DiscoverResult.MixedListing("Client",
@@ -752,10 +724,6 @@ public class DiscoverResultRenderingTest {
         Assert.assertFalse(json.has("container"));
     }
 
-    // -----------------------------------------------------------------------
-    // NoMatch
-    // -----------------------------------------------------------------------
-
     @Test
     public void aMissNamesTheClosestNamesAndWhatIsThereInBothRenderings() {
         DiscoverResult result = new DiscoverResult.NoMatch("sendd", "Producer", List.of("send"), List.of(),
@@ -814,10 +782,6 @@ public class DiscoverResultRenderingTest {
                 "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets");
         Assert.assertFalse(json.has("available"));
     }
-
-    // -----------------------------------------------------------------------
-    // Owners and EmptyBucket
-    // -----------------------------------------------------------------------
 
     @Test
     public void aMemberOnSeveralContainersListsTheOwnersInBothRenderings() {

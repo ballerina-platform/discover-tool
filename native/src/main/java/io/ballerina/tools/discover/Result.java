@@ -31,12 +31,6 @@ package io.ballerina.tools.discover;
  */
 public sealed interface Result<T> {
 
-    /**
-     * A value.
-     *
-     * @param <T> the value's type
-     * @param value the value
-     */
     record Ok<T>(T value) implements Result<T> { }
 
     /**
@@ -59,10 +53,7 @@ public sealed interface Result<T> {
         return this instanceof Ok<T>;
     }
 
-    /**
-     * The value. Only legal on an {@code Ok}, which is the discipline every call site follows by
-     * checking {@link #isOk()} first.
-     */
+    /** Only legal on an {@code Ok}; call sites check {@link #isOk()} first. */
     default T value() {
         return switch (this) {
             case Ok<T> ok -> ok.value();
@@ -70,7 +61,7 @@ public sealed interface Result<T> {
         };
     }
 
-    /** The failure. Only legal on an {@code Err}. */
+    /** Only legal on an {@code Err}. */
     default Failure failure() {
         return switch (this) {
             case Ok<T> ok -> throw new IllegalStateException("not a failure: " + ok.value());

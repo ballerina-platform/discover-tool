@@ -41,9 +41,8 @@ import java.util.concurrent.TimeoutException;
 /**
  * The real transport, on the JDK's own client.
  *
- * <p>Nothing to bundle: {@code java.net.http} has been in the platform since 11, and the tool jar carries no
- * third-party classes of its own. The client is built once per process because a fresh one per attempt would
- * throw away the connection pool between the two requests a lookup makes.
+ * <p>The client is built once per process because a fresh one per attempt would throw away the connection pool
+ * between the two requests a lookup makes.
  *
  * @since 0.1.0
  */
