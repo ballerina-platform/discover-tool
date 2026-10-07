@@ -936,6 +936,27 @@ public class CliTest {
     }
 
     @Test
+    public void aTypeFromASiblingSubmoduleIsReachedThroughModuleThoughOnlyChildrenAreListed() {
+        JsonElement page = FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph");
+        JsonObject typename = page.getAsJsonObject().getAsJsonObject("docsData").getAsJsonArray("modules").get(0)
+                .getAsJsonObject().getAsJsonArray("records").get(1).getAsJsonObject().getAsJsonArray("fields")
+                .get(0).getAsJsonObject().getAsJsonObject("type");
+        typename.addProperty("name", "DataLoader");
+        typename.addProperty("category", "classes");
+        typename.addProperty("orgName", "ballerina");
+        typename.addProperty("moduleName", "graphql.dataloader");
+        typename.addProperty("version", GRAPHQL_VERSION);
+        Capture capture = new Capture();
+        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Representation"),
+                capture.streams(), options(graphqlCentral(Map.of("subgraph", page))));
+        Assert.assertEquals(exitCode, 0, capture.stderr());
+        JsonObject foreign = JsonParser.parseString(capture.stdout()).getAsJsonObject().getAsJsonArray("foreign")
+                .get(0).getAsJsonObject();
+        Assert.assertEquals(foreign.get("command").getAsString(),
+                "bal discover ballerina/graphql --module dataloader type DataLoader");
+    }
+
+    @Test
     public void theModuleFlagTargetsTheSubmodulesOwnReadme() {
         JsonElement page = FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader");
         page.getAsJsonObject().getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject()

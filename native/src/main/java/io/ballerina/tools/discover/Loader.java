@@ -289,6 +289,7 @@ public final class Loader {
                 Readmes.of(module.value()),
                 submodule,
                 submodulesOf(docs, qualified, submodule),
+                moduleNamesOf(docs, qualified),
                 unverifiedWarning(resolved.stale()),
                 options.version(),
                 bound));
@@ -302,6 +303,13 @@ public final class Loader {
             }
             return once.get(0);
         };
+    }
+
+    private static List<String> moduleNamesOf(CentralDocs docs, QualifiedName qualified) {
+        int prefix = qualified.name().length() + 1;
+        return FromCentral.submodulesOf(docs, qualified).stream()
+                .map(module -> module.id().substring(prefix))
+                .toList();
     }
 
     private static List<LoadedPackage.Submodule> submodulesOf(

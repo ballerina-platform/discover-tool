@@ -251,6 +251,7 @@ public final class FixtureCorpus {
                 Readmes.of(module.value()),
                 null,
                 List.of(),
+                List.of(),
                 Loader.unverifiedWarning(false),
                 null,
                 () -> library);
