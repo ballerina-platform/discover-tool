@@ -25,6 +25,7 @@ import com.google.gson.JsonPrimitive;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.Result;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -358,6 +359,9 @@ public final class Schema {
      */
     private static final class Cursor {
 
+        /** The most {@code []} pairs a type node is believed to carry: far past any real one, far short of harm. */
+        static final int MAX_COUNT = 255;
+
         private final List<Failure.SchemaIssue> issues = new ArrayList<>();
 
         static String child(String path, String key) {
@@ -444,7 +448,8 @@ public final class Schema {
          *
          * <p>Absent is not drift even though {@code arrayDimensions} is present on all 13,632 type nodes in
          * the corpus: it is read as "how many {@code []} pairs", and zero is what a node with no array
-         * carries anyway. A value that is not a number IS drift, because that is a shape change.
+         * carries anyway. A value that is not a number IS drift, because that is a shape change — and so is one
+         * that is not a whole number up to {@link #MAX_COUNT}, since the count is spent as that many {@code []}.
          */
         int count(JsonObject owner, String path, String key) {
             JsonElement value = owner.get(key);
@@ -452,19 +457,21 @@ public final class Schema {
                 return 0;
             }
             if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber()) {
-                return value.getAsInt();
+                BigDecimal number = value.getAsBigDecimal();
+                if (number.signum() >= 0 && number.compareTo(BigDecimal.valueOf(MAX_COUNT)) <= 0
+                        && number.stripTrailingZeros().scale() <= 0) {
+                    return number.intValueExact();
+                }
+                issue(child(path, key), "expected a whole number from 0 to " + MAX_COUNT + ", received "
+                        + value.getAsString());
+                return 0;
             }
             issue(child(path, key), "expected a number, received " + describe(value));
             return 0;
         }
 
         <T> T requiredObject(JsonObject owner, String path, String key, Nested<T> shape) {
-            String childPath = child(path, key);
-            JsonElement value = owner.get(key);
-            if (value == null || value.isJsonNull()) {
-                issue(childPath, "expected an object, received " + describe(value));
-            }
-            return shape.read(this, object(value, childPath), childPath);
+            return nested(owner.get(key), child(path, key), shape);
         }
 
         <T> Optional<T> optionalObject(JsonObject owner, String path, String key, Nested<T> shape) {
@@ -472,8 +479,20 @@ public final class Schema {
             if (value == null || value.isJsonNull()) {
                 return Optional.empty();
             }
-            String childPath = child(path, key);
-            return Optional.of(shape.read(this, object(value, childPath), childPath));
+            return Optional.of(nested(value, child(path, key), shape));
+        }
+
+        // A non-object value is one issue, not one per missing key: the placeholder read's own issues are dropped,
+        // and the placeholder itself is never used, since any issue fails the parse.
+        private <T> T nested(JsonElement value, String path, Nested<T> shape) {
+            if (value != null && value.isJsonObject()) {
+                return shape.read(this, value.getAsJsonObject(), path);
+            }
+            object(value, path);
+            int reported = issues.size();
+            T placeholder = shape.read(this, new JsonObject(), path);
+            issues.subList(reported, issues.size()).clear();
+            return placeholder;
         }
 
         /** A required array. Missing or mistyped is drift; empty is a package with none of them. */
@@ -532,7 +551,12 @@ public final class Schema {
             List<T> parsed = new ArrayList<>(array.size());
             for (int index = 0; index < array.size(); index++) {
                 String itemPath = path + "." + index;
-                parsed.add(shape.read(this, object(array.get(index), itemPath), itemPath));
+                JsonElement item = array.get(index);
+                if (item.isJsonObject()) {
+                    parsed.add(shape.read(this, item.getAsJsonObject(), itemPath));
+                } else {
+                    object(item, itemPath);
+                }
             }
             return parsed;
         }
