@@ -354,7 +354,7 @@ public final class Containers {
     private static String ownerNote(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container owner, List<String> selectors) {
         return "'" + selectors.get(0) + "' is declared on " + owner.label() + " — showing it. Canonical: "
-                + "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + owner.name()
+                + "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + shellWord(owner.name())
                 + shellWords(selectors);
     }
 
@@ -512,7 +512,7 @@ public final class Containers {
         if (foreign.isPresent()) {
             return foreign.get();
         }
-        return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + Texts.shellWord(container.name())
+        return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + shellWord(container.name())
                 + (namedByFilter(container, options) ? "" : filterArgument(options));
     }
 
@@ -540,7 +540,7 @@ public final class Containers {
                 .skip(window.from())
                 .limit(window.to() - window.from())
                 .map(entry -> new DiscoverResult.Owners.Owner(entry.getKey().name(), entry.getValue().size(),
-                        bucket + " " + entry.getKey().name() + member))
+                        bucket + " " + shellWord(entry.getKey().name()) + member))
                 .toList();
         return Result.ok(new DiscoverResult.Owners(String.join(" ", selectors), listed, owners.size(),
                 window.paging(), window.next(command), loaded.warning(), note));
@@ -1322,7 +1322,7 @@ public final class Containers {
 
     private static String baseCommand(LoadedPackage loaded, Surface.Scope scope, Surface.Container container) {
         return "bal discover " + loaded.pkgArgument() + " " + scope.verb()
-                + (container.isModule() ? "" : " " + container.name());
+                + (container.isModule() ? "" : " " + shellWord(container.name()));
     }
 
     private static List<String> spelled(Entry entry, List<String> selectors) {

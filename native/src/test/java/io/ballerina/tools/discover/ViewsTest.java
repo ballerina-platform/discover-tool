@@ -1274,6 +1274,39 @@ public class ViewsTest {
     }
 
     @Test
+    public void aContainerNameNeedingQuotesIsQuotedInEveryCommandBuiltOnIt() {
+        Payload payload = Payload.pkg();
+        payload.with("clients",
+                Decl.client("'Client", Decl.method("send").on("isRemote"), Decl.method("receive").on("isRemote")),
+                Decl.client("'Other", Decl.method("send").on("isRemote")));
+        LoadedPackage loaded = fromPayload(payload);
+
+        DiscoverResult.MethodList methods = as(DiscoverResult.MethodList.class, result(Containers.render(loaded,
+                Surface.Scope.CLIENT, new Containers.Options(List.of("'Client"))), "client 'Client"));
+        Assert.assertEquals(methods.methods().stream().map(DiscoverResult.Method::command).toList(), List.of(
+                "bal discover test/pkg client \"'Client\" receive",
+                "bal discover test/pkg client \"'Client\" send"));
+
+        DiscoverResult.Owners owners = as(DiscoverResult.Owners.class, result(Containers.render(loaded,
+                Surface.Scope.CLIENT, new Containers.Options(List.of("send"))), "client send"));
+        Assert.assertEquals(owners.owners().stream().map(DiscoverResult.Owners.Owner::command).toList(), List.of(
+                "bal discover test/pkg client \"'Client\" send",
+                "bal discover test/pkg client \"'Other\" send"));
+    }
+
+    @Test
+    public void aKeywordNamedPathParameterIsEscapedInTheDeclaration() {
+        Payload payload = Payload.pkg();
+        payload.with("clients", Decl.client("Items", Decl.method("get").on("isResource").with("accessor", "get")
+                .with("resourcePath", "items/[string type]")));
+        DiscoverResult.Signature get = as(DiscoverResult.Signature.class, result(Containers.render(
+                fromPayload(payload), Surface.Scope.CLIENT, new Containers.Options(List.of("Items", "items/:type",
+                        "get"))), "client Items items/:type get"));
+        Assert.assertTrue(get.declaration().contains("resource function get items/[string 'type]()"),
+                get.declaration());
+    }
+
+    @Test
     public void owningContainersThatReadDifferentlyManySelectorsAreOfferedTheCommandBothRead() {
         Payload payload = Payload.pkg();
         payload.with("clients",
