@@ -21,6 +21,7 @@ package io.ballerina.tools.discover;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.constructs.Decl;
+import io.ballerina.tools.discover.constructs.Node;
 import io.ballerina.tools.discover.constructs.Payload;
 import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.Pipeline;
@@ -1083,18 +1084,17 @@ public class ViewsTest {
     }
 
     @Test
-    public void theLastPageOfADocumentationOnlyTypeMissStillEndsWithACommand() {
+    public void theLastPageOfADocumentationOnlyTypeMissHasNoNextButEveryEntryOpens() {
         LoadedPackage twilio = FixtureCorpus.loadedFixture("ballerinax__twilio");
         DiscoverResult.NoMatch last = as(DiscoverResult.NoMatch.class, result(
                 Types.render(twilio, new Types.Options(List.of(), "which", 2)), "type --filter which --page 2"));
         Assert.assertEquals(last.paging().page(), last.paging().pages());
-        Assert.assertEquals(last.next(), "bal discover ballerinax/twilio type");
+        Assert.assertNull(last.next(), "a paged answer's next only ever turns the page");
         String text = TextRenderer.render(last, new TextRenderer.Context("ballerinax/twilio", null, List.of("type"),
                 "which", null));
-        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/twilio type <name>\n"
-                + "Next: bal discover ballerinax/twilio type"), text);
+        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/twilio type <name>"), text);
         JsonObject json = JsonParser.parseString(JsonRenderer.render(last)).getAsJsonObject();
-        Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerinax/twilio type");
+        Assert.assertFalse(json.has("next"), json.toString());
         json.getAsJsonArray("documented").forEach(entry -> Assert.assertEquals(
                 entry.getAsJsonObject().get("command").getAsString(),
                 "bal discover ballerinax/twilio type " + entry.getAsJsonObject().get("name").getAsString()));
@@ -1111,6 +1111,71 @@ public class ViewsTest {
         Assert.assertTrue(text.contains("\nNext: bal discover ballerinax/twilio client Client --page 2\n"), text);
         Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/twilio client Client --filter <keyword>"),
                 text);
+    }
+
+    @Test
+    public void aDocumentedResourceIsOnePathRowWithACommandPerAccessor() {
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        DiscoverResult rest = result(Containers.render(http, Surface.Scope.CLIENT,
+                new Containers.Options(List.of("Client"), "entity", 1)), "client Client --filter entity");
+        DiscoverResult.NoMatch miss = as(DiscoverResult.NoMatch.class, rest);
+        List<String> names = miss.documented().names();
+        Assert.assertEquals(names, names.stream().sorted(io.ballerina.tools.discover.Texts.LOCALE_ORDER).toList());
+        DiscoverResult.ResourceList.Resource row = (DiscoverResult.ResourceList.Resource)
+                miss.documented().entries().get(0);
+        Assert.assertEquals(row.path(), ":...path");
+        Assert.assertTrue(row.accessors().containsAll(List.of("get", "post")), row.toString());
+        Assert.assertEquals(row.commands().get("get"), "bal discover ballerina/http client Client :...path get");
+        JsonObject entry = JsonParser.parseString(JsonRenderer.render(rest)).getAsJsonObject()
+                .getAsJsonArray("documented").get(0).getAsJsonObject();
+        Assert.assertEquals(entry.get("path").getAsString(), ":...path");
+        Assert.assertFalse(entry.has("name"), entry.toString());
+        Assert.assertEquals(entry.getAsJsonObject("commands").get("post").getAsString(),
+                "bal discover ballerina/http client Client :...path post");
+        String text = TextRenderer.render(rest, new TextRenderer.Context("ballerina/http", null,
+                List.of("client", "Client"), "entity", null));
+        Assert.assertTrue(text.contains("\nMatched by documentation only\n  :...path  get, post"), text);
+        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerina/http client Client <path> <accessor>\n"
+                + "Next: bal discover ballerina/http client Client <name>"), text);
+
+        LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
+        DiscoverResult.NoMatch escaped = as(DiscoverResult.NoMatch.class, result(Containers.render(github,
+                Surface.Scope.CLIENT, new Containers.Options(List.of("Client", "repos/:owner/:repo/'import"),
+                        "start", 1)), "client Client repos/:owner/:repo/'import --filter start"));
+        DiscoverResult.ResourceList.Resource importRow = (DiscoverResult.ResourceList.Resource)
+                escaped.documented().entries().get(0);
+        Assert.assertEquals(importRow.path(), "repos/:owner/:repo/'import");
+        Assert.assertEquals(importRow.commands().get("put"),
+                "bal discover ballerinax/github client Client \"repos/:owner/:repo/'import\" put");
+
+        DiscoverResult limits = result(Containers.render(github, Surface.Scope.CLIENT,
+                new Containers.Options(List.of("Client"), "public", 1)), "client Client --filter public");
+        DiscoverResult.Documented documented = switch (limits) {
+            case DiscoverResult.NoMatch noMatch -> noMatch.documented();
+            case DiscoverResult.PathGroups ignored -> DiscoverResult.Documented.NONE;
+            case DiscoverResult.ResourceList list -> list.documented();
+            default -> throw new AssertionError(limits.toString());
+        };
+        Assert.assertEquals(documented.names().stream().filter("user/interaction-limits"::equals).count(), 1L,
+                documented.toString());
+    }
+
+    @Test
+    public void aSignaturesPageCommandSpellsTheMethodAsDeclared() {
+        Payload payload = Payload.pkg();
+        List<Decl> methods = new ArrayList<>();
+        methods.add(Decl.method("createAccount", Decl.param("zebra", Node.builtin("string"))).on("isRemote"));
+        for (int index = 1; index <= 41; index++) {
+            methods.add(Decl.method("createAccount" + index).on("isRemote").with("description", "Not a zebra."));
+        }
+        payload.with("clients", Decl.client("Client", methods.toArray(new Decl[0])));
+        DiscoverResult.Signature signature = as(DiscoverResult.Signature.class, result(
+                Containers.render(fromPayload(payload), Surface.Scope.CLIENT,
+                        new Containers.Options(List.of("Client", "createaccount"), "zebra", 1)),
+                "client Client createaccount --filter zebra"));
+        Assert.assertEquals(signature.paging().pages(), 2);
+        Assert.assertEquals(signature.next(),
+                "bal discover test/pkg client Client createAccount --filter zebra --page 2");
     }
 
     @Test

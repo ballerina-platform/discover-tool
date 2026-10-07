@@ -975,16 +975,13 @@ public final class Containers {
         }
         note = mergeNotes(note, listenerNote(loaded, container));
         List<Entry> selected = select(container, selectors);
-        List<DiscoverResult.Method> documented = List.of();
+        List<DiscoverResult.Documented.Entry> documented = List.of();
 
         if (options.filtered()) {
             Filter.Split<Entry> split = Filter.apply(options.filter(), selected,
                     entry -> Filter.surfaceOf(entry.fn()), entry -> Filter.docsOf(entry.fn()));
             selected = split.surface();
-            String base = baseCommand(loaded, scope, container);
-            documented = split.documented().stream()
-                    .map(entry -> new DiscoverResult.Method(entry.label(), openCommand(entry, base)))
-                    .toList();
+            documented = documentedRows(split.documented(), baseCommand(loaded, scope, container));
         }
 
         if (selected.isEmpty() && selectors.isEmpty() && !options.filtered()) {
@@ -1006,12 +1003,12 @@ public final class Containers {
      * turned a page, reaches the rest. At or under the ceiling this is page 1 whatever was asked: the answer is
      * not paged, and {@code Cli} rejects any other {@code --page} against it.
      */
-    static Result<Page> documentedPage(List<DiscoverResult.Method> documented, int page, String command) {
+    static Result<Page> documentedPage(List<DiscoverResult.Documented.Entry> documented, int page, String command) {
         return Page.of(documented.size() > MAX_ENTRIES ? page : 1, documented.size(), command);
     }
 
     static DiscoverResult.Documented documentedOn(
-            Page window, List<DiscoverResult.Method> documented, int offset) {
+            Page window, List<DiscoverResult.Documented.Entry> documented, int offset) {
         return documented.isEmpty()
                 ? DiscoverResult.Documented.NONE
                 : new DiscoverResult.Documented(window.slice(documented, offset), documented.size());
@@ -1025,7 +1022,7 @@ public final class Containers {
      */
     private static Result<DiscoverResult> listing(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> selected, Options options, List<DiscoverResult.Method> documented, String warning,
+            List<Entry> selected, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
             String note) {
         List<Entry> callable = selected.stream()
                 .filter(entry -> !(entry.fn() instanceof Fn.Constructor))
@@ -1049,7 +1046,7 @@ public final class Containers {
      */
     private static Result<DiscoverResult> nothingMatched(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            Options options, List<DiscoverResult.Method> documented, String note) {
+            Options options, List<DiscoverResult.Documented.Entry> documented, String note) {
         String asked = options.filtered() ? options.filter() : String.join(" ", selectors);
         String command = baseCommand(loaded, scope, container);
         String repeated = command + selectorArguments(container, selectors) + filterArgument(options);
@@ -1076,7 +1073,7 @@ public final class Containers {
             DiscoverResult forPath = listing(loaded, scope, container, List.of(pair.get().path()),
                     pair.get().entries(), Options.bare(), List.of(), null, null).value();
             return Result.ok(new DiscoverResult.NoMatch(asked, containerName(container), pair.get().accessors(),
-                    List.of(), forPath, missNext(window.next(repeated), command),
+                    List.of(), forPath, window.paging() == null ? command : window.next(repeated),
                     documentedOn(window, documented, 0), window.paging(), loaded.warning(), note));
         }
         List<Entry> all = entriesOf(container);
@@ -1093,7 +1090,7 @@ public final class Containers {
                 : null;
         return Result.ok(new DiscoverResult.NoMatch(asked, containerName(container),
                 Names.nearMisses(asked, names), alternatives, available,
-                missNext(window.next(repeated), command),
+                window.paging() == null ? command : window.next(repeated),
                 documentedOn(window, documented, 0), window.paging(), loaded.warning(), note));
     }
 
@@ -1110,7 +1107,7 @@ public final class Containers {
      */
     private static Result<DiscoverResult> signature(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            Entry entry, Options options, List<DiscoverResult.Method> documented, String note) {
+            Entry entry, Options options, List<DiscoverResult.Documented.Entry> documented, String note) {
         String command = baseCommand(loaded, scope, container) + selectorArguments(container, spelled(entry, selectors))
                 + filterArgument(options);
         Result<Page> page = documentedPage(documented, options.page(), command);
@@ -1188,7 +1185,7 @@ public final class Containers {
      */
     private static Result<DiscoverResult> mixedAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> callable, Options options, List<DiscoverResult.Method> documented, String warning,
+            List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
             String note) {
         String base = baseCommand(loaded, scope, container);
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
@@ -1230,7 +1227,7 @@ public final class Containers {
 
     private static Result<DiscoverResult> methodAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> callable, Options options, List<DiscoverResult.Method> documented, String warning,
+            List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
             String note) {
         // A page is turned on the SAME selection — selector and filter both — or paging would silently widen
         // back out to the container's full roster.
@@ -1262,7 +1259,7 @@ public final class Containers {
      */
     private static Result<DiscoverResult> resourceAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
-            List<Entry> callable, Options options, List<DiscoverResult.Method> documented, String warning,
+            List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
             String note) {
         String base = baseCommand(loaded, scope, container);
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
@@ -1485,17 +1482,19 @@ public final class Containers {
         return selectors.stream().map(word -> Names.normalise(word).equals(wanted) ? named.name() : word).toList();
     }
 
-    /** A miss's {@code next}: the next page of its documentation-only matches, else what is there to open. */
-    static String missNext(String nextPage, String command) {
-        return nextPage == null ? command : nextPage;
-    }
-
-    /** The command that opens one entry of a container, {@code base} being the command that opens the container. */
-    private static String openCommand(Entry entry, String base) {
-        return switch (entry.fn()) {
-            case Fn.Resource resource -> base + " " + shellWord(pathName(entry.path())) + " " + resource.accessor();
-            default -> base + " " + shellWord(entry.label());
-        };
+    /**
+     * Documentation-only matches as the listings show the same entries — one row per resource path with its
+     * accessors, one per method — and in the listings' alphabetical order.
+     */
+    private static List<DiscoverResult.Documented.Entry> documentedRows(List<Entry> entries, String base) {
+        List<DiscoverResult.Documented.Entry> rows = new ArrayList<>(mergedResources(
+                entries.stream().filter(entry -> entry.fn() instanceof Fn.Resource).toList(), base));
+        entries.stream()
+                .filter(entry -> !(entry.fn() instanceof Fn.Resource))
+                .map(entry -> new DiscoverResult.Method(entry.label(), base + " " + shellWord(entry.label())))
+                .forEach(rows::add);
+        rows.sort(Comparator.comparing(DiscoverResult.Documented.Entry::key, Texts.LOCALE_ORDER));
+        return List.copyOf(rows);
     }
 
     private static String containerName(Surface.Container container) {

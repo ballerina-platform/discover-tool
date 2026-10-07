@@ -554,7 +554,8 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
                 false, List.of(), List.of(), 0, null, List.of(),
-                new DiscoverResult.Documented(methods("bal discover pkg client Client", "ping", "auth"), 82),
+                new DiscoverResult.Documented(
+                        List.copyOf(methods("bal discover pkg client Client", "ping", "auth")), 82),
                 new DiscoverResult.Paging(2, 3, 2),
                 command + " --page 3", null, null);
         String text = TextRenderer.render(result);
@@ -576,7 +577,7 @@ public class DiscoverResultRenderingTest {
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
                 false, List.of(), List.of(new DiscoverResult.Method("Gist", "bal discover pkg type Gist")), 3,
                 "bal discover pkg type", List.of(),
-                new DiscoverResult.Documented(methods("bal discover pkg client Client", "ping"), 41),
+                new DiscoverResult.Documented(List.copyOf(methods("bal discover pkg client Client", "ping")), 41),
                 new DiscoverResult.Paging(1, 2, 1),
                 command + " --page 2", null, null);
         String text = TextRenderer.render(result);
@@ -587,6 +588,16 @@ public class DiscoverResultRenderingTest {
                 "Next: bal discover pkg client Client <name>",
                 "Next: " + command + " --page 2")), text);
         Assert.assertFalse(text.contains("narrow further"), text);
+    }
+
+    @Test
+    public void onlyTheContainerAndTheFinalMemberAreRespelledInTheHeader() {
+        DiscoverResult result = new DiscoverResult.Signature("Client", "resource", null, "get", "client", "->",
+                "resource isolated function get client() returns error?;", List.of(), "error?", false, List.of(),
+                List.of(), 0, null, List.of(), DiscoverResult.Documented.NONE, null, null, null, null);
+        String text = TextRenderer.render(result, new TextRenderer.Context("pkg", null,
+                List.of("client", "client", "client", "get"), null, null));
+        Assert.assertTrue(text.startsWith("pkg · client · Client · client · get\n"), text);
     }
 
     @Test
@@ -709,7 +720,7 @@ public class DiscoverResultRenderingTest {
                 List.of(), methods("bal discover pkg client Client", "execute"),
                 methods("bal discover pkg client Client", "'close"), new DiscoverResult.MixedListing.Counts(0, 2, 2),
                 2, 4, new DiscoverResult.Paging(1, 2, 2), next,
-                new DiscoverResult.Documented(methods("bal discover pkg client Client", "forward"), 3),
+                new DiscoverResult.Documented(List.copyOf(methods("bal discover pkg client Client", "forward")), 3),
                 null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 remote methods, 2 normal methods",

@@ -26,8 +26,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * {@link DiscoverResult} → the human-oriented text {@code --output text} prints at an interactive terminal.
@@ -263,11 +265,11 @@ public final class TextRenderer {
         layout.top(counted(resources.total(), "resource path", "resource paths"));
         Drill drill = resourceDrill(resources.resources());
         layout.block(resourceTable(resources.resources(), drill).lines(INDENT));
-        String documentedDrill = documented(layout, resources.documented());
+        List<String> documentedDrill = documented(layout, resources.documented());
         layout.notices(resources.note(), resources.warning());
         layout.more(remaining(resources.shown(), resources.total(), resources.paging()), resources.paging());
         layout.next(drill.pattern());
-        layout.next(documentedDrill);
+        documentedDrill.forEach(layout::next);
         layout.next(resources.next());
     }
 
@@ -277,11 +279,11 @@ public final class TextRenderer {
                 : counted(methods.total(), "method", "methods"));
         Drill drill = methodDrill(methods.methods());
         layout.block(methodTable(methods.methods(), drill).lines(INDENT));
-        String documentedDrill = documented(layout, methods.documented());
+        List<String> documentedDrill = documented(layout, methods.documented());
         layout.notices(methods.note(), methods.warning());
         layout.more(remaining(methods.shown(), methods.total(), methods.paging()), methods.paging());
         layout.next(drill.pattern());
-        layout.next(documentedDrill);
+        documentedDrill.forEach(layout::next);
         layout.next(methods.next());
     }
 
@@ -329,11 +331,11 @@ public final class TextRenderer {
         }
         closureTail(layout, signature.omitted(), signature.omittedTotal(), signature.omittedNext(),
                 signature.foreign());
-        String documentedDrill = documented(layout, signature.documented());
+        List<String> documentedDrill = documented(layout, signature.documented());
         layout.notices(signature.note(), signature.warning());
         layout.more(remaining(signature.documented().names().size(), signature.documented().total(),
                 signature.paging()), signature.paging(), DOCUMENTED);
-        layout.next(documentedDrill);
+        documentedDrill.forEach(layout::next);
         layout.next(signature.next());
     }
 
@@ -357,12 +359,12 @@ public final class TextRenderer {
         Drill methodDrill = methodDrill(methods);
         layout.section("Remote (->)", methodTable(mixed.remote(), methodDrill, 0));
         layout.section("Normal (.)", methodTable(mixed.normal(), methodDrill, mixed.remote().size()));
-        String documentedDrill = documented(layout, mixed.documented());
+        List<String> documentedDrill = documented(layout, mixed.documented());
         layout.notices(mixed.note(), mixed.warning());
         layout.more(remaining(mixed.shown(), mixed.total(), mixed.paging()), mixed.paging());
         layout.next(drill.pattern());
         layout.next(methodDrill.pattern());
-        layout.next(documentedDrill);
+        documentedDrill.forEach(layout::next);
         layout.next(mixed.next());
     }
 
@@ -373,7 +375,7 @@ public final class TextRenderer {
         TextTable paths = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
         noMatch.paths().forEach(alternative -> paths.row(alternative.path(), alternative.command()));
         layout.section(noMatch.paths().size() + " paths carry that segment; pick one", paths);
-        String documentedDrill = documented(layout, noMatch.documented());
+        List<String> documentedDrill = documented(layout, noMatch.documented());
         if (noMatch.available() != null) {
             Layout available = new Layout();
             fill(available, noMatch.available(), where);
@@ -383,7 +385,7 @@ public final class TextRenderer {
             layout.block(block);
         }
         layout.notices(noMatch.note(), noMatch.warning());
-        layout.next(documentedDrill);
+        documentedDrill.forEach(layout::next);
         if (noMatch.paging() != null) {
             layout.more(noMatch.paging().remaining(), noMatch.paging(), DOCUMENTED);
             layout.next(noMatch.next());
@@ -429,11 +431,11 @@ public final class TextRenderer {
             layout.section(heading, methodTable(section.entries(), drill, offset));
             offset += section.entries().size();
         }
-        String documentedDrill = documented(layout, roster.documented());
+        List<String> documentedDrill = documented(layout, roster.documented());
         layout.notices(roster.note(), roster.warning());
         layout.more(remaining(roster.shown(), roster.total(), roster.paging()), roster.paging());
         layout.next(drill.pattern());
-        layout.next(documentedDrill);
+        documentedDrill.forEach(layout::next);
         layout.next(roster.next());
     }
 
@@ -506,18 +508,26 @@ public final class TextRenderer {
         return parts.isEmpty() ? null : String.join(SEPARATOR, parts);
     }
 
-    /** The trail as typed, each selector that resolved to the container or member spelled as it resolved. */
+    /**
+     * The trail as typed, with the first selector spelled as the container it resolved to and the last as the
+     * method or function it resolved to — no other word, which may be a path segment that only looks like either.
+     */
     private static List<String> resolvedTrail(Context where, String container, String member) {
         List<String> trail = new ArrayList<>(where.trail());
-        for (int i = 1; i < trail.size(); i++) {
-            String typed = Names.normalise(trail.get(i));
-            if (container != null && typed.equals(Names.normalise(container))) {
-                trail.set(i, container);
-            } else if (member != null && typed.equals(Names.normalise(member))) {
-                trail.set(i, member);
-            }
+        int containerAt = -1;
+        if (container != null && trail.size() > 1 && sameName(trail.get(1), container)) {
+            trail.set(1, container);
+            containerAt = 1;
+        }
+        int last = trail.size() - 1;
+        if (member != null && last >= 1 && last != containerAt && sameName(trail.get(last), member)) {
+            trail.set(last, member);
         }
         return trail;
+    }
+
+    private static boolean sameName(String typed, String declared) {
+        return Names.normalise(typed).equals(Names.normalise(declared));
     }
 
     private static String memberOf(DiscoverResult result) {
@@ -606,20 +616,38 @@ public final class TextRenderer {
      * Documentation-only matches on this page — or, on a page that holds none of them while a later one does,
      * one line saying how many are coming, so they are never silently absent.
      *
-     * @return the command shape that opens one of them, for the footer, or {@code null}
+     * @return the command shapes that open them, for the footer
      */
-    private static String documented(Layout layout, DiscoverResult.Documented documented) {
-        List<DiscoverResult.Method> entries = documented.entries();
+    private static List<String> documented(Layout layout, DiscoverResult.Documented documented) {
+        List<DiscoverResult.Documented.Entry> entries = documented.entries();
         if (entries.isEmpty() && documented.total() > 0) {
             layout.block(List.of("Matched by documentation only: " + documented.total() + ", on a later page"));
-            return null;
+            return List.of();
         }
-        Drill drill = methodDrill(entries);
+        List<DiscoverResult.Method> methods = new ArrayList<>();
+        List<DiscoverResult.ResourceList.Resource> resources = new ArrayList<>();
+        entries.forEach(entry -> {
+            switch (entry) {
+                case DiscoverResult.Method method -> methods.add(method);
+                case DiscoverResult.ResourceList.Resource resource -> resources.add(resource);
+            }
+        });
+        Drill methodDrill = methodDrill(methods);
+        Drill resourceDrill = resourceDrill(resources);
+        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        int method = 0;
+        int resource = 0;
+        for (DiscoverResult.Documented.Entry entry : entries) {
+            if (entry instanceof DiscoverResult.ResourceList.Resource row) {
+                table.row(row.path(), String.join(", ", row.accessors()), ownCommand(resourceDrill.unfit(resource++)));
+            } else {
+                table.row(entry.key(), null, methodDrill.explicit(method++));
+            }
+        }
         int shown = entries.size();
         layout.section("Matched by documentation only"
-                + (shown < documented.total() ? " (" + shown + " of " + documented.total() + ")" : ""),
-                methodTable(entries, drill));
-        return drill.pattern();
+                + (shown < documented.total() ? " (" + shown + " of " + documented.total() + ")" : ""), table);
+        return Stream.of(resourceDrill.pattern(), methodDrill.pattern()).filter(Objects::nonNull).toList();
     }
 
     private static List<String> indented(List<String> lines) {
