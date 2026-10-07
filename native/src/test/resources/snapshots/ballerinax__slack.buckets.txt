@@ -47,7 +47,7 @@ Groups (operations under each)
 ... 134 more (page 1 of 5)
 Next: bal discover ballerinax/slack client Client <group>
 Next: bal discover ballerinax/slack client Client --page 2
-Next: bal discover ballerinax/slack client --filter <keyword>
+Next: bal discover ballerinax/slack client Client --filter <keyword>
 == service ==
 ballerinax/slack · service
 This package declares nothing in service.

@@ -480,7 +480,7 @@ public final class JsonRenderer {
 
     private static void addDocumented(JsonObject json, DiscoverResult.Documented documented) {
         if (documented.total() > 0) {
-            json.add("documented", strings(documented.names()));
+            json.add("documented", methods(documented.entries()));
             json.addProperty("documentedTotal", documented.total());
         }
     }
