@@ -20,6 +20,7 @@ package io.ballerina.tools.discover.render;
 
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.symbols.Names;
+import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -163,11 +164,11 @@ public final class TextRenderer {
     }
 
     private static void containerRoster(Layout layout, DiscoverResult.ContainerRoster roster, Context where) {
-        String[] noun = switch (where.bucket() == null ? "" : where.bucket()) {
-            case "client" -> new String[] {"client", "clients"};
-            case "class" -> new String[] {"class", "classes"};
-            case "service" -> new String[] {"service type", "service types"};
-            default -> new String[] {"container", "containers"};
+        String[] noun = switch (Surface.Scope.ofVerb(where.bucket()).orElse(Surface.Scope.MODULE)) {
+            case CLIENT -> new String[] {"client", "clients"};
+            case CLASS -> new String[] {"class", "classes"};
+            case SERVICE -> new String[] {"service type", "service types"};
+            case MODULE -> new String[] {"container", "containers"};
         };
         layout.top(counted(roster.total(), noun[0], noun[1]));
 

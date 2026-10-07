@@ -320,7 +320,7 @@ public final class Containers {
         }
         if (options.selectors().size() == 1 && Types.declares(loaded, token)) {
             return Types.render(loaded, new Types.Options(options.selectors(), options.filter(), options.page(),
-                    kindNote(loaded, "type", options.selectors())));
+                    kindNote(loaded, Types.BUCKET, options.selectors())));
         }
         return null;
     }
@@ -477,8 +477,9 @@ public final class Containers {
                     other.verb(), count, "bal discover " + pkg + " " + other.verb()));
         }
         int types = Types.count(loaded);
-        if (types > 0 && !"type".equals(bucket)) {
-            elsewhere.add(new DiscoverResult.EmptyBucket.Elsewhere("type", types, "bal discover " + pkg + " type"));
+        if (types > 0 && !Types.BUCKET.equals(bucket)) {
+            elsewhere.add(new DiscoverResult.EmptyBucket.Elsewhere(
+                    Types.BUCKET, types, "bal discover " + pkg + " " + Types.BUCKET));
         }
         return new DiscoverResult.EmptyBucket(bucket, List.copyOf(elsewhere), loaded.warning());
     }
@@ -619,7 +620,7 @@ public final class Containers {
             return switch (fn) {
                 case Fn.Resource resource -> resource.accessor() + " " + String.join("/", path);
                 case Fn.Standalone named -> named.name();
-                case Fn.Constructor ignored -> "init";
+                case Fn.Constructor ignored -> Fn.Constructor.NAME;
             };
         }
 
@@ -1193,7 +1194,7 @@ public final class Containers {
         String name = switch (fn) {
             case Fn.Resource ignored -> null;
             case Fn.Standalone standalone -> standalone.name();
-            case Fn.Constructor ignored -> "init";
+            case Fn.Constructor ignored -> Fn.Constructor.NAME;
         };
         return Result.ok(new DiscoverResult.Signature(
                 container.isModule() ? null : container.name(), kind, name,

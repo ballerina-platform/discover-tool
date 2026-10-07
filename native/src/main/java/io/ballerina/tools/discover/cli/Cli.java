@@ -177,23 +177,18 @@ public final class Cli {
             return Result.ok(bucketList(loaded));
         }
         List<String> selectors = rest.subList(1, rest.size());
-        if ("readme".equals(bucket)) {
+        if (Readme.BUCKET.equals(bucket)) {
             // Not derived from call-site grammar, so it shares no code with Containers — see Readme's own class
             // comment for why.
             return Readme.render(loaded, new Readme.Options(
                     selectors.isEmpty() ? null : String.join(" ", selectors), filter, page));
         }
-        if ("type".equals(bucket)) {
+        if (Types.BUCKET.equals(bucket)) {
             return Types.render(loaded, new Types.Options(selectors, filter, page));
         }
-        Containers.Options options = new Containers.Options(selectors, filter, page);
-        return switch (bucket) {
-            case "client" -> Containers.render(loaded, Surface.Scope.CLIENT, options);
-            case "service" -> Containers.render(loaded, Surface.Scope.SERVICE, options);
-            case "class" -> Containers.render(loaded, Surface.Scope.CLASS, options);
-            case "funcs" -> Containers.render(loaded, Surface.Scope.MODULE, options);
-            default -> throw new IllegalStateException("unreachable: validated above");
-        };
+        Surface.Scope scope = Surface.Scope.ofVerb(bucket)
+                .orElseThrow(() -> new IllegalStateException("unreachable: validated above"));
+        return Containers.render(loaded, scope, new Containers.Options(selectors, filter, page));
     }
 
     /**
@@ -248,10 +243,10 @@ public final class Cli {
         // Neither is a Surface.Scope — they are not part of the callable surface — so they are appended here
         // rather than found by the loop above: `type`, then `readme` last, matching the RFC's worked examples.
         if (Types.count(loaded) > 0) {
-            buckets.add("type");
+            buckets.add(Types.BUCKET);
         }
         if (loaded.readme().isPresent()) {
-            buckets.add("readme");
+            buckets.add(Readme.BUCKET);
         }
         List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.BucketList.Submodule(
@@ -263,7 +258,7 @@ public final class Cli {
 
     /** {@code --output}, or the TTY default when it was not passed. */
     private static boolean jsonOutput(String output, boolean interactive) {
-        return output != null ? "json".equals(output) : !interactive;
+        return output != null ? Commands.JSON_OUTPUT.equals(output) : !interactive;
     }
 
     // -----------------------------------------------------------------------
@@ -295,12 +290,13 @@ public final class Cli {
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
-        if (root.output == null || "json".equals(root.output) || "text".equals(root.output)) {
+        if (root.output == null || Commands.JSON_OUTPUT.equals(root.output)
+                || Commands.TEXT_OUTPUT.equals(root.output)) {
             return null;
         }
         return new Failure.Validation(
                 "'" + root.output + "' is not a valid --output value.",
-                "Pass --output json or --output text.");
+                "Pass --output " + Commands.JSON_OUTPUT + " or --output " + Commands.TEXT_OUTPUT + ".");
     }
 
     /** A version, as Central publishes them. No bucket name, selector or path can look like one. */

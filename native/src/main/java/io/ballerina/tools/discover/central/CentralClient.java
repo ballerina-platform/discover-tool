@@ -59,6 +59,9 @@ public final class CentralClient {
      */
     public static final String REPOSITORY_ID = "central";
 
+    private static final String REGISTRY_PACKAGES_URL = CENTRAL_BASE_URL + "registry/packages/";
+    private static final String DOCS_URL = CENTRAL_BASE_URL + "docs/";
+
     /**
      * How long Central's answer to "what is the latest version" is believed.
      *
@@ -314,7 +317,7 @@ public final class CentralClient {
         String submodule = qualified.name().substring(parent.name().length() + 1);
         String command = "`bal discover " + Texts.shellWord(parent.qualified()) + " --module "
                 + Texts.shellWord(submodule) + pinArgument(pin) + "`";
-        String url = CENTRAL_BASE_URL + "registry/packages/" + encode(parent.org()) + "/" + encode(parent.name())
+        String url = REGISTRY_PACKAGES_URL + encode(parent.org()) + "/" + encode(parent.name())
                 + "/" + encode(version.text());
         Result<JsonElement> response = fetchJson(url, options);
         Optional<List<String>> listed = response.isOk() ? Coordinates.moduleNames(response.value()) : Optional.empty();
@@ -363,7 +366,7 @@ public final class CentralClient {
             }
         }
 
-        String url = CENTRAL_BASE_URL + "registry/packages/" + encode(qualified.org())
+        String url = REGISTRY_PACKAGES_URL + encode(qualified.org())
                 + "/" + encode(qualified.name());
         Result<JsonElement> response = fetchJson(url, options);
         if (!response.isOk()) {
@@ -475,7 +478,7 @@ public final class CentralClient {
             }
         }
 
-        String url = CENTRAL_BASE_URL + "docs/" + encode(qualified.org())
+        String url = DOCS_URL + encode(qualified.org())
                 + "/" + encode(qualified.name()) + "/" + encode(version.text());
         Result<JsonElement> response = fetchJson(url, options);
         if (!response.isOk()) {
@@ -539,7 +542,7 @@ public final class CentralClient {
             }
         }
 
-        String url = CENTRAL_BASE_URL + "docs/" + encode(qualified.org())
+        String url = DOCS_URL + encode(qualified.org())
                 + "/" + encode(moduleName) + "/" + encode(version.text());
         Result<JsonElement> response = fetchJson(url, options);
         if (!response.isOk()) {
@@ -607,7 +610,7 @@ public final class CentralClient {
      * message rather than replace the failure the caller actually hit.
      */
     private static String publishedVersions(QualifiedName qualified, HttpOptions options) {
-        String url = CENTRAL_BASE_URL + "registry/packages/" + encode(qualified.org())
+        String url = REGISTRY_PACKAGES_URL + encode(qualified.org())
                 + "/" + encode(qualified.name());
         Result<JsonElement> response = fetchJson(url, options);
         if (!response.isOk()) {
@@ -637,7 +640,7 @@ public final class CentralClient {
      */
     public static Optional<Map<String, String>> fetchModuleSources(
             QualifiedName qualified, Version version, String moduleId, HttpOptions options) {
-        String url = CENTRAL_BASE_URL + "registry/packages/" + encode(qualified.org())
+        String url = REGISTRY_PACKAGES_URL + encode(qualified.org())
                 + "/" + encode(qualified.name()) + "/" + encode(version.text());
         Result<JsonElement> response = fetchJson(url, options);
         if (!response.isOk()) {

@@ -19,9 +19,14 @@
 package io.ballerina.tools.discover.cli;
 
 import io.ballerina.tools.discover.render.DiscoverResult;
+import io.ballerina.tools.discover.symbols.Surface;
+import io.ballerina.tools.discover.views.Readme;
+import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * The argument grammar, declared once: {@code bal discover <org/name> [bucket] [args...] [flags]}.
@@ -62,7 +67,13 @@ final class Commands {
     }
 
     /** Every bucket wired into dispatch. */
-    static final List<String> BUCKETS = List.of("client", "service", "class", "funcs", "type", "readme");
+    static final List<String> BUCKETS = Stream.concat(
+            Arrays.stream(Surface.Scope.values()).map(Surface.Scope::verb),
+            Stream.of(Types.BUCKET, Readme.BUCKET)).toList();
+
+    /** The two {@code --output} values. */
+    static final String JSON_OUTPUT = "json";
+    static final String TEXT_OUTPUT = "text";
 
     /**
      * The one command. {@code pkg} is optional at the grammar level — {@code bal discover} with nothing else is a
@@ -79,7 +90,7 @@ final class Commands {
                         + "exist and does not.")
         boolean refresh;
 
-        @CommandLine.Option(names = "--output", paramLabel = "<json|text>",
+        @CommandLine.Option(names = "--output", paramLabel = "<" + JSON_OUTPUT + "|" + TEXT_OUTPUT + ">",
                 description = "Override the TTY-detected default: human text at an interactive terminal, JSON "
                         + "otherwise.")
         String output;

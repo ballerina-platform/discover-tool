@@ -26,6 +26,7 @@ import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.model.TypeDef;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -98,6 +99,11 @@ public final class Surface {
         /** The verb that addresses this scope, for the note that routes a caller to it. */
         public String verb() {
             return verb;
+        }
+
+        /** The scope {@code verb} addresses, if it addresses one. */
+        public static Optional<Scope> ofVerb(String verb) {
+            return Arrays.stream(values()).filter(scope -> scope.verb.equals(verb)).findFirst();
         }
     }
 
@@ -179,14 +185,14 @@ public final class Surface {
          */
         public List<String> memberNames() {
             List<String> names = new ArrayList<>();
-            constructor().ifPresent(ignored -> names.add("init"));
+            constructor().ifPresent(ignored -> names.add(Fn.Constructor.NAME));
             standalone().forEach(fn -> names.add(fn.name()));
             return List.copyOf(names);
         }
 
         /** One member by exact name, {@code init} included. */
         public Optional<Fn> member(String name) {
-            if ("init".equals(name)) {
+            if (Fn.Constructor.NAME.equals(name)) {
                 return constructor().map(Fn.class::cast);
             }
             return standalone().stream()

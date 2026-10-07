@@ -22,6 +22,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Version;
+import io.ballerina.tools.discover.central.schema.Schema;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -87,10 +88,10 @@ public final class Coordinates {
     public static boolean isModulePage(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
         String id = qualified.name() + "." + submodule;
         for (JsonObject module : modules(raw)) {
-            if (id.equals(Json.string(module, "id"))
-                    && qualified.org().equals(Json.string(module, "orgName"))
-                    && version.text().equals(Json.string(module, "version"))
-                    && flagged(module, "isDefaultModule", false)
+            if (id.equals(Json.string(module, Schema.ID))
+                    && qualified.org().equals(Json.string(module, Schema.ORG_NAME))
+                    && version.text().equals(Json.string(module, Schema.VERSION))
+                    && flagged(module, Schema.IS_DEFAULT_MODULE, false)
                     && namesDefaultModule(module, qualified)) {
                 return true;
             }
@@ -105,13 +106,14 @@ public final class Coordinates {
      * {@code isDefaultModule: false} still stand on their own, and still reject a separately published package.
      */
     private static boolean namesDefaultModule(JsonObject module, QualifiedName qualified) {
-        List<JsonObject> readable = objectsIn(module, "relatedModules").orElse(List.of()).stream()
-                .filter(entry -> Json.string(entry, "id") != null && Json.string(entry, "orgName") != null)
+        List<JsonObject> readable = objectsIn(module, Schema.RELATED_MODULES).orElse(List.of()).stream()
+                .filter(entry -> Json.string(entry, Schema.ID) != null
+                        && Json.string(entry, Schema.ORG_NAME) != null)
                 .toList();
         return readable.isEmpty() || readable.stream().anyMatch(entry ->
-                qualified.name().equals(Json.string(entry, "id"))
-                        && qualified.org().equals(Json.string(entry, "orgName"))
-                        && flagged(entry, "isDefaultModule", true));
+                qualified.name().equals(Json.string(entry, Schema.ID))
+                        && qualified.org().equals(Json.string(entry, Schema.ORG_NAME))
+                        && flagged(entry, Schema.IS_DEFAULT_MODULE, true));
     }
 
     /** Is the value exactly this boolean? Absent and non-boolean values are neither. */
@@ -131,9 +133,9 @@ public final class Coordinates {
      */
     public static boolean describesSubmodule(JsonElement raw, QualifiedName qualified) {
         for (JsonObject module : modules(raw)) {
-            if (qualified.name().equals(Json.string(module, "id"))
-                    && qualified.org().equals(Json.string(module, "orgName"))
-                    && flagged(module, "isDefaultModule", false)) {
+            if (qualified.name().equals(Json.string(module, Schema.ID))
+                    && qualified.org().equals(Json.string(module, Schema.ORG_NAME))
+                    && flagged(module, Schema.IS_DEFAULT_MODULE, false)) {
                 return true;
             }
         }
@@ -141,8 +143,9 @@ public final class Coordinates {
     }
 
     private static List<JsonObject> modules(JsonElement raw) {
-        JsonElement docsData = raw != null && raw.isJsonObject() ? raw.getAsJsonObject().get("docsData") : null;
-        return objectsIn(docsData, "modules").orElse(List.of());
+        JsonElement docsData =
+                raw != null && raw.isJsonObject() ? raw.getAsJsonObject().get(Schema.DOCS_DATA) : null;
+        return objectsIn(docsData, Schema.MODULES).orElse(List.of());
     }
 
     /**
@@ -168,11 +171,11 @@ public final class Coordinates {
     }
 
     private static boolean describes(JsonObject module, QualifiedName qualified, Version version) {
-        String id = Json.string(module, "id");
-        if (id == null || !qualified.org().equals(Json.string(module, "orgName"))) {
+        String id = Json.string(module, Schema.ID);
+        if (id == null || !qualified.org().equals(Json.string(module, Schema.ORG_NAME))) {
             return false;
         }
-        return id.equals(qualified.name()) && version.text().equals(Json.string(module, "version"));
+        return id.equals(qualified.name()) && version.text().equals(Json.string(module, Schema.VERSION));
     }
 
     /**
@@ -182,11 +185,11 @@ public final class Coordinates {
      * about what the package publishes.
      */
     static Optional<List<String>> moduleNames(JsonElement raw) {
-        JsonElement modules = raw != null && raw.isJsonObject() ? raw.getAsJsonObject().get("modules") : null;
+        JsonElement modules = raw != null && raw.isJsonObject() ? raw.getAsJsonObject().get(Schema.MODULES) : null;
         if (modules == null || !modules.isJsonArray() || modules.getAsJsonArray().isEmpty()) {
             return Optional.empty();
         }
-        List<String> names = objectsIn(raw, "modules").orElse(List.of()).stream()
+        List<String> names = objectsIn(raw, Schema.MODULES).orElse(List.of()).stream()
                 .map(module -> Json.string(module, "name"))
                 .filter(name -> name != null && !name.isEmpty())
                 .toList();

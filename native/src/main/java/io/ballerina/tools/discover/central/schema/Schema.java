@@ -45,6 +45,18 @@ import java.util.Optional;
  */
 public final class Schema {
 
+    /** Central's keys for a page's module list and each listed module's identity. */
+    public static final String DOCS_DATA = "docsData";
+    public static final String MODULES = "modules";
+    public static final String RELATED_MODULES = "relatedModules";
+    public static final String ID = "id";
+    public static final String ORG_NAME = "orgName";
+    public static final String VERSION = "version";
+    public static final String SUMMARY = "summary";
+    public static final String IS_DEFAULT_MODULE = "isDefaultModule";
+
+    private static final String INCLUSION_TYPE = "inclusionType";
+
     private Schema() {
     }
 
@@ -52,11 +64,11 @@ public final class Schema {
     public static Result<CentralDocs> parse(JsonElement raw, String qualified) {
         Cursor cursor = new Cursor();
         JsonObject root = cursor.object(raw, "");
-        JsonObject docsData = cursor.object(root.get("docsData"), "docsData");
+        JsonObject docsData = cursor.object(root.get(DOCS_DATA), DOCS_DATA);
         List<CentralDocs.Module> modules =
-                cursor.array(docsData, "docsData", "modules", Schema::module);
+                cursor.array(docsData, DOCS_DATA, MODULES, Schema::module);
         if (modules.isEmpty() && cursor.issues.isEmpty()) {
-            cursor.issue("docsData.modules", "expected at least one module, received none");
+            cursor.issue(DOCS_DATA + "." + MODULES, "expected at least one module, received none");
         }
         if (!cursor.issues.isEmpty()) {
             return Result.err(new Failure.SchemaDrift(
@@ -80,9 +92,9 @@ public final class Schema {
      */
     private static CentralDocs.Module module(Cursor cursor, JsonObject json, String path) {
         return new CentralDocs.Module(
-                cursor.requiredString(json, path, "id"),
-                cursor.requiredString(json, path, "orgName"),
-                cursor.optionalString(json, path, "summary"),
+                cursor.requiredString(json, path, ID),
+                cursor.requiredString(json, path, ORG_NAME),
+                cursor.optionalString(json, path, SUMMARY),
                 cursor.optionalString(json, path, "description"),
                 cursor.bucket(json, path, "records", Schema::recordDecl),
                 cursor.bucket(json, path, "stringTypes", Schema::aliasDecl),
@@ -127,7 +139,7 @@ public final class Schema {
      * here can only shorten the submodule list.
      */
     private static List<CentralDocs.RelatedModule> relatedModules(JsonObject json) {
-        JsonElement related = json.get("relatedModules");
+        JsonElement related = json.get(RELATED_MODULES);
         if (related == null || !related.isJsonArray()) {
             return List.of();
         }
@@ -137,11 +149,11 @@ public final class Schema {
                 continue;
             }
             JsonObject module = entry.getAsJsonObject();
-            String id = string(module, "id");
-            String orgName = string(module, "orgName");
+            String id = string(module, ID);
+            String orgName = string(module, ORG_NAME);
             if (id != null && orgName != null) {
-                JsonElement isDefault = module.get("isDefaultModule");
-                modules.add(new CentralDocs.RelatedModule(id, orgName, Optional.ofNullable(string(module, "summary")),
+                JsonElement isDefault = module.get(IS_DEFAULT_MODULE);
+                modules.add(new CentralDocs.RelatedModule(id, orgName, Optional.ofNullable(string(module, SUMMARY)),
                         isDefault != null && isDefault.isJsonPrimitive()
                                 && isDefault.getAsJsonPrimitive().isBoolean() && isDefault.getAsBoolean()));
             }
@@ -160,9 +172,9 @@ public final class Schema {
         return new CentralDocs.TypeNode(
                 cursor.optionalString(json, path, "name"),
                 cursor.optionalString(json, path, "category"),
-                cursor.optionalString(json, path, "orgName"),
+                cursor.optionalString(json, path, ORG_NAME),
                 cursor.optionalString(json, path, "moduleName"),
-                cursor.optionalString(json, path, "version"),
+                cursor.optionalString(json, path, VERSION),
                 cursor.optionalString(json, path, "description"),
                 cursor.flag(json, path, "isArrayType"),
                 cursor.flag(json, path, "isNullable"),
@@ -191,9 +203,9 @@ public final class Schema {
     private static CentralDocs.AnnotationRef annotationRef(Cursor cursor, JsonObject json, String path) {
         return new CentralDocs.AnnotationRef(
                 cursor.requiredString(json, path, "name"),
-                cursor.optionalString(json, path, "orgName"),
+                cursor.optionalString(json, path, ORG_NAME),
                 cursor.optionalString(json, path, "moduleName"),
-                cursor.optionalString(json, path, "version"),
+                cursor.optionalString(json, path, VERSION),
                 cursor.optionalString(json, path, "description"));
     }
 
@@ -229,9 +241,9 @@ public final class Schema {
     }
 
     private static CentralDocs.Field field(Cursor cursor, JsonObject json, String path) {
-        if (json.has("inclusionType")) {
+        if (json.has(INCLUSION_TYPE)) {
             return new CentralDocs.Field.Inclusion(
-                    cursor.requiredObject(json, path, "inclusionType", Schema::typeNode),
+                    cursor.requiredObject(json, path, INCLUSION_TYPE, Schema::typeNode),
                     cursor.flag(json, path, "isReadOnly"),
                     cursor.flag(json, path, "isDeprecated"));
         }
