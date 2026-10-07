@@ -282,7 +282,7 @@ public class ViewsAgreeTest {
             // A wildcard cannot reach anything the tree does not hold either.
             for (List<String> path : paths) {
                 List<String> wildcarded = path.stream()
-                        .map(segment -> segment.startsWith("{") ? "*" : segment)
+                        .map(segment -> segment.startsWith(":") ? "*" : segment)
                         .toList();
                 PathTree.Resolution resolution = PathTree.resolve(tree, wildcarded);
                 if (!(resolution instanceof PathTree.Resolution.Found found)) {
