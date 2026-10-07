@@ -869,14 +869,12 @@ public class DiscoverResultRenderingTest {
 
     private static final String HTTP = "bal discover ballerina/http client Client";
 
-    /** Each name with its command, {@code prefix} and the name as one shell word. */
     private static List<DiscoverResult.Method> methods(String prefix, String... names) {
         return Arrays.stream(names)
                 .map(name -> new DiscoverResult.Method(name, prefix + " " + Texts.shellWord(name)))
                 .toList();
     }
 
-    /** A resource row whose command for each accessor is {@code prefix} and the accessor. */
     private static DiscoverResult.ResourceList.Resource resource(String path, String prefix, String... accessors) {
         Map<String, String> commands = new LinkedHashMap<>();
         for (String accessor : accessors) {

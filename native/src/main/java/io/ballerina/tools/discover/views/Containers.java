@@ -245,13 +245,6 @@ public final class Containers {
         return elsewhere(loaded, scope, options);
     }
 
-    /**
-     * Whichever containers in this scope hold the selector: one is answered, several are a roster.
-     *
-     * <p>{@code exactly} is two passes rather than two code paths — the resolution ORDER is the whole subtlety
-     * here, and expressing it as one function called twice is what keeps the two passes from drifting into
-     * different notions of a match.
-     */
     private static Result<DiscoverResult> byOwner(
             LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers,
             List<String> selectors, Options options, String note, boolean exactly) {
@@ -288,23 +281,15 @@ public final class Containers {
         return owners(loaded, scope, owners, selectors, options, note);
     }
 
-    /** Whether {@code container} holds what the selectors start with, read in full or by a leading part alone. */
     private static boolean knows(Surface.Container container, List<String> selectors, boolean exactly) {
         return !select(container, selectors, exactly).isEmpty();
     }
 
-    /** Does {@code token} alone select a member that is not a resource, which is what it names when more follows? */
     private static boolean namesMember(Surface.Container container, String token) {
         return select(container, List.of(token)).stream()
                 .anyMatch(entry -> !(entry.fn() instanceof Fn.Resource));
     }
 
-    /**
-     * Is this selector known to ANOTHER scope, or to the declaration roster?
-     *
-     * <p>Split out of {@link #elsewhere} so the resolution order can consult it without committing to a failure:
-     * {@code null} means "not there either", which is what lets the substring pass run afterwards.
-     */
     private static Result<DiscoverResult> elsewhereIfKnown(
             LoadedPackage loaded, Surface.Scope scope, Options options) {
         String token = options.selectors().get(0);
@@ -329,12 +314,6 @@ public final class Containers {
     // Kind tolerance
     // -----------------------------------------------------------------------
 
-    /**
-     * A symbol this bucket does not hold, answered anyway.
-     *
-     * <p>This is what makes bucket-specific addressing safe for an agent at all. Without it every kind guess
-     * risks a wasted round trip; with it the split costs ONE PRINTED LINE.
-     */
     private static Result<DiscoverResult> elsewhere(
             LoadedPackage loaded, Surface.Scope scope, Options options) {
         if (options.selectors().isEmpty()) {
@@ -359,13 +338,11 @@ public final class Containers {
                 Declarations.index(loaded.library().addressable())));
     }
 
-    /** The note for an answer found under {@code verb} rather than the bucket typed, with its canonical command. */
     private static String kindNote(LoadedPackage loaded, String verb, List<String> selectors) {
         return "'" + selectors.get(0) + "' is addressed by " + verb + " — showing it. Canonical: "
                 + "bal discover " + loaded.pkgArgument() + " " + verb + shellWords(selectors);
     }
 
-    /** {@link #kindNote}, its first selector spelled as the container of {@code scope} it names, if it names one. */
     private static String kindNote(LoadedPackage loaded, Surface.Scope scope, List<String> selectors) {
         List<String> spelled = new ArrayList<>(selectors);
         Surface.byName(Surface.of(loaded.library(), scope), selectors.get(0))
@@ -381,7 +358,6 @@ public final class Containers {
                 + shellWords(selectors);
     }
 
-    /** Two notes, concatenated when both are present — the same join every other combined note in this class uses. */
     private static String mergeNotes(String first, String second) {
         if (first == null) {
             return second;
@@ -389,11 +365,6 @@ public final class Containers {
         return second == null ? first : first + "; " + second;
     }
 
-    /**
-     * The listener(s) a service container's own pairings name, joined — every pairing, confirmed or not, since
-     * dropping an unconfirmed sibling would lose it for a caller who only ever sees this joined form (the roster's
-     * {@code listener} field never carries a per-name confirmation hedge the way {@link #listenerNote} does).
-     */
     private static String listenerNames(Surface.Container container) {
         List<Service> pairings = container.pairings();
         if (pairings.isEmpty()) {
@@ -405,7 +376,6 @@ public final class Containers {
                 .collect(Collectors.joining(", "));
     }
 
-    /** {@link #listenerNames} as a one-line fact, for the containers the ceiling has no room to list a fact row for. */
     private static String listenerNote(LoadedPackage loaded, Surface.Container container) {
         if (Surface.isUnattachable(loaded.library(), container)) {
             return "not attachable to any listener this package declares";
@@ -424,16 +394,11 @@ public final class Containers {
                 .orElse("binds to " + names);
     }
 
-    /** The first of a container's pairings whose binding is unsettled, if any is. */
     private static Optional<Bindings.Binding> unsettled(Surface.Container container) {
         return container.pairings().stream().map(Service::binding).filter(Bindings.Binding::isUnsettled).findFirst();
     }
 
-    /**
-     * Nothing matched anywhere, with the names that came closest.
-     *
-     * <p>The suggestion must never rebuild the command WITHOUT the argument that failed.
-     */
+    // The suggestion must never rebuild the command without the argument that failed.
     private static Failure notFound(
             LoadedPackage loaded, Surface.Scope scope, String token, Declarations index) {
         String pkg = loaded.pkgArgument();
@@ -458,7 +423,6 @@ public final class Containers {
         return new Failure.SymbolNotFound(loaded.label(), List.of(token), near, suggestion);
     }
 
-    /** A scope with nothing in it, saying where the callable surface actually is. */
     private static DiscoverResult emptyBucket(LoadedPackage loaded, Surface.Scope scope) {
         return emptyBucket(loaded, scope.verb());
     }
@@ -488,15 +452,6 @@ public final class Containers {
     // Rosters
     // -----------------------------------------------------------------------
 
-    /**
-     * Several containers and nothing to choose between them yet — the RFC's entry ceiling, applied to a roster
-     * of containers rather than to one container's own members, and paged like every other listing.
-     *
-     * <p>{@code --filter} keeps a container whose own NAME matches as well as one with a matching member, and a
-     * name match opens the whole container rather than its members narrowed by the keyword: a container that
-     * declares no methods at all ({@code ballerinax/postgresql}'s {@code *Value} classes) has nothing else for
-     * the keyword to match.
-     */
     private static Result<DiscoverResult> roster(
             LoadedPackage loaded, Surface.Scope scope, List<Surface.Container> containers, Options options) {
         String pkg = loaded.pkgArgument();
@@ -551,12 +506,6 @@ public final class Containers {
         return options.filtered() && Filter.matches(options.filter(), container.name());
     }
 
-    /**
-     * The command that opens one container — in ANOTHER package for a service type a listener here accepts but
-     * another module declares ({@code postgresql:CdcListener}'s {@code cdc:Service}), since that is where its
-     * contract is, when {@link LoadedPackage#argumentFor} can name that package; otherwise the local stub that
-     * says where the type is declared.
-     */
     private static String openCommand(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, Options options) {
         Optional<String> foreign = foreignPairing(container).flatMap(service -> foreignCommand(loaded, service));
@@ -576,12 +525,6 @@ public final class Containers {
                 .map(target -> "bal discover " + target + " service " + shellWord(service.name()));
     }
 
-    /**
-     * One member name, declared on several containers.
-     *
-     * <p>The answer is the OWNERS with counts, each ending in the command that opens it — never a bare
-     * validation failure, and never a silent pick of one.
-     */
     private static Result<DiscoverResult> owners(
             LoadedPackage loaded, Surface.Scope scope, Map<Surface.Container, List<Entry>> owners,
             List<String> selectors, Options options, String note) {
@@ -637,24 +580,12 @@ public final class Containers {
         }
     }
 
-    /**
-     * What a selector selects inside one container.
-     *
-     * <p>THE GRAMMAR FOLLOWS THE CONTAINER. A container that declares resource functions reads
-     * {@code get}/{@code post}/{@code delete} as an accessor and the token after it as a path; one that does not
-     * reads the same token as a member name.
-     */
     private static List<Entry> select(Surface.Container container, List<String> selectors) {
         return select(container, selectors, false);
     }
 
-    /**
-     * The same selection, restricted to matches a caller could not have meant by accident.
-     *
-     * <p>An exact member name or a path that resolves. The substring widening — which is what makes a
-     * half-remembered name work — is deliberately excluded here, because it is what lets a container name in
-     * another scope lose to letters inside an unrelated member (see the resolution order in {@link #render}).
-     */
+    // No substring widening here: it would let letters inside an unrelated member beat a container name in
+    // another scope.
     private static List<Entry> selectExactly(Surface.Container container, List<String> selectors) {
         return select(container, selectors, true);
     }
@@ -707,7 +638,6 @@ public final class Containers {
      */
     private record PathRequest(String accessor, List<String> tokens) { }
 
-    /** How a path selector reads against this container, or nothing when it is not one. */
     private static Optional<PathRequest> pathRequest(Surface.Container container, List<String> selectors) {
         if (!container.hasPaths()) {
             return Optional.empty();
@@ -736,12 +666,6 @@ public final class Containers {
         return Optional.empty();
     }
 
-    /**
-     * How many leading selectors this container reads, derived from what they name: two that resolve as a path and
-     * its accessor are read as one, a first that names a member that is not a resource is read alone, and on a
-     * container with resource paths any other two are a pair that resolves nothing (a no-match). The rest are
-     * unread, and rejected rather than answered as if they were never typed.
-     */
     private static int consumed(Surface.Container container, List<String> selectors) {
         if (selectors.size() < 2 || !container.hasPaths()) {
             return Math.min(selectors.size(), 1);
@@ -752,7 +676,6 @@ public final class Containers {
         return namesMember(container, selectors.get(0)) ? 1 : 2;
     }
 
-    /** Selectors after the ones {@code container} reads, as a usage failure naming the command without them. */
     private static Failure unread(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options) {
@@ -772,10 +695,6 @@ public final class Containers {
                 joined.orElse(drop(kept, selectors.size() - consumed, base, options)));
     }
 
-    /**
-     * The same failure for what several containers declare, none of which reads what follows it: {@code owners}
-     * maps each to how many selectors it read.
-     */
     private static Failure unread(
             LoadedPackage loaded, Surface.Scope scope, Map<Surface.Container, Integer> owners,
             List<String> selectors, Options options) {
@@ -788,7 +707,6 @@ public final class Containers {
                         "bal discover " + loaded.pkgArgument() + " " + scope.verb(), options));
     }
 
-    /** The failure both forms raise: the selectors after the first {@code consumed}, and why they are unread. */
     private static Failure unread(List<String> selectors, int consumed, String reason, String suggestion) {
         List<String> unread = selectors.subList(consumed, selectors.size());
         return new Failure.Validation(
@@ -798,16 +716,11 @@ public final class Containers {
                 suggestion);
     }
 
-    /** The suggestion to rerun {@code base} with only the {@code kept} selectors. */
     private static String drop(List<String> kept, int dropped, String base, Options options) {
         return "Drop " + (dropped == 1 ? "it" : "them") + ": `" + base + shellWords(kept) + filterArgument(options)
                 + "`.";
     }
 
-    /**
-     * A path typed as separate words, joined into the one argument that resolves, with its accessor when one was
-     * typed first or last: {@code repos :owner :repo} is {@code "repos/:owner/:repo"}.
-     */
     private static Optional<String> joinedPath(Surface.Container container, List<String> selectors) {
         if (!container.hasPaths()) {
             return Optional.empty();
@@ -870,7 +783,6 @@ public final class Containers {
         return Optional.empty();
     }
 
-    /** Where a path selector landed, relocation and alternatives included. */
     private static Optional<PathTree.Located> located(
             Surface.Container container, List<String> selectors) {
         return pathRequest(container, selectors)
@@ -904,12 +816,6 @@ public final class Containers {
                 .toList();
     }
 
-    /**
-     * Where a path selector landed when that is not simply where it pointed, as one line for the result's own
-     * {@code note} field: silently dropping which sibling branch a wildcard or an auto-relocation did NOT take is
-     * exactly the bug this mechanism exists to prevent (GITHUB-02: {@code repos/*}/{@code *} answered with 420 of
-     * 421 operations under exit 0 and nothing said so).
-     */
     private static String pathNote(Surface.Container container, List<String> selectors) {
         Optional<PathTree.Located> found = located(container, selectors);
         if (found.isEmpty() || !(found.get().resolution() instanceof PathTree.Resolution.Found node)) {
@@ -928,9 +834,6 @@ public final class Containers {
         return parts.isEmpty() ? null : String.join("; ", parts);
     }
 
-    /**
-     * Is this token an accessor rather than a member name?
-     */
     private static boolean isAccessor(Surface.Container container, String token) {
         if (!ACCESSOR.matcher(token).matches()) {
             return false;
@@ -939,7 +842,6 @@ public final class Containers {
                 .anyMatch(operation -> operation.fn().accessor().equalsIgnoreCase(token));
     }
 
-    /** A bare token matches anywhere in a name; {@code *} is a wildcard, as it is in a path. */
     private static boolean matchesName(Entry entry, String token) {
         return glob(token).matcher(entry.label()).matches()
                 || glob(PathTree.readableSelector(token)).matcher(entry.label()).matches();
@@ -979,10 +881,6 @@ public final class Containers {
     // The answer
     // -----------------------------------------------------------------------
 
-    /**
-     * One container's answer: every entry, one signature, a narrower listing or a no-match. Selectors it does not
-     * read are rejected before any of them.
-     */
     private static Result<DiscoverResult> answer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, String note) {
@@ -1038,12 +936,6 @@ public final class Containers {
                 : new DiscoverResult.Documented(window.slice(documented, offset), documented.size());
     }
 
-    /**
-     * Several entries: resource paths, methods of one call form, or several forms side by side.
-     *
-     * <p>The constructor is never part of the ceiling problem — it is one signature, always shown once, on request
-     * ({@code init}/{@code new}) rather than folded into a "many entries" listing.
-     */
     private static Result<DiscoverResult> listing(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> selected, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
@@ -1062,12 +954,6 @@ public final class Containers {
         return methodAnswer(loaded, scope, container, selectors, callable, options, documented, warning, note);
     }
 
-    /**
-     * A selector that matched nothing, answered with what IS there.
-     *
-     * <p>Exit 0 with the alternatives rather than a failure: an empty selection is a fact about the container,
-     * and the caller's next move is in the answer.
-     */
     private static Result<DiscoverResult> nothingMatched(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, List<DiscoverResult.Documented.Entry> documented, String note) {
@@ -1129,13 +1015,6 @@ public final class Containers {
     // Exactly one result, and the mixed case
     // -----------------------------------------------------------------------
 
-    /**
-     * One result, in full, with the declarations its signature names.
-     *
-     * <p>The inlining is a DEPTH-1 closure and it is what makes the common flow one call rather than two: the
-     * caches DELETE on github names {@code ActionsDeleteActionsCacheByKeyQueries}, the included-record parameter
-     * whose fields are the call's named arguments, and no signature line spells those out.
-     */
     private static Result<DiscoverResult> signature(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Entry entry, Options options, List<DiscoverResult.Documented.Entry> documented, String note) {
@@ -1207,13 +1086,6 @@ public final class Containers {
                 loaded.warning(), mergeNotes(note, pathNote(container, selectors))));
     }
 
-    /**
-     * A selection in more than one call form — resources beside named methods ({@code ballerina/http}'s and
-     * {@code ballerinax/sap}'s {@code Client}), or remote methods beside normal ones — split by form, because a
-     * flat list of names loses whether each is called with {@code ->} or {@code .}. The three sections are one
-     * sequence — resources, then remote, then normal — paged {@value #MAX_ENTRIES} at a time like every other flat
-     * listing, so a page can end partway through one section and start the next.
-     */
     private static Result<DiscoverResult> mixedAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
@@ -1242,7 +1114,6 @@ public final class Containers {
                 mergeNotes(note, pathNote(container, selectors))));
     }
 
-    /** Each method of one call form, alphabetical, with the command that opens its signature. */
     private static List<DiscoverResult.Method> methodsOf(List<Entry> entries, Class<? extends Fn> form, String base) {
         return entries.stream()
                 .filter(entry -> form.isInstance(entry.fn()))
@@ -1256,10 +1127,6 @@ public final class Containers {
     // Remote / normal methods — flat under the ceiling, paginated over it
     // -----------------------------------------------------------------------
 
-    /**
-     * Remote or normal methods, paged over the ceiling. Every page is turned on the same selectors and filter, so
-     * paging never widens back out to the whole container.
-     */
     private static Result<DiscoverResult> methodAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
@@ -1282,14 +1149,6 @@ public final class Containers {
     // Resource paths — flat under the ceiling, grouped by segment over it
     // -----------------------------------------------------------------------
 
-    /**
-     * Resource paths: flat under the ceiling, grouped by their next literal segment over it.
-     *
-     * <p>Only a selection anchored at a path GROUPS, and it groups the SELECTED operations, never the whole tree
-     * under the node — an accessor narrows the counts and rides along into every group's {@code command}. A
-     * selection that is not a path (a name substring such as {@code action}, or a {@code --filter}) has no prefix a
-     * group name could extend without inventing one, so it pages flat instead, every entry carrying its own command.
-     */
     private static Result<DiscoverResult> resourceAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
@@ -1328,10 +1187,6 @@ public final class Containers {
                 documentedOn(window, documented, merged.size()), warning, combinedNote));
     }
 
-    /**
-     * The groups at one level, and the paths that end there, as one paged sequence: the paths first, since no
-     * group name reaches them, then the groups, busiest first.
-     */
     private static Result<DiscoverResult> groupedAnswer(
             Surface.Container container, List<String> selectors, PathTree node, List<String> prefix, String base,
             String command, int requested, String warning, String note) {
@@ -1362,12 +1217,8 @@ public final class Containers {
                 total, window.paging(), window.next(command), warning, note));
     }
 
-    /**
-     * A group's own selector: its path, plus the accessor the listing was narrowed by. Checked against the
-     * selection it would actually make, because a path that itself declares that accessor reads as one
-     * operation's signature rather than as a filter over the group — and a call that answers with one of the
-     * group's {@code count} operations is a call that silently loses the rest. Such a group is opened unnarrowed.
-     */
+    // A path that itself declares the accessor would answer with one signature and silently drop the rest of
+    // the group, so such a group is opened unnarrowed.
     private static String groupArguments(Surface.Container container, String name, String accessor, int count) {
         if (accessor != null && select(container, List.of(name, accessor)).size() == count) {
             return " " + shellWord(name) + " " + accessor;
@@ -1375,7 +1226,6 @@ public final class Containers {
         return " " + shellWord(name);
     }
 
-    /** One entry per resource PATH, not one per accessor — several accessors on one path share one row. */
     private static List<DiscoverResult.ResourceList.Resource> mergedResources(List<Entry> entries, String base) {
         Map<String, List<String>> accessorsByPath = new LinkedHashMap<>();
         for (Entry entry : entries) {
@@ -1399,7 +1249,6 @@ public final class Containers {
                 .toList();
     }
 
-    /** The node at exactly {@code path}, walked segment by segment through a tree of the selected operations. */
     private static Optional<PathTree> descend(PathTree root, List<String> path) {
         PathTree node = root;
         for (String segment : path) {
@@ -1418,16 +1267,8 @@ public final class Containers {
         return (int) path.stream().filter(segment -> !segment.startsWith(":")).count();
     }
 
-    /**
-     * The next literal children into {@code into}, keyed by their FULL path — through any purely-parameter level
-     * in between, since a parameter carries no naming choice and is not a grouping boundary, but spelled out in
-     * the key: {@code repos/branches} alone also names {@code repos/:owner/:repo/rules/branches}, so a group
-     * named by its literal segments only would be an ambiguous address. The operations that terminate
-     * transparently through {@code node} and every parameter level walked go into {@code terminal} — a parameter
-     * node can carry its own terminal operations AND further literal children at once (github's
-     * {@code repos/:owner/:repo} declares get/update/delete of the repo itself alongside 63 literal children like
-     * {@code issues}), and both have to survive the same walk.
-     */
+    // Keyed by FULL path: literal segments alone are ambiguous (repos/branches), and a parameter node can carry
+    // terminal operations and literal children at once.
     private static void collectNextLiteralChildren(
             PathTree node, List<String> path, List<PathTree.Operation> terminal, Map<List<String>, PathTree> into) {
         terminal.addAll(node.operations());
@@ -1442,21 +1283,11 @@ public final class Containers {
         }
     }
 
-    /** A path as it is printed and typed back: keyword segments escaped, the root spelled {@code .}. */
     private static String pathName(List<String> segments) {
         return segments.isEmpty() ? "." : escapeKeywordSegments(String.join("/", segments));
     }
 
-    /**
-     * A path, with every segment that collides with a Ballerina keyword quoted — the same keyword set and the
-     * same per-segment rule {@link ModuleRef#importPath()} applies to a module path, here applied to a resource
-     * path instead.
-     *
-     * <p>{@link PathTree#readableSegment} already strips this apostrophe on the way IN, for the tree's own
-     * prose/matching register — so by the time a path reaches this class, {@code gists/'public} has already
-     * become {@code gists/public} and the collision has to be re-derived from the keyword set rather than
-     * recovered from what Central published.
-     */
+    // PathTree strips the apostrophe on the way in, so the collision is re-derived from the keyword set.
     private static String escapeKeywordSegments(String path) {
         return Arrays.stream(path.split("/", -1))
                 .map(segment -> ModuleRef.isKeyword(segment) ? "'" + segment : segment)
@@ -1467,14 +1298,6 @@ public final class Containers {
     // Shared
     // -----------------------------------------------------------------------
 
-    /**
-     * The path a selection was anchored at, when the selection came from a path at all — in the tree's own
-     * spelling.
-     *
-     * <p>A pointer offers the CANONICAL form, not the one the caller happened to type: {@code repos/owner/repo},
-     * {@code repos/:owner/:repo} and {@code repos/[string owner]/[string repo]} all address one path, and a
-     * command echoing the typed spelling teaches the reader whichever variant they arrived with.
-     */
     private static Optional<List<String>> resolvedPath(Surface.Container container, List<String> selectors) {
         if (selectByPath(container, selectors).isEmpty()) {
             return Optional.empty();
@@ -1485,10 +1308,6 @@ public final class Containers {
                 .map(resolution -> ((PathTree.Resolution.Found) resolution).path());
     }
 
-    /**
-     * The selector, as every follow-up command re-types it: a path selection canonically (path, then accessor), and
-     * anything else exactly as given, one shell word per argument — never joined into a path it was not.
-     */
     private static String selectorArguments(Surface.Container container, List<String> selectors) {
         if (selectors.isEmpty()) {
             return "";
@@ -1501,13 +1320,11 @@ public final class Containers {
         return " " + shellWord(pathName(path.get())) + (accessor == null ? "" : " " + accessor);
     }
 
-    /** The command that opens {@code container}; every command printed for one of its entries extends it. */
     private static String baseCommand(LoadedPackage loaded, Surface.Scope scope, Surface.Container container) {
         return "bal discover " + loaded.pkgArgument() + " " + scope.verb()
                 + (container.isModule() ? "" : " " + container.name());
     }
 
-    /** {@code selectors} with the one that names {@code entry}'s method or function spelled as it is declared. */
     private static List<String> spelled(Entry entry, List<String> selectors) {
         if (!(entry.fn() instanceof Fn.Standalone named)) {
             return selectors;
@@ -1516,10 +1333,6 @@ public final class Containers {
         return selectors.stream().map(word -> Names.normalise(word).equals(wanted) ? named.name() : word).toList();
     }
 
-    /**
-     * Documentation-only matches as the listings show the same entries — one row per resource path with its
-     * accessors, one per method — and in the listings' alphabetical order.
-     */
     private static List<DiscoverResult.Documented.Entry> documentedRows(List<Entry> entries, String base) {
         List<DiscoverResult.Documented.Entry> rows = new ArrayList<>(mergedResources(
                 entries.stream().filter(entry -> entry.fn() instanceof Fn.Resource).toList(), base));

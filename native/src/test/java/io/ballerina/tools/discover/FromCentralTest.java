@@ -49,11 +49,6 @@ public class FromCentralTest {
         return parsed.value();
     }
 
-    /**
-     * A recorded payload rearranged into several modules, so "the requested one" and "the first one" are different
-     * answers. {@code kafka} is the donor because it is small and its module carries every array the schema
-     * requires.
-     */
     private static CentralDocs multiModule(List<String> ids, String org) {
         JsonObject raw = FixtureCorpus.loadRawFixture("ballerinax__kafka").getAsJsonObject();
         JsonElement template = raw.getAsJsonObject("docsData").getAsJsonArray("modules").get(0);

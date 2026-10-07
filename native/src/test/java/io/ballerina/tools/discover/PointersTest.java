@@ -71,7 +71,6 @@ public class PointersTest {
         return FixtureCorpus.fixtureRows();
     }
 
-    /** Central, replayed: the versions endpoint then the docs endpoint. */
     private static HttpOptions centralFor(String slug) {
         String docs = FixtureCorpus.loadRawFixture(slug).toString();
         HttpTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
@@ -86,13 +85,6 @@ public class PointersTest {
                 .build();
     }
 
-    /**
-     * Every answer a fixture's buckets give, from every shape a bucket query can produce, plus every shape
-     * {@code readme} can answer with.
-     *
-     * <p>Deliberately the same breadth {@code RegisterTest} uses: a pointer printed only by the roster of a
-     * package with 91 classes is exactly the one nobody checks by hand.
-     */
     private static List<DiscoverResult> answersOf(LoadedPackage context) {
         List<DiscoverResult> answers = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
@@ -135,7 +127,6 @@ public class PointersTest {
                 run(slug, centralFor(slug), each.command()).get("name").getAsString(), each.name()));
     }
 
-    /** The type roster, a filtered one, and a leaf for the first two declarations of every kind. */
     private static List<DiscoverResult> typeAnswers(LoadedPackage context) {
         List<DiscoverResult> answers = new ArrayList<>();
         DiscoverResult roster = expect(Types.render(context, new Types.Options(List.of(), null, 1)));
@@ -156,10 +147,6 @@ public class PointersTest {
         return commands;
     }
 
-    /**
-     * The selections a caller narrows with, beyond naming a container: a name substring (which must never be
-     * re-typed as a path) and a top-level path with an accessor (which must ride along into every group).
-     */
     private static List<List<String>> narrowingSelectors(Surface.Container container) {
         List<List<String>> selectors = new ArrayList<>();
         container.memberNames().stream().findFirst().filter(name -> name.length() > 3)
@@ -238,10 +225,6 @@ public class PointersTest {
         return commands;
     }
 
-    /**
-     * Another module's declaration, which this fixture cannot serve: a sibling submodule's page is a separate
-     * Central document the replayed transport does not hold, just as another package's is.
-     */
     private static void addForeign(List<String> commands, List<DiscoverResult.Foreign> foreign) {
         foreign.stream().map(DiscoverResult.Foreign::command)
                 .filter(command -> command != null && !command.contains(" --module "))
@@ -397,10 +380,6 @@ public class PointersTest {
         };
     }
 
-    /**
-     * Whether a printed command can be run against this fixture — asserting the shape of the two kinds that
-     * cannot, so an exclusion cannot become a hiding place.
-     */
     private static boolean runnable(String slug, String pkg, String text) {
         if (text.contains("<") || text.contains(">")) {
             // A template is the grammar rather than an argument, so it has to LOOK like one: every angle-bracket
@@ -418,7 +397,6 @@ public class PointersTest {
         return true;
     }
 
-    /** Runs one printed command, requiring an answer that is not "nothing matched". */
     private static JsonObject run(String slug, HttpOptions http, String text) {
         StringBuilder out = new StringBuilder();
         StringBuilder err = new StringBuilder();
@@ -433,7 +411,6 @@ public class PointersTest {
         return answer;
     }
 
-    /** Runs one printed command and returns every command its own answer prints. */
     private static List<String> followed(String slug, HttpOptions http, String text) {
         JsonObject answer = run(slug, http, text);
         List<String> printed = new ArrayList<>();
@@ -463,7 +440,6 @@ public class PointersTest {
         }
     }
 
-    /** Split a printed command into argv, honouring the single quotes a path selector needs. */
     private static List<String> argv(String command) {
         List<String> tokens = new ArrayList<>();
         Matcher token = Pattern.compile("'([^']*)'|\"([^\"]*)\"|(\\S+)").matcher(command);

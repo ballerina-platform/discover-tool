@@ -68,7 +68,6 @@ public final class Versions {
         return new Parts(numbers, dash == -1 ? "" : value.substring(dash + 1));
     }
 
-    /** A non-numeric piece counts as 0, which is what {@code parseInt(...) || 0} does in the source. */
     private static int parseOrZero(String piece) {
         try {
             return Integer.parseInt(piece);

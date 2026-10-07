@@ -92,7 +92,6 @@ public class SourceInclusionsTest {
         return FixtureCorpus.recordedSources("ballerina__http").orElseThrow();
     }
 
-    /** A bala as Central serves it: the module's sources under {@code modules/<id>/}, beside files never read. */
     private static byte[] bala(Map<String, String> sources) {
         try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
                 ZipOutputStream zip = new ZipOutputStream(bytes)) {

@@ -60,7 +60,6 @@ public class RegisterTest {
      */
     private record Answer(String label, DiscoverResult result) { }
 
-    /** Every answer one fixture's buckets give: bare, filtered, per container, and a selector that misses. */
     private static List<Answer> answers(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         List<Answer> answers = new ArrayList<>();
@@ -114,7 +113,7 @@ public class RegisterTest {
         return answers;
     }
 
-    /** A member named bare can be ambiguous across buckets in ways this walk does not control. */
+    // A member named bare can be ambiguous across buckets in ways this walk does not control.
     private static void addIfOk(List<Answer> answers, String label, Result<DiscoverResult> view) {
         if (view.isOk()) {
             answers.add(new Answer(label, view.value()));
@@ -284,10 +283,6 @@ public class RegisterTest {
         }
     }
 
-    /**
-     * A resource row whose quoted path the footer's shape cannot spell prints its command once with the accessor
-     * left as a slot — lossless, because the same row lists every accessor that fills it.
-     */
     private static boolean accessorSlotOnItsRow(String text, String path, String command) {
         String slotted = command.substring(0, command.lastIndexOf(' ')) + " <accessor>";
         return text.lines().anyMatch(line -> isRowFor(line, path) && line.endsWith(slotted));
@@ -351,7 +346,6 @@ public class RegisterTest {
         return entries;
     }
 
-    /** Each row's own name and the command the JSON rendering gives it. */
     private static List<String[]> rowCommandsOf(DiscoverResult result) {
         List<String[]> commands = new ArrayList<>();
         switch (result) {
@@ -381,7 +375,6 @@ public class RegisterTest {
         return commands;
     }
 
-    /** One row per accessor, named by its path and that accessor, with the row's path as the line it sits on. */
     private static void addResourceCommands(List<String[]> commands, DiscoverResult.ResourceList.Resource resource) {
         resource.commands().forEach((accessor, command) ->
                 commands.add(new String[] {resource.path() + " " + accessor, command, resource.path()}));

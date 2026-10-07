@@ -134,7 +134,6 @@ public class DiscoverTool implements BLauncherCmd {
         }
     }
 
-    /** A defect in this tool, still reported as the one JSON object on stderr the contract promises. */
     private static String internalFailure(Throwable cause) {
         String message = cause.getMessage();
         JsonObject json = new JsonObject();
@@ -145,18 +144,6 @@ public class DiscoverTool implements BLauncherCmd {
         return json.toString();
     }
 
-    /**
-     * The first candidate location that actually works.
-     *
-     * <p>{@link CacheLocation#candidates} is pure and cannot tell whether a directory is writable, so trying
-     * them is this class's job — it is already the only one allowed to touch a filesystem the caller did not
-     * name. The case this exists for is a container whose {@code $HOME} exists and is read-only, which is a shape
-     * a runner genuinely has: without the retry, the default rung would be chosen, fail, and silently disable
-     * caching rather than reaching a temp directory.
-     *
-     * <p>If every candidate fails, the null store is the answer. Never a failure: cache trouble is not the
-     * caller's problem.
-     */
     private static DocsCache buildCache() {
         CacheLocation.Environment environment = new CacheLocation.Environment(
                 System.getenv(),
@@ -185,23 +172,12 @@ public class DiscoverTool implements BLauncherCmd {
                 : DocsCache.NULL;
     }
 
-    /** A system property that a stripped container can genuinely be missing. */
     private static String property(String name) {
         String value = System.getProperty(name);
         return value == null ? "" : value;
     }
 
-    /**
-     * The Ballerina project this process is standing in, or {@code null}.
-     *
-     * <p>The whole of what replaced {@code --project-dir}. It is HERE rather than in {@link Cli} because reading
-     * the process's own directory is reading the environment, and this class is the only one allowed to — which is
-     * what keeps every test in the suite hermetic and what lets {@link Cli#run} be driven against a temporary tree.
-     *
-     * <p>A project is found by walking up for a {@code Ballerina.toml}, which is what a build does. The version
-     * beside each package in the sibling {@code Dependencies.toml} is then the version the component will actually
-     * compile against, so a lookup and a build cannot disagree — and no caller had to know to ask for that.
-     */
+    // Here rather than in Cli: this class alone reads the environment, which keeps Cli and its tests hermetic.
     private static String discoverProject() {
         String cwd = property("user.dir");
         if (cwd.isEmpty()) {

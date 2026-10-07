@@ -100,13 +100,6 @@ public final class TypeDefs {
         };
     }
 
-    /**
-     * A record, in the form that says whether it accepts fields it does not declare.
-     *
-     * <p>{@code record {| |}} is closed and {@code record { }} is open, and the difference decides whether
-     * a value carrying an extra field type-checks. Central publishes it as {@code isClosed} and the reader
-     * used to drop it, so 418 closed records across the corpus read as open.
-     */
     private static String renderRecord(TypeDef.Rec typeDef) {
         String open = typeDef.isClosed() ? " record {|" : " record {";
         String close = typeDef.isClosed() ? "|};" : "};";
@@ -125,13 +118,6 @@ public final class TypeDefs {
         return Signatures.renderDescription(typeDef.description()) + String.join("\n", lines);
     }
 
-    /**
-     * One record member, in the form it is written.
-     *
-     * <p>{@code readonly} sits inside the type and {@code @deprecated} sits above the member, which is
-     * where Ballerina puts each of them: the first is part of what the field IS, the second is a note about
-     * using it.
-     */
     private static String renderRecordField(RecordField field, Owner owner) {
         List<Signatures.ExternalLink> links = Signatures.collectExternalLinks(field.type());
         String typeName = Signatures.applyPrefixToTypeName(field.type().name(), links);
@@ -158,19 +144,6 @@ public final class TypeDefs {
         };
     }
 
-    /**
-     * A class, an object type, a service type or a listener, with everything it declares.
-     *
-     * <p>Two forms, and the difference is not cosmetic: {@code class X { }} is instantiable and
-     * {@code type X object { };} is a contract that is not, so printing every object type as a class told a
-     * caller to {@code new} an abstract type — for {@code sql:Client}, the front door of every Ballerina
-     * database connector.
-     *
-     * <p>The qualifiers are ordered as the language's own libraries write them:
-     * {@code public distinct readonly isolated client class X}, with {@code public} outermost on a class and
-     * before the NAME on an object type ({@code public type X distinct isolated client object { }}) — which is
-     * where the language puts it, and where compiling both forms confirmed it belongs.
-     */
     private static String renderObject(TypeDef.ObjectDef typeDef) {
         boolean isClass = typeDef.form() == TypeDef.ObjectDef.Form.CLASS;
         StringBuilder quals = new StringBuilder();
@@ -228,13 +201,6 @@ public final class TypeDefs {
         return lines;
     }
 
-    /**
-     * An enum, with a doc comment on each member that has one.
-     *
-     * <p>13 of the corpus's 65 members are described and all 65 printed as bare names. It is the only part of a
-     * member Central publishes beyond the name — no member anywhere in the payload carries its VALUE — so where a
-     * description exists it is the whole of what distinguishes one member from another.
-     */
     private static String renderEnum(TypeDef.Enumeration typeDef) {
         List<String> members = new ArrayList<>();
         for (TypeDef.Enumeration.Member member : typeDef.members()) {
@@ -248,13 +214,8 @@ public final class TypeDefs {
                 + PUBLIC + "enum " + typeDef.name() + " {\n" + String.join(",\n", members) + "\n}";
     }
 
-    /**
-     * A type alias, in the one form all seventeen of Central's alias categories share.
-     *
-     * <p>{@code // Unknown type:} survives for the case where the descriptor could not be encoded, because
-     * the alternatives are both worse: dropping the declaration hides that the name exists, and emitting
-     * {@code type X ;} is a syntax error.
-     */
+    // `// Unknown type:` when the descriptor could not be encoded: dropping hides the name, `type X ;` does not
+    // parse.
     private static String renderAlias(TypeDef.Alias typeDef) {
         String description = Signatures.renderDescription(typeDef.description());
         if (typeDef.type().name().isEmpty()) {
@@ -273,16 +234,7 @@ public final class TypeDefs {
      * printing a guess: it used to come out as {@code const record {} EXECUTION_FAILED = -3;}, which does
      * not compile and typed an integer as a record. The inferred form is what the source says.
      */
-    /**
-     * A module-level {@code public final} variable, WITH its initialiser.
-     *
-     * <p>The initialiser is not optional here the way a record field's default is: {@code public final T X;} is
-     * {@code uninitialized variable 'X'}, checked by compiling it. And Central's value is the real one, also
-     * checked — all 64 of these in the corpus are written {@code = {}} in their published sources, with zero
-     * exceptions, so the empty mapping is the package's own initialiser and not a placeholder standing in for
-     * one. That makes the rendered line byte-identical to the source rather than a guess that happens to
-     * compile.
-     */
+    // The initialiser is required (`public final T X;` does not compile); Central's value is the source's own.
     private static String renderVariable(TypeDef.Variable typeDef) {
         List<Signatures.ExternalLink> links = Signatures.collectExternalLinks(typeDef.varType());
         String type = Signatures.applyPrefixToTypeName(typeDef.varType().name(), links);
@@ -300,27 +252,6 @@ public final class TypeDefs {
                 + PUBLIC + "const " + declared + typeDef.name() + " = " + value + ";";
     }
 
-    /**
-     * An error declaration, as the combinations of the facts Central publishes about it:
-     *
-     * <pre>
-     *   distinct + supertype      type SslError distinct ClientError;
-     *   distinct + detail record  type FHIRServerError distinct error&lt;FHIRServerErrorDetails&gt;;
-     *   distinct only             type Error distinct error;
-     *   base only                 type X A|B|C;
-     *   neither                   type X error;
-     * </pre>
-     *
-     * <p>Every one of {@code ballerina/http}'s 56 errors used to render as the last line, which made the
-     * subtype hierarchy — and therefore {@code e is http:ClientRequestError} — unlearnable from the
-     * document. The absent-base default is {@code error} rather than nothing because an error at the top
-     * of its own hierarchy narrows the language's {@code error}, and that is what its declaration says.
-     *
-     * <p>The second line is the later fix. A detail record is not a supertype, so printing it bare said
-     * {@code distinct FHIRServerErrorDetails} — a declaration naming a record where an error type has to
-     * be, which does not compile and cannot be {@code is}-tested. {@code error<...>} is the wrapper the
-     * language requires and the wrapper the published source carries.
-     */
     private static String renderError(TypeDef.ErrorDef typeDef) {
         TypeRef baseRef = typeDef.base().orElse(null);
         List<Signatures.ExternalLink> links = Signatures.collectExternalLinks(baseRef);

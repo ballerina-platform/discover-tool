@@ -205,7 +205,6 @@ public class ViewsTest {
         Assert.assertTrue(checked > 0, slug + ": no listing was checked");
     }
 
-    /** One answer, and any listing nested inside it. Returns how many listings were checked. */
     private static int assertInsideTheCeiling(String label, DiscoverResult answer) {
         record Window(int listed, int shown, int total, String next) { }
         Window window = switch (answer) {
@@ -244,7 +243,6 @@ public class ViewsTest {
         return nested + 1;
     }
 
-    /** Entries on the pages before this one, so a later page's {@code shown < total} is read against what is left. */
     private static int pagesBefore(DiscoverResult.Paging paging, int total, int shown) {
         return paging == null ? 0 : total - shown - paging.remaining();
     }
@@ -495,7 +493,6 @@ public class ViewsTest {
         Assert.assertFalse(github.contains("function init("), github);
     }
 
-    /** Does this container hold anything genuinely named {@code new} — a member, or a path segment? */
     private static boolean declaresNew(Surface.Container container) {
         return container.memberNames().stream().anyMatch(name -> name.equalsIgnoreCase("new"))
                 || container.operations().stream()
@@ -637,7 +634,6 @@ public class ViewsTest {
         Assert.assertEquals(clientAnswer(github, "repos/:owner/:repo"), bare);
     }
 
-    /** The {@code note} field of a resource-shaped answer. */
     private static String clientNote(LoadedPackage loaded, String path) {
         return switch (clientAnswer(loaded, path)) {
             case DiscoverResult.ResourceList resources -> resources.note();
@@ -650,7 +646,6 @@ public class ViewsTest {
         return render(loaded, Surface.Scope.CLIENT, List.of("Client", path));
     }
 
-    /** An answer's resource paths, for a test that does not care which listing shape it landed on. */
     private static List<String> resourcePaths(DiscoverResult answer) {
         return switch (answer) {
             case DiscoverResult.ResourceList resources ->

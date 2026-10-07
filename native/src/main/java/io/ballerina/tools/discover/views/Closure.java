@@ -211,7 +211,6 @@ public final class Closure {
         return names;
     }
 
-    /** Every same-package declaration one declaration mentions. */
     private static List<String> localReferences(TypeDef typeDef, Declarations index) {
         if (typeDef == null) {
             return List.of();
@@ -262,13 +261,6 @@ public final class Closure {
         return List.copyOf(types);
     }
 
-    /**
-     * The same-package declarations an expression names.
-     *
-     * <p>A token preceded by {@code :} is another module's, and a token followed by {@code :} is the module alias
-     * itself, so neither is local. Everything else is looked up by the caller, so builtins ({@code string},
-     * {@code map}, {@code anydata}) fall out for free by not being declarations.
-     */
     private static List<String> localTokens(String expression) {
         List<String> local = new ArrayList<>();
         Matcher matcher = IDENTIFIER.matcher(expression);

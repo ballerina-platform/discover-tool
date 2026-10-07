@@ -42,11 +42,8 @@ public class JdkHttpTransportTest {
 
     private static final int LIMIT = 1024;
 
-    /**
-     * {@code bytes} of body under {@code status} and a declared length ({@code 0} for chunked). A declared length
-     * past {@code bytes} holds the response open until the download returns, so a client that waited on the
-     * declared body would run into the deadline.
-     */
+    // A declared length past `bytes` holds the response open, so a client waiting on the full body hits the
+    // deadline.
     private static Optional<InputStream> download(int status, long declaredLength, int bytes, long timeoutMs)
             throws IOException {
         CountDownLatch released = new CountDownLatch(1);

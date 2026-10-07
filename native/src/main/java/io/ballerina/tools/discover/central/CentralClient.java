@@ -98,10 +98,6 @@ public final class CentralClient {
     // The retry loop
     // -----------------------------------------------------------------------
 
-    /**
-     * Statuses worth trying again. A 404 is an answer — the package is not there — and retrying it only spends
-     * the caller's budget.
-     */
     private static boolean isRetryableStatus(int status) {
         return status == 429 || status == 502 || status == 503 || status == 504;
     }
@@ -258,11 +254,6 @@ public final class CentralClient {
         return Result.err(notAPackage(qualified, null, options));
     }
 
-    /**
-     * The packages a dotted coordinate could be a module of, longest first.
-     *
-     * <p>Empty for an undotted name, which is every ordinary package — so the common path adds no work.
-     */
     private static List<QualifiedName> containingPackages(QualifiedName qualified) {
         List<QualifiedName> parents = new ArrayList<>();
         String name = qualified.name();
@@ -275,16 +266,6 @@ public final class CentralClient {
         return parents;
     }
 
-    /**
-     * A dotted name the registry has no package for, explained by the package it is a module of when there is
-     * one.
-     *
-     * <p>{@code a.b.c} can be a module of {@code a.b} or of {@code a}, so each prefix is asked in turn, and the
-     * first that exists is asked which modules it publishes — so the {@code --module} command is offered only
-     * for a module that is really there. A prefix the registry cannot answer for at all ends the probe with the
-     * plain failure: claiming nothing contains the module, when one of the packages that might was never
-     * actually checked, would send the caller to fix a spelling that may be right.
-     */
     private static Failure notAPackage(QualifiedName qualified, String pin, HttpOptions options) {
         List<QualifiedName> parents = containingPackages(qualified);
         for (QualifiedName parent : parents) {
@@ -307,11 +288,6 @@ public final class CentralClient {
                         + "`bal search <keyword>` lists what Central publishes.");
     }
 
-    /**
-     * The failure for a dotted name whose prefix is a package, worded by what that version's registry row says:
-     * the module is listed, it is not, or the row could not be read. Fetched through {@link #fetchJson}'s retries
-     * but not cached: it is asked only on this failure path, and the command it leads to never needs it again.
-     */
     private static Failure moduleOf(
             QualifiedName qualified, QualifiedName parent, Version version, String pin, HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
@@ -338,14 +314,7 @@ public final class CentralClient {
         return new Failure.PackageNotFound(qualified.qualified(), suggestion);
     }
 
-    /**
-     * The latest published version of one package.
-     *
-     * <p>{@code registry/packages/<org>/<name>} answers with just this package's versions, newest first. The
-     * alternative — listing the org and filtering client-side — costs about 45 seconds for {@code ballerinax},
-     * which has roughly a thousand packages, and that cost lands on every lookup an agent makes without an
-     * explicit version.
-     */
+    // Asks for this package's row: listing the whole org (ballerinax) and filtering costs about 45 seconds.
     private static Result<ResolvedVersion> resolvePublishedVersion(QualifiedName qualified, HttpOptions options) {
         DocsCache cache = options.cache();
         DocsCache.PackageKey key = new DocsCache.PackageKey(REPOSITORY_ID, qualified.org(), qualified.name());
@@ -398,14 +367,6 @@ public final class CentralClient {
         return Result.ok(new ResolvedVersion(parsed.value(), false));
     }
 
-    /**
-     * The best version answer available with the registry unreachable: an expired {@code latest} entry first,
-     * then the newest docs payload already on disk.
-     *
-     * <p>Without this, a warm cached payload plus one registry blip is a hard failure that can burn the
-     * client's full budget — four times over in a four-invocation episode. The {@code stale} flag is how the
-     * caller learns to say so on the provenance line rather than claiming a version it did not verify.
-     */
     private static Version offlineVersion(DocsCache cache, DocsCache.PackageKey key, HttpOptions options) {
         DocsCache.LatestEntry expired = cache.readLatest(key);
         if (expired != null) {
@@ -424,12 +385,6 @@ public final class CentralClient {
         return null;
     }
 
-    /**
-     * The registry had no row for this name.
-     *
-     * <p>A dotted name gets its own, more specific advice from {@link #notAPackage} whenever the registry can
-     * say which package, if any, the name is a module of.
-     */
     private static Failure notFound(QualifiedName qualified) {
         return new Failure.PackageNotFound(
                 qualified.qualified(),
@@ -577,15 +532,6 @@ public final class CentralClient {
                 + pinArgument(pin) + "` to list the submodules it does publish.");
     }
 
-    /**
-     * The docs endpoint answered 404: the org/name may well exist, this VERSION does not.
-     *
-     * <p>T10, closed in the failure rather than in the grammar. Which half the caller can act on depends on who
-     * chose the version — and since the redesign, NEITHER answer is "omit the version", because there is no
-     * version argument to omit. A version this reader resolved is its own problem to explain; a version a
-     * {@code Dependencies.toml} locked is a real skew between the project and Central, so the failure NAMES what
-     * Central publishes instead of telling the caller to go and look, which no verb would have let them do.
-     */
     private static String missingVersion(
             QualifiedName qualified, Version version, boolean supplied, HttpOptions options) {
         if (!supplied) {
@@ -603,12 +549,6 @@ public final class CentralClient {
 
     private static final int LISTED_VERSIONS = 10;
 
-    /**
-     * The versions Central lists, as a sentence, or {@code null} when the registry cannot say.
-     *
-     * <p>Best-effort by design: this runs on a path that has ALREADY failed, so a second failure must degrade the
-     * message rather than replace the failure the caller actually hit.
-     */
     private static String publishedVersions(QualifiedName qualified, HttpOptions options) {
         String url = REGISTRY_PACKAGES_URL + encode(qualified.org())
                 + "/" + encode(qualified.name());

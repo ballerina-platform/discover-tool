@@ -157,12 +157,7 @@ public final class Signatures {
                 .collect(Collectors.joining("\n")) + "\n";
     }
 
-    /**
-     * Every foreign name a signature mentions, params before return.
-     *
-     * <p>Not deduplicated: {@link #applyPrefixToTypeName} is idempotent by its own "preceded by a colon" guard, so
-     * a repeated link qualifies a name once.
-     */
+    // Not deduplicated: applyPrefixToTypeName is idempotent, so a repeated link qualifies a name once.
     private static List<ExternalLink> collectSignatureLinks(List<Param> params, TypeRef returns) {
         List<ExternalLink> links = new ArrayList<>();
         for (Param param : params) {
@@ -172,12 +167,6 @@ public final class Signatures {
         return List.copyOf(links);
     }
 
-    /**
-     * One parameter, in the form it is written: {@code T p}, {@code *T p} or {@code T... p}.
-     *
-     * <p>Neither of the two special forms takes a default. An inclusion's fields carry their own and
-     * {@code *T x = {}} is not a form the language has; a rest parameter's default is "none passed".
-     */
     private static String renderParam(Param param) {
         String type = paramType(param);
         String name = Identifiers.write(param.name());
@@ -202,27 +191,12 @@ public final class Signatures {
                 : null;
     }
 
-    /**
-     * The {@code returns} clause, or nothing at all.
-     *
-     * <p>A callable Central publishes no return parameter for returns nothing, and a Ballerina function that
-     * returns nothing has no clause. Twelve of http's declarations used to end in {@code returns nil}, which
-     * names a type the compiler does not have, and three of those are constructors — where the wrong clause
-     * also erased the one fact a caller needs from it, whether {@code new} can fail.
-     */
     private static String renderReturns(ReturnDef returns, List<ExternalLink> links) {
         return returns.hasType()
                 ? " returns " + applyPrefixToTypeName(returns.type().name(), links)
                 : "";
     }
 
-    /**
-     * The clause that says a printed default is not one the caller can write.
-     *
-     * <p>The expression stays on the line because dropping it would make a defaultable parameter read as
-     * required, which is a worse claim than an unwritable default. Naming it and saying so leaves the caller
-     * with the one move that works: omit the argument, or pass the ones after it by name.
-     */
     private static String unwritableClause(List<String> expressions) {
         String names = String.join(", ", expressions);
         return expressions.size() == 1
@@ -232,7 +206,6 @@ public final class Signatures {
                         + "than repeating them";
     }
 
-    /** Every unwritable default in a parameter list, in the order the parameters are declared. */
     private static List<String> unwritableDefaults(List<Param> params) {
         return params.stream()
                 .filter(Param::unwritableDefault)
@@ -254,13 +227,6 @@ public final class Signatures {
         return indent + "# " + String.join("\n" + indent + "# ", description.split("\n", -1)) + "\n";
     }
 
-    /**
-     * A {@code # + name - description} doc row, continued as bare {@code #} lines.
-     *
-     * <p>Ballerina's own convention continues a {@code +} row without repeating the marker, so a
-     * description that spans lines becomes one row and then plain comment lines. The alternative —
-     * repeating {@code # + name -} per line — would claim the parameter is documented twice.
-     */
     private static void addDocRow(List<String> lines, String indent, String label, String description) {
         String[] parts = description.split("\n", -1);
         lines.add(indent + "# + " + label + " - " + parts[0]);
@@ -269,16 +235,6 @@ public final class Signatures {
         }
     }
 
-    /**
-     * A callable's whole doc comment: its own description, then a {@code # +} row per documented parameter and
-     * one for the return.
-     *
-     * <p>Central publishes 2,755 parameter and 1,532 return descriptions across the nine fixtures and the reader
-     * rendered them for module-level functions only, so the same fact appeared in one section of a document and
-     * not in another. Little of it is prose — 282 distinct parameter descriptions cover all 2,755 uses, and
-     * {@code ballerinax/github} has 1,168 drawn from five strings — but which parameter carries which is exactly
-     * what a caller cannot infer, and the source states it on every one.
-     */
     private static String renderCallableDocs(Fn fn, String indent, Detail detail) {
         String description = renderDocComment(fn.description(), indent);
         if (detail == Detail.SIGNATURE) {
@@ -296,29 +252,10 @@ public final class Signatures {
         return rows.isEmpty() ? description : description + String.join("\n", rows) + "\n";
     }
 
-    /**
-     * The qualifiers that precede {@code function}, in the order the language writes them.
-     *
-     * <p>{@code isolated} sits between visibility and {@code remote}/{@code resource} — {@code isolated remote
-     * function}, {@code public isolated function} — verified by compiling each form rather than recalled.
-     * Central sets {@code isIsolated} on 1,615 of the corpus's 1,617 methods and the reader emitted it on none,
-     * which is invisible until a service contract has to be matched exactly: {@code graphql:Interceptor.execute}
-     * is declared {@code isolated remote function}, and the compiler's {@code mismatched function signatures}
-     * message prints an expected and a found signature that are textually identical because it omits the
-     * qualifier from both.
-     */
     private static String isolatedQualifier(Fn fn) {
         return fn.isIsolated() ? "isolated " : "";
     }
 
-    /**
-     * A resource function's path, as the caller types it.
-     *
-     * <p>Path parameters keep the {@code [string owner]} spelling rather than a display form like
-     * {@code {owner}}, because this string is a declaration and that is what goes in the source.
-     * {@code ops} prints the display form in its Markdown prose and this form inside its fenced blocks,
-     * which is the whole reason the two registers are separate.
-     */
     private static String renderResourcePath(Fn.Resource fn) {
         return fn.paths().stream()
                 .map(segment -> switch (segment) {

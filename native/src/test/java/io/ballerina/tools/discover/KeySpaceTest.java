@@ -139,7 +139,6 @@ public class KeySpaceTest {
         return findField(payload, false);
     }
 
-    /** The first record field that is, or is not, a rest field. */
     private static JsonObject findField(JsonObject payload, boolean rest) {
         for (JsonElement module : payload.getAsJsonObject("docsData").getAsJsonArray("modules")) {
             JsonArray records = module.getAsJsonObject().getAsJsonArray("records");

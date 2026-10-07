@@ -129,7 +129,6 @@ public final class SourceInclusions {
         }
     }
 
-    /** Each prefix a file's imports put in scope, to the {@code org/module} it names. */
     private static Map<String, String> imports(ModulePartNode root) {
         Map<String, String> imports = new LinkedHashMap<>();
         for (ImportDeclarationNode declaration : root.imports()) {

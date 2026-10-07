@@ -100,11 +100,6 @@ public final class TextRenderer {
         return layout.render();
     }
 
-    /**
-     * The command that narrows the listing just shown by a keyword, which is what most callers want over a page:
-     * its own page command — the canonical one, whatever bucket and spelling were typed — with a filter for the
-     * page.
-     */
     private static String filterCommand(DiscoverResult result) {
         String next = switch (result) {
             case DiscoverResult.ContainerRoster roster -> roster.next();
@@ -293,7 +288,6 @@ public final class TextRenderer {
         layout.next(methods.next());
     }
 
-    /** Verbatim, per the RFC's own words for this bucket — no header, no wrapping, for the whole-readme case. */
     private static String verbatimReadme(DiscoverResult.Readme readme) {
         return readme.warning() == null ? readme.markdown() : readme.markdown() + "\n\nWarning: " + readme.warning();
     }
@@ -323,7 +317,6 @@ public final class TextRenderer {
         layout.next(chunks.next());
     }
 
-    /** The declaration verbatim — it is Ballerina to copy — then each type it names, indented, one block apiece. */
     private static void signature(Layout layout, DiscoverResult.Signature signature) {
         layout.block(List.of(signature.declaration()));
         List<DiscoverResult.Signature.Type> types = signature.types();
@@ -455,7 +448,6 @@ public final class TextRenderer {
         return kind;
     }
 
-    /** The declaration verbatim, then each type it names, indented, one block apiece — as a signature does. */
     private static void typeDeclaration(Layout layout, DiscoverResult.TypeDeclaration declaration) {
         layout.block(List.of(declaration.declaration()));
         List<DiscoverResult.Signature.Type> types = declaration.types();
@@ -472,7 +464,6 @@ public final class TextRenderer {
         layout.notices(declaration.note(), declaration.warning());
     }
 
-    /** What a closure left behind: the names its budget dropped, and the declarations another package owns. */
     private static void closureTail(
             Layout layout, List<DiscoverResult.Method> omitted, int omittedTotal, String omittedNext,
             List<DiscoverResult.Foreign> foreign) {
@@ -494,7 +485,6 @@ public final class TextRenderer {
     // Shared pieces
     // -----------------------------------------------------------------------
 
-    /** {@code org/name · module m · bucket · Container · selectors · --filter k}, from what was asked. */
     private static String header(Context where, String container, String member) {
         List<String> parts = new ArrayList<>();
         if (where.pkg() != null) {
@@ -514,10 +504,6 @@ public final class TextRenderer {
         return parts.isEmpty() ? null : String.join(SEPARATOR, parts);
     }
 
-    /**
-     * The trail as typed, with the first selector spelled as the container it resolved to and the last as the
-     * method or function it resolved to — no other word, which may be a path segment that only looks like either.
-     */
     private static List<String> resolvedTrail(Context where, String container, String member) {
         List<String> trail = new ArrayList<>(where.trail());
         int containerAt = -1;
@@ -532,12 +518,10 @@ public final class TextRenderer {
         return trail;
     }
 
-    /** Whether the caller typed the declared name, in any spelling {@link Names#normalise} accepts. */
     private static boolean sameName(String typed, String declared) {
         return Names.normalise(typed).equals(Names.normalise(declared));
     }
 
-    /** The member the header names after its container: only a signature answers one. */
     private static String memberOf(DiscoverResult result) {
         return result instanceof DiscoverResult.Signature signature ? signature.name() : null;
     }
@@ -563,10 +547,6 @@ public final class TextRenderer {
         return table;
     }
 
-    /**
-     * Every accessor's command teaches the shape, a multi-accessor row's as much as a single one's — the
-     * {@code <path> <accessor>} pair is what a row's own name fills.
-     */
     private static Drill resourceDrill(List<DiscoverResult.ResourceList.Resource> resources) {
         List<List<String>> literals = new ArrayList<>();
         List<List<String>> commands = new ArrayList<>();
@@ -578,10 +558,6 @@ public final class TextRenderer {
         return Drill.ofRows(literals, commands, "<path> <accessor>");
     }
 
-    /**
-     * A resource row's commands the shared shape cannot spell (its path needs quoting): one is printed whole;
-     * several differ only in their accessor, which the row already lists, so they print once with that slot open.
-     */
     private static String ownCommand(List<String> unfit) {
         if (unfit.size() < 2) {
             return unfit.isEmpty() ? null : unfit.get(0);
@@ -599,7 +575,6 @@ public final class TextRenderer {
         return methodTable(methods, drill, 0);
     }
 
-    /** {@code methods}, whose rows sit at {@code offset} in the list {@code drill} was derived from. */
     private static TextTable methodTable(List<DiscoverResult.Method> methods, Drill drill, int offset) {
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
         for (int i = 0; i < methods.size(); i++) {
@@ -620,12 +595,6 @@ public final class TextRenderer {
         return table;
     }
 
-    /**
-     * Documentation-only matches on this page — or, on a page that holds none of them while a later one does,
-     * one line saying how many are coming, so they are never silently absent.
-     *
-     * @return the command shapes that open them, for the footer
-     */
     private static List<String> documented(Layout layout, DiscoverResult.Documented documented) {
         List<DiscoverResult.Documented.Entry> entries = documented.entries();
         if (entries.isEmpty() && documented.total() > 0) {
@@ -669,7 +638,6 @@ public final class TextRenderer {
         return count + " " + (count == 1 ? singular : plural);
     }
 
-    /** How many entries a listing left out: everything after this page, or everything past what was shown. */
     private static int remaining(int shown, int total, DiscoverResult.Paging paging) {
         return paging == null ? total - shown : paging.remaining();
     }
@@ -721,7 +689,6 @@ public final class TextRenderer {
             return new Drill(pattern, List.copyOf(unfit));
         }
 
-        /** {@code command} with its last whole-word occurrence of {@code literal} replaced, or {@code null}. */
         private static String shapeOf(String command, String literal, String placeholder) {
             String needle = " " + literal;
             for (int at = command.lastIndexOf(needle); at >= 0; at = command.lastIndexOf(needle, at - 1)) {

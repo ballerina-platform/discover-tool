@@ -99,21 +99,12 @@ public final class FromCentral {
         return named ? Encoding.BASIC : Encoding.REF;
     }
 
-    /** {@code googleapis.gmail} → {@code gmail}: the alias an import statement puts in scope. */
     private static String moduleNameSuffix(String moduleName) {
         String[] parts = moduleName.split("\\.", -1);
         return parts.length == 0 ? moduleName : parts[parts.length - 1];
     }
 
-    /**
-     * A type node's name, trimmed.
-     *
-     * <p>Central pads some singleton and literal type names with surrounding whitespace — 21 of slack's
-     * nodes, all of category {@code other}. Its own page gets away with it because HTML collapses the
-     * padding; a plain-text declaration does not, and the padding lands either in front of a field's
-     * indentation or in the middle of a union. Every other string the reader takes from Central already
-     * goes through {@link #trimmed}; type names were the exception.
-     */
+    // Central pads some singleton/literal type names with whitespace, which plain text would print.
     private static String typeName(CentralDocs.TypeNode type) {
         return trimmed(type.name());
     }
@@ -131,14 +122,8 @@ public final class FromCentral {
         return ref(types.stream().map(TypeRef::name).collect(Collectors.joining(separator)), links);
     }
 
-    /**
-     * How many {@code []} pairs a node carries.
-     *
-     * <p>{@code arrayDimensions} is the count and {@code isArrayType} is the same fact as a boolean;
-     * Central sets both, and reading only the boolean is what made a 2-D array print as 1-D. The boolean
-     * is still the fallback, because it is the older of the two keys and a payload that dropped the count
-     * should degrade to one dimension rather than to none.
-     */
+    // Central sets both arrayDimensions and isArrayType; the boolean is only the fallback, since reading it alone
+    // printed a 2-D array as 1-D.
     private static int arrayDepth(CentralDocs.TypeNode type) {
         if (type.arrayDimensions() > 0) {
             return type.arrayDimensions();
@@ -146,27 +131,15 @@ public final class FromCentral {
         return type.isArrayType() ? 1 : 0;
     }
 
-    /**
-     * {@code []} per dimension, then {@code ?} — the order Ballerina writes them, and the order that makes
-     * {@code T[]?} "a nullable array" rather than "an array of nullables".
-     */
     private static TypeRef suffixed(TypeRef type, CentralDocs.TypeNode node) {
         String name = type.name() + "[]".repeat(arrayDepth(node));
         return ref(node.isNullable() ? name + "?" : name, type.links());
     }
 
-    /**
-     * Does a suffix on this node need the type it wraps in parentheses first?
-     *
-     * <p>{@code string|()[]} is an array of nil unioned with a string; {@code (string|())[]} is an array of
-     * either. Ballerina reads the postfix {@code []} as binding tighter than {@code |}, so a union that
-     * takes an array suffix without parentheses is a different type — not a cosmetic difference.
-     */
     private static boolean needsParentheses(CentralDocs.TypeNode inner, CentralDocs.TypeNode outer) {
         return arrayDepth(outer) > 0 && (inner.isAnonymousUnionType() || inner.isIntersectionType());
     }
 
-    /** The same names, wrapped in brackets or parentheses. */
     private static TypeRef wrapped(TypeRef type, String open, String close) {
         return ref(open + type.name() + close, type.links());
     }
@@ -174,14 +147,6 @@ public final class FromCentral {
     /** A type the reader cannot encode. Named, because {@code ""} at a use site reads as a bug. */
     private static final TypeRef UNKNOWN = new TypeRef("");
 
-    /**
-     * A function type: {@code isolated function (A, B) returns C}.
-     *
-     * <p>Central models it as a member node with {@code isLambda}, its parameters in {@code paramTypes}
-     * and its result in {@code returnType} — the only place either key appears. Parameter NAMES are not
-     * published, so the rendered form is the type-only spelling, which is what a variable of this type is
-     * declared with anyway.
-     */
     private static TypeRef lambda(CentralDocs.TypeNode type, Scope scope) {
         TypeRef params = mergeMembers(transformAll(type.params(), scope), ", ");
         TypeRef returns = type.returnType().map(node -> transformType(node, scope)).orElse(UNKNOWN);
@@ -195,7 +160,6 @@ public final class FromCentral {
         return ref(signature + " returns " + returns.name(), links);
     }
 
-    /** The two categories whose members are an anonymous record's own fields. */
     private static boolean isInlineRecord(String category) {
         return INLINE_RECORD.equals(category) || INLINE_CLOSED_RECORD.equals(category);
     }
@@ -255,10 +219,6 @@ public final class FromCentral {
         return suffixed(new TypeRef(name), type);
     }
 
-    /**
-     * A type Central spells by its structure rather than by a name: a function type, tuple, union,
-     * intersection, inline record, a wrapper around an element type, or an anonymous object.
-     */
     private static TypeRef transformRef(CentralDocs.TypeNode type, Scope scope) {
         List<CentralDocs.TypeNode> members = type.members();
 
@@ -325,22 +285,13 @@ public final class FromCentral {
         return types.stream().map(type -> transformType(type, scope)).toList();
     }
 
-    /**
-     * A member of an inline record that is a field rather than a bare type: a named field, or the nameless rest
-     * member Central publishes as an element type flagged {@code isRestParam}.
-     */
+    // Central publishes an inline record's rest member nameless, as an element type flagged isRestParam.
     private static boolean isInlineField(CentralDocs.TypeNode member) {
         return member.elementType().isPresent()
                 && (member.name().filter(name -> !name.isEmpty()).isPresent()
                         || member.elementType().get().isRestParam());
     }
 
-    /**
-     * An inline record written out field by field, in the same grammar as a declared record.
-     *
-     * <p>Closed when Central says so or when it carries a rest member, for the reason {@link #isClosed} gives.
-     * A rest member that is not last is dropped, for the reason {@link #isStrandedRest} gives.
-     */
     private static TypeRef inlineRecordFields(List<CentralDocs.TypeNode> members, boolean closed, Scope scope) {
         StringBuilder fields = new StringBuilder();
         List<TypeRef.Link> links = new ArrayList<>();
@@ -365,7 +316,6 @@ public final class FromCentral {
         return ref((exclusive ? CLOSED_RECORD : OPEN_RECORD).formatted(fields), links);
     }
 
-    /** An anonymous record whose fields Central did not describe; only its links survive. */
     private static TypeRef inlineRecord(List<CentralDocs.TypeNode> members, Scope scope) {
         List<TypeRef.Link> links = members.stream()
                 .flatMap(member -> transformType(member, scope).links().stream())
@@ -393,15 +343,8 @@ public final class FromCentral {
         return value.isEmpty() ? null : value;
     }
 
-    /**
-     * A parameter's form, from the two flags Central sets on its TYPE node rather than on the parameter.
-     *
-     * <p>A rest parameter is published the same way a record's rest field is: {@code isRestParam} on the type
-     * node, the parameter's own name repeated as that node's {@code name}, and the real type one level down in
-     * {@code elementType}. Reading the node's name instead produced
-     * {@code function removeCookiesFromRemoteStore(cookiesToRemove cookiesToRemove);} — the parameter's name
-     * standing in as its type, with {@code Cookie} dropped.
-     */
+    // Central flags a rest parameter on its TYPE node, repeating the parameter's name as the node's name; the
+    // real type is one level down in elementType.
     private static Param.Form paramForm(CentralDocs.TypeNode type) {
         if (type.isRestParam()) {
             return Param.Form.REST;
@@ -495,12 +438,7 @@ public final class FromCentral {
     // Records
     // -----------------------------------------------------------------------
 
-    /**
-     * Fields of one record, with inclusions ({@code *Other;}) spliced in.
-     *
-     * <p>Keyed by name as it goes: an included field that the record also declares itself must resolve
-     * to the declaration, and Central lists them in that order.
-     */
+    // Keyed by name: Central lists an inclusion's fields before the record's own, and the own declaration wins.
     private static List<RecordField> transformRecordFields(List<CentralDocs.Field> declared, Scope scope) {
         List<RecordField> members = new ArrayList<>();
         Set<String> declaredNames = new LinkedHashSet<>();
@@ -544,33 +482,14 @@ public final class FromCentral {
         return List.copyOf(members);
     }
 
-    /**
-     * A rest field somewhere other than the end, which the grammar cannot express.
-     *
-     * <p>{@code T...;} is only legal as a record's LAST member, so a rest field with declarations after it is
-     * not something a source ever wrote — it is a flattening artefact. When Central splices an inclusion in
-     * ({@code time:Civil} is {@code *Date; *TimeOfDay;}) it copies each included record's implicit
-     * {@code anydata...} along with the members, so {@code Civil} arrives carrying TWO rest fields, at
-     * positions 3 and 7 of 11.
-     *
-     * <p>Rendering those emitted {@code anydata...;} twice mid-record, which the compiler rejects four times
-     * over with {@code more record fields after rest field}. Dropping them costs nothing: the record stays
-     * inclusive, and {@code record { … }} already means {@code anydata...}. Every genuine rest field in the
-     * corpus is the final member, so this leaves all four untouched.
-     */
+    // Central copies each included record's implicit `anydata...` when splicing an inclusion (time:Civil gets
+    // two mid-record); a rest field that is not last does not compile, so it is dropped.
     private static boolean isStrandedRest(CentralDocs.Field.Declared entry, boolean isLast) {
         return entry.type().isRestParam() && !isLast;
     }
 
-    /**
-     * Whether a record is closed, which Central's own flag does not always answer.
-     *
-     * <p>{@code isClosed} is the flag, but a record carrying an explicit rest field is closed by the
-     * GRAMMAR: {@code T...;} is only legal in an exclusive descriptor, because an inclusive one already has
-     * an implicit {@code anydata...} rest field. Central publishes {@code isClosed: false} for all four
-     * rest-field records in the corpus while their sources are all {@code record {| … |}} — so trusting the
-     * flag alone emits {@code record { … QueryParamType...; }}, which does not compile.
-     */
+    // Central publishes isClosed:false even for records with an explicit rest field, which only a closed
+    // record may declare.
     private static boolean isClosed(CentralDocs.RecordDecl record, List<RecordField> fields) {
         return record.isClosed()
                 || fields.stream().anyMatch(field -> field.form() == RecordField.Form.REST);
@@ -597,14 +516,7 @@ public final class FromCentral {
     // Objects: classes, object types, service types and listeners
     // -----------------------------------------------------------------------
 
-    /**
-     * One object declaration, from the shape Central publishes for all four of its object categories.
-     *
-     * <p>Only {@code methods} is read. {@code otherMethods}, {@code lifeCycleMethods} and {@code initMethod}
-     * are all subsets of it — verified on every object in the corpus, 103 of 103 {@code initMethod}s
-     * byte-identical to the {@code init} entry in {@code methods} — so reading them too would print the
-     * constructor twice and the lifecycle methods three times.
-     */
+    // otherMethods, lifeCycleMethods and initMethod are subsets of methods; reading them would print duplicates.
     private static TypeDef.ObjectDef objectDef(
             CentralDocs.ObjectDecl decl, TypeDef.ObjectDef.Form form, Scope scope) {
         List<Fn> methods = distinctMethods(decl.methodList()).stream()
@@ -623,18 +535,7 @@ public final class FromCentral {
                 methods);
     }
 
-    /**
-     * One entry per method the object actually declares.
-     *
-     * <p>{@code 'start} and {@code start} are the SAME identifier — the quote is an escape, not part of the
-     * name — and {@code postgresql:CdcListener} publishes both: its own {@code start} and the {@code 'start}
-     * it includes from {@code *cdc:Listener}, with different descriptions and the same signature spelled two
-     * ways. Emitting both is a redeclared symbol, which the compiler reports and no test would have.
-     *
-     * <p>First wins, as it does in the declaration index, and for the same reason: Central lists an object's
-     * own declaration before the ones it inherits, so the entry that survives is the one the class itself
-     * wrote.
-     */
+    // `'start` and `start` are the same identifier, and Central can publish both; first wins (the object's own).
     private static List<CentralDocs.Method> distinctMethods(List<CentralDocs.Method> methods) {
         Map<String, CentralDocs.Method> byIdentity = new LinkedHashMap<>();
         for (CentralDocs.Method method : methods) {
@@ -647,18 +548,7 @@ public final class FromCentral {
         return List.copyOf(byIdentity.values());
     }
 
-    /**
-     * Whether an object is a client, a service, or neither.
-     *
-     * <p>Derived, because Central publishes neither fact: there is no {@code isClient} key at all, and
-     * {@code isService} is present but false on all 230 objects in the corpus, including the seven
-     * {@code http} service types whose own sources say {@code distinct service object}. The grammar settles
-     * both — a {@code remote} method is legal only inside a client or service object, and a service type is
-     * by definition the object a {@code service … on …} declaration implements — and getting it wrong is not
-     * cosmetic: {@code class Client {}} tells a caller to construct an abstract type, and a client whose
-     * methods are not marked {@code remote} tells them to call {@code db.query()} instead of
-     * {@code db->query()}.
-     */
+    // Derived: Central has no isClient key, and isService is false even on real service types.
     private static TypeDef.ObjectDef.Role roleOf(CentralDocs.ObjectDecl decl, List<Fn> methods) {
         if (decl.isService()) {
             return TypeDef.ObjectDef.Role.SERVICE;
@@ -667,7 +557,6 @@ public final class FromCentral {
         return remote ? TypeDef.ObjectDef.Role.CLIENT : TypeDef.ObjectDef.Role.PLAIN;
     }
 
-    /** The same object declared as the service object a {@code serviceTypes} entry is. */
     private static TypeDef.ObjectDef asService(TypeDef.ObjectDef object) {
         return new TypeDef.ObjectDef(
                 object.name(),
@@ -686,15 +575,6 @@ public final class FromCentral {
     // Services
     // -----------------------------------------------------------------------
 
-    /**
-     * Pair each listener the module declares with the service types it accepts.
-     *
-     * <p>Every listener, not the first: {@code ballerina/email} publishes an IMAP listener and a POP one, and
-     * taking {@code listeners().get(0)} named one and discarded the other with no diagnostic. Which service types
-     * a listener accepts is {@link Bindings}' call; a listener whose {@code attach} takes another module's type
-     * ({@code postgresql:CdcListener}, a {@code cdc:Service}) gets that foreign type as its pairing rather than
-     * nothing.
-     */
     private static List<Service> buildServices(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
         if (module.listeners().isEmpty()) {
             return List.of();
@@ -732,22 +612,6 @@ public final class FromCentral {
         return List.copyOf(services);
     }
 
-    /**
-     * Every annotation the module declares, with its config record and the whole of its {@code on} clause.
-     *
-     * <p>All of them, and Central's own clause verbatim. The reader used to keep the two attachment points a
-     * service author writes and drop the rest, on the argument that an annotation attaching to a parameter or a
-     * record field "is not something the agent reaches for from a service". For {@code ballerina/http} that
-     * argument fails on its own document: {@code @http:Payload}, {@code @http:Header} and {@code @http:Query} are
-     * the three most common annotations in Ballerina HTTP code, two of them are named in the doc comments of
-     * {@code getHeaderMap} and {@code getQueryMap} and shown in their fenced examples, and all three were deleted
-     * a few lines below. Nine of the corpus's twelve went that way.
-     *
-     * <p>The clause is passed through rather than mapped onto a closed set. Checked against the published
-     * sources, Central's string matches the {@code on} clause exactly for all twelve — including the order — so
-     * mapping it could only lose information, and the mapping that existed invented {@code service_function},
-     * which is not a token the language has.
-     */
     private static List<Library.AnnotationDef> buildAnnotations(CentralDocs.Module module, Scope scope) {
         List<Library.AnnotationDef> annotations = new ArrayList<>();
         for (CentralDocs.Annotation annotation : module.annotations()) {
@@ -817,12 +681,6 @@ public final class FromCentral {
                 Failure.SCHEMA_DRIFT_SUGGESTION));
     }
 
-    /**
-     * {@code --module} named a submodule this package does not publish — a caller mistake, not a schema
-     * problem, so it is {@code symbol-not-found} rather than {@code schema-drift}. The candidates are every
-     * OTHER module's bare submodule name (the part after {@code org/name.}), which is exactly what
-     * {@code --module} itself takes.
-     */
     private static Failure noSuchSubmodule(
             CentralDocs docs, QualifiedName qualified, String submodule, Version version) {
         String prefix = qualified.name() + ".";
@@ -994,15 +852,7 @@ public final class FromCentral {
                 buildConfigurables(module, scope));
     }
 
-    /**
-     * The module's {@code configurable} declarations, which are settings rather than API.
-     *
-     * <p>Kept out of the declaration list on purpose. A {@code configurable} is module-private — referencing
-     * {@code http:maxActiveConnections} from another module is {@code attempt to refer to non-accessible
-     * symbol} — so printing one among the declarations would offer a caller a name they cannot write, and
-     * printing it with the blanket {@code public} the others carry would be a second error on the same line.
-     * What a caller CAN do with it is set it in {@code Config.toml}, which is a report-register fact.
-     */
+    // Kept out of the declarations: a configurable is module-private, so no other module can name it.
     private static List<Library.Configurable> buildConfigurables(CentralDocs.Module module, Scope scope) {
         return module.configurables().stream()
                 .map(configurable -> new Library.Configurable(
@@ -1013,13 +863,6 @@ public final class FromCentral {
                 .toList();
     }
 
-    /**
-     * The module's {@code public final} variables, as declarations.
-     *
-     * <p>These ARE public API: {@code http:CONTINUE} compiles from another module. All 64 in the corpus were
-     * dropped, so a caller had no way to learn from this tool that the package exports 61 pre-built status
-     * values — the names its own signatures and readme use.
-     */
     private static void addVariables(List<TypeDef> typeDefs, CentralDocs.Module module, Scope scope) {
         for (CentralDocs.VariableDecl variable : module.variables()) {
             typeDefs.add(new TypeDef.Variable(
@@ -1031,15 +874,7 @@ public final class FromCentral {
         }
     }
 
-    /**
-     * Whether an error's {@code detailType} is its DETAIL RECORD rather than its supertype.
-     *
-     * <p>Central overloads the one key, and only {@code category} separates the two: {@code "errors"} is
-     * a supertype ({@code distinct ClientError}), anything else is the detail record, which the language
-     * writes as {@code distinct error<Detail>}. Reading category-less as a supertype keeps every fixture
-     * rendering as before — all nine publish {@code "errors"} — while a record-detail package like
-     * {@code ballerinax/health.clients.fhir} stops printing a declaration that is not an error type.
-     */
+    // Central overloads detailType: only category "errors" makes it a supertype; otherwise it is the detail record.
     private static boolean isDetailRecord(Optional<CentralDocs.TypeNode> detailType) {
         return detailType.flatMap(CentralDocs.TypeNode::category).filter(c -> !ERRORS.equals(c)).isPresent();
     }

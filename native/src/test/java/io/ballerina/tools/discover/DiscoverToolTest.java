@@ -68,12 +68,6 @@ public class DiscoverToolTest {
                 err.toString(StandardCharsets.UTF_8));
     }
 
-    /**
-     * A usage request, driven through the real command with the cache disabled.
-     *
-     * <p>Through {@link Cli#run} rather than the text-building class directly, so what the golden pins is what a
-     * caller's stdout actually receives.
-     */
     private static String usage(String... argv) {
         StringBuilder err = new StringBuilder();
         StringBuilder out = new StringBuilder();

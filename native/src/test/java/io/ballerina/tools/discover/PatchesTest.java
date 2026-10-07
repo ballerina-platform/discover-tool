@@ -56,14 +56,7 @@ public class PatchesTest {
         return error.base().map(base -> base.name()).orElse(null);
     }
 
-    /**
-     * Every declaration's type descriptor as rendered, by name — errors by their base, aliases by their
-     * type.
-     *
-     * <p>Both, because the detail-argument correction spans both: Central files three of http's five under
-     * {@code errors} and two under {@code intersectionTypes}, and a test that looked only at
-     * {@link TypeDef.ErrorDef} would report full coverage while missing 2 of 11 sites.
-     */
+    // Errors and aliases both: Central files some detail-argument sites under intersectionTypes, not errors.
     private static Map<String, String> descriptorsOf(String slug) {
         Map<String, String> descriptors = new LinkedHashMap<>();
         for (TypeDef typeDef : FixtureCorpus.libraryFor(slug).typeDefs()) {

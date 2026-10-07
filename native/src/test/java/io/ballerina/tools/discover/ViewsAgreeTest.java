@@ -83,7 +83,6 @@ public class ViewsAgreeTest {
         return lines;
     }
 
-    /** Every path in the tree, as token lists. */
     private static List<List<String>> allPaths(PathTree node, List<String> prefix) {
         List<List<String>> paths = new ArrayList<>();
         for (PathTree child : node.children()) {
