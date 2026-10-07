@@ -91,6 +91,7 @@ public sealed interface DiscoverResult {
             String key();
         }
 
+        /** Each entry's {@link Entry#key}: a name, or a resource path. */
         public List<String> names() {
             return entries.stream().map(Entry::key).toList();
         }

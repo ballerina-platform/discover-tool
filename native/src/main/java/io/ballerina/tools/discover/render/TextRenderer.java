@@ -77,10 +77,15 @@ public final class TextRenderer {
         }
     }
 
+    /** {@code result} with no header line, for a caller that has no command to echo. */
     public static String render(DiscoverResult result) {
         return render(result, Context.NONE);
     }
 
+    /**
+     * {@code result} under a header naming where it was asked from. A whole readme is printed verbatim, without
+     * one.
+     */
     public static String render(DiscoverResult result, Context where) {
         if (result instanceof DiscoverResult.Readme readme && readme.chunk() == null) {
             return verbatimReadme(readme);
@@ -526,10 +531,12 @@ public final class TextRenderer {
         return trail;
     }
 
+    /** Whether the caller typed the declared name, in any spelling {@link Names#normalise} accepts. */
     private static boolean sameName(String typed, String declared) {
         return Names.normalise(typed).equals(Names.normalise(declared));
     }
 
+    /** The member the header names after its container: only a signature answers one. */
     private static String memberOf(DiscoverResult result) {
         return result instanceof DiscoverResult.Signature signature ? signature.name() : null;
     }
@@ -806,6 +813,7 @@ public final class TextRenderer {
             }
         }
 
+        /** A {@code Next:} line for {@code command}, once however many times it is offered. */
         void next(String command) {
             if (command != null && !next.contains("Next: " + command)) {
                 next.add("Next: " + command);
