@@ -127,6 +127,9 @@ public final class Filter {
     /**
      * A callable's addressable text: how it is named, and every name inside its declaration.
      *
+     * <p>A resource's path is there twice, segment by segment and joined with {@code /}, so that a keyword matches
+     * a segment and a keyword written as a path matches the path.
+     *
      * <p>Parameter and TYPE names are included deliberately. An agent that knows it holds an
      * {@code ActionsCacheList} and wants the call that returns one has no other way to ask, and the type name is
      * on the line either way — so matching it costs nothing and answers a question the name alone cannot.
@@ -135,9 +138,10 @@ public final class Filter {
         StringBuilder text = new StringBuilder();
         switch (fn) {
             case Fn.Resource resource -> {
+                List<String> segments = resource.paths().stream().map(PathTree::displaySegment).toList();
                 text.append(resource.accessor()).append(' ');
-                resource.paths().forEach(segment ->
-                        text.append(PathTree.displaySegment(segment)).append(' '));
+                segments.forEach(segment -> text.append(segment).append(' '));
+                text.append(String.join("/", segments)).append(' ');
             }
             case Fn.Standalone named -> text.append(named.name()).append(' ');
             case Fn.Constructor ignored -> text.append("init ");
