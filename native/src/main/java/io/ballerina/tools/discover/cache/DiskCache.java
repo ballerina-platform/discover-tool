@@ -51,27 +51,21 @@ import java.util.stream.Stream;
  *   &lt;root&gt;/v2/latest/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;.json              {"version":"6.0.0","atMs":…}
  *   &lt;root&gt;/v2/modules/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;/&lt;module&gt;/&lt;version&gt;.json
  *                                                                          a submodule's page, mode 0600, no TTL
+ *   &lt;root&gt;/v2/inclusions/&lt;derivation&gt;/&lt;repository&gt;/&lt;org&gt;/&lt;name&gt;/&lt;version&gt;/
+ *       &lt;module&gt;.json                                                    a module's object inclusions
  * </pre>
  *
- * <p>{@code v2} is the on-disk format generation, bumped only when the stored bytes change meaning — bumped
- * from {@code v1} here because a {@code v1} path has no repository segment at all, a different shape from
- * {@code v2} rather than a value that could collide with it. Sharing one generation between the two shapes
- * would have meant the read path either had to guess which shape an old entry used or lose the repository
- * dimension entirely; a new generation makes every {@code v1} entry a plain, harmless miss instead, healed on
- * the next fetch like any other. Deliberately not a build identity — see {@link DocsCache} for why the raw
- * payload is what gets stored.
+ * <p>{@code v2} is the on-disk format generation, bumped only when the stored bytes change meaning: a {@code v1}
+ * path had no repository segment, so every {@code v1} entry is now a harmless miss. Deliberately not a build
+ * identity — see {@link DocsCache} for why the raw payload is what gets stored.
  *
- * <p>Entries are stored UNCOMPRESSED, exactly as Central served them. Disk is not the constrained resource:
- * a runner's mounts are emptyDirs and the cache does not outlive the run. Compression would add a level to
- * choose, a corruption mode to handle and a compress step on the write path, to save bytes nobody is paying
- * for.
+ * <p>Entries are stored UNCOMPRESSED, exactly as Central served them: disk is not the constrained resource, and
+ * compression would add a corruption mode and a write-path step to save bytes nobody is paying for.
  *
- * <p>Concurrency is structural rather than hypothetical — fan-out is a runner's default and recorded runs
- * show two subagents' shell calls interleaving seconds apart in one container sharing one {@code $HOME}. So
- * every write goes to a per-process temp file and is then moved atomically. There is deliberately no lock and
- * no single-flight: two processes that miss the same package both fetch and both move, the content is
- * equivalent, and no third process can observe a partial file. A lock could outlive the client's own budget
- * and hang a run; a duplicate download is the cheaper failure.
+ * <p>Concurrency is real — parallel agents share one {@code $HOME} — so every write goes to a per-process temp
+ * file and is then moved atomically. There is deliberately no lock and no single-flight: two processes that miss
+ * the same package both fetch and both move, the content is equivalent, and no third process can observe a
+ * partial file. A lock could outlive the client's own budget and hang a run; a duplicate download is cheaper.
  *
  * @since 0.1.0
  */
@@ -79,13 +73,11 @@ public final class DiskCache implements DocsCache {
 
     private static final String FORMAT = "v2";
 
-    /** The directory under {@link #FORMAT} for each kind of entry. */
     private static final String DOCS = "docs";
     private static final String MODULES = "modules";
     private static final String INCLUSIONS = "inclusions";
     private static final String LATEST = "latest";
 
-    /** The keys of a latest-version entry, which this class both writes and reads back. */
     private static final String VERSION_KEY = "version";
     private static final String AT_MS_KEY = "atMs";
 
@@ -190,10 +182,6 @@ public final class DiskCache implements DocsCache {
         return PosixFilePermissions.fromString(bits.toString());
     }
 
-    // -----------------------------------------------------------------------
-    // Paths
-    // -----------------------------------------------------------------------
-
     private static boolean isSafeSegment(String segment) {
         return SAFE_SEGMENT.matcher(segment).matches() && !".".equals(segment) && !"..".equals(segment);
     }
@@ -250,10 +238,6 @@ public final class DiskCache implements DocsCache {
                 List.of(key.repository(), key.org(), key.name()),
                 List.of(FORMAT, LATEST, key.repository(), key.org(), key.name() + ".json"));
     }
-
-    // -----------------------------------------------------------------------
-    // Reading and writing
-    // -----------------------------------------------------------------------
 
     private static JsonElement readJson(Path path) {
         try {

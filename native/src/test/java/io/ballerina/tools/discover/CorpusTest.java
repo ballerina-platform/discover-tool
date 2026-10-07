@@ -25,11 +25,6 @@ import org.testng.annotations.Test;
 /**
  * Coverage across Ballerina libraries: every fixture renders to exactly the bytes in its snapshot.
  *
- * <p>THIS is the test that proves the port. The nine {@code .bal} files were produced by the TypeScript reader
- * and verified against real packages; nothing in this repository generated them. If this passes, the schema, the
- * IR, the seven patches and the renderer are all correct together against 927KB of oracle for
- * {@code ballerinax/github} alone.
- *
  * <p>Offline and deterministic, so it runs on every PR in seconds. What it cannot catch — Central changing under
  * us — is {@link KeySpaceTest}'s job.
  *
@@ -51,9 +46,7 @@ public class CorpusTest {
 
     /**
      * Routed through {@code matchesSnapshot} so this honours {@code UPDATE_SNAPSHOTS=1} like every other
-     * snapshot test. Reading the file directly meant a NEWLY recorded fixture could never be enrolled — the
-     * first run threw {@code NoSuchFileException} whether or not the escape hatch was set, and the only way
-     * to add a package to the corpus was to hand-transcribe a megabyte of rendered Ballerina.
+     * snapshot test, which is how a NEWLY recorded fixture is enrolled.
      */
     @Test(dataProvider = "fixtures")
     public void rendersExactlyAsSnapshotted(String slug) {

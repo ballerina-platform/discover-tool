@@ -86,10 +86,6 @@ public final class FromCentral {
         REF
     }
 
-    // -----------------------------------------------------------------------
-    // Type expressions
-    // -----------------------------------------------------------------------
-
     private static Encoding classify(CentralDocs.TypeNode type) {
         boolean owned = type.orgName().filter(org -> !org.isEmpty() && !NO_ORG.equals(org)).isPresent()
                 && type.moduleName().filter(module -> !module.isEmpty()).isPresent();
@@ -177,9 +173,6 @@ public final class FromCentral {
         if (sameModule) {
             link = new TypeRef.Link.Internal(recordName);
         } else {
-            // The three facts Central publishes, kept as three facts. Quoting a reserved-word path segment,
-            // deciding whether an import is needed at all, and pinning a follow-up lookup to the version this
-            // package was documented against are all `ModuleRef`'s job now.
             link = new TypeRef.Link.External(
                     new ModuleRef(orgName, moduleName, type.version().orElse("")), recordName);
             name = moduleNameSuffix(moduleName) + ":" + name;
@@ -213,8 +206,7 @@ public final class FromCentral {
             TypeRef argument = type.constraint()
                     .map(constraint -> transformType(constraint, scope))
                     .orElseGet(() -> new TypeRef(fallback));
-            // Suffixed like any other type: the `?` and the `[]` belong OUTSIDE the argument list, and
-            // returning early from this branch is what dropped them from 61 of http's parameters.
+            // Suffixed like any other type: the `?` and the `[]` belong OUTSIDE the argument list.
             return suffixed(ref(name + "<" + argument.name() + ">", argument.links()), type);
         }
 
@@ -252,9 +244,8 @@ public final class FromCentral {
             CentralDocs.TypeNode inner = type.elementType().get();
             TypeRef result = transformType(inner, scope);
             // Parenthesised either because Central said so, or because the suffix about to be appended
-            // would otherwise bind to the union's last member instead of to the whole union. Central sets
-            // the flag on 23 of the corpus's nodes and omits it on the ones SQL-04 measured, so the reader
-            // cannot rely on it alone.
+            // would otherwise bind to the union's last member instead of to the whole union. Central does
+            // not set the flag reliably, so the reader cannot rely on it alone.
             if (type.isParenthesisedType() || needsParentheses(inner, type)) {
                 result = wrapped(result, "(", ")");
             }
@@ -266,10 +257,8 @@ public final class FromCentral {
         }
 
         if (!type.objectMethods().isEmpty()) {
-            // An anonymous object type. `object {}` is the widest true statement available — the methods are
-            // there in the payload but rendering them belongs with the rest of the object surface. Measured
-            // against the real signature: `object {}|http:ClientError` typechecks where `record {}|…` does
-            // not, which is the whole of HTTP-09's cost.
+            // An anonymous object type. `object {}` is the widest true statement available: measured against
+            // the real signature, `object {}|http:ClientError` typechecks where `record {}|…` does not.
             return suffixed(new TypeRef("object {}"), type);
         }
 
@@ -277,9 +266,7 @@ public final class FromCentral {
             return optional(inlineRecord(members, scope), type.isNullable());
         }
 
-        // Nothing to encode: no name, no members, no element type. `record {}` here was the reader's value
-        // for "I could not tell" printed as though it were a fact, which is worse than saying nothing —
-        // sql's two constants came out typed as records for comparison against an `int?`.
+        // Nothing to encode. Not `record {}`: that would print "could not tell" as though it were a fact.
         return UNKNOWN;
     }
 
@@ -333,10 +320,6 @@ public final class FromCentral {
         };
     }
 
-    // -----------------------------------------------------------------------
-    // Functions
-    // -----------------------------------------------------------------------
-
     private static String trimmed(Optional<String> value) {
         return value.orElse("").trim();
     }
@@ -373,9 +356,6 @@ public final class FromCentral {
 
     private static ReturnDef transformReturn(CentralDocs.Method method, Scope scope) {
         List<CentralDocs.ReturnParameter> returns = method.returns();
-        // A function Central gives no return parameters for returns nothing, and a function that returns
-        // nothing has no `returns` clause. The previous stand-in was the word `nil`, which is the English
-        // name of the basic type and not a type name the compiler knows.
         if (returns.isEmpty()) {
             return ReturnDef.none();
         }
@@ -445,10 +425,6 @@ public final class FromCentral {
         return new Fn.Normal(method.name(), description, params, returns, deprecated, isolated);
     }
 
-    // -----------------------------------------------------------------------
-    // Records
-    // -----------------------------------------------------------------------
-
     // Keyed by name: Central lists an inclusion's fields before the record's own, and the own declaration wins.
     private static List<RecordField> transformRecordFields(List<CentralDocs.Field> declared, Scope scope) {
         List<RecordField> members = new ArrayList<>();
@@ -470,7 +446,7 @@ public final class FromCentral {
                     }
                     // Central named no included record, so `*;` is not available. Splicing its members is
                     // the fallback — with a name the record declares ITSELF winning, because the source's
-                    // own declaration is the one that holds (PSQL-01).
+                    // own declaration is the one that holds.
                     for (CentralDocs.TypeNode member : inclusion.inclusionType().members()) {
                         if (member.name().isEmpty() || member.elementType().isEmpty()
                                 || declaredNames.contains(member.name().get())) {
@@ -522,10 +498,6 @@ public final class FromCentral {
                 entry.isDeprecated(),
                 RecordField.Form.DECLARED);
     }
-
-    // -----------------------------------------------------------------------
-    // Objects: classes, object types, service types and listeners
-    // -----------------------------------------------------------------------
 
     // otherMethods, lifeCycleMethods and initMethod are subsets of methods; reading them would print duplicates.
     private static TypeDef.ObjectDef objectDef(
@@ -582,10 +554,6 @@ public final class FromCentral {
                 object.methods());
     }
 
-    // -----------------------------------------------------------------------
-    // Services
-    // -----------------------------------------------------------------------
-
     private static List<Service> buildServices(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
         if (module.listeners().isEmpty()) {
             return List.of();
@@ -639,10 +607,6 @@ public final class FromCentral {
         return List.copyOf(annotations);
     }
 
-    // -----------------------------------------------------------------------
-    // Entry point
-    // -----------------------------------------------------------------------
-
     /**
      * The package's own default module — the one {@code import org/name;} puts in scope.
      *
@@ -658,15 +622,10 @@ public final class FromCentral {
     /**
      * The exact module this coordinate names, literally — never a guess.
      *
-     * <p>An earlier reader also matched a module whose id merely STARTED WITH {@code qualified.name() + "."},
-     * meant to catch the hierarchical-package-name form ({@code googleapis.gmail}, which Central already
-     * matches by {@code equals} since the caller types the whole dotted name as the package coordinate). What it
-     * actually did, for a package that also publishes a submodule, was match on iteration order rather than on
-     * which id was ACTUALLY requested: a payload listing {@code kafka.other} before {@code kafka} would render
-     * the submodule for a caller who typed neither {@code --module} nor anything but {@code kafka}. The RFC's own
-     * rule replaces the guess outright — {@code <org>/<package>} is always one literal, complete coordinate, and
-     * a submodule is reached only through the explicit {@code submodule} parameter here, composed onto it as
-     * Central names the pair ({@code kafka.other}, not a bare {@code other}).
+     * <p>Exact id match only: prefix-matching {@code qualified.name() + "."} would pick whichever module the
+     * payload lists first, rendering {@code kafka.other} for a caller who typed {@code kafka}. Per the RFC,
+     * {@code <org>/<package>} is one literal, complete coordinate, and a submodule is reached only through the
+     * explicit {@code submodule} parameter, composed as Central names it ({@code kafka.other}).
      *
      * @param submodule the {@code --module} value, or {@code null} to select the package's own default module
      * @param version the version {@code docs} was read at, or {@code null} when the caller has none to name
@@ -716,9 +675,7 @@ public final class FromCentral {
      * Every submodule of this package — not the default module, org matches, id starts with {@code name.} — as
      * the page's {@code relatedModules} names them. A page carries ONE module's declarations (a package's page its
      * default module, a module page that module alone), so its {@code relatedModules} is the only place the rest
-     * of the package is listed; any page of the package lists the same set. The shared base
-     * {@link #noSuchSubmodule} and {@code Loader.submodulesOf} both build on this, so "which modules are this
-     * package's submodules" is computed in exactly one place.
+     * of the package is listed; any page of the package lists the same set.
      */
     public static List<CentralDocs.RelatedModule> submodulesOf(CentralDocs docs, QualifiedName qualified) {
         String prefix = qualified.name() + ".";
@@ -784,8 +741,6 @@ public final class FromCentral {
             typeDefs.add(new TypeDef.Enumeration(
                     enumeration.name(),
                     trimmed(enumeration.description()),
-                    // The member's description as well as its name. Taking `Named::name` and dropping the rest
-                    // was a one-line loss at the IR builder, exactly like `arrayTypes` in SLACK-01.
                     enumeration.memberList().stream()
                             .map(member -> new TypeDef.Enumeration.Member(
                                     member.name(), trimmed(member.description())))
@@ -793,10 +748,7 @@ public final class FromCentral {
         }
 
         // Grouped, because they are one family: a class, an object type and a service type differ in what
-        // their declaration says, not in what Central sends. The previous reader took the name of each and
-        // discarded everything else — 340 declarations across the corpus, on the argument that the callable
-        // surface lives in the clients section. For `ballerina/sql` that argument fails in both halves:
-        // `clients` is empty and every one of its 122 methods is on a class or an object type.
+        // their declaration says, not in what Central sends.
         for (CentralDocs.ObjectDecl cls : module.classes()) {
             typeDefs.add(objectDef(cls, TypeDef.ObjectDef.Form.CLASS, scope));
         }
@@ -814,9 +766,7 @@ public final class FromCentral {
         addAliases(typeDefs, module.simpleNameReferenceTypes(), scope);
         addAliases(typeDefs, module.booleanTypes(), scope);
 
-        // The nine categories nothing read until now. Appended rather than interleaved: the order above is
-        // the output contract a reader greps by, and moving an existing declaration to make room for a new
-        // one would be a second change nobody asked for.
+        // Appended rather than interleaved: the order above is the output contract a reader greps by.
         addAliases(typeDefs, module.anyDataTypes(), scope);
         addAliases(typeDefs, module.anyTypes(), scope);
         addAliases(typeDefs, module.tupleTypes(), scope);
@@ -844,9 +794,8 @@ public final class FromCentral {
                 .map(Fn.Standalone.class::cast)
                 .toList();
 
-        // A listener is a class, and Central publishes it as one. It gets its own section rather than a place
-        // among the type declarations because it is the entry point to a package's service half — postgresql's
-        // `CdcListener` printed nowhere at all, and its readme's own example names it.
+        // A listener is a class, and Central publishes it as one. It gets its own section because it is the
+        // entry point to a package's service half.
         List<TypeDef.ObjectDef> listeners = module.listeners().stream()
                 .map(listener -> objectDef(listener.object(), TypeDef.ObjectDef.Form.CLASS, scope))
                 .toList();

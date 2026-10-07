@@ -41,8 +41,8 @@ import java.util.Set;
  * <p>THE CUT IS BY DERIVED ROLE, NOT BY CENTRAL'S BUCKET, and that is the whole reason this class exists.
  * Central publishes no {@code isClient} key at all, and its {@code clients} array is not the callable surface: for
  * {@code ballerina/sql} it is EMPTY while {@code Client} and {@code SchemaClient} — both reached with {@code ->} —
- * are filed under the ordinary declarations, along with the 122 methods that hang off them. A verb that read
- * {@link Library#clients()} would answer "this package has no clients" for a package whose whole point is one.
+ * are filed under the ordinary declarations. A verb that read {@link Library#clients()} would answer "this
+ * package has no clients" for a package whose whole point is one.
  *
  * <p>So {@code Role} decides, and {@code Role} is derived from the grammar by {@code FromCentral.roleOf}: an
  * object with a {@code remote} method is a CLIENT, a {@code serviceTypes} entry is a SERVICE, everything else is
@@ -54,10 +54,9 @@ import java.util.Set;
  * type(s) it binds, under {@code SERVICE}. It still appears in {@link Library#addressable()} — {@code type} and
  * closure resolution both need to reach it by name — this class is the only place that excludes it.
  *
- * <p>{@link Scope#MODULE} is the odd one and it is deliberately shaped like the other two callable scopes. A
- * module's functions have no container to name, so they get an anonymous one — which lets {@code funcs} share
- * every line of resolution, filtering, budgeting and rendering with {@code client} and {@code class} instead of
- * being a fifth code path that drifts from them.
+ * <p>{@link Scope#MODULE} is the odd one, deliberately shaped like the others: a module's functions have no
+ * container to name, so they get an anonymous one, which lets {@code funcs} share every line of resolution,
+ * filtering, paging and rendering with the other buckets.
  *
  * @since 0.1.0
  */
@@ -66,12 +65,7 @@ public final class Surface {
     private Surface() {
     }
 
-    /**
-     * Which slice of the callable surface a verb addresses.
-     *
-     * <p>The verb name rides on the scope so that a kind-mismatch note can say where a symbol actually lives
-     * without a switch at each site that has to say it.
-     */
+    /** Which slice of the callable surface a verb addresses. */
     public enum Scope {
 
         /** Objects reached with {@code ->}: every derived-CLIENT declaration, from either Central bucket. */
@@ -129,7 +123,6 @@ public final class Surface {
             return scope == Scope.MODULE;
         }
 
-        /** How this container is named in prose: its declaration name, or "module-level functions". */
         public String label() {
             return isModule() ? "module-level functions" : name;
         }
@@ -165,10 +158,8 @@ public final class Surface {
         }
 
         /**
-         * The constructor, which is part of the container and used to be reachable from no verb at all.
-         *
-         * <p>Addressable as {@code init} or {@code new}, so an agent that has navigated to the operation it wants
-         * can then ask how to build the thing it calls.
+         * The constructor, addressable as {@code init} or {@code new}, so an agent that has navigated to the
+         * operation it wants can then ask how to build the thing it calls.
          */
         public Optional<Fn.Constructor> constructor() {
             return functions.stream()
@@ -180,8 +171,7 @@ public final class Surface {
         /**
          * Every member a caller can address BY NAME — the constructor as {@code init}, then the named functions.
          *
-         * <p>Resource functions are absent by construction: they have no name, which is the structural wrinkle
-         * the whole addressing scheme is built around.
+         * <p>Resource functions are absent: they have no name.
          */
         public List<String> memberNames() {
             List<String> names = new ArrayList<>();
@@ -203,7 +193,7 @@ public final class Surface {
     }
 
     /**
-     * The containers a scope addresses, in the package's own order.
+     * The containers a scope addresses, alphabetically.
      *
      * <p>Deduplicated by name, first winning, for the same reason {@link Declarations} keeps the first: a
      * declaration Central files twice is a filing artefact, and a silent last-wins would make the next one

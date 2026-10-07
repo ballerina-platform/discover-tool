@@ -79,11 +79,6 @@ public final class DependenciesToml {
     /**
      * The Ballerina project a directory sits in, found by walking up for a {@code Ballerina.toml}.
      *
-     * <p>This is what makes version resolution INTERNAL. The caller used to pass {@code --project-dir}, which
-     * meant the tool answered for Central's latest unless an agent knew to name its own project — and T11
-     * recorded that the flag was invisible in {@code --help} and spelled differently per verb, so it was never
-     * passed. Walking up is what a build does, and it needs no argument.
-     *
      * <p>Pure over the path it is given, so a test can drive it against a temporary tree; the process's actual
      * directory is read once, by {@code DiscoverTool}, which is the only class allowed to.
      *
@@ -107,10 +102,8 @@ public final class DependenciesToml {
      * The locked version of one package in a component directory, or {@code null} if a build has not written
      * one. A missing file is not an error — most lookups happen before the first build.
      *
-     * <p>The file carries the TRANSITIVE closure rather than the direct imports, which is what makes an internal
-     * resolution correct across package boundaries: measured, {@code maintenance_api} imports 8 packages directly
-     * and its {@code Dependencies.toml} lists 36, {@code ballerina/auth}, {@code crypto} and {@code jwt} among
-     * them. So a cross-package pointer needs no version argument — the project already pins the far side.
+     * <p>The file carries the TRANSITIVE closure, not just the direct imports, so a cross-package pointer needs no
+     * version argument — the project already pins the far side.
      */
     public static String lockedVersion(String projectDir, QualifiedName qualified) {
         String content;

@@ -78,10 +78,6 @@ public final class Schema {
         return Result.ok(new CentralDocs(modules));
     }
 
-    // -----------------------------------------------------------------------
-    // The shapes
-    // -----------------------------------------------------------------------
-
     // `types` and `resources` are deliberately not read: empty in every fixture, so their shape is unknown;
     // KeySpaceTest flags the first package that populates one.
     private static CentralDocs.Module module(Cursor cursor, JsonObject json, String path) {
@@ -236,8 +232,8 @@ public final class Schema {
         // The type is read FIRST because it decides whether the name is required. A rest field
         // (`anydata...;`) has no name to publish, and Central spells that absence two ways: most
         // packages send `"name": ""`, while ballerina/time omits the key entirely. Requiring a
-        // string accepted the first and rejected the second, which failed the WHOLE document —
-        // every verb, `guide` included — over a field that is not supposed to have a name.
+        // string rejected the second, which failed the WHOLE document over a field that is not
+        // supposed to have a name.
         CentralDocs.TypeNode type = cursor.requiredObject(json, path, "type", Schema::typeNode);
         String name = type.isRestParam()
                 ? cursor.optionalString(json, path, "name").orElse("")
@@ -349,10 +345,6 @@ public final class Schema {
                 cursor.optionalObject(json, path, "type", Schema::typeNode));
     }
 
-    // -----------------------------------------------------------------------
-    // Reading one value, and remembering where it went wrong
-    // -----------------------------------------------------------------------
-
     /**
      * Accumulates issues so a drifted payload reports all of them, and turns a key plus an owner path
      * into the dotted path a reviewer greps the payload for.
@@ -446,9 +438,8 @@ public final class Schema {
         /**
          * A non-negative count, absent meaning zero — the same convention as {@link #flag}.
          *
-         * <p>Absent is not drift even though {@code arrayDimensions} is present on all 13,632 type nodes in
-         * the corpus: it is read as "how many {@code []} pairs", and zero is what a node with no array
-         * carries anyway. A value that is not a number IS drift, because that is a shape change — and so is one
+         * <p>Absent is not drift: it is read as "how many {@code []} pairs", and zero is what a node with no
+         * array carries anyway. A value that is not a number IS drift, because that is a shape change — and so is one
          * that is not a whole number up to {@link #MAX_COUNT}, since the count is spent as that many {@code []}.
          */
         int count(JsonObject owner, String path, String key) {
@@ -510,16 +501,9 @@ public final class Schema {
          * A declaration bucket: ABSENT means the module has none of that kind, not that the payload
          * drifted.
          *
-         * <p>This was {@link #array} until a sweep found that Central omits a bucket when it is empty
-         * rather than sending {@code []}. Requiring all 30 made every verb fail on the whole package —
-         * `ballerinax/pinecone.vector` reported 19 issues, all "expected an array, received nothing",
-         * and an agent with no readable signatures hand-rolled the connector over {@code http:Client},
-         * which is the one outcome this tool exists to prevent. Measured at ~15% of packages
-         * (`pinecone.vector`, `weaviate`, `azure_cosmosdb`, `sendgrid`).
-         *
-         * <p>Drift detection is not lost, only narrowed to the case that is actually evidence of it: a
-         * key that IS present and is not an array still fails. What no longer fails is a key that was
-         * never sent, because for a list of declarations "absent" and "empty" describe the same module.
+         * <p>Central omits a bucket when it is empty rather than sending {@code []}; requiring them refused
+         * ~15% of packages outright ({@code pinecone.vector}, {@code weaviate}, {@code azure_cosmosdb},
+         * {@code sendgrid}). A key that IS present and is not an array is still drift.
          */
         <T> List<T> bucket(JsonObject owner, String path, String key, Nested<T> shape) {
             JsonElement value = owner.get(key);
@@ -562,11 +546,6 @@ public final class Schema {
         }
     }
 
-    /**
-     * One nested shape's reader.
-     *
-     * @param <T> the type it reads into
-     */
     private interface Nested<T> {
         T read(Cursor cursor, JsonObject json, String path);
     }

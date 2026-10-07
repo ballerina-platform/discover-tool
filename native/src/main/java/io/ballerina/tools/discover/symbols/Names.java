@@ -133,7 +133,7 @@ public final class Names {
         return best;
     }
 
-    /** Every distinct candidate across several matches, in the order they were offered. */
+    /** The candidates a failed match offers, in the order they were offered; none for a found one. */
     public static List<String> candidatesOf(Match match) {
         return switch (match) {
             case Match.Found ignored -> List.of();

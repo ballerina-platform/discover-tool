@@ -19,7 +19,6 @@
 package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.central.CentralClient;
-import io.ballerina.tools.discover.central.CentralRepository;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.PackageRepository;
@@ -43,8 +42,8 @@ import java.util.function.Supplier;
  * {@code Dependencies.toml} is a file read; asking Central is a round trip. Callers that already know the
  * version should never pay for the ones that follow.
  *
- * <p>{@link #loadPackage} is deliberately the only load: all five verbs read the same payload and differ only
- * in which document they write from it, so a verb cannot be cheap because it skipped work another verb does.
+ * <p>{@link #loadPackage} is deliberately the only load: every bucket reads the same payload and differs only in
+ * what it renders from it.
  *
  * @since 0.1.0
  */
@@ -61,11 +60,9 @@ public final class Loader {
      *
      * @param http the transport options to fetch and cache through
      * @param projectDir the Ballerina project the lookup is running inside, or {@code null} when it is not in one
-     * @param repositories where the package's version and docs payload come from, in priority order — see
-     *     {@link PackageRepository}. Tried in order for each lookup, first success wins; {@link CentralRepository}
-     *     is the only one and the only element this phase ever populates, but the shape is a list because the
-     *     RFC's multi-source repository interface (Central, a local "Local Central" cache, Artifactory) is
-     *     several sources considered for ONE lookup, not one source picked ahead of time.
+     * @param repositories where the package's version and docs payload come from, in priority order, first success
+     *     wins — see {@link PackageRepository}. A list because the RFC's multi-source repository interface considers
+     *     several sources for ONE lookup, not one source picked ahead of time.
      * @param module the {@code --module} value, or {@code null} for the package's own default module — read from
      *     the submodule's own page, since a package's page carries its default module alone
      * @param version the {@code --version} value, or {@code null} to resolve one
@@ -131,17 +128,9 @@ public final class Loader {
     }
 
     /**
-     * The one thing a caller has to be told about how this was loaded, or nothing.
-     *
-     * <p>Whether the bytes came off disk or off the wire is not the reader's business — the document is the
-     * same either way, and the line saying so cost a row in every header while answering a question nobody
-     * asked. What a caller cannot recover on their own is that the version was never confirmed: with the
-     * registry unreachable the newest published version may be something else entirely, so every signature
-     * below is a claim about a version this run took on faith.
-     *
-     * <p>Returned as {@code null} in the ordinary case, so the header carries nothing when there is nothing
-     * to say. That also makes stdout run-order-independent again: the same command twice now prints the same
-     * bytes, where the old provenance line printed {@code central} then {@code cache}.
+     * The one thing a caller must be told about how this was loaded — that the version was never confirmed
+     * against an unreachable registry — or {@code null}. Whether the bytes came off disk or the wire is
+     * deliberately not reported, so the same command prints the same bytes run after run.
      */
     public static String unverifiedWarning(boolean stale) {
         return stale
@@ -157,20 +146,15 @@ public final class Loader {
      * <p>A pinned or locked {@code Dependencies.toml} version is the one exception: it names no repository, so every
      * repository is tried in order to serve THAT version, rather than resolve deciding which one wins.
      *
-     * <p>Under {@code --module} the version is still the PACKAGE's, resolved from its literal coordinate, and the
-     * page read is the submodule's own. Its {@code relatedModules} lists the package's other modules, so the
-     * success path never fetches the package's page as well. Every repository is asked for the submodule's page
-     * before any package page is read: one repository lacking it is the routine fallback case, and a later one
-     * may publish it. Only when every repository that has the package answers that it has no such page is a
-     * package page read — from those same repositories in order, each at the version it resolved — purely so
-     * selection fails naming the submodules the package does publish. Any other failure on the way is reported
-     * as it is, never turned into a missing module.
+     * <p>Under {@code --module} the version is still the PACKAGE's, and the page read is the submodule's own (its
+     * {@code relatedModules} names the package's other modules). Every repository is asked for that page before
+     * any package page is read, since a later one may publish it. Only when every repository that has the package
+     * lacks the page is a package page read — purely so selection fails naming the submodules it does publish. Any
+     * other failure is reported as it is, never turned into a missing module.
      *
-     * <p>Module selection happens exactly once, after some repository has actually answered — never inside the
-     * per-repository retry. A repository that has nothing for this package is a routine fallback case, but a
-     * repository that answered with a package that just doesn't contain the requested module is not: every
-     * repository serving the same immutable version would disagree with the caller the same way, so retrying
-     * the rest would only risk burying that specific failure under an unrelated one from a later repository.
+     * <p>Module selection happens once, after some repository answered — never inside the per-repository retry:
+     * every repository serving the same immutable version would lack the module the same way, so retrying would
+     * only bury that failure under an unrelated one from a later repository.
      */
     public static Result<LoadedPackage> loadPackage(QualifiedName qualified, LoadOptions options) {
         Function<PackageRepository, Result<CentralClient.ResolvedVersion>> resolve = repository ->

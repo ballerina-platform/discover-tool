@@ -40,9 +40,8 @@ import java.util.List;
  * test in the suite hermetic: they drive {@link Cli#run} with an injected cache and cannot accidentally read or
  * write a developer's real {@code ~/.cache}.
  *
- * <p>{@code bal} hands the whole argument list through unparsed — verified: all ten arguments of a realistic
- * invocation arrive raw — so the tool owns its own grammar, and {@link System#exit} here is what carries the
- * exit code to the shell.
+ * <p>{@code bal} hands the whole argument list through unparsed, so the tool owns its own grammar, and
+ * {@link System#exit} here is what carries the exit code to the shell.
  *
  * @since 0.1.0
  */
@@ -53,13 +52,9 @@ public class DiscoverTool implements BLauncherCmd {
     private List<String> argList;
 
     /**
-     * Declared here only so {@code bal}'s own launcher hands it over.
-     *
-     * <p>Everything else passes through untouched — verified, all ten arguments of a realistic invocation arrive
-     * raw — but {@code --help} is the exception: without a declaration the launcher rejects it with
-     * {@code ballerina: unknown option: '--help'} at exit 1, which is the launcher's error rather than ours and
-     * not the usage text a caller asked for. Declaring it, then putting it back on the argument list, keeps
-     * {@link Cli} the only thing that decides what help means for which verb.
+     * Declared only so {@code bal}'s own launcher hands it over: undeclared, the launcher rejects it with
+     * {@code ballerina: unknown option: '--help'} at exit 1. It is put back on the argument list, so {@link Cli}
+     * alone decides what help means.
      */
     @CommandLine.Option(names = {"--help", "-h"}, hidden = true)
     private boolean helpFlag;
@@ -108,13 +103,9 @@ public class DiscoverTool implements BLauncherCmd {
 
         int code;
         try {
-            // Pre-JDK 22, System.console() returns null if EITHER stream is redirected, not just stdout — so this
-            // under-detects an interactive terminal whose stdin happens to be redirected too, rather than
-            // over-detecting one. That is the safe direction to be wrong in: the RFC's own worked case (an
-            // agent's harness piping stdout) is unaffected either way, and the only cost of under-detecting is a
-            // human at a real terminal getting JSON instead of text — recoverable with --output text, where the
-            // opposite mistake would hand an agent's parser human prose it cannot read. Verified directly against
-            // this project's own JDK 21 (Ballerina 2201.13.x's bre/lib target) rather than assumed.
+            // Pre-JDK 22, System.console() is null if EITHER stream is redirected, so a terminal with redirected
+            // stdin is under-detected. That is the safe direction: a human gets JSON (recoverable with
+            // --output text) rather than an agent's parser getting prose.
             boolean interactive = System.console() != null;
             code = Cli.run(argv, streams, http, discoverProject(), interactive);
         } catch (RuntimeException cause) {
@@ -177,7 +168,6 @@ public class DiscoverTool implements BLauncherCmd {
         return value == null ? "" : value;
     }
 
-    // Here rather than in Cli: this class alone reads the environment, which keeps Cli and its tests hermetic.
     private static String discoverProject() {
         String cwd = property("user.dir");
         if (cwd.isEmpty()) {

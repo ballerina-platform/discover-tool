@@ -23,9 +23,8 @@ import java.util.List;
 /**
  * A client class and everything callable on it.
  *
- * <p>{@code isIsolated} is Central's, and true on all 18 clients in the corpus. It is part of the declaration
- * rather than decoration: a caller whose own function is {@code isolated} can only construct and call into an
- * isolated one, and the client class is the first thing they construct.
+ * <p>{@code isIsolated} is part of the declaration rather than decoration: a caller whose own function is
+ * {@code isolated} can only construct and call into an isolated client.
  *
  * @param name the client class's name
  * @param description the class's own documentation, verbatim
@@ -40,16 +39,11 @@ public record ClientClass(String name, String description, boolean isIsolated, L
     }
 
     /**
-     * The same declaration as a {@link TypeDef}, which is what makes it addressable.
+     * The same declaration as a {@link TypeDef}, so that the name index (built from {@code TypeDef}s) can
+     * address a client under {@code type}.
      *
-     * <p>{@code type <pkg> Client} used to fail on the one declaration an agent asks for first, because the
-     * name index is built from {@code TypeDef}s and a client was not one. It renders identically either way —
-     * {@code TypeDefs.renderObject} on a {@code CLIENT}-role class emits the same bytes the client renderer
-     * did, which is why that renderer is gone and this conversion is the whole of the fix.
-     *
-     * <p>The two shapes still both exist because they carry different amounts: a client has no fields and no
-     * {@code distinct}/{@code readonly} qualifiers to lose, and Central publishes it under its own key. This is
-     * the widening, done at the one boundary that needs it rather than by flattening the IR.
+     * <p>The two shapes stay separate because a client has no fields and no {@code distinct}/{@code readonly}
+     * qualifiers, and Central publishes it under its own key.
      */
     public TypeDef.ObjectDef asObjectDef() {
         return new TypeDef.ObjectDef(

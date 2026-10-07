@@ -72,11 +72,9 @@ public class PatchesTest {
     /**
      * The whole detail-argument table, every row, in the direction that catches a rot.
      *
-     * <p>This is the pin the mechanism went without for as long as it was silent. The correction matches a
-     * RENDERED intersection, so a change to how {@code &} is spaced — or to which IR case a category becomes
-     * — stops it matching, and a patch that matches nothing produces no failure of its own. Sampling one row
-     * does not help: the version of this that asserted a reachable {@code Detail} record stayed green while
-     * eight of the eleven sites went uncorrected, two of them in http itself.
+     * <p>The correction matches a RENDERED intersection, so a change to how {@code &} is spaced — or to which IR
+     * case a category becomes — stops it matching, and a patch that matches nothing produces no failure of its
+     * own. Sampling one row would not catch that.
      */
     @Test
     public void everyDeclarationInTheDetailArgumentTableGetsItsArgument() {
@@ -107,18 +105,15 @@ public class PatchesTest {
                 rows++;
             }
         }
-        // Eleven across three packages, not five across two. The count is asserted so that deleting a row
-        // from the table cannot pass as "every row still lands".
+        // Asserted so that deleting a row from the table cannot pass as "every row still lands".
         Assert.assertEquals(rows, 11);
     }
 
     @Test
     public void anIntersectionOfTwoNamedErrorsIsLeftAlone() {
-        // The over-reach guard. Widening the correction to aliases and to the unparenthesised spelling put
-        // these two within range of a rule keyed on shape alone: they are unparenthesised intersection
-        // aliases in the same category as `LoadBalanceActionError`, and their members are two named errors
-        // rather than a bare `error`, so their sources give them no argument to restore. The declaration-name
-        // gate is what excludes them.
+        // The over-reach guard: these are unparenthesised intersection aliases like `LoadBalanceActionError`,
+        // but their members are two named errors rather than a bare `error`, so their sources give them no
+        // argument to restore. The declaration-name gate is what excludes them.
         Map<String, String> descriptors = descriptorsOf("ballerina__http");
         Assert.assertEquals(descriptors.get("StatusCodeBindingClientRequestError"),
                 "distinct StatusCodeResponseBindingError & ClientRequestError");
@@ -129,8 +124,8 @@ public class PatchesTest {
     @Test
     public void anErrorWhoseBaseIsAPlainReferenceIsLeftAlone() {
         // The negative half of the pin. Attaching `Detail` at the root `Error` is the intuitive reading of
-        // Central's `detailType`, and it would make roughly 50 of http's 56 errors advertise an `int statusCode`
-        // they do not have.
+        // Central's `detailType`, and it would make most of http's errors advertise an `int statusCode` they do
+        // not have.
         Map<String, TypeDef.ErrorDef> errors = errorsOf("ballerina__http");
         for (String name : new String[] {"SslError", "ListenerError", "ClientError", "AllRetryAttemptsFailed"}) {
             TypeDef.ErrorDef error = errors.get(name);
@@ -143,8 +138,7 @@ public class PatchesTest {
 
     @Test
     public void clientRequestErrorsChainReachesDetailInTheSamePackage() {
-        // Following the chain rather than asserting one line: this is the lookup the recorded corpus came for,
-        // and it is only useful if every hop resolves.
+        // Following the chain rather than asserting one line: it is only useful if every hop resolves.
         Map<String, TypeDef.ErrorDef> errors = errorsOf("ballerina__http");
         Assert.assertEquals(baseOf(errors.get("ClientRequestError")),
                 "(ApplicationResponseError & error<Detail>)");
@@ -165,8 +159,7 @@ public class PatchesTest {
 
     @Test
     public void everyErrorCarriesTheDistinctnessItDeclared() {
-        // Including the one that declares none. The whole point of promoting the field: before this, all 74 error
-        // declarations across the corpus rendered identically as `type X error;`.
+        // Including the one that declares none.
         Map<String, TypeDef.ErrorDef> errors = errorsOf("ballerina__http");
         Assert.assertEquals(errors.size(), 56);
         List<TypeDef.ErrorDef> plain = errors.values().stream()
@@ -185,9 +178,9 @@ public class PatchesTest {
 
     @Test
     public void sapDeclaresClientErrorExactlyOnceAndAsTheReExportItIs() {
-        // SAP-01. `simpleNameReferenceTypes` carried `http:ClientError` all along; once that category is read,
-        // the injection is skipped and the declaration is the real re-export rather than a bare `error`.
-        // Exactly one either way: a duplicate is an ambiguity a name-addressed lookup cannot arbitrate.
+        // `simpleNameReferenceTypes` carries `http:ClientError`, so the declaration is the real re-export rather
+        // than an injected bare `error`. Exactly one: a duplicate is an ambiguity a name-addressed lookup cannot
+        // arbitrate.
         List<TypeDef> named = FixtureCorpus.libraryFor("ballerinax__sap").typeDefs().stream()
                 .filter(typeDef -> typeDef.name().equals("ClientError"))
                 .toList();
@@ -198,31 +191,25 @@ public class PatchesTest {
 
     @Test
     public void sapDeclaresTheFourNamesItPublishesAndNoPhantom() {
-        // SAP-02. `RequestMessage` used to be injected here, on the premise that sap re-exports it and
-        // Central omits it. Neither half held: sap publishes four declarations and this is not one of them,
-        // its own `.bal` files declare no such type, and all eight use sites are `ballerina/http`-qualified
-        // already. The injection rendered as `// Unknown type: RequestMessage` — a placeholder standing in
-        // for a name that is not sap's to declare.
+        // No `RequestMessage`: sap's own `.bal` files declare no such type, and every use site is
+        // `ballerina/http`-qualified already.
         List<String> declared = FixtureCorpus.libraryFor("ballerinax__sap").declarations().stream()
                 .map(TypeDef::name)
                 .sorted()
                 .toList();
         Assert.assertEquals(declared, List.of("CSRFTokenFetchFailure", "ClientError", "TargetType"));
         // And the name still reaches the caller, at every site that mentions it, qualified to the package
-        // that owns it — which is the strictly-true statement the injection replaced with a false one.
+        // that owns it.
         String document = FixtureCorpus.readSnapshot("ballerinax__sap");
         Assert.assertFalse(document.contains("// Unknown type:"));
         Assert.assertEquals(document.split("http:RequestMessage", -1).length - 1, 8);
     }
 
     /**
-     * SLACK-15. The declaration Central omits is injected; the 179 references to it are left as the source
-     * writes them.
+     * The declaration Central omits is injected; the references to it are left as the source writes them.
      *
-     * <p>Pinned in both directions because the previous repair went the other way — it rewrote the 179 field
-     * types to the literal {@code true} and asserted the name was ABSENT from the document. That assertion
-     * was green while the output diverged from slack's own source at 179 lines and denied the existence of a
-     * public declaration.
+     * <p>Pinned in both directions: rewriting the references to the literal {@code true} instead would diverge
+     * from slack's own source and deny the existence of a public declaration.
      */
     @Test
     public void slackDeclaresOkTrueDefOnceAndEveryReferenceResolvesToIt() {
@@ -240,23 +227,17 @@ public class PatchesTest {
                 .orElse(null);
         Assert.assertNotNull(declared, "`type ballerinax/slack OkTrueDef` must resolve");
         Assert.assertEquals(((TypeDef.Alias) declared).type().name(), "true");
-        // No description, because `types.bal:1146` carries no doc comment and inventing one would be the same
-        // category of error as the erasure this replaced.
+        // No description, because `types.bal:1146` carries no doc comment.
         Assert.assertEquals(declared.description(), "");
     }
 
     /**
-     * SHEETS-01, and what is left of {@code fixSheets2dArray} now that the patch is gone.
+     * Central does NOT type sheets' 2D values one dimension short: the payload carries
+     * {@code arrayDimensions: 2} and {@code isParenthesisedType} on the element, so reading it is enough for
+     * all three 2D value fields — {@code Range.values}, {@code ValuesRange.values} and {@code appendValues}'
+     * parameter.
      *
-     * <p>The patch hard-coded this one type on the premise that "Central types it one dimension short". The
-     * premise named the wrong party: the payload carries {@code arrayDimensions: 2} and
-     * {@code isParenthesisedType} on the element, and it was the READER that dropped a dimension. Once
-     * dimensions are read, all three of the package's 2D value fields come out right — this one, which the
-     * patch covered, and {@code ValuesRange.values} plus {@code appendValues}' parameter, which it never
-     * touched and which are therefore the control.
-     *
-     * <p>Keyed on the field's NAME rather than on index 1, which is what the patch was keyed on: a positional
-     * assumption is a claim about Central's field ORDER, which is not the fact under test here.
+     * <p>Keyed on the field's NAME rather than its index: Central's field ORDER is not the fact under test.
      */
     @Test
     public void sheetsReadsTheSecondArrayDimensionAtAllThreeSites() {
@@ -273,25 +254,15 @@ public class PatchesTest {
                         .map(field -> field.type().name())
                         .toList(),
                 List.of("(int|string|decimal)[][]"));
-        // The two the patch never reached, so a regression in the reader cannot hide behind a correction.
+        // The other two sites.
         String document = FixtureCorpus.readSnapshot("ballerinax__googleapis.sheets");
         Assert.assertTrue(document.contains("(int|string|decimal|boolean|float)[][] values;"));
         Assert.assertTrue(document.contains("(int|string|decimal|boolean|float)[][] values,"));
     }
 
     /**
-     * What is left of {@code simplifyGraphQlErrorDetail}, which is deleted.
-     *
-     * <p>The patch rewrote {@code ErrorDetail.locations} because Central resolved it through the GraphQL
-     * parser's internal {@code Location} type. It found that field by name among the members spliced in from
-     * an inclusion — and once the inclusion renders as {@code *parser:ErrorDetail;}, which is byte-for-byte
-     * what {@code records.bal:137-139} declares, there is no {@code locations} member to rewrite. Confirmed
-     * inert before deletion: 0 of graphql's patched lines were its.
-     *
-     * <p>So the assertion is about the declaration being right rather than about a patch working — which is
-     * the direction every one of these should have pointed in the first place. A test that asserts the
-     * OUTCOME lets an inert correction sit undetected for as long as the reader happens to produce the same
-     * answer, and two of them did.
+     * graphql's {@code ErrorDetail} renders as {@code *parser:ErrorDetail;}, byte-for-byte what
+     * {@code records.bal:137-139} declares — so no correction to its spliced-in members is needed.
      */
     @Test
     public void graphqlErrorDetailIsTheInclusionItsSourceDeclares() {
@@ -302,9 +273,7 @@ public class PatchesTest {
                 .findFirst()
                 .orElse(null);
         Assert.assertNotNull(detail);
-        // Closed, as `records.bal:137` declares it. Worth asserting HERE and not only in the corpus snapshot:
-        // this record is the one a patch rewrites, and `mapRecord` rebuilt it through a constructor that
-        // defaulted `isClosed` to false — silently reopening the single declaration a patch had touched.
+        // Closed, as `records.bal:137` declares it.
         Assert.assertTrue(detail.isClosed());
         Assert.assertEquals(detail.fields().size(), 1);
         RecordField only = detail.fields().get(0);
@@ -313,14 +282,8 @@ public class PatchesTest {
     }
 
     /**
-     * HTTP-03. The service packages describe their own services, and now say so.
-     *
-     * <p>{@code addGenericServices} replaced whatever Central described with three comment lines, on the
-     * premise that it described nothing. It described everything: http publishes one listener and seven
-     * service types, graphql one and two, and every one of them is a real {@code distinct service object} in
-     * its package's source. The three lines it substituted were also wrong about the listener — they gave
-     * http's {@code init} one parameter of two and dropped its {@code returns ListenerError?}, and gave
-     * graphql's {@code int} where the declared type is {@code int|http:Listener}.
+     * The service packages describe their own services: Central publishes every listener and service type,
+     * each a real {@code distinct service object} in its package's source, so no generic stand-in replaces them.
      */
     @Test
     public void theServicePackagesDescribeTheirOwnServices() {
@@ -334,7 +297,7 @@ public class PatchesTest {
                         .map(Service::name)
                         .toList(),
                 List.of("Service"));
-        // Their contracts are the declarations in the Types section, which is where they always were.
+        // Their contracts are the declarations in the Types section.
         String document = FixtureCorpus.readSnapshot("ballerina__http");
         Assert.assertFalse(document.contains("// --- Service (generic) ---"));
         Assert.assertTrue(document.contains(
@@ -346,11 +309,9 @@ public class PatchesTest {
     /**
      * The one correction the corpus cannot reach, given a tripwire of its own.
      *
-     * <p>There is no {@code ballerinax/client.config} fixture, so until now this was a verified fact with
-     * nothing guarding it — one deleted line and nothing would have gone red. It is verified: the compiler
-     * rejects {@code import ballerinax/client.config;} with {@code invalid token 'client'} and accepts
-     * {@code import ballerinax/'client.config;}. The rejected token is {@code client}, a keyword that
-     * prefixes {@code client class} — not {@code config}, which the patch's javadoc used to blame.
+     * <p>There is no {@code ballerinax/client.config} fixture. The compiler rejects
+     * {@code import ballerinax/client.config;} with {@code invalid token 'client'} and accepts
+     * {@code import ballerinax/'client.config;}: the rejected token is {@code client}, not {@code config}.
      *
      * <p>Asserted through {@code applyPatches} on a hand-built library rather than through a fixture, because
      * the fact under test is about the NAME and needs no payload at all.
@@ -369,9 +330,9 @@ public class PatchesTest {
     public void applyingThePatchesTwiceChangesNothing() {
         // Two properties in one, and both are worth keeping. For github and postgresql it says the patches are
         // narrow: nothing keys on them, so a second pass is trivially identity. For kafka — which a patch DOES
-        // key on since the detail-argument table reached it — it says the correction is idempotent, because a
-        // restored intersection no longer ends in the bare `error` the pattern looks for. A correction that
-        // applied twice would render `error<PartitionOffset><PartitionOffset>`.
+        // key on — it says the correction is idempotent, because a restored intersection no longer ends in the
+        // bare `error` the pattern looks for. A correction that applied twice would render
+        // `error<PartitionOffset><PartitionOffset>`.
         for (String slug : new String[] {"ballerinax__github", "ballerinax__kafka", "ballerinax__postgresql"}) {
             Assert.assertEquals(
                     Patches.applyPatches(FixtureCorpus.libraryFor(slug)),

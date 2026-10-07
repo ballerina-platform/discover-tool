@@ -33,12 +33,8 @@ import java.util.regex.Pattern;
 /**
  * Operations by path.
  *
- * <p>Discovery is what this exists for. The recorded golden trace greps for
- * {@code repos/[string owner]/[string repo]} because the model already had GitHub's REST API memorised —
- * measured, an agent without that knowledge has nowhere to go, since the roster says {@code repos(421)} and
- * a substring search for {@code repos} returns 484 hits. A path tree is the answer that does not need the
- * answer: {@code ballerinax/github}'s 903 operations reduce to 36 top-level segments in 445 bytes, and each
- * level names the next.
+ * <p>A path tree needs no prior knowledge of the API: {@code ballerinax/github}'s 903 operations reduce to 36
+ * top-level segments, and each level names the next.
  *
  * @param segment the display segment this node is reached by; empty at the root
  * @param isParam whether the segment is a path parameter rather than a literal
@@ -62,15 +58,9 @@ public record PathTree(
     public sealed interface Resolution {
 
         /**
-         * The path resolved. {@code alsoMatched} is the branches a wildcard token matched and did NOT take.
-         *
-         * <p>GITHUB-02. {@code *} matches any child and {@code resolve} takes the first, and children are
-         * ordered busiest-first — so {@code *} meant "the busiest branch", not "this level". On github that
-         * silently dropped {@code post repos/&#123;templateOwner&#125;/&#123;templateRepo&#125;/generate} from
-         * {@code 'repos/*&#47;*' --sigs} (420 of 421) and four of the nine {@code commits} operations, with
-         * nothing in the header to say so. The level view already had this discipline for auto-descent —
-         * "the skipping cannot be silent" — and the wildcard, which is the idiom the README recommends, did
-         * not.
+         * The path resolved. {@code alsoMatched} is the branches a wildcard token matched and did NOT take:
+         * {@code *} takes the first child, and children are ordered busiest-first, so without naming the rest
+         * {@code *} would silently mean "the busiest branch" rather than "this level".
          *
          * @param node the tree node the path resolved to
          * @param path the resolved path, in display spelling
@@ -91,7 +81,6 @@ public record PathTree(
          */
         record Missing(List<String> matched, String token, List<PathTree> children) implements Resolution {
 
-            /** The child segments, as a report lists them. */
             public List<String> available() {
                 return children.stream().map(PathTree::segment).toList();
             }
@@ -116,8 +105,7 @@ public record PathTree(
      * <p>Central publishes github's paths as Ballerina writes them: {@code code\-scanning}, because
      * {@code -} needs escaping in an identifier, and {@code 'import}, because {@code import} is a reserved
      * word. Those are correct INSIDE a fence, where the line is a quotation of source — and unusable in
-     * prose or as a shell argument, which is where an agent has to type them. Unescaping here and matching
-     * tolerantly below is the same two-registers split the whole design rests on.
+     * prose or as a shell argument, which is where an agent has to type them.
      */
     public static String readableSegment(String text) {
         return text.replaceAll("^'", "").replaceAll("\\\\(?=[^A-Za-z0-9_])", "");
@@ -126,11 +114,8 @@ public record PathTree(
     /**
      * A whole selector unescaped — every segment of it, not just the first.
      *
-     * <p>{@link #readableSegment} takes ONE segment, which is all the path walk ever hands it. A selector is not
-     * one segment: {@code post chat\.postMessage} carries an accessor and a path in a single argument, and
-     * {@code get repos/{owner}/{repo}/code\-scanning} carries five. Those arrive as one token from a caller who
-     * copied a line out of a fenced signature, and they are compared against an entry's label rather than walked,
-     * so they need the same normalisation applied across the whole string.
+     * <p>A selector copied out of a fenced signature ({@code post chat\.postMessage}) carries an accessor and
+     * several segments in one argument, and is compared against an entry's label rather than walked.
      *
      * <p>The {@code '} strip is anchored at a segment boundary rather than global: an apostrophe INSIDE a name is
      * part of it, and {@code 'key} is only a quoted identifier where a segment starts.
@@ -200,12 +185,10 @@ public record PathTree(
     /**
      * Walk a path from the FIRST segment, one token per level.
      *
-     * <p>Anchoring is the whole contract. An unanchored or suffix match for {@code repos/{owner}/{repo}} on
-     * github returns NINE operations rather than three, because
-     * {@code orgs/{org}/teams/{slug}/repos/{owner}/{repo}} and {@code teams/{id}/repos/{owner}/{repo}} share
-     * the suffix and belong to unrelated subtrees. A caller that asked for one path and got three others
-     * mixed in has no way to tell — which makes substring matching not a convenience but a correctness bug,
-     * and the reason this walks the tree instead of filtering strings.
+     * <p>Anchoring is the whole contract. A suffix match for {@code repos/:owner/:repo} on github returns NINE
+     * operations rather than three, because {@code orgs/:org/teams/:slug/repos/:owner/:repo} and
+     * {@code teams/:id/repos/:owner/:repo} share the suffix and belong to unrelated subtrees, and the caller has
+     * no way to tell.
      */
     public static Resolution resolve(PathTree root, List<String> tokens) {
         PathTree node = root;
@@ -257,12 +240,8 @@ public record PathTree(
      *   <li>none → the anchored answer, which already names the failing segment and the deepest working prefix.
      * </ol>
      *
-     * <p>ANCHORING ITSELF IS UNTOUCHED, and that is the point. Unanchored matching of
-     * {@code repos/&#123;owner&#125;/&#123;repo&#125;} on github returns NINE operations rather than three,
-     * pulling in two unrelated team-access subtrees with nothing in the output to say so. Locating the missed
-     * segments under a matched prefix is a different operation from matching a suffix anywhere: the first
-     * token must match directly, and a request that missed on its first token is only searched for when it is
-     * that one token.
+     * <p>This is not suffix matching, which {@link #resolve} explains is unsafe: the first token must match
+     * directly, and a request that missed on its first token is only searched for when it is that one token.
      */
     public static Located locate(PathTree root, List<String> tokens) {
         Resolution direct = resolve(root, tokens);
@@ -320,13 +299,9 @@ public record PathTree(
         }
         String bare = node.segment().replaceFirst("^:\\.{0,3}", "");
         boolean rest = node.segment().startsWith(":...");
-        // Four spellings, because a path arrives from four places. `:owner` is what the tree prints now,
-        // `{owner}` is what it used to print, `owner` is what an agent types from memory, and
-        // `[string owner]` is the DECLARATION form — the one inside every fenced signature this tool emits, so
-        // it is the likeliest thing a caller copies. Rejecting it made the tool's own output an argument it
-        // would not accept. A REST parameter's brace spelling carries the same leading ellipsis the tree does
-        // (`{...path}`, not `{path}`) — dropping it here would silently reject the one legacy spelling this
-        // tool used to print for exactly this kind of segment.
+        // Four spellings: `:owner` (what the tree prints), `{owner}` (the legacy spelling; a rest parameter's
+        // is `{...path}`), `owner` (typed from memory) and `[string owner]` (the declaration form inside every
+        // fenced signature this tool emits, so the likeliest thing a caller copies).
         return token.equals(bare) || token.equals(":" + bare)
                 || token.equals("{" + bare + "}") || (rest && token.equals("{..." + bare + "}"))
                 || declaredName(token).equals(bare);
@@ -350,9 +325,9 @@ public record PathTree(
     /**
      * Step down through levels that add no routing choice, and NAME what was skipped.
      *
-     * <p>{@code ops <pkg> repos} should land on the operations, not on a level whose only content is "there
+     * <p>Drilling into {@code repos} should land on the operations, not on a level whose only content is "there
      * is a parameter here". But the skipping cannot be silent: {@code repos} genuinely has two parameter
-     * children with different spellings — {@code {owner}} with 420 operations and {@code {templateOwner}}
+     * children with different spellings — {@code :owner} with 420 operations and {@code :templateOwner}
      * with 1 — and collapsing to the dominant one without saying so hides an operation permanently, since
      * nothing downstream would ever mention it again.
      *

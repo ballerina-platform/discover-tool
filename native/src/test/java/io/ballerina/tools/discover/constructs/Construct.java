@@ -23,25 +23,18 @@ package io.ballerina.tools.discover.constructs;
  *
  * <p>{@code renders} is what the reader prints TODAY. {@code shouldRender} is what the construct's own
  * Ballerina declaration is. Where they are equal the case carries {@code shouldRender = null} and is a
- * plain regression guard; where they differ the case names the finding — a register ID (see
- * {@link #finding}) from this package's pre-migration fidelity audit, a document that predates this
- * repository and is not checked in here.
+ * plain regression guard; where they differ the case names the finding (see {@link #finding}).
  *
- * <p>Holding both is the design decision worth explaining. A suite that asserted only the correct answer
- * would be 30-odd failures on a green checkout, so it would be switched off; a suite that asserted only
- * today's output would go green after a fix that changed nothing and give no clue what the fix owed. With
- * both, a checkout is green, a construct that moves for the wrong reason fails by name, and a construct
- * that moves for the RIGHT reason fails too — with a message saying the finding closed and the row should
- * be promoted. That last failure is the point: it is how a stage of the fix plan proves it did what it
- * claimed to a construct nobody had to remember to re-check.
+ * <p>Why both: asserting only the correct answer would leave a green checkout full of failures, so the suite
+ * would be switched off; asserting only today's output would go green after a fix that changed nothing. With
+ * both, a construct that moves for the wrong reason fails by name, and one that moves for the RIGHT reason
+ * fails too, saying the finding closed and the row should be promoted.
  *
  * @param id a stable dotted name, {@code dimension/case}, used in failure messages
  * @param dimension which syntax family this belongs to, for the per-dimension coverage assertion
  * @param claim one line stating what the case establishes, in the vocabulary of the language
- * @param finding the register IDs explaining the gap, comma-separated, or {@code null} when the output is
- *     already faithful. Plural because a construct is sometimes wrong in more than one way at once — an
- *     error's detail argument is dropped AND its intersection loses the separating space — and naming only
- *     one of them would leave the other with no test
+ * @param finding the register IDs explaining the gap, comma-separated (a construct can be wrong in more than
+ *     one way at once), or {@code null} when the output is already faithful
  * @param payload the synthetic Central payload — exactly one construct
  * @param renders what the reader prints today, verbatim
  * @param shouldRender the correct Ballerina, or {@code null} when {@code renders} is already correct
@@ -96,7 +89,6 @@ public record Construct(
         return shouldRender != null;
     }
 
-    /** The register IDs this case pins, as a list. */
     public java.util.List<String> findings() {
         return finding == null ? java.util.List.of() : java.util.List.of(finding.split(",\\s*"));
     }

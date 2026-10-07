@@ -129,10 +129,8 @@ public final class HttpOptions {
     /**
      * The same options with {@code --refresh} applied.
      *
-     * <p>The CLI cannot build these itself: the transport and the cache are handed to it by the process wrapper,
-     * and the flag is not known until the arguments are parsed. Without this the flag parses and is then silently
-     * dropped, which is the exact failure the grammar refuses everywhere else — and worse here, because
-     * {@code --refresh} is the recovery a {@code symbol-not-found} failure recommends.
+     * <p>The CLI cannot build these itself: the transport and the cache come from the process wrapper, and the flag
+     * is not known until the arguments are parsed.
      */
     public HttpOptions withRefresh(boolean value) {
         if (value == refresh) {
@@ -180,7 +178,7 @@ public final class HttpOptions {
         sleeper.sleep(millis);
     }
 
-    /** Everything unset, plus a transport. */
+    /** Production defaults until overridden. */
     public static final class Builder {
 
         private HttpTransport transport;

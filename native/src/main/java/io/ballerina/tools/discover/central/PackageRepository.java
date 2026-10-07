@@ -29,12 +29,9 @@ import java.util.Optional;
  * Where a package's version and its docs payload come from — the seam a source other than Ballerina Central
  * implements identically, so {@link io.ballerina.tools.discover.Loader} never special-cases one.
  *
- * <p>{@link io.ballerina.tools.discover.Loader.LoadOptions} holds an ORDERED LIST of these, not one: the RFC's
- * multi-source repository interface (Central, a local "Local Central" cache, Artifactory) means several sources
- * are candidates for the same lookup, tried in order until one answers. Ballerina Central is the only
- * implementation this phase ships ({@link CentralRepository}), and the only element that list ever holds yet — a
- * local cache and Artifactory-backed repositories are additive later work behind this same interface, not
- * designed here.
+ * <p>{@link io.ballerina.tools.discover.Loader.LoadOptions} holds an ordered list of these, tried in order until
+ * one answers (the RFC's multi-source repository interface). {@link CentralRepository} is the only implementation
+ * yet.
  *
  * @since 0.1.0
  */

@@ -55,10 +55,8 @@ import java.util.regex.Pattern;
  *       the JSON, never the code
  * </ul>
  *
- * <p>PACKAGE-FIRST, not verb-first. {@code bal discover <org/name> [bucket] [args...]} resolves the package, then
- * the bucket, then the rest — there is exactly one picocli command, and {@code bucket} is a plain positional value
- * rather than a subcommand, since a package resolving to a bucket resolving to a member is one drill-down, not a
- * mode switch.
+ * <p>{@code bal discover <org/name> [bucket] [args...]} is one picocli command, and {@code bucket} a plain positional
+ * value rather than a subcommand: package, then bucket, then member is one drill-down, not a mode switch.
  *
  * <p>No {@link System#exit} here, and no environment read: the cache, the transport and the project directory
  * arrive as arguments, so a test drives the real command against a recorded payload and a temporary directory.
@@ -145,8 +143,7 @@ public final class Cli {
             return fail(unknownBucket(bucket), streams);
         }
 
-        // `--refresh` is only known once arguments are parsed. The transport and the cache arrive from the process
-        // wrapper, so the options are rebuilt here rather than there.
+        // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
         HttpOptions resolved = http.withRefresh(root.refresh);
         Loader.LoadOptions options = new Loader.LoadOptions(
                 resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, root.version);
@@ -178,8 +175,6 @@ public final class Cli {
         }
         List<String> selectors = rest.subList(1, rest.size());
         if (Readme.BUCKET.equals(bucket)) {
-            // Not derived from call-site grammar, so it shares no code with Containers — see Readme's own class
-            // comment for why.
             return Readme.render(loaded, new Readme.Options(
                     selectors.isEmpty() ? null : String.join(" ", selectors), filter, page));
         }
@@ -216,10 +211,6 @@ public final class Cli {
         streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result, where)) + "\n");
     }
 
-    // -----------------------------------------------------------------------
-    // Dispatch
-    // -----------------------------------------------------------------------
-
     private static Failure unknownBucket(String token) {
         return new Failure.Validation(
                 "'" + token + "' is not a bucket.",
@@ -252,10 +243,6 @@ public final class Cli {
     private static boolean jsonOutput(String output, boolean interactive) {
         return output != null ? Commands.JSON_OUTPUT.equals(output) : !interactive;
     }
-
-    // -----------------------------------------------------------------------
-    // Argument errors
-    // -----------------------------------------------------------------------
 
     private static Failure validate(Commands.Root root) {
         Failure output = rejectInvalidOutput(root);

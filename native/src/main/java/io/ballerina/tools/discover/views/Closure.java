@@ -89,7 +89,6 @@ public final class Closure {
             return !omitted.isEmpty();
         }
 
-        /** The printed declarations, in walk order. */
         public List<DiscoverResult.Signature.Type> types(Declarations index) {
             return names.stream()
                     .map(name -> new DiscoverResult.Signature.Type(name, TypeDefs.renderTypeDef(index.get(name))))
@@ -124,8 +123,6 @@ public final class Closure {
                 queue.add(new Step(root, 0));
             }
         }
-        // The roots are charged but not checked: they are the question, and a budget that can refuse the
-        // question is not a budget, it is a refusal.
         int spent = order.stream().mapToInt(name -> cost(name, index)).sum();
 
         while (!queue.isEmpty()) {
@@ -155,12 +152,6 @@ public final class Closure {
         return new Result(List.copyOf(order), List.copyOf(omitted));
     }
 
-    /**
-     * One entry of the walk, carrying how far from a root it was reached.
-     *
-     * @param name the declaration reached
-     * @param depth how many steps from a root it took to reach it
-     */
     private record Step(String name, int depth) { }
 
     private static int cost(String name, Declarations index) {
@@ -168,13 +159,7 @@ public final class Closure {
         return typeDef == null ? 0 : Texts.byteLength(TypeDefs.renderTypeDef(typeDef)) + 2;
     }
 
-    /**
-     * The same-package declarations a signature names — its parameters' types and its return's.
-     *
-     * <p>This is the entry point that lets a callable have a closure at all. Deliberately the same walk afterwards:
-     * a signature's types are just another set of roots, so there is one closure implementation rather than one
-     * per entry point that could disagree about cycles or budgets.
-     */
+    /** The same-package declarations a signature names — its parameters' types and its return's. */
     public static List<String> rootsOf(Fn fn, Declarations index) {
         List<String> roots = new ArrayList<>();
         for (Param param : fn.params()) {
@@ -226,10 +211,6 @@ public final class Closure {
         return List.copyOf(names);
     }
 
-    // -----------------------------------------------------------------------
-    // Reading a declaration's type expressions
-    // -----------------------------------------------------------------------
-
     /**
      * Every type expression a declaration mentions.
      *
@@ -245,7 +226,6 @@ public final class Closure {
             case TypeDef.Variable variable -> List.of(variable.varType());
             case TypeDef.ErrorDef error -> error.base().map(List::of).orElse(List.of());
             case TypeDef.Enumeration ignored -> List.of();
-            // A class's dependencies are its members': the declaration itself has none to walk.
             case TypeDef.ObjectDef object -> objectExpressions(object);
         };
     }

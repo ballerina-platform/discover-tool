@@ -104,8 +104,8 @@ public class KeySpaceTest {
      * Central spells a rest field's absent name two ways, and both have to parse.
      *
      * <p>Every rest field in the corpus carries {@code "name": ""} — an empty string, which a required-string
-     * check accepts. {@code ballerina/time} omits the key entirely, and requiring the string rejected the WHOLE
-     * document over it: all six verbs, {@code guide} included, for a field that by definition has no name.
+     * check accepts. {@code ballerina/time} omits the key entirely, and requiring the string would reject the
+     * WHOLE document over a field that by definition has no name.
      * The corpus cannot catch this on its own, so the shape is reproduced here by deleting the key.
      */
     @Test

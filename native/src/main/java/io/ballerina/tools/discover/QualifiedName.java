@@ -66,12 +66,7 @@ public final class QualifiedName {
         return org + "/" + name;
     }
 
-    /**
-     * {@code org/name:version} — the label every document and every failure identifies a lookup by.
-     *
-     * <p>One method because it was hand-built at four sites, and a label that differs between a
-     * document header and the failure about that document is a label an agent cannot correlate.
-     */
+    /** {@code org/name:version} — the label every document and every failure identifies a lookup by. */
     public String versioned(Version version) {
         return qualified() + ":" + version.text();
     }

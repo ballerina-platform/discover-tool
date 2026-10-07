@@ -33,7 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The cut the four container verbs address, and the one property that makes it safe.
+ * The cut the four container buckets address, and the one property that makes it safe.
  *
  * <p>{@code client}, {@code service}, {@code class} and {@code funcs} are only worth splitting if the split is
  * EXHAUSTIVE and DISJOINT: every callable declaration is addressed by exactly one of them, with one deliberate
@@ -172,9 +172,9 @@ public class SurfaceTest {
     /**
      * The rule Central's own filing cannot express.
      *
-     * <p>SQL-03's shape, and it is present in this corpus too: {@code ballerina/http} declares
-     * {@code ClientObject} and {@code StatusCodeClientObject} as {@code client object} types, so Central files
-     * them among the ordinary declarations and NOT under {@code clients}. A verb reading that array would leave
+     * <p>{@code ballerina/http} declares {@code ClientObject} and {@code StatusCodeClientObject} as
+     * {@code client object} types, so Central files them among the ordinary declarations and NOT under
+     * {@code clients}. A bucket reading that array would leave
      * both unaddressable while reporting the package has eight clients.
      */
     @Test
@@ -193,7 +193,7 @@ public class SurfaceTest {
 
     @Test
     public void theModuleScopeIsOneAnonymousContainerOrNoneAtAll() {
-        // `funcs` shares every line of resolution and rendering with the other two verbs, which is only possible
+        // `funcs` shares every line of resolution and rendering with the other buckets, which is only possible
         // because a module's functions arrive wearing the same shape as a client's.
         List<Surface.Container> uuidLike =
                 Surface.of(FixtureCorpus.libraryFor("ballerina__http"), Surface.Scope.MODULE);
@@ -202,7 +202,7 @@ public class SurfaceTest {
         Assert.assertEquals(uuidLike.get(0).name(), "");
         Assert.assertEquals(uuidLike.get(0).functions().size(), 7);
 
-        // A package with none gets an empty list rather than an empty container, so the verb can say where the
+        // A package with none gets an empty list rather than an empty container, so the bucket can say where the
         // callable surface actually is instead of printing a heading with nothing under it.
         Assert.assertTrue(Surface.of(FixtureCorpus.libraryFor("ballerinax__github"), Surface.Scope.MODULE)
                 .isEmpty());
@@ -210,7 +210,6 @@ public class SurfaceTest {
 
     @Test
     public void aConstructorIsAMemberNamedInitAndUsedToBeReachableFromNoVerb() {
-        // T14. `ops` could not address one, and `overview --client <Name>` was the only document that carried it.
         Surface.Container client = client("ballerinax__github", "Client");
         Assert.assertTrue(client.constructor().isPresent());
         Assert.assertTrue(client.memberNames().contains("init"));
@@ -219,7 +218,7 @@ public class SurfaceTest {
 
     @Test
     public void whetherAContainerDeclaresResourceFunctionsIsWhatChoosesTheSelectorGrammar() {
-        // Not a per-verb property: `ballerina/http`'s Client is a legal argument to BOTH `client` and `class`,
+        // Not a per-bucket property: `ballerina/http`'s Client is a legal argument to BOTH `client` and `class`,
         // and it declares seven resource functions either way.
         Assert.assertTrue(client("ballerinax__github", "Client").hasPaths());
         Assert.assertTrue(client("ballerina__http", "Client").hasPaths());

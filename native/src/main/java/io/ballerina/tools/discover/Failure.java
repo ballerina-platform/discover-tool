@@ -105,13 +105,10 @@ public sealed interface Failure {
             implements Failure { }
 
     /**
-     * The one route left when Central itself is the problem, and the reason the three failures below
-     * can all end the same way: the {@code .bala} of a resolved version carries the same signatures
-     * Central serves, so a lookup blocked at the network is not a lookup without an answer. It follows
-     * a retry rather than replacing one because the tree only exists for a package some build already
-     * pulled. Every suggestion that admits defeat has to close the door a blocked agent otherwise
-     * walks through — writing the call from a remembered API — because that is the failure this tool
-     * exists to prevent, and it is measurably what happens when nothing forbids it.
+     * The route left when Central itself is the problem: a resolved version's {@code .bala} carries the same
+     * signatures Central serves, but only if some build already pulled it, so it follows a retry. Every
+     * suggestion that admits defeat must forbid writing the call from a remembered API — the failure this tool
+     * exists to prevent, and measurably what a blocked agent does otherwise.
      */
     String OFFLINE_FALLBACK = "read the resolved version's sources under "
             + "`~/.ballerina/repositories/central.ballerina.io/bala/<org>/<name>/`, which exist if a "
@@ -119,10 +116,8 @@ public sealed interface Failure {
             + "fall back to a remembered signature.";
 
     /**
-     * The suggestions for the three failures that fire when the outside world is the problem, kept
-     * here rather than at each construction site because more than one module raises each of them and
-     * an agent branching on {@code kind} should never see two different instructions for the same
-     * condition.
+     * Shared rather than written at each construction site: more than one module raises each of these, and one
+     * {@code kind} must never carry two different instructions.
      */
     String UPSTREAM_SUGGESTION = "Central answered badly. Run the same command once more; if it "
             + "persists, " + OFFLINE_FALLBACK;
@@ -150,11 +145,7 @@ public sealed interface Failure {
         };
     }
 
-    /**
-     * The one line a failing run writes to stderr. Kept as a single JSON object so an agent can read
-     * it without a parser and a human can read it without tools; {@code kind} is the field worth
-     * branching on.
-     */
+    /** The one line a failing run writes to stderr: a single JSON object. */
     default String describe() {
         JsonObject json = new JsonObject();
         json.addProperty("kind", kind());

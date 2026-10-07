@@ -35,18 +35,12 @@ import java.util.List;
 /**
  * A one-construct Central payload, and the real pipeline that turns it into Ballerina.
  *
- * <p>This is the whole point of the construct suite. The recorded corpus proves the pipeline against nine
- * real packages, which is what catches a regression in aggregate — but a 20,000-line snapshot diff does not
- * say WHICH language construct moved, and a construct no package in the corpus happens to use is not
- * covered at all even though every line of the code that would handle it reports as covered.
- *
- * <p>So a case here is a payload containing exactly one declaration, exercising exactly one syntax
- * dimension, run through {@link Pipeline} — {@link Schema} → {@link FromCentral} → patches → defaults —
- * and then {@link Documents}: the same path the {@code api} verb takes, with nothing stubbed. Through
- * {@code Pipeline} and not the stages by hand, because a suite that assembles its own pipeline stops
- * describing the product the moment one gains a stage. A fix that changes how closed records render
- * fails the closed-record case by name and leaves the other fifty-odd alone, which is the property that
- * makes the fidelity register's stages safe to land one at a time.
+ * <p>The recorded corpus catches a regression in aggregate, but a snapshot diff does not say WHICH language
+ * construct moved, and a construct no recorded package uses is not covered at all. So a case here is a
+ * payload containing exactly one declaration, exercising exactly one syntax dimension, run through
+ * {@link Pipeline} — {@link Schema} → {@link FromCentral} → patches → defaults — and then {@link Documents},
+ * with nothing stubbed. Through {@code Pipeline} and not the stages by hand, because a suite that assembles
+ * its own pipeline stops describing the product the moment one gains a stage.
  *
  * <p>The package is {@code test/pkg} rather than a real name so that no per-package patch applies. Cases
  * that exist to test a patch name the package the patch keys on.
@@ -168,7 +162,7 @@ public final class Payload {
         return selected.value();
     }
 
-    /** The whole {@code api} document, header and all. */
+    /** The whole document, header and all. */
     public String document() {
         return Documents.toSyntaxString(library());
     }
@@ -176,10 +170,8 @@ public final class Payload {
     /**
      * The document from its first section banner on, trailing newlines removed.
      *
-     * <p>The header is four lines of package name that every case would otherwise repeat, and repeating it
-     * fifty times would make the matrix about the header. The banner itself is KEPT: which section a
-     * declaration lands in is part of what the reader promises, and two of the registered findings are
-     * about a declaration landing in the wrong one or in none.
+     * <p>The header would otherwise be repeated by every case. The banner itself is KEPT: which section a
+     * declaration lands in is part of what the reader promises.
      */
     public String body() {
         String document = document();

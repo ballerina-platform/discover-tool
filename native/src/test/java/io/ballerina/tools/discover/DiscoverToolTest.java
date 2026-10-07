@@ -35,9 +35,7 @@ import java.util.List;
  * The process wrapper, and the usage text as a golden file.
  *
  * <p>{@link CliTest} proves the behaviour; this proves the two things only the wrapper owns: that {@code bal} hands
- * the whole argument list through to us unparsed, and that the usage text has not drifted. There is one usage page
- * now, not one per verb — the grammar collapsed to a single flat command — so this file is far smaller than its
- * verb-first predecessor.
+ * the whole argument list through to us unparsed, and that the usage text has not drifted.
  *
  * @since 0.1.0
  */
@@ -46,13 +44,7 @@ public class DiscoverToolTest {
     private static final Path COMMAND_OUTPUTS =
             Path.of("src", "test", "resources", "command-outputs", "unix");
 
-    /**
-     * The tool driven the way {@code bal} drives it: through picocli, into the raw argument list.
-     *
-     * @param exitCode the code the run finished with
-     * @param stdout everything written to stdout
-     * @param stderr everything written to stderr
-     */
+    // The tool driven the way `bal` drives it: through picocli, into the raw argument list.
     private record Run(int exitCode, String stdout, String stderr) { }
 
     private static Run run(String... argv) {
@@ -113,11 +105,7 @@ public class DiscoverToolTest {
         Assert.assertFalse(text.contains("language server"), "no document mentions the language server");
     }
 
-    /**
-     * {@code --all}, {@code -s/--search} and {@code -r/--resolve-types} appear in no help text at all — the RFC
-     * has no equivalent for any of them, so unlike the earlier grammar's {@code --all} (hidden but still parsed),
-     * these are gone outright.
-     */
+    /** The RFC has no equivalent for any of these, so they are gone outright rather than hidden. */
     @Test
     public void deadFlagsAppearNowhereInTheUsageText() {
         String text = usage("--help");

@@ -23,9 +23,8 @@ package io.ballerina.tools.discover.model;
  *
  * <p>{@link Form} is what the member is WRITTEN as, and the three forms are not interchangeable: an
  * inclusion states that another record's fields are part of this one, and a rest field states what an open
- * record's extra fields may hold. Both were previously flattened into declared fields — an inclusion by
- * copying the included record's members in, which loses the link and lets a member overwrite a local
- * declaration, and a rest field by printing its type followed by an empty name.
+ * record's extra fields may hold. Flattening an inclusion into copied members would lose the link and let a
+ * member overwrite a local declaration.
  *
  * <p>One record with a form rather than a sealed triple, because all three genuinely carry a type and the
  * renderer's job is to spell that type differently. {@code name} is empty for the two forms that have none.

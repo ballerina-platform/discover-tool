@@ -42,12 +42,7 @@ public class ReadmeTest {
         return FixtureCorpus.fixtureRows();
     }
 
-    /**
-     * One module of an assembled payload. A {@code null} readme means the key is absent entirely.
-     *
-     * @param id the module's name
-     * @param readme the module's readme, or {@code null} to omit the key entirely
-     */
+    // One module of an assembled payload. A `null` readme means the key is absent entirely.
     private record Stub(String id, String readme) { }
 
     // Built from a real module because the schema requires every array; a hand-written stub would not parse.

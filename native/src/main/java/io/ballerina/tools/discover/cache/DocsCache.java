@@ -31,24 +31,19 @@ import java.util.List;
  *
  * <p>NOTHING HERE MAY THROW OR REPORT. Cache trouble is never the caller's problem: an unwritable
  * directory, a foreign owner, a full disk and a corrupt entry all have to come out as "no cached copy",
- * with no byte on stdout, no byte on stderr and no non-zero exit. The alternative — an unusable
- * {@code BAL_DISCOVER_CACHE_DIR} failing the run as {@code validation} — sends the agent into the skill's
- * argument-error advice in a loop it can never escape.
+ * with no byte on stdout, no byte on stderr and no non-zero exit. An unusable {@code BAL_DISCOVER_CACHE_DIR}
+ * failing the run as {@code validation} would loop an agent on argument errors it can never fix.
  *
  * <p>WHAT IS CACHED IS THE RAW PAYLOAD, not the IR and not the rendered string. The IR and the rendering are
  * our code, so an IR entry's key would need a build identity in it. The raw payload is not derived from our
  * code, so the coordinates are the whole key. Re-deriving costs about 200ms of parse and transform against
  * 5 to 7 seconds of download.
  *
- * <p>THE KEY'S ONLY IDENTITY DIMENSION IS WHICH REPOSITORY ANSWERED. That is deliberate and load-bearing now
- * that {@code Loader} tries an ORDERED LIST of {@link io.ballerina.tools.discover.central.PackageRepository}
- * sources for one lookup (the RFC's multi-source interface — Central, a local "Local Central" cache,
- * Artifactory): two sources are free to publish different bytes at the same {@code org/name/version}, so an
- * entry from one must never be read back as if it came from another. Beyond that one dimension, the same
- * caveat as before holds: this is correct only while the transport sends no headers and only public data is
- * reachable per repository. If a token is ever threaded through the options, this cache must be disabled or
- * keyed by a token fingerprint too: {@code $HOME} outlives the per-task workspace scrub, and a 0600 mode buys
- * nothing against the same user.
+ * <p>THE KEY'S ONLY IDENTITY DIMENSION IS WHICH REPOSITORY ANSWERED: two
+ * {@link io.ballerina.tools.discover.central.PackageRepository} sources may publish different bytes at the same
+ * {@code org/name/version}. That is correct only while the transport sends no headers and only public data is
+ * reachable. If a token is ever threaded through the options, this cache must be disabled or keyed by a token
+ * fingerprint too: a 0600 mode buys nothing against the same user.
  *
  * @since 0.1.0
  */
@@ -131,11 +126,7 @@ public interface DocsCache {
      */
     List<String> listVersions(PackageKey key);
 
-    /**
-     * One line for {@code --help}. The only place the cache is allowed to speak, and it is on stderr beside
-     * usage text, outside both the document and the {@code Failure} contract — which is how an operator
-     * proves the cache is alive in a runner image without parsing anything.
-     */
+    /** One line naming where the cache lives, or why there is none. */
     String describe();
 
     /** A cache that stores nothing and says so. */

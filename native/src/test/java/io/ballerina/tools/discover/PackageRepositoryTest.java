@@ -181,7 +181,7 @@ public class PackageRepositoryTest {
     }
 
     /**
-     * No source is never a failure, and never the old cross product: the attach target is confirmed and every other
+     * No source is never a failure: the attach target is confirmed and every other
      * service type is paired with the "not confirmed" hedge, rather than dropped.
      */
     @Test
@@ -302,10 +302,6 @@ public class PackageRepositoryTest {
         Assert.assertEquals(second.resolveCalls, 0, "a module mismatch must not trigger fallback to a repository");
         Assert.assertEquals(second.fetchCalls, 0);
     }
-
-    // -----------------------------------------------------------------------
-    // --module across several repositories
-    // -----------------------------------------------------------------------
 
     private static final QualifiedName GRAPHQL = QualifiedName.parse("ballerina/graphql").value();
 

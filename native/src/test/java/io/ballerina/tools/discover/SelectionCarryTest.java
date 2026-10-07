@@ -92,10 +92,6 @@ public class SelectionCarryTest {
         return tokens.subList(2, tokens.size());
     }
 
-    // -----------------------------------------------------------------------
-    // Paging keeps the selector
-    // -----------------------------------------------------------------------
-
     @Test
     public void turningThePageOfASelectedMethodListKeepsTheSelector() {
         String command = "bal discover ballerinax/twilio client Client list";
@@ -135,10 +131,6 @@ public class SelectionCarryTest {
                 "validation");
     }
 
-    // -----------------------------------------------------------------------
-    // Which container answered, and how to name it again
-    // -----------------------------------------------------------------------
-
     @Test
     public void anAutoSelectedContainerIsNamedInBothRenderings() {
         JsonObject service = answer("ballerinax__kafka", "bal discover ballerinax/kafka service");
@@ -172,10 +164,6 @@ public class SelectionCarryTest {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // A selection that is not a path never becomes one
-    // -----------------------------------------------------------------------
-
     @Test
     public void aNameSubstringOverTheCeilingPagesFlatRatherThanInventingGroups() {
         JsonObject action = answer("ballerinax__github", GITHUB + " action");
@@ -194,10 +182,6 @@ public class SelectionCarryTest {
         JsonObject second = answer("ballerinax__github", get.get("next").getAsString());
         Assert.assertEquals(second.get("total").getAsInt(), get.get("total").getAsInt());
     }
-
-    // -----------------------------------------------------------------------
-    // Grouping counts and carries the accessor
-    // -----------------------------------------------------------------------
 
     @Test
     public void groupsUnderAnAccessorCountOnlyThatAccessorAndCarryItIntoTheirCommands() {
@@ -277,10 +261,6 @@ public class SelectionCarryTest {
         Assert.assertEquals(parameters.code(), 0, parameters.err());
         Assert.assertFalse(parameters.json().has("groups"), "parameters counted toward depth: " + parameters.out());
     }
-
-    // -----------------------------------------------------------------------
-    // A mixed listing pages as one sequence, sections kept
-    // -----------------------------------------------------------------------
 
     private static final String HTTP = "bal discover ballerina/http client Client";
 
@@ -497,10 +477,6 @@ public class SelectionCarryTest {
         Assert.assertEquals(documented.stream().distinct().count(), (long) documentedTotal);
     }
 
-    // -----------------------------------------------------------------------
-    // Rosters page like every other listing
-    // -----------------------------------------------------------------------
-
     /** postgresql's 125 classes, 82 of them declaring no method at all — every one reachable by turning pages. */
     @Test
     public void aRosterOverTheCeilingPagesAndEveryContainerOnItIsReachable() {
@@ -568,10 +544,6 @@ public class SelectionCarryTest {
             Assert.assertEquals(container.get("resources").getAsInt(), paths, container.toString());
         }
     }
-
-    // -----------------------------------------------------------------------
-    // A grouped level pages too
-    // -----------------------------------------------------------------------
 
     @Test
     public void aGroupedLevelOverTheCeilingPagesWithoutRepeatingOrSkipping() {

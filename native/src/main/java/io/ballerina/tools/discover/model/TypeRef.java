@@ -35,12 +35,10 @@ public record TypeRef(String name, List<Link> links) {
 
     /**
      * Where a type name came from. {@code External} names are re-prefixed with the owning module at
-     * render time and gathered into the trailing agent note; {@code Internal} ones are already in
-     * scope.
+     * render time; {@code Internal} ones are already in scope.
      *
-     * <p>{@code External} carries the module as {@link ModuleRef} rather than as a formatted string,
-     * because the import path, the CLI coordinate and "needs no import at all" are three different
-     * answers that one string kept conflating.
+     * <p>{@code External} carries a {@link ModuleRef} rather than a formatted string because the import path,
+     * the CLI coordinate and "needs no import at all" are three different answers.
      */
     public sealed interface Link {
 

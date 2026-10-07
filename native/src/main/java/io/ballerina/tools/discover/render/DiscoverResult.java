@@ -30,10 +30,7 @@ import java.util.Map;
  *
  * <p>Field names follow the RFC's own worked examples wherever one exists ({@code buckets}, {@code groups}/
  * {@code name}/{@code count}, {@code resources}/{@code path}/{@code accessors}/{@code commands}, {@code methods},
- * {@code shown}/{@code total}/{@code next}/{@code command}). {@link ContainerRoster} has no RFC example to match —
- * several containers in one bucket is existing, pre-RFC behaviour — so its field names are this rewrite's own
- * choice, as are those of every other shape the RFC shows no example for ({@link Signature}, {@link MixedListing},
- * {@link NoMatch}, {@link Owners}, {@link EmptyBucket}).
+ * {@code shown}/{@code total}/{@code next}/{@code command}); shapes the RFC shows no example for name their own.
  *
  * @since 0.1.0
  */

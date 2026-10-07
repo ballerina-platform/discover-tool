@@ -54,7 +54,6 @@ import java.util.Set;
  */
 public final class Types {
 
-    /** The bucket a caller types to reach a type declaration. */
     public static final String BUCKET = "type";
 
     private static final String RECORDS = "records";
@@ -132,10 +131,6 @@ public final class Types {
         }
         return leaf(loaded, options.selectors().get(0), options.note());
     }
-
-    // -----------------------------------------------------------------------
-    // The roster
-    // -----------------------------------------------------------------------
 
     private static List<Entry> entries(Library library) {
         List<Entry> entries = new ArrayList<>();
@@ -246,10 +241,6 @@ public final class Types {
                 Containers.documentedOn(window, documented, 0),
                 window.paging(), loaded.warning(), options.note()));
     }
-
-    // -----------------------------------------------------------------------
-    // One declaration
-    // -----------------------------------------------------------------------
 
     private static Result<DiscoverResult> leaf(LoadedPackage loaded, String requested, String note) {
         Library library = loaded.library();

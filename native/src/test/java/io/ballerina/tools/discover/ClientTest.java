@@ -54,10 +54,6 @@ public class ClientTest {
                 });
     }
 
-    // -----------------------------------------------------------------------
-    // Retries
-    // -----------------------------------------------------------------------
-
     @Test
     public void a503IsRetriedAndTheRetrysAnswerIsUsed() {
         FakeTransport transport = FakeTransport.scripted(List.of(
@@ -138,14 +134,10 @@ public class ClientTest {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Version resolution
-    // -----------------------------------------------------------------------
-
     /**
      * A version a PROJECT locked that Central does not publish.
      *
-     * <p>T10, and the "supplied version" path ({@code --version}, or a {@code Dependencies.toml} lock): "omit the
+     * <p>The "supplied version" path ({@code --version}, or a {@code Dependencies.toml} lock): "omit the
      * version to take the latest" would name a step the caller did not take. The failure lists the newest
      * published versions instead, which is why no {@code versions} verb is needed — and the list is fetched on a
      * path that has already failed, so it degrades to no list rather than to a different failure.
@@ -264,13 +256,9 @@ public class ClientTest {
         Assert.assertTrue(result.failure() instanceof Failure.Validation);
     }
 
-    // -----------------------------------------------------------------------
-    // Modules of a package
-    //
     // The coordinate is always one literal package name. A dotted name the registry has no row for is probed
     // against its prefixes only to say which package it is a module of — never to read the module in the
     // package's place.
-    // -----------------------------------------------------------------------
 
     private static final QualifiedName AWS_AUTH = QualifiedName.parse("ballerinax/aws.auth").value();
 
@@ -456,14 +444,9 @@ public class ClientTest {
         Assert.assertTrue(result.failure() instanceof Failure.Upstream, result.failure().getClass().getName());
     }
 
-    // -----------------------------------------------------------------------
-    // Suggestions
-    // -----------------------------------------------------------------------
-
     @Test
     public void everyFailureTheOutsideWorldCanCauseCarriesASuggestion() {
-        // Three of them used to omit it — the three that fire during a Central outage, when the reader has
-        // nothing else to offer.
+        // These three fire during a Central outage, when the reader has nothing else to offer.
         Result<JsonElement> timeout = CentralClient.fetchJson("https://example.invalid/x",
                 fast(FakeTransport.always(new HttpTransport.Reply.TimedOut())).maxAttempts(1).build());
         Assert.assertTrue(timeout.failure() instanceof Failure.Timeout);
@@ -484,11 +467,8 @@ public class ClientTest {
     }
 
     /**
-     * The drift this exists to catch: {@code UPSTREAM_SUGGESTION} once told the agent to "write the code from
-     * what you already know", while {@code --help} told it no failure is licence to guess. The failure object is
-     * what an agent is reading at the moment it is blocked, so when the two disagree the object wins and the
-     * tool loses the single behaviour it exists to prevent. Only asserting the content — not merely that a
-     * suggestion is present — turns that divergence back into a red build.
+     * A failure object must not contradict {@code --help}'s "no failure is licence to guess": it is what an agent
+     * reads at the moment it is blocked, so the content is asserted, not merely that a suggestion is present.
      */
     @Test
     public void noFailureOffersARememberedSignatureAsTheWayOut() {
@@ -520,16 +500,10 @@ public class ClientTest {
         Assert.assertNull(failure.status(), "a request that never answered has no status line");
     }
 
-    // -----------------------------------------------------------------------
-    // Schema drift
-    // -----------------------------------------------------------------------
-
     @Test
     public void anAbsentDeclarationBucketIsAModuleWithNoneOfThemNotDrift() {
-        // Central OMITS a bucket when the module has none of that kind. Requiring all 30 cost the tool
-        // ~15% of Central — pinecone.vector, weaviate, azure_cosmosdb and sendgrid each failed EVERY verb
-        // with a wall of "expected an array, received nothing", and an agent with no readable signatures
-        // hand-rolled the connector over http:Client instead.
+        // Central OMITS a bucket when the module has none of that kind (pinecone.vector, weaviate,
+        // azure_cosmosdb, sendgrid), so requiring every bucket would refuse those packages outright.
         JsonObject module = onlyModule("ballerinax__sap");
         int configurablesBefore = module.getAsJsonArray("configurables").size();
         module.remove("records");
@@ -586,7 +560,7 @@ public class ClientTest {
     public void theValidatorReportsEveryMismatchAtOnceRatherThanTheFirst() {
         // The person reading a drift failure is about to extend the schema and needs the whole list; a
         // fail-fast validator turns one review into four round trips. Mistyped rather than absent: an
-        // absent bucket is a module with none of that kind, so a module carrying only id and orgName now
+        // absent bucket is a module with none of that kind, so a module carrying only id and orgName
         // parses as an empty module rather than reporting thirty issues.
         JsonObject module = onlyModule("ballerinax__sap");
         for (String bucket : List.of("records", "clients", "functions", "errors", "constants", "enums")) {
@@ -604,18 +578,13 @@ public class ClientTest {
 
     @Test
     public void aModuleCarryingNoDeclarationBucketsAtAllStillParses() {
-        // The shape Central actually serves for a package with nothing in most buckets. Before the fix
-        // this reported ~30 issues and refused the package outright.
+        // The shape Central actually serves for a package with nothing in most buckets.
         String payload = "{\"docsData\":{\"modules\":[{\"id\":\"kafka\",\"orgName\":\"ballerinax\"}]}}";
         Result<CentralDocs> result =
                 Schema.parse(com.google.gson.JsonParser.parseString(payload), "ballerinax/kafka:4.6.5");
         Assert.assertTrue(result.isOk(), "a module with no declarations is empty, not drifted");
         Assert.assertTrue(result.value().modules().get(0).clients().isEmpty());
     }
-
-    // -----------------------------------------------------------------------
-    // Dependencies.toml
-    // -----------------------------------------------------------------------
 
     @Test
     public void dependenciesTomlYieldsTheLockedVersionOfEachPackage() {

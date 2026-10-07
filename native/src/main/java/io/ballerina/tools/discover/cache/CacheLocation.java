@@ -26,18 +26,14 @@ import java.util.Map;
  * Where the cache lives — decided as a pure function of the environment, so the decision is testable
  * without a filesystem and without setting real environment variables.
  *
- * <p>{@code ~/.cache/bal-discover} is the default because it is the conventional location; because
- * {@code $HOME} in a runner is owned by the run user with nothing mounted over it but the workspace; and
- * because it is not world-writable, so the symlink-precreation hazard {@code /tmp} has does not arise.
- *
- * <p>Not beside the installed tool, which lives in the read-only bala repository. Not in the workspace,
- * which is a git clone the platform commits and provisioning scrubs per task.
+ * <p>{@code ~/.cache/bal-discover} is the default: the conventional location, and not world-writable, so the
+ * symlink-precreation hazard {@code /tmp} has does not arise. Never beside the installed tool, which lives in
+ * the read-only bala repository.
  *
  * @since 0.1.0
  */
 public final class CacheLocation {
 
-    /** The environment variable value that turns the cache off, spelled once. */
     public static final String CACHE_OFF = "off";
 
     public static final String CACHE_VARIABLE = "BAL_DISCOVER_CACHE";
@@ -72,12 +68,8 @@ public final class CacheLocation {
     /**
      * The candidates, in preference order, for the caller to try until one works.
      *
-     * <p>A LIST rather than one answer, because the precedence has a fallback in it —
-     * "{@code <tmpdir>/bal-discover-<user>} when {@code $HOME} is unusable" — and "unusable" is not something
-     * a pure function can determine. An empty or relative {@code $HOME} it can see; a {@code $HOME} that
-     * exists and is read-only, which is a shape a container genuinely has, it cannot. Returning the ordered
-     * candidates keeps this function pure and testable with no filesystem while still letting the process
-     * wrapper reach a temp directory in that case.
+     * <p>A LIST rather than one answer: whether {@code $HOME} is usable (it may exist but be read-only, as in
+     * some containers) is not something a pure function can determine, so the caller tries each in turn.
      *
      * <ol>
      *   <li>{@code BAL_DISCOVER_CACHE=off} — explicit opt-out

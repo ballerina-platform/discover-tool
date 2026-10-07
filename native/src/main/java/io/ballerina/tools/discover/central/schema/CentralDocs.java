@@ -25,10 +25,9 @@ import java.util.Optional;
  * The ONLY description of what Ballerina Central sends.
  *
  * <p>Everything downstream of {@link Schema#parse} takes typed values; {@link Schema} is the one place
- * that touches untyped JSON. That matters because the payload is a deeply nested, undocumented JSON
- * tree: hand-walking it — which is what the language-server reader did, across 500 lines — turns a
- * Central field being renamed into subtly wrong signatures that nobody notices until an agent writes
- * Ballerina that will not compile. A schema turns the same event into a located parse error.
+ * that touches untyped JSON. The payload is a deeply nested, undocumented JSON tree: hand-walking it
+ * turns a Central field rename into subtly wrong signatures, where a schema turns it into a located
+ * parse error.
  *
  * <p>The strictness split is deliberate:
  *
@@ -129,8 +128,7 @@ public record CentralDocs(List<Module> modules) {
          *
          * <p>Central inlines an object type's structure here when the source's own name is module-private —
          * {@code http:createHttpSecureClient} returns {@code HttpClient|ClientError} and {@code HttpClient}
-         * is not exported, so this is all a caller gets. A node carrying these is an object, which is why
-         * calling it {@code record {}} was not a vague answer but a wrong one.
+         * is not exported, so this is all a caller gets. A node carrying these is an object, never a record.
          */
         public List<TypeNode> objectMethods() {
             return functionTypes.orElse(List.of());
@@ -247,16 +245,15 @@ public record CentralDocs(List<Module> modules) {
     public record Named(String name, Optional<String> description, boolean isDeprecated) { }
 
     /**
-     * A declared type alias, which is the ONE shape Central uses for fourteen categories.
+     * A declared type alias, which is the ONE shape Central uses for seventeen categories.
      *
-     * <p>Verified rather than assumed: across the nine fixtures every item of {@code stringTypes},
-     * {@code integerTypes}, {@code decimalTypes}, {@code booleanTypes}, {@code simpleNameReferenceTypes},
-     * {@code arrayTypes}, {@code unionTypes}, {@code intersectionTypes}, {@code anyDataTypes},
-     * {@code tupleTypes}, {@code functionTypes} and {@code typeDescriptorTypes} has exactly the same key
-     * set — a name, a description, and the whole of a {@link TypeNode}. The four remaining categories
+     * <p>Every item of {@code stringTypes}, {@code integerTypes}, {@code decimalTypes}, {@code booleanTypes},
+     * {@code simpleNameReferenceTypes}, {@code arrayTypes}, {@code unionTypes}, {@code intersectionTypes},
+     * {@code anyDataTypes}, {@code tupleTypes}, {@code functionTypes} and {@code typeDescriptorTypes} has the
+     * same key set — a name, a description, and the whole of a {@link TypeNode}. The five remaining categories
      * ({@code anyTypes}, {@code mapTypes}, {@code streamTypes}, {@code tableTypes}, {@code xmlTypes}) are
-     * empty in every fixture and are read the same way, because they are siblings in Central's model and
-     * a wrong guess surfaces as a located {@code schema-drift} failure rather than as silence.
+     * empty in every fixture and are read the same way, as siblings in Central's model; a wrong guess surfaces
+     * as a located {@code schema-drift} failure rather than as silence.
      *
      * <p>{@code type} is the declaration object read AS a type node, which is not a trick — a Ballerina
      * type alias IS a name bound to a type descriptor, and that is how Central publishes it. Reading it
@@ -277,8 +274,7 @@ public record CentralDocs(List<Module> modules) {
      * without pretending the differences do not exist.
      *
      * <p>{@code otherMethods} is Central's name for the methods that are neither remote nor resource;
-     * {@code methods} holds the ones that are. A caller needs both, and the previous reader took the name
-     * and discarded every one of them.
+     * {@code methods} holds the ones that are.
      *
      * @param name the declaration's name
      * @param description the declaration's own documentation, when it has one
@@ -321,9 +317,7 @@ public record CentralDocs(List<Module> modules) {
     /**
      * A module-level {@code public} variable or {@code configurable}.
      *
-     * <p>One shape for both, again by measurement: http's 61 variables and 13 configurables and graphql's
-     * 3 and 1 all carry the same six keys. Neither was read at all, so a configurable — which is the one
-     * declaration a deployer must set — appeared in no verb.
+     * <p>One shape for both: http's and graphql's variables and configurables all carry the same six keys.
      *
      * @param name the variable's name
      * @param description the variable's own documentation, when it has one
@@ -343,14 +337,12 @@ public record CentralDocs(List<Module> modules) {
     /**
      * An error declaration, which carries two facts beyond a name.
      *
-     * <p>{@code isDistinct} is required under this package's usual rule — verified present on all 74
-     * error declarations across the nine fixtures, so its absence means the payload changed shape
-     * rather than that a package is unusual.
+     * <p>{@code isDistinct} is required: it is present on every error declaration in the fixtures, so its
+     * absence means the payload changed shape rather than that a package is unusual.
      *
-     * <p>{@code detailType} is optional because six of the nine module roots genuinely publish none: an
-     * error at the top of its own hierarchy ({@code http:Error}, {@code kafka:Error}) narrows nothing.
-     * Despite the name it holds the distinct SUPERTYPE, and the reader calls it {@code base} from here
-     * on.
+     * <p>{@code detailType} is optional because an error at the top of its own hierarchy ({@code http:Error},
+     * {@code kafka:Error}) publishes none. Despite the name it holds the distinct SUPERTYPE, and the reader
+     * calls it {@code base} from here on.
      *
      * @param name the error type's name
      * @param description the error's own documentation, when it has one
@@ -386,9 +378,8 @@ public record CentralDocs(List<Module> modules) {
     /**
      * A client class.
      *
-     * <p>{@code isIsolated} is required under this package's usual rule: it is set on all 18 clients across the
-     * nine fixtures, and every one of their sources writes {@code public isolated client class}. Its absence
-     * would mean the payload changed shape rather than that a package is unusual.
+     * <p>{@code isIsolated} is required: it is set on every client in the fixtures, so its absence would mean the
+     * payload changed shape rather than that a package is unusual.
      *
      * @param name the client class's name
      * @param description the class's own documentation, when it has one
@@ -456,13 +447,10 @@ public record CentralDocs(List<Module> modules) {
      * The module. Every array here is read as a BUCKET, not as a required key: Central omits a bucket
      * when the module has none of that kind, so absent and empty describe the same module.
      *
-     * <p>This used to say the opposite — that every array is always present, so a missing one means the
-     * payload changed shape rather than that a package is unusual. That was measured and it is false.
-     * Requiring them cost the tool ~15% of Central: `pinecone.vector`, `weaviate`, `azure_cosmosdb` (at
-     * every published version) and `sendgrid` each failed EVERY verb with a wall of "expected an array,
-     * received nothing", and an agent left with no readable signatures hand-rolled the connector over
-     * {@code http:Client}. A reader that refuses a whole package over an absent empty list is worse than
-     * one that reports the list as empty. See {@code Schema.Cursor#bucket}.
+     * <p>Requiring them refused ~15% of Central outright — {@code pinecone.vector}, {@code weaviate},
+     * {@code azure_cosmosdb} (at every published version) and {@code sendgrid} among them. A reader that refuses
+     * a whole package over an absent empty list is worse than one that reports the list as empty. See
+     * {@code Schema.Cursor#bucket}.
      *
      * <p>{@code description} is a different kind of exception, and the one field whose absence must not
      * cost the caller anything else: it is the module's own written guide — the same bytes the published

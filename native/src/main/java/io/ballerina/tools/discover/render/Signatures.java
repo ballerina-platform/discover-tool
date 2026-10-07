@@ -42,8 +42,8 @@ import java.util.stream.Collectors;
  * {@code ViewsAgreeTest} still asserts it, because the cheap way to break the guarantee is for a view to
  * hand-roll a line rather than call this.
  *
- * <p>Two conventions carry meaning beyond syntax: a name owned by another package is rendered with that
- * package's module alias ({@code gmail:Message}), which is the import the caller adds.
+ * <p>A name owned by another package is rendered with that package's module alias ({@code gmail:Message}), which
+ * is the import the caller adds.
  *
  * @since 0.1.0
  */
@@ -88,11 +88,8 @@ public final class Signatures {
     /**
      * The foreign names inside a type expression that a caller has to import to use it.
      *
-     * <p>A PRE-DECLARED module is skipped, which is the one place this collection is not simply "every
-     * external link". {@code int:Signed32} is a foreign name by Central's encoding and needs no import by the
-     * language's, so a note about it is advice with nothing to advise — and the advice was worse than absent:
-     * the literal spelling of {@code import ballerina/lang.int;} is three compiler errors, and the twelve
-     * corpus lines carrying it match published sources that import nothing of the kind.
+     * <p>A pre-declared module is skipped: {@code int:Signed32} is a foreign name by Central's encoding but needs
+     * no import by the language's, and {@code import ballerina/lang.int;} does not even compile.
      */
     public static List<ExternalLink> collectExternalLinks(TypeRef type) {
         if (type == null) {
@@ -205,9 +202,8 @@ public final class Signatures {
     /**
      * The indented sibling of {@link #renderDescription}, for a doc comment inside a block.
      *
-     * <p>Public because a continuation line that does not carry its own {@code #} is not a comment — it is
-     * source, and the compiler reads it as a declaration. Every renderer that prefixes a description by
-     * hand has emitted that, so the splitting lives in one place and the block renderers call it.
+     * <p>A continuation line without its own {@code #} is not a comment but source the compiler reads as a
+     * declaration, so every block renderer splits descriptions through this one place.
      */
     public static String renderDocComment(String description, String indent) {
         if (description.isEmpty()) {
@@ -256,10 +252,8 @@ public final class Signatures {
     }
 
     /**
-     * A signature at column zero — a report quotes declarations, it does not indent them.
-     *
-     * <p>Named here rather than repeated in each view, because "the views and {@code api} print the same bytes"
-     * is a property of calling one function, and two private copies is where that starts to drift.
+     * A signature at column zero — a report quotes declarations, it does not indent them. Every view calls this
+     * rather than its own copy, so they all print the same bytes.
      */
     public static String renderSignature(Fn fn) {
         return renderMemberFunction(fn, "", Detail.SIGNATURE);
@@ -269,16 +263,11 @@ public final class Signatures {
         String params = fn.params().stream().map(Signatures::renderParam).collect(Collectors.joining(", "));
         String note = trailingNote(unwritableDefaults(fn.params()));
         String docs = renderCallableDocs(fn, indent, detail);
-        // Above the signature and below the doc comment, which is where the language puts it. A caller who
-        // reads only the signature line still sees it, because it is on the line before.
+        // Between the doc comment and the signature, which is where the language puts it.
         String deprecated = fn.isDeprecated() ? indent + "@deprecated\n" : "";
         String isolated = isolatedQualifier(fn);
 
         return switch (fn) {
-            // The constructor's doc comment, like every other member's. It was the one arm that opened with the
-            // signature, and `init` is the one method every caller has to write: sap's says the config record
-            // decides "which type of additional behaviours are added to the endpoint (e.g. security, circuit
-            // breaking)" and that "Caching is enabled always", neither of which is inferable from its parameters.
             case Fn.Constructor constructor -> docs + deprecated
                     + indent + isolated + "function init(" + params + ")"
                     + renderReturns(constructor.returns()) + ";" + note;
@@ -311,10 +300,8 @@ public final class Signatures {
      * A module-level function, documented rather than merely declared: standalone functions are usually
      * utilities whose parameters are not self-describing.
      *
-     * <p>Kept separate from {@link #renderMemberFunction} because a module function's declaration differs from a
-     * member's in a way a mode cannot express: it carries {@code public}, which no member does. It has always
-     * spent lines on {@code # +} rows, and since {@link Detail#FULL} landed the two forms document a parameter
-     * the same way — through the same {@link #addDocRow}.
+     * <p>Separate from {@link #renderMemberFunction} because a module function carries {@code public}, which no
+     * member does.
      */
     public static String renderStandaloneFunction(Fn.Standalone fn) {
         List<String> lines = new ArrayList<>();

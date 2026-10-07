@@ -90,7 +90,7 @@ public final class Decl {
      * An error's {@code detailType}, which is the one key Central uses for two different facts: for most
      * errors it holds the BASE the error narrows ({@code distinct ClientError}), and for an error that
      * carries a detail record it holds a parenthesised intersection whose {@code error} member has had its
-     * type argument stripped. Both shapes appear in the corpus and both are tested.
+     * type argument stripped.
      */
     public Decl detail(Node detailType) {
         json.add("detailType", detailType.json());
@@ -166,9 +166,8 @@ public final class Decl {
      * {@code init} is how every reader tells a constructor from a method.
      *
      * <p>It is written TWICE, under {@code initMethod} and again in {@code methods}, because that is what
-     * Central sends: across the corpus all 103 {@code initMethod}s are byte-identical to the {@code init}
-     * entry in the same object's {@code methods}. A payload carrying only one of the two would test a shape
-     * Central never publishes, and would make a reader that correctly reads one array look broken.
+     * Central sends: {@code initMethod} is byte-identical to the {@code init} entry in the same object's
+     * {@code methods}. A payload carrying only one of the two would test a shape Central never publishes.
      */
     public static Decl listener(String name, Decl... initParams) {
         return listenerAttaching("Service", name, initParams);
@@ -178,7 +177,7 @@ public final class Decl {
      * A listener whose {@code attach} takes a named service type.
      *
      * <p>{@code attach} is what decides whether a {@code service X on new Listener(…)} template is written at
-     * all (HTTP-14), and Central files it under {@code lifeCycleMethods} rather than with the listener's own
+     * all, and Central files it under {@code lifeCycleMethods} rather than with the listener's own
      * methods — so a synthetic listener without it exercises a shape no real payload has.
      */
     public static Decl listenerAttaching(String attachedType, String name, Decl... initParams) {
@@ -218,8 +217,7 @@ public final class Decl {
     /**
      * Set the declaration's {@code type} node.
      *
-     * <p>For an annotation, this is the record an attachment's argument must be — the key Central sends for
-     * eleven of the corpus's twelve annotations and the reader never read.
+     * <p>For an annotation, this is the record an attachment's argument must be.
      */
     public Decl typed(Node type) {
         json.add("type", type.json());
@@ -230,9 +228,8 @@ public final class Decl {
      * A type alias: a name, the members it resolves to, and the flag that says how they combine.
      *
      * <p>{@code isAnonymousUnionType} is not incidental — Central sets it on EVERY item of every alias
-     * category, including the single-member ones. {@code type TsDef string;} arrives as a one-member
-     * anonymous union, which is why a helper that wrote only {@code memberTypes} produced a shape Central
-     * never sends.
+     * category, including the single-member ones: {@code type TsDef string;} arrives as a one-member
+     * anonymous union.
      */
     public static Decl alias(String name, Node... members) {
         return aliasOf(name, "isAnonymousUnionType", members);

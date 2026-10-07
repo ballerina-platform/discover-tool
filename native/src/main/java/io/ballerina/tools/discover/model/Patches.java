@@ -34,20 +34,10 @@ import java.util.stream.Collectors;
  * trusts the docs writes code that fails to build. They are deliberately narrow — keyed on the exact library
  * name, no pattern matching — so a package nobody has had trouble with passes through untouched.
  *
- * <p>"Omits" is the whole admission criterion, and it is narrower than what used to be here. Five of the
- * eight corrections this file once held were re-derived against the payload and the packages' own sources
- * and did not survive it. Two were provably inert: the reader had grown to handle the shape, and the
- * correction went on matching nothing while its test asserted the outcome rather than the mechanism. One
- * injected a name no oracle declares. One rewrote 179 field types to a spelling the package never uses, on a
- * style judgement about someone else's API. One replaced seven real service types with three comment lines,
- * on the premise that they did not exist.
- *
- * <p>So a correction has to clear a specific bar: name the fact Central drops, name the oracle that has it,
- * and be pinned in both directions — what it must change AND what it must leave alone. A correction that is
- * merely an improvement on what the package chose to publish does not belong here, and neither does one whose
- * failure mode is silence.
- *
- * <p>Each patch takes a {@link Library} and returns one; nothing here mutates.
+ * <p>"Omits" is the whole admission criterion. A correction has to name the fact Central drops, name the
+ * oracle that has it, and be pinned in both directions — what it must change AND what it must leave alone. A
+ * correction that is merely an improvement on what the package chose to publish does not belong here, and
+ * neither does one whose failure mode is silence.
  *
  * @since 0.1.0
  */
@@ -59,13 +49,10 @@ public final class Patches {
      *
      * <p>Both spellings occur and the difference is Central's, not a rendering artefact:
      * {@code isParenthesisedType} is true for the three http declarations filed under {@code errors} and
-     * false for the two filed under {@code intersectionTypes}. Matching only the parenthesised form is
-     * what hid eight of the eleven sites.
+     * false for the two filed under {@code intersectionTypes}.
      *
      * <p>The spacing around {@code &} is {@link FromCentral}'s — this matches a RENDERED intersection, so
-     * the two move together. When they last diverged this matched nothing and the type argument went
-     * missing with no failure anywhere, which is why {@code PatchesTest} now pins every row of the table
-     * below rather than a sample of it.
+     * the two must move together; a mismatch fails silently, which is why {@code PatchesTest} pins every row.
      */
     private static final Pattern TRAILING_BARE_ERROR = Pattern.compile(" & error(\\))?$");
 
@@ -80,10 +67,8 @@ public final class Patches {
      * Central files under {@code intersectionTypes}, which the reader renders as aliases rather than errors.
      *
      * <p>Every row is read off the SAME package version the corresponding fixture records — http 2.16.6,
-     * kafka 4.6.5, graphql 1.17.0 — so no row is transcribed from a version the corpus cannot check. That
-     * is the whole guarantee available here: the argument is a fact about the package, and a table of facts
-     * about someone else's package rots when they release. What it must never do is rot silently, which is
-     * what the two-direction pins in {@code PatchesTest} are for.
+     * kafka 4.6.5, graphql 1.17.0. The table rots when those packages release; the two-direction pins in
+     * {@code PatchesTest} keep that from happening silently.
      *
      * <p>What is deliberately absent matters as much: http's 51 errors whose {@code detailType} is a plain
      * named base carry no detail record at all, and attaching one would make every {@code SslError}

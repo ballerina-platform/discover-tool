@@ -65,10 +65,9 @@ public final class CentralClient {
     /**
      * How long Central's answer to "what is the latest version" is believed.
      *
-     * <p>The measured lookup episode runs 70 to 260 seconds, so ten minutes spans a whole episode without a
-     * second registry round trip — they cost 1.0 to 1.5s each — while a package published mid-run is still
-     * picked up. It is the one mutable response this reader caches; a docs payload for a named version is
-     * immutable and never expires.
+     * <p>Ten minutes spans an agent's whole lookup session (measured at 70 to 260 seconds) without a second
+     * registry round trip, while a package published mid-run is still picked up. It is the one mutable response
+     * this reader caches; a docs payload for a named version is immutable and never expires.
      */
     public static final long LATEST_TTL_MS = 600_000;
 
@@ -80,10 +79,8 @@ public final class CentralClient {
      *
      * @param version the resolved version
      * @param stale the registry was unreachable and this came off disk unverified
-     * @param supplied the CALLER chose this version — {@code --version}, or a {@code Dependencies.toml} the
-     *     reader was pointed at — rather than the reader resolving it. It decides what a later 404 from the
-     *     docs endpoint means: a version the caller chose is theirs to correct, and one the reader resolved is
-     *     not, so advice about changing it would name a command they never wrote.
+     * @param supplied the CALLER chose this version — {@code --version} or {@code Dependencies.toml} — so a
+     *     later 404 from the docs endpoint is theirs to correct, not the reader's
      * @param pinned the version came from {@code --version} itself, so a command printed for the caller must
      *     repeat it
      */
@@ -93,10 +90,6 @@ public final class CentralClient {
             this(version, stale, false, false);
         }
     }
-
-    // -----------------------------------------------------------------------
-    // The retry loop
-    // -----------------------------------------------------------------------
 
     private static boolean isRetryableStatus(int status) {
         return status == 429 || status == 502 || status == 503 || status == 504;
@@ -140,7 +133,7 @@ public final class CentralClient {
         record Body(JsonElement value) implements Outcome { }
 
         /**
-         * {@code retryAfterMs} is negative when upstream did not say.
+         * A failed attempt.
          *
          * @param message what upstream, or the transport, said
          * @param status the HTTP status the attempt failed with, or {@code null}
@@ -226,10 +219,6 @@ public final class CentralClient {
         return new Failure.Upstream(
                 url, attempts, spent.message(), Failure.UPSTREAM_SUGGESTION, spent.status());
     }
-
-    // -----------------------------------------------------------------------
-    // Version resolution
-    // -----------------------------------------------------------------------
 
     /**
      * The version to read a package at.
@@ -319,9 +308,8 @@ public final class CentralClient {
         DocsCache cache = options.cache();
         DocsCache.PackageKey key = new DocsCache.PackageKey(REPOSITORY_ID, qualified.org(), qualified.name());
 
-        // `--refresh` re-resolves unconditionally. An earlier draft made the re-download conditional on the
-        // version having changed, which made the flag a no-op in exactly the case its own error message
-        // recommends it for.
+        // `--refresh` re-resolves unconditionally: making it conditional on the version having changed would make
+        // it a no-op in exactly the case its own error message recommends it for.
         if (!options.refresh()) {
             DocsCache.LatestEntry entry = cache.readLatest(key);
             // The lower bound matters as much as the TTL: a clock that jumped backwards leaves a
@@ -391,18 +379,11 @@ public final class CentralClient {
                 "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
     }
 
-    // -----------------------------------------------------------------------
-    // The docs payload
-    // -----------------------------------------------------------------------
-
     /**
      * The API docs for one published version, from disk when they are already there.
      *
-     * <p>This is where the cache belongs: above the retry loop, so a hit costs no attempt, and below the
-     * schema, so what gets stored is not derived from our own code. It is also the reason the addressed verbs
-     * are affordable at all — at 4.9 to 6.6 seconds and 12.4MB per invocation the CLI can only be asked once
-     * per package, which is what forces a 22,829-line document to be navigated by hand. Once re-opening a
-     * package is cheap, four precise questions beat one big answer.
+     * <p>The cache sits above the retry loop, so a hit costs no attempt, and below the schema, so what gets stored
+     * is Central's payload, not something derived from our own code.
      *
      * <p>ANY problem with a cached entry is a miss, never a failure: a missing file, an unreadable one, a
      * truncated one, one that is not JSON, one the schema no longer accepts, one whose coordinates do not
@@ -565,10 +546,6 @@ public final class CentralClient {
                 : String.join(", ", versions.subList(0, LISTED_VERSIONS)) + " and "
                         + (versions.size() - LISTED_VERSIONS) + " older";
     }
-
-    // -----------------------------------------------------------------------
-    // The package archive
-    // -----------------------------------------------------------------------
 
     /**
      * One module's {@code .bal} files, read out of the version's published bala.

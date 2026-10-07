@@ -28,10 +28,8 @@ import java.util.stream.Stream;
 /**
  * Central's module → the finished {@link Library}, in one place.
  *
- * <p>It exists because there were two: the CLI built the IR in {@code Loader} and the recorded corpus built it
- * in its own fixture helper, so a stage that added a pass to one left the nine {@code .bal} snapshots
- * measuring a pipeline the tool does not run. That is a silent failure by construction — the oracle goes on
- * passing while it stops describing the product.
+ * <p>The CLI and the recorded corpus both build through here, so the snapshots always measure the pipeline
+ * the tool runs.
  *
  * <p>The order is not arbitrary. {@link Patches} runs after {@link FromCentral} because a correction needs
  * something to correct, and {@link Defaults} runs after {@code Patches} because a patch can inject the very

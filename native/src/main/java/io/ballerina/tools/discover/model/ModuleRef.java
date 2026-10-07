@@ -27,8 +27,7 @@ import java.util.stream.Collectors;
  * Another module, as Central publishes it: an org, a module path and the version this package was documented
  * against.
  *
- * <p>This exists because one string was being asked to be three different things. A foreign reference used to
- * carry a single pre-formatted {@code libraryName}, and the three answers derived from it do not agree:
+ * <p>Three answers derived from it that do not agree, so no single formatted string can stand for it:
  *
  * <ul>
  *   <li>{@link #importPath()} — what an {@code import} statement takes, so a segment that is a Ballerina
@@ -36,11 +35,6 @@ import java.util.stream.Collectors;
  *   <li>{@link #coordinate()} — what this CLI's {@code <org/name>} argument takes, which rejects the quote.
  *   <li>{@link #isPredeclared()} — whether an import is needed AT ALL, which for a langlib module it is not.
  * </ul>
- *
- * <p>Collapsing them cost three separate findings: a note telling an agent to write
- * {@code import ballerina/lang.int;} (three compiler errors, and the type needed no import in the first
- * place), a footer command built from a module path that is not a package, and a follow-up that silently
- * resolved a different version than the one the signature was documented against.
  *
  * @param orgName Central's {@code orgName} — {@code ballerina}, {@code ballerinax}
  * @param moduleName Central's {@code moduleName} — a dotted module path, NOT necessarily a package name
@@ -53,9 +47,7 @@ public record ModuleRef(String orgName, String moduleName, String version) {
      * Every Ballerina keyword, so a module-path segment that is one can be quoted in an import.
      *
      * <p>Taken from the compiler's own {@code SyntaxKind} — its 103 {@code *_KEYWORD} constants for
-     * 2201.13.2, less the two that are not identifiers ({@code !is} and {@code _}). A hand-picked subset is
-     * what this replaces: the reader special-cased exactly one path ({@code client.config}) and left the
-     * twelve {@code lang.*} paths that need the same treatment unquoted.
+     * 2201.13.2, less the two that are not identifiers ({@code !is} and {@code _}).
      */
     private static final Set<String> KEYWORDS = Set.of(
             "public", "private", "remote", "abstract", "client", "import", "function", "const", "listener",

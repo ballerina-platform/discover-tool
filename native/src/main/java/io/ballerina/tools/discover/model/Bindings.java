@@ -83,16 +83,12 @@ public final class Bindings {
     public enum Binding {
         /** It is the listener's attach target, or includes one. */
         CONFIRMED(null, null),
-        /** Unsettled: the listener publishes no {@code attach()} to read the target from. */
         NO_ATTACH_EVIDENCE("the listener publishes no attach() signature to read its service type from",
                 "listener publishes no attach()"),
-        /** Unsettled: {@code attach()}'s parameter resolves to no named service type ({@code service object {}}). */
         UNNAMED_ATTACH_TARGET("the listener's attach() takes no named service type to pair with",
                 "attach() names no service type"),
-        /** Unsettled: the package source, which shows the type's inclusions, was unavailable. */
         SOURCE_UNAVAILABLE("the package source, which shows which service types include the listener's attach() "
                 + "type, was unavailable", "package source unavailable"),
-        /** It does not bind. */
         NONE(null, null);
 
         private final String reason;

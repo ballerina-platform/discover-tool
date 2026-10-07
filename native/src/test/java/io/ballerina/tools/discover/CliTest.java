@@ -50,10 +50,8 @@ import java.util.Map;
  * {@code validation} rather than resolving as something else and reporting a Central failure the agent will
  * retry.
  *
- * <p>Every bucket wired into {@link Cli} is covered here: {@code client}/{@code service}/{@code class}/
- * {@code funcs} through {@code Containers}, and {@code readme} through its own dispatch branch — the one bucket
- * not built on {@code Containers} at all, so its own end-to-end wiring gets its own test below rather than
- * riding along with the other four's.
+ * <p>Every bucket wired into {@link Cli} is covered here, {@code readme} included: it is not built on
+ * {@code Containers}, so its dispatch branch gets its own tests.
  *
  * @since 0.1.0
  */
@@ -139,10 +137,6 @@ public class CliTest {
         return options(FakeTransport.never());
     }
 
-    // -----------------------------------------------------------------------
-    // Usage and argument errors
-    // -----------------------------------------------------------------------
-
     @Test
     public void noArgumentsPrintsUsageOnStdoutAndSucceeds() {
         // Usage is a document, not a failure: it goes where every document goes, under the code that says
@@ -163,8 +157,6 @@ public class CliTest {
 
     @Test
     public void helpBypassesAMissingPackage() {
-        // `--help` answers even with no package and no bucket — the same bypass the grammar's earlier, verb-first
-        // shape relied on, now on the one flat command.
         Capture capture = new Capture();
         Assert.assertEquals(
                 Cli.run(List.of("ballerinax/github", "--help"), capture.streams(), never()), 0);
@@ -194,9 +186,8 @@ public class CliTest {
 
     @Test
     public void anUnrecognisedFlagIsAUsageErrorNotAVersionCentralIsAskedAbout() {
-        // The regression this pins: `--refresh` on a stale binary used to resolve as the VERSION, so it reported
-        // `package-not-found` at exit 1 — which the skill teaches means "Central could not answer, run it once
-        // more". The agent then retried a command that could never succeed.
+        // A flag resolved as the VERSION would report `package-not-found`, which an agent retries although the
+        // command can never succeed.
         Capture capture = new Capture();
         Assert.assertEquals(
                 Cli.run(List.of("ballerina/http", "--nonesuch"), capture.streams(), never()), 1);
@@ -217,14 +208,7 @@ public class CliTest {
         Assert.assertTrue(capture.field("suggestion").contains("client, service, class, funcs"), capture.stderr());
     }
 
-    /**
-     * A selector the container does not read, with the command that drops it.
-     *
-     * @param slug the fixture
-     * @param argv the invocation
-     * @param unread the selector the failure names
-     * @param command the command its suggestion prints
-     */
+    // A selector the container does not read, with the command that drops it.
     private record Unread(String slug, List<String> argv, String unread, String command) { }
 
     @Test
@@ -613,14 +597,9 @@ public class CliTest {
         Assert.assertNull(DependenciesToml.discoverProject(tempDir()));
     }
 
-    // -----------------------------------------------------------------------
-    // Bucket dispatch
-    // -----------------------------------------------------------------------
-
     @Test
     public void aContainerVerbNavigatesAClientsPathsAsStructuredJson() {
-        // gmail's Client has enough resource paths that the bare `client` bucket lands on the RFC's structured
-        // IR rather than the legacy Markdown report — this is the JSON default off a TTY.
+        // JSON is the default off a TTY.
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerinax/googleapis.gmail", "client"), capture.streams(),
                 centralFor("ballerinax__googleapis.gmail", "4.2.0"));
@@ -664,8 +643,7 @@ public class CliTest {
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
         Assert.assertTrue(capture.failure().getAsJsonArray("candidates").toString()
                 .contains("FailoverClient"), capture.stderr());
-        // The failed argument is never dropped from the failure object, even though the suggestion no longer
-        // echoes it into a runnable command — there is no search flag left to embed it in.
+        // The failed argument stays in the failure object even though the suggestion does not echo it.
         Assert.assertTrue(capture.failure().getAsJsonArray("requested").toString().contains("FailoverClientt"),
                 capture.stderr());
     }
@@ -686,10 +664,6 @@ public class CliTest {
                         + "  client    3  bal discover ballerinax/kafka client\n"),
                 text.stdout());
     }
-
-    // -----------------------------------------------------------------------
-    // Every container answer honours --output
-    // -----------------------------------------------------------------------
 
     private static Capture run(List<String> argv, String slug, String version, boolean interactive) {
         Capture capture = new Capture();
@@ -859,13 +833,6 @@ public class CliTest {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Bucket dispatch — readme
-    //
-    // Not built on Containers at all — see Readme's own class comment — so its dispatch is exercised here on
-    // its own rather than riding along with the other four buckets' tests above.
-    // -----------------------------------------------------------------------
-
     @Test
     public void theReadmeBucketIsTheWholeReadmeVerbatimAtATerminal() {
         Capture capture = new Capture();
@@ -907,10 +874,6 @@ public class CliTest {
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
     }
-
-    // -----------------------------------------------------------------------
-    // --module — recorded ballerina/graphql pages, see graphqlCentral
-    // -----------------------------------------------------------------------
 
     @Test
     public void theModuleFlagReadsTheSubmodulesOwnPageAndNeverThePackages() {
@@ -1052,10 +1015,6 @@ public class CliTest {
                 titled.stderr());
     }
 
-    // -----------------------------------------------------------------------
-    // --page against what does and does not page
-    // -----------------------------------------------------------------------
-
     @Test
     public void aPageBelowOneIsRejectedBeforeAnythingIsFetched() {
         for (String page : List.of("0", "-1")) {
@@ -1095,10 +1054,6 @@ public class CliTest {
                 oneGroupedPage.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
         Assert.assertTrue(oneGroupedPage.field("message").contains("on 1 page"), oneGroupedPage.stderr());
     }
-
-    // -----------------------------------------------------------------------
-    // --filter
-    // -----------------------------------------------------------------------
 
     @Test
     public void aBlankFilterIsNoFilterInEitherRendering() {
@@ -1342,7 +1297,6 @@ public class CliTest {
         Assert.assertTrue(out.contains("\"client\""), out);
         Assert.assertTrue(out.contains("\"class\""), out);
         Assert.assertFalse(out.contains("\"funcs\""), "kafka declares no module functions: " + out);
-        // No Markdown-report furniture: this response is on the new result IR, not `Containers`' shape.
         Assert.assertFalse(out.contains("<!-- bal discover"), out);
     }
 
@@ -1398,10 +1352,6 @@ public class CliTest {
         Assert.assertEquals(capture.field("kind"), "validation");
     }
 
-    // -----------------------------------------------------------------------
-    // Version resolution
-    // -----------------------------------------------------------------------
-
     @Test
     public void anUnknownPackageExits1AndNamesItself() {
         Capture capture = new Capture();
@@ -1413,10 +1363,6 @@ public class CliTest {
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "package-not-found");
     }
-
-    // -----------------------------------------------------------------------
-    // The stream contract
-    // -----------------------------------------------------------------------
 
     @Test
     public void aFailingRunLeavesStdoutEmptyAndStderrHoldingExactlyOneJsonObject() {
@@ -1463,10 +1409,6 @@ public class CliTest {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Failure text as golden files
-    // -----------------------------------------------------------------------
-
     @Test
     public void theFailureTextIsUnchanged() {
         record Case(String name, List<String> argv) { }
@@ -1500,8 +1442,6 @@ public class CliTest {
                 capture.stderr(),
                 "symbol-not-found failure text");
     }
-
-    // -----------------------------------------------------------------------
 
     private static Path tempDir() {
         try {

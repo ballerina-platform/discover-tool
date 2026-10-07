@@ -35,18 +35,10 @@ import java.util.regex.Pattern;
  * something false — and the natural way to override a later parameter from a positional list is to repeat the
  * printed default for the earlier one, which is exactly the call that fails.
  *
- * <p>Central's own page presents the same fact without the trap: the constructor is printed WITHOUT defaults
- * and the default appears in a separate parameter row, as documentation about a default rather than as syntax.
- * Dropping the default here would be worse than either, because a defaultable parameter printed without its
- * default reads as required.
- *
- * <p>So the expression stays and the line says it cannot be written. Deciding that needs every declaration in
- * the document at once — which is why this is a whole-library pass and not a rule inside the renderer — and it
- * runs after {@link Patches}, because a patch can inject the very declaration that resolves a name.
- *
- * <p>Measured: 66 sites across the nine recorded packages. Two are the sheets constructor parameters the
- * register filed; 63 are http record fields whose default is a private {@code STATUS_*_OBJ} response object,
- * and one is graphql's {@code contextInit}, which defaults to a private function.
+ * <p>Dropping the default would be worse, because a defaultable parameter printed without its default reads as
+ * required — so the expression stays and the line says it cannot be written. Deciding that needs every
+ * declaration in the document at once, hence a whole-library pass rather than a renderer rule, and it runs after
+ * {@link Patches}, because a patch can inject the very declaration that resolves a name.
  *
  * @since 0.1.0
  */
@@ -99,7 +91,6 @@ public final class Defaults {
      * {@code variables} and {@code configurables}. They belong in the set because the claim on the line is
      * that the package does not EXPORT the name, and the payload is the authority on that: http defaults eight
      * fields to public configurables such as {@code waitTime}, and calling those unexported would be false.
-     * That they are also invisible in the document is a different gap, and it has its own finding.
      */
     public static Library markUnwritable(Library library, Set<String> alsoPublished) {
         Set<String> declared = declaredNames(library);
@@ -201,9 +192,8 @@ public final class Defaults {
     /**
      * Whether every identifier in a default expression is one the caller can write.
      *
-     * <p>Textual because the expression arrives as text and there is no expression IR to walk. The three
-     * exclusions are what a survey of all 184 distinct default expressions in the corpus turned up: literals,
-     * module-qualified references, and the language's own words.
+     * <p>Textual because the expression arrives as text and there is no expression IR to walk. Literals,
+     * module-qualified references, record keys and the language's own words are excluded.
      */
     public static boolean isWritable(String expression, Set<String> declared) {
         String scanned = QUALIFIED.matcher(withoutRecordKeys(LITERAL.matcher(expression).replaceAll(" ")))
