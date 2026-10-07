@@ -163,6 +163,7 @@ public final class Types {
         return "bal discover " + loaded.pkgArgument() + " type";
     }
 
+    /** Every declaration, in {@link #KINDS} sections, each alphabetical, paged as one listing over the ceiling. */
     private static Result<DiscoverResult> roster(LoadedPackage loaded, Options options) {
         List<Entry> all = entries(loaded.library());
         if (all.isEmpty()) {

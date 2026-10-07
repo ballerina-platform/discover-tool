@@ -46,6 +46,7 @@ final class UsageRenderer {
     private UsageRenderer() {
     }
 
+    /** The {@code Usage:} line for {@code --help}, wrapped to {@link #WIDTH}. */
     static String synopsis(Commands.Grammar grammar) {
         String label = "Usage: bal discover ";
         return wrap(label, slots(grammar), label.length());
@@ -84,6 +85,7 @@ final class UsageRenderer {
                 + " and " + names.get(names.size() - 1) + ".";
     }
 
+    /** Each positional, then each option, as the synopsis spells it; {@code --help} is not among them. */
     private static List<String> slots(Commands.Grammar grammar) {
         CommandSpec spec = grammar.line().getCommandSpec();
         List<String> slots = new ArrayList<>();

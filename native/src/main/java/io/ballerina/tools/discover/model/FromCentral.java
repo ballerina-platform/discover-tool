@@ -54,6 +54,15 @@ public final class FromCentral {
     /** Central's own placeholder for "no owning module", which counts as absent. */
     private static final String NO_ORG = "UNK_ORG";
 
+    /** Central's categories for an anonymous record whose members are its own fields. */
+    private static final String INLINE_RECORD = "inline_record";
+    private static final String INLINE_CLOSED_RECORD = "inline_closed_record";
+
+    private static final String OPEN_RECORD = "record {%s}";
+    private static final String CLOSED_RECORD = "record {|%s|}";
+    private static final String FIELD = "%s %s%s; ";
+    private static final String REST_FIELD = "%s...; ";
+
     private FromCentral() {
     }
 
@@ -185,7 +194,7 @@ public final class FromCentral {
 
     /** The two categories whose members are an anonymous record's own fields. */
     private static boolean isInlineRecord(String category) {
-        return "inline_record".equals(category) || "inline_closed_record".equals(category);
+        return INLINE_RECORD.equals(category) || INLINE_CLOSED_RECORD.equals(category);
     }
 
     private static TypeRef transformExternal(CentralDocs.TypeNode type, Scope scope) {
@@ -243,6 +252,10 @@ public final class FromCentral {
         return suffixed(new TypeRef(name), type);
     }
 
+    /**
+     * A type Central spells by its structure rather than by a name: a function type, tuple, union,
+     * intersection, inline record, a wrapper around an element type, or an anonymous object.
+     */
     private static TypeRef transformRef(CentralDocs.TypeNode type, Scope scope) {
         List<CentralDocs.TypeNode> members = type.members();
 
@@ -265,7 +278,7 @@ public final class FromCentral {
         String category = type.category().orElse("");
         if (isInlineRecord(category)) {
             TypeRef record = !members.isEmpty() && members.stream().allMatch(FromCentral::isInlineField)
-                    ? inlineRecordFields(members, "inline_closed_record".equals(category), scope)
+                    ? inlineRecordFields(members, INLINE_CLOSED_RECORD.equals(category), scope)
                     : inlineRecord(members, scope);
             return optional(record, type.isNullable());
         }
@@ -338,16 +351,15 @@ public final class FromCentral {
             }
             TypeRef typeRef = transformType(fieldType, scope);
             if (fieldType.isRestParam()) {
-                fields.append(typeRef.name()).append("...; ");
+                fields.append(REST_FIELD.formatted(typeRef.name()));
                 exclusive = true;
             } else {
-                fields.append(typeRef.name()).append(' ').append(member.name().orElseThrow())
-                        .append(member.isOptional() ? "?" : "").append("; ");
+                fields.append(FIELD.formatted(typeRef.name(), member.name().orElseThrow(),
+                        member.isOptional() ? "?" : ""));
             }
             links.addAll(typeRef.links());
         }
-        String body = exclusive ? "record {|" + fields + "|}" : "record {" + fields + "}";
-        return ref(body, links);
+        return ref((exclusive ? CLOSED_RECORD : OPEN_RECORD).formatted(fields), links);
     }
 
     /** An anonymous record whose fields Central did not describe; only its links survive. */

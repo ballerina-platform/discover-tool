@@ -359,6 +359,7 @@ public final class Containers {
                 Declarations.index(loaded.library().addressable())));
     }
 
+    /** The note for an answer found under {@code verb} rather than the bucket typed, with its canonical command. */
     private static String kindNote(LoadedPackage loaded, String verb, List<String> selectors) {
         return "'" + selectors.get(0) + "' is addressed by " + verb + " — showing it. Canonical: "
                 + "bal discover " + loaded.pkgArgument() + " " + verb + shellWords(selectors);
@@ -786,6 +787,7 @@ public final class Containers {
                         "bal discover " + loaded.pkgArgument() + " " + scope.verb(), options));
     }
 
+    /** The failure both forms raise: the selectors after the first {@code consumed}, and why they are unread. */
     private static Failure unread(List<String> selectors, int consumed, String reason, String suggestion) {
         List<String> unread = selectors.subList(consumed, selectors.size());
         return new Failure.Validation(
@@ -795,6 +797,7 @@ public final class Containers {
                 suggestion);
     }
 
+    /** The suggestion to rerun {@code base} with only the {@code kept} selectors. */
     private static String drop(List<String> kept, int dropped, String base, Options options) {
         return "Drop " + (dropped == 1 ? "it" : "them") + ": `" + base + shellWords(kept) + filterArgument(options)
                 + "`.";
@@ -975,6 +978,10 @@ public final class Containers {
     // The answer
     // -----------------------------------------------------------------------
 
+    /**
+     * One container's answer: every entry, one signature, a narrower listing or a no-match. Selectors it does not
+     * read are rejected before any of them.
+     */
     private static Result<DiscoverResult> answer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             Options options, String note) {
@@ -1022,6 +1029,7 @@ public final class Containers {
         return Page.of(documented.size() > MAX_ENTRIES ? page : 1, documented.size(), command);
     }
 
+    /** The documentation-only matches on {@code window}, which come after the listing's {@code offset} entries. */
     static DiscoverResult.Documented documentedOn(
             Page window, List<DiscoverResult.Documented.Entry> documented, int offset) {
         return documented.isEmpty()
@@ -1247,12 +1255,14 @@ public final class Containers {
     // Remote / normal methods — flat under the ceiling, paginated over it
     // -----------------------------------------------------------------------
 
+    /**
+     * Remote or normal methods, paged over the ceiling. Every page is turned on the same selectors and filter, so
+     * paging never widens back out to the whole container.
+     */
     private static Result<DiscoverResult> methodAnswer(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, List<String> selectors,
             List<Entry> callable, Options options, List<DiscoverResult.Documented.Entry> documented, String warning,
             String note) {
-        // A page is turned on the SAME selection — selector and filter both — or paging would silently widen
-        // back out to the container's full roster.
         String base = baseCommand(loaded, scope, container);
         String command = base + selectorArguments(container, selectors) + filterArgument(options);
         List<DiscoverResult.Method> methods = methodsOf(callable, Fn.class, base);
@@ -1490,6 +1500,7 @@ public final class Containers {
         return " " + shellWord(pathName(path.get())) + (accessor == null ? "" : " " + accessor);
     }
 
+    /** The command that opens {@code container}; every command printed for one of its entries extends it. */
     private static String baseCommand(LoadedPackage loaded, Surface.Scope scope, Surface.Container container) {
         return "bal discover " + loaded.pkgArgument() + " " + scope.verb()
                 + (container.isModule() ? "" : " " + container.name());
