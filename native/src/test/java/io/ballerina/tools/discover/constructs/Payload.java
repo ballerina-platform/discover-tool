@@ -133,7 +133,8 @@ public final class Payload {
         return this;
     }
 
-    private JsonObject raw() {
+    /** The payload as Central would send it: {@code docsData.modules[0]} is this module. */
+    public JsonObject raw() {
         JsonArray modules = new JsonArray();
         modules.add(module.deepCopy());
         JsonObject docsData = new JsonObject();
