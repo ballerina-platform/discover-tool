@@ -54,6 +54,8 @@ public final class FromCentral {
     /** Central's own placeholder for "no owning module", which counts as absent. */
     static final String NO_ORG = "UNK_ORG";
 
+    private static final String REST = "...";
+
     /** Central's categories for an anonymous record whose members are its own fields. */
     private static final String INLINE_RECORD = "inline_record";
     private static final String INLINE_CLOSED_RECORD = "inline_closed_record";
@@ -384,7 +386,9 @@ public final class FromCentral {
     /**
      * Split a resource path into its segments, keeping a path parameter's type and name apart. Central
      * writes them as {@code [string owner]}; a bracketed segment with no space inside is not a parameter
-     * and stays a literal.
+     * and stays a literal. The name is the last word, since the type can hold spaces ({@code readonly & T}).
+     * A rest parameter comes both as {@code [PathParamType ...path]} and as {@code [http:PathParamType... path]};
+     * either is kept as the second, the {@code ...} on the type.
      */
     public static List<Fn.PathSegment> createPaths(Optional<String> resourcePath) {
         String path = resourcePath.orElse("");
@@ -394,11 +398,18 @@ public final class FromCentral {
         List<Fn.PathSegment> segments = new ArrayList<>();
         for (String segment : path.split("/", -1)) {
             if (segment.startsWith("[") && segment.endsWith("]") && segment.length() >= 2) {
-                String inner = segment.substring(1, segment.length() - 1);
-                int space = inner.indexOf(' ');
+                String inner = segment.substring(1, segment.length() - 1).trim();
+                int space = inner.lastIndexOf(' ');
                 if (space != -1) {
-                    segments.add(new Fn.PathSegment.Parameter(
-                            inner.substring(0, space), inner.substring(space + 1)));
+                    String type = inner.substring(0, space).trim();
+                    String name = inner.substring(space + 1);
+                    if (name.startsWith(REST)) {
+                        type += REST;
+                        name = name.substring(REST.length());
+                    } else if (type.endsWith(REST)) {
+                        type = type.substring(0, type.length() - REST.length()).trim() + REST;
+                    }
+                    segments.add(new Fn.PathSegment.Parameter(type, name));
                     continue;
                 }
             }
