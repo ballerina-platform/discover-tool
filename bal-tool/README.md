@@ -578,8 +578,8 @@ its accessor, in either order, are read together and win over a member of the sa
 selector naming a method, function or `new` is read alone, and any other pair is a no-match answer listing
 the path's accessors.
 A selector beyond what the container reads is a `validation` failure naming the command without it, never
-silently dropped; a path's segments go in one argument joined by `/`, which that failure suggests when they
-were typed apart.
+silently dropped; a path's segments go in one argument joined by `/`. Typed apart, two segments are a no-match
+answer whose `next` is the joined command, and three or more are that failure, suggesting the joined command.
 
 ## The contract
 
