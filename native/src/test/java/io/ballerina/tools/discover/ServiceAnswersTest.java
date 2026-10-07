@@ -227,10 +227,13 @@ public class ServiceAnswersTest {
         Payload payload = Payload.pkg("test", module == null ? name : name + "." + module)
                 .with("listeners", Decl.listenerAttaching(serviceType, "Listener"));
         Library library = Pipeline.build(payload.module());
+        String childPrefix = module == null ? "" : module + ".";
+        List<LoadedPackage.Submodule> children = Arrays.stream(submodules)
+                .filter(submodule -> submodule.startsWith(childPrefix))
+                .map(submodule -> new LoadedPackage.Submodule(submodule, ""))
+                .toList();
         return new LoadedPackage(QualifiedName.parse("test/" + name).value(), FixtureCorpus.FIXTURE_VERSION,
-                library, Optional.empty(), module,
-                Arrays.stream(submodules).map(submodule -> new LoadedPackage.Submodule(submodule, "")).toList(), null,
-                null, () -> library);
+                library, Optional.empty(), module, children, List.of(submodules), null, null, () -> library);
     }
 
     private static DiscoverResult.ContainerRoster roster(LoadedPackage loaded) {

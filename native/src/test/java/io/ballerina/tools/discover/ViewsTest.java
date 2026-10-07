@@ -934,7 +934,7 @@ public class ViewsTest {
                 library.functions(), library.listeners(), library.services(), library.annotations(),
                 library.configurables());
         LoadedPackage loaded = new LoadedPackage(base.qualified(), base.version(), withHolder, base.readme(), "sub",
-                List.of(new LoadedPackage.Submodule("other", "")), base.warning(), null, () -> withHolder);
+                List.of(), List.of("sub", "other"), base.warning(), null, () -> withHolder);
 
         DiscoverResult.TypeDeclaration holder = as(DiscoverResult.TypeDeclaration.class, result(
                 Types.render(loaded, new Types.Options(List.of("Holder"), null, 1)), "type Holder"));
@@ -1236,7 +1236,7 @@ public class ViewsTest {
     private static LoadedPackage fromPayload(Payload payload) {
         Library library = Pipeline.build(payload.module());
         return new LoadedPackage(QualifiedName.parse("test/pkg").value(), FixtureCorpus.FIXTURE_VERSION, library,
-                Optional.empty(), null, List.of(), null, null, () -> library);
+                Optional.empty(), null, List.of(), List.of(), null, null, () -> library);
     }
 
     @Test

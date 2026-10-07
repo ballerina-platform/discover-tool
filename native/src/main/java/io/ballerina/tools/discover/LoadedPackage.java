@@ -34,8 +34,10 @@ import java.util.function.Supplier;
  * @param readme the resolved module's own readme, verbatim, or empty when it publishes none
  * @param module the {@code --module} value that resolved this module, or {@code null} for the package's own
  *     default module
- * @param submodules every OTHER module this package publishes, name and summary only — the bare-package fact
- *     shown as {@code Submodules:}, regardless of which module {@code module} itself addresses
+ * @param submodules the modules listed under the one being read, name and summary only — every other module of
+ *     the package for its default module, a submodule's own children otherwise; shown as {@code Submodules:}
+ * @param modules every submodule this package publishes, by the name {@code --module} takes — what a command
+ *     reaching another module of this package is checked against, whichever module is being read
  * @param warning why this version cannot be trusted, or {@code null} when it was confirmed against the
  *     registry — see {@link Loader#unverifiedWarning}
  * @param pinned the {@code --version} the caller supplied, or {@code null} when it was resolved — carried into
@@ -51,6 +53,7 @@ public record LoadedPackage(
         Optional<String> readme,
         String module,
         List<Submodule> submodules,
+        List<String> modules,
         String warning,
         String pinned,
         Supplier<Library> bound) {
@@ -85,9 +88,9 @@ public record LoadedPackage(
 
     /**
      * The argument that reaches another module in its own package, or empty when that package is not known.
-     * Unpinned, as every command this tool prints is. A module of THIS package — its default module, or a
-     * submodule its payload lists, read from a sibling — is reached through {@code --module} or none; a name that
-     * merely starts with this package's is not enough, since {@code postgresql.driver} is a package of its own.
+     * A module of THIS package — its default module, or any submodule it publishes — is reached through
+     * {@code --module} or none; a name that merely starts with this package's is not enough, since
+     * {@code postgresql.driver} is a package of its own.
      * An undotted module path is its package's default module, so it is the package coordinate as written.
      * Another package's dotted module path names no package boundary, and a command guessing one would not be
      * ready to run.
@@ -100,7 +103,7 @@ public record LoadedPackage(
         if (sameOrg && module.moduleName().equals(qualified.name())) {
             return Optional.of(pkgArgument(null));
         }
-        if (sibling != null && submodules.stream().anyMatch(submodule -> submodule.name().equals(sibling))) {
+        if (sibling != null && modules.contains(sibling)) {
             return Optional.of(pkgArgument(sibling));
         }
         return module.moduleName().contains(".") ? Optional.empty() : Optional.of(module.coordinate());
@@ -108,8 +111,8 @@ public record LoadedPackage(
 
     /** The same package with a different IR, which is what a test that removes every client needs. */
     public LoadedPackage withLibrary(Library replacement) {
-        return new LoadedPackage(qualified, version, replacement, readme, module, submodules, warning, pinned,
-                () -> replacement);
+        return new LoadedPackage(qualified, version, replacement, readme, module, submodules, modules, warning,
+                pinned, () -> replacement);
     }
 
     /**
