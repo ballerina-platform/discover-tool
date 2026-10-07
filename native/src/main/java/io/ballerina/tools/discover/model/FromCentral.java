@@ -52,7 +52,7 @@ import java.util.stream.Collectors;
 public final class FromCentral {
 
     /** Central's own placeholder for "no owning module", which counts as absent. */
-    private static final String NO_ORG = "UNK_ORG";
+    static final String NO_ORG = "UNK_ORG";
 
     /** Central's categories for an anonymous record whose members are its own fields. */
     private static final String INLINE_RECORD = "inline_record";

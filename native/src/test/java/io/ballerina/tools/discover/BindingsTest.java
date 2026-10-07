@@ -139,7 +139,7 @@ public class BindingsTest {
         CentralDocs.Module module = withServices(Decl.listenerAttaching(local("A"), "Listener"), "Service")
                 .with("unionTypes", Decl.alias("A", local("B")), Decl.alias("B", local("A")))
                 .module();
-        Assert.assertEquals(targetsOf(module), Optional.empty());
+        Assert.assertEquals(targetsOf(module), Optional.of(Set.of()));
     }
 
     @Test
@@ -154,10 +154,25 @@ public class BindingsTest {
     }
 
     @Test
-    public void anAnonymousServiceObjectIsNoEvidence() {
+    public void anAnonymousServiceObjectIsNoEvidenceForADifferentReasonThanNoAttach() {
         CentralDocs.Module module = withServices(Decl.listenerAttaching(
                 Node.structural().with("category", "other"), "Listener"), "Service").module();
-        Assert.assertEquals(targetsOf(module), Optional.empty());
+        Assert.assertEquals(targetsOf(module), Optional.of(Set.of()));
+        Assert.assertFalse(Bindings.needsSource(module), "nothing to settle against");
+        List<Service> services = Pipeline.build(module).services();
+        Assert.assertEquals(services.stream().map(Service::binding).toList(),
+                List.of(Bindings.Binding.UNNAMED_ATTACH_TARGET));
+        Assert.assertNotEquals(Bindings.Binding.UNNAMED_ATTACH_TARGET.reason(),
+                Bindings.Binding.NO_ATTACH_EVIDENCE.reason());
+        Assert.assertFalse(services.get(0).binding().reason().contains("no attach()"),
+                services.get(0).binding().reason());
+    }
+
+    @Test
+    public void centralsUnknownOrgPlaceholderIsNoForeignModule() {
+        CentralDocs.Module module = withServices(Decl.listenerAttaching(
+                Node.external("UNK_ORG", "pkg", "Service"), "Listener"), "Service").module();
+        Assert.assertEquals(targetsOf(module), Optional.of(locals("Service")));
     }
 
     @Test

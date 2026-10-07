@@ -86,6 +86,9 @@ public final class Bindings {
         /** Unsettled: the listener publishes no {@code attach()} to read the target from. */
         NO_ATTACH_EVIDENCE("the listener publishes no attach() signature to read its service type from",
                 "listener publishes no attach()"),
+        /** Unsettled: {@code attach()}'s parameter resolves to no named service type ({@code service object {}}). */
+        UNNAMED_ATTACH_TARGET("the listener's attach() takes no named service type to pair with",
+                "attach() names no service type"),
         /** Unsettled: the package source, which shows the type's inclusions, was unavailable. */
         SOURCE_UNAVAILABLE("the package source, which shows which service types include the listener's attach() "
                 + "type, was unavailable", "package source unavailable"),
@@ -118,8 +121,9 @@ public final class Bindings {
     }
 
     /**
-     * Every type {@code listener.attach} accepts, or empty when the payload gives no evidence — no {@code attach},
-     * or a parameter that resolves to no named service type ({@code service object {}}).
+     * Every type {@code listener.attach} accepts: empty when the listener publishes no {@code attach}, and an empty
+     * set when its parameter resolves to no named service type ({@code service object {}}) — no evidence either
+     * way, for two different reasons.
      *
      * <p>The parameter is resolved through anonymous unions and through the module's own union, name-reference and
      * intersection aliases, recursively: salesforce's {@code Service} is {@code CdcService|PlatformEventsService},
@@ -137,7 +141,7 @@ public final class Bindings {
         }
         Set<Target> targets = new LinkedHashSet<>();
         collect(parameter.get(), module, aliases(module), new HashSet<>(), targets);
-        return targets.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableSet(targets));
+        return Optional.of(Collections.unmodifiableSet(targets));
     }
 
     private static Map<String, CentralDocs.AliasDecl> aliases(CentralDocs.Module module) {
@@ -179,7 +183,7 @@ public final class Bindings {
     private static Optional<ModuleRef> foreignModule(CentralDocs.TypeNode node, CentralDocs.Module module) {
         String moduleName = node.moduleName().orElse("");
         String org = node.orgName().orElse("");
-        boolean foreign = !moduleName.isEmpty() && !org.isEmpty()
+        boolean foreign = !moduleName.isEmpty() && !org.isEmpty() && !FromCentral.NO_ORG.equals(org)
                 && (!moduleName.equals(module.id()) || !org.equals(module.orgName()));
         return foreign ? Optional.of(new ModuleRef(org, moduleName, node.version().orElse(""))) : Optional.empty();
     }
@@ -194,7 +198,7 @@ public final class Bindings {
         boolean evidence = false;
         for (CentralDocs.Listener listener : module.listeners()) {
             Optional<Set<Target>> targets = attachTargets(listener, module);
-            if (targets.isPresent()) {
+            if (targets.isPresent() && !targets.get().isEmpty()) {
                 evidence = true;
                 targets.get().forEach(target -> {
                     if (target instanceof Target.Local named) {
@@ -217,6 +221,9 @@ public final class Bindings {
             Optional<ObjectInclusions> inclusions) {
         if (targets.isEmpty()) {
             return Binding.NO_ATTACH_EVIDENCE;
+        }
+        if (targets.get().isEmpty()) {
+            return Binding.UNNAMED_ATTACH_TARGET;
         }
         if (targets.get().contains(new Target.Local(serviceType))) {
             return Binding.CONFIRMED;
