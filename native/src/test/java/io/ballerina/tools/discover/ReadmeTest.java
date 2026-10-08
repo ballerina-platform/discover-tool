@@ -65,7 +65,7 @@ public class ReadmeTest {
         JsonObject wrapper = new JsonObject();
         wrapper.add("docsData", docsData);
 
-        Result<CentralDocs> parsed = Schema.parse(wrapper, "assembled");
+        Result<CentralDocs> parsed = Schema.parse(wrapper, "assembled", null);
         Assert.assertTrue(parsed.isOk(), parsed.isOk() ? "" : parsed.failure().describe());
         return parsed.value().modules().get(0);
     }

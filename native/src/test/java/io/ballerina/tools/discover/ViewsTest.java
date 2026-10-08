@@ -1020,7 +1020,7 @@ public class ViewsTest {
                 new Types.Options(List.of(), null, 9));
         Assert.assertFalse(page.isOk());
         Assert.assertEquals(page.failure(), new Failure.Validation(
-                "--page 9 is out of range: this listing has 58 entries on 2 pages.",
+                "Page 9 is out of range: this listing has 58 entries on 2 pages.",
                 "Pass a page from 1 to 2, e.g. `bal discover ballerinax/kafka type --page 2`."));
     }
 

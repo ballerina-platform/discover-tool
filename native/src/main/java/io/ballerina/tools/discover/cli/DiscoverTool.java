@@ -18,8 +18,8 @@
 
 package io.ballerina.tools.discover.cli;
 
-import com.google.gson.JsonObject;
 import io.ballerina.cli.BLauncherCmd;
+import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.cache.CacheLocation;
 import io.ballerina.tools.discover.cache.DiskCache;
 import io.ballerina.tools.discover.cache.DocsCache;
@@ -111,7 +111,8 @@ public class DiscoverTool implements BLauncherCmd {
         } catch (RuntimeException cause) {
             // Nothing in the pipeline throws by design; if something does, it is a defect in this tool and the
             // caller still needs a failure in the run's own mode rather than a Java stack trace on stdout.
-            errStream.print(internalFailure(cause, Cli.jsonOutput(argv, interactive)) + "\n");
+            Failure failure = new Failure.Internal(messageOf(cause), Failure.INTERNAL_SUGGESTION);
+            errStream.print((Cli.jsonOutput(argv, interactive) ? failure.describe() : failure.describeText()) + "\n");
             code = 1;
         }
 
@@ -125,17 +126,10 @@ public class DiscoverTool implements BLauncherCmd {
         }
     }
 
-    private static String internalFailure(Throwable cause, boolean asJson) {
-        String message = cause.getMessage() == null || cause.getMessage().isEmpty()
+    private static String messageOf(Throwable cause) {
+        return cause.getMessage() == null || cause.getMessage().isEmpty()
                 ? cause.getClass().getName()
                 : cause.getMessage();
-        if (!asJson) {
-            return "error: " + message;
-        }
-        JsonObject json = new JsonObject();
-        json.addProperty("kind", "internal");
-        json.addProperty("message", message);
-        return json.toString();
     }
 
     private static DocsCache buildCache() {
