@@ -40,11 +40,8 @@ import picocli.CommandLine;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -76,13 +73,13 @@ import java.util.stream.Collectors;
  */
 public final class Cli {
 
-    private static final String VERSION_FLAG = "--version";
-
     private static final String OUTPUT_FLAG = "--output";
 
     private static final String HELP = "bal discover --help";
 
-    private static final Pattern OVERWRITTEN = Pattern.compile("option '([^']+)'");
+    private static final String RUN_HELP = "Run `" + HELP + "` for usage.";
+
+    private static final int USAGE_ERROR = 2;
 
     private Cli() {
     }
@@ -119,15 +116,19 @@ public final class Cli {
             return 0;
         }
 
-        boolean json = jsonOutput(argv, interactive);
         Commands.Grammar grammar = Commands.Grammar.create();
+        boolean json = jsonOutput(argv, interactive, grammar);
+        UsageErrors usage = new UsageErrors(grammar, streams, json);
         CommandLine.ParseResult parsed;
         try {
             parsed = grammar.line().parseArgs(argv.toArray(new String[0]));
         } catch (CommandLine.ParameterException cause) {
             // picocli's own error printing is deliberately never used: stderr has to hold exactly one `Failure`
             // object, and picocli would write a usage block beside it.
-            return usageError(describeParseError(cause, argv), streams, json);
+            Failure specific = describeParseError(cause, grammar);
+            return specific == null
+                    ? usage.helpError(firstLine(cause.getMessage()))
+                    : usage.error(specific);
         }
 
         // A usage request is answered, not failed: it goes to stdout at exit 0, because "exit 0 means stdout is
@@ -138,21 +139,24 @@ public final class Cli {
         }
 
         Commands.Root root = grammar.root();
+        if (root.version != null) {
+            return usage.error(versionFlag(root));
+        }
         if (root.pkg == null) {
-            return usageError(new Failure.Validation(
+            return usage.error(new Failure.Validation(
                     "A package is required.",
-                    "Pass '<org>/<name>', e.g. bal discover ballerinax/github."), streams, json);
+                    "Pass '<org>/<name>', e.g. bal discover ballerinax/github."));
         }
 
         Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
         if (!coordinate.isOk()) {
-            return usageError(coordinate.failure(), streams, json);
+            return usage.error(coordinate.failure());
         }
         QualifiedName qualified = coordinate.value().qualified();
 
-        Failure argumentError = validate(root, qualified);
+        Failure argumentError = validate(root, coordinate.value());
         if (argumentError != null) {
-            return usageError(argumentError, streams, json);
+            return usage.error(argumentError);
         }
         Version version = coordinate.value().version();
 
@@ -161,13 +165,13 @@ public final class Cli {
         List<String> rest = root.rest == null ? List.of() : root.rest;
         String bucket = rest.isEmpty() ? null : rest.get(0);
         if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
-            return usageError(unknownBucket(bucket), streams, json);
+            return usage.error(unknownBucket(bucket));
         }
 
         String filter = root.filter;
         Failure extra = extraNames(bucket, rest, filter, root, qualified, version);
         if (extra != null) {
-            return usageError(extra, streams, json);
+            return usage.error(extra);
         }
 
         // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
@@ -278,8 +282,12 @@ public final class Cli {
      * failure to parse the arguments is still written in the mode the caller asked for.
      */
     public static boolean jsonOutput(List<String> argv, boolean interactive) {
-        Set<String> takesValue = Commands.Grammar.create().line().getCommandSpec().options().stream()
-                .filter(option -> option.arity().max() > 0)
+        return jsonOutput(argv, interactive, Commands.Grammar.create());
+    }
+
+    private static boolean jsonOutput(List<String> argv, boolean interactive, Commands.Grammar grammar) {
+        Set<String> takesValue = grammar.line().getCommandSpec().options().stream()
+                .filter(option -> option.arity().min() > 0)
                 .flatMap(option -> Arrays.stream(option.names()))
                 .collect(Collectors.toSet());
         for (int i = 0; i < argv.size(); i++) {
@@ -298,7 +306,7 @@ public final class Cli {
         return !interactive;
     }
 
-    private static Failure validate(Commands.Root root, QualifiedName qualified) {
+    private static Failure validate(Commands.Root root, Coordinate coordinate) {
         Failure output = rejectInvalidOutput(root);
         if (output != null) {
             return output;
@@ -312,7 +320,16 @@ public final class Cli {
                     "Page " + root.page + " is out of range: pages are numbered from 1.",
                     "Pass --page 1 or later, or drop it for the first page.");
         }
-        return rejectVersionArguments(root, qualified);
+        return rejectVersionArguments(root, coordinate.qualified());
+    }
+
+    private static Failure versionFlag(Commands.Root root) {
+        Result<Coordinate> coordinate = root.pkg == null ? null : Coordinate.parse(root.pkg);
+        String pkg = coordinate != null && coordinate.isOk() ? coordinate.value().qualified().qualified()
+                : "<org>/<name>";
+        String version = Version.isComplete(root.version) ? root.version : "<version>";
+        return new Failure.Validation("Unknown option '" + Commands.VERSION_FLAG + "'.",
+                "To read a specific version, write " + pkg + ":" + version);
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
@@ -342,24 +359,19 @@ public final class Cli {
                 "Write it after the package: " + qualified.qualified() + ":" + misplaced);
     }
 
-    private static Failure describeParseError(CommandLine.ParameterException cause, List<String> argv) {
+    /** The failure a parse error is, or {@code null} when picocli's own first line says it best. */
+    private static Failure describeParseError(CommandLine.ParameterException cause, Commands.Grammar grammar) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();
-            String token = tokens.isEmpty() ? "" : tokens.get(0);
-            if (VERSION_FLAG.equals(token) || token.startsWith(VERSION_FLAG + "=")) {
-                return versionFlag(argv);
-            }
             // Every positional fits `[bucket] [name ...]`, so only an option is ever left unmatched.
             return new Failure.Validation(
-                    "Unknown option '" + token + "'.",
-                    UsageRenderer.knownFlags(Commands.Grammar.create()));
+                    "Unknown option '" + (tokens.isEmpty() ? "" : tokens.get(0)) + "'.",
+                    UsageRenderer.knownFlags(grammar));
         }
-        Optional<String> repeated = cause instanceof CommandLine.OverwrittenOptionException
-                ? overwritten(cause.getMessage())
-                : Optional.empty();
-        if (repeated.isPresent()) {
+        if (cause instanceof CommandLine.OverwrittenOptionException overwritten
+                && overwritten.getOverwritten() instanceof CommandLine.Model.OptionSpec option) {
             return new Failure.Validation(
-                    repeated.get() + " is given more than once.", "Pass " + repeated.get() + " once.");
+                    option.longestName() + " is given more than once.", "Pass " + option.longestName() + " once.");
         }
         if (cause instanceof CommandLine.MissingParameterException missing) {
             return missing.getMissing().stream()
@@ -367,8 +379,7 @@ public final class Cli {
                     .map(CommandLine.Model.OptionSpec.class::cast)
                     .findFirst()
                     .map(Cli::missingValue)
-                    .orElseGet(() -> new Failure.Validation(firstLine(missing.getMessage()),
-                            "Run `" + HELP + "` for usage."));
+                    .orElse(null);
         }
         if (cause.getArgSpec() instanceof CommandLine.Model.OptionSpec option && cause.getValue() != null) {
             if (option.type() == boolean.class) {
@@ -380,39 +391,7 @@ public final class Cli {
                     "'" + cause.getValue() + "' is not a valid " + option.longestName() + " value.",
                     "Write " + option.longestName() + " " + option.paramLabel() + ".");
         }
-        return new Failure.Validation(
-                firstLine(cause.getMessage()),
-                "Run `" + HELP + "` for usage.");
-    }
-
-    // picocli 4.0.1 names the option only in its message: "option '--page' (<n>) should be specified only once".
-    private static Optional<String> overwritten(String message) {
-        Matcher named = OVERWRITTEN.matcher(message == null ? "" : message);
-        return named.find()
-                ? Optional.ofNullable(Commands.Grammar.create().line().getCommandSpec().findOption(named.group(1)))
-                        .map(CommandLine.Model.OptionSpec::longestName)
-                : Optional.empty();
-    }
-
-    // `--version` conventionally asks for a program's own version, so the package's goes in the coordinate.
-    private static Failure versionFlag(List<String> argv) {
-        String pkg = null;
-        String version = "<version>";
-        for (int i = 0; i < argv.size(); i++) {
-            String token = argv.get(i);
-            String attached = token.startsWith(VERSION_FLAG + "=") ? token.substring(VERSION_FLAG.length() + 1) : "";
-            Result<Coordinate> coordinate = Coordinate.parse(token);
-            if (Version.isComplete(attached)) {
-                version = attached;
-            } else if (token.equals(VERSION_FLAG) && i + 1 < argv.size() && Version.isComplete(argv.get(i + 1))) {
-                version = argv.get(i + 1);
-            } else if (pkg == null && coordinate.isOk()) {
-                pkg = coordinate.value().qualified().qualified();
-            }
-        }
-        return new Failure.Validation(
-                "Unknown option '" + VERSION_FLAG + "'.",
-                "To read a specific version, write " + (pkg == null ? "<org>/<name>" : pkg) + ":" + version);
+        return null;
     }
 
     private static Failure missingValue(CommandLine.Model.OptionSpec option) {
@@ -433,10 +412,23 @@ public final class Cli {
         return 1;
     }
 
-    private static int usageError(Failure failure, Streams streams, boolean json) {
-        String usage = json ? "" : "\n" + UsageRenderer.usageLine(Commands.Grammar.create())
-                + (failure.suggestion().contains(HELP) ? "" : "\nRun `" + HELP + "` for details.");
-        streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + usage + "\n");
-        return 2;
+    // A malformed command line: the failure at exit 2, then in text mode the synopsis and, unless the suggestion
+    // already is one, a pointer to --help.
+    private record UsageErrors(Commands.Grammar grammar, Streams streams, boolean json) {
+
+        int error(Failure failure) {
+            return write(failure, true);
+        }
+
+        int helpError(String message) {
+            return write(new Failure.Validation(message, RUN_HELP), false);
+        }
+
+        private int write(Failure failure, boolean pointToHelp) {
+            String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar)
+                    + (pointToHelp ? "\nRun `" + HELP + "` for details." : "");
+            streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + usage + "\n");
+            return USAGE_ERROR;
+        }
     }
 }
