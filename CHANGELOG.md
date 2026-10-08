@@ -41,4 +41,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Report failures on stderr in the run's output mode: a single-line JSON object, or `error: <message>` with the
   suggestion indented below it; a usage error (a malformed command line, rejected before anything is looked up)
   exits 2 and, in text, ends with the synopsis and a pointer to `--help`, and every other failure exits 1
+- Send requests to Ballerina Central through the HTTP proxy `bal pull` uses, the `[proxy]` table of
+  `~/.ballerina/Settings.toml`, with its `username` and `password` for proxy authentication
 - Cache Central responses under `$XDG_CACHE_HOME`, falling back to a live fetch on any cache failure

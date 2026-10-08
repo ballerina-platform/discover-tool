@@ -634,6 +634,21 @@ printed commands are unpinned (a locked version is resolved again), except one t
 package owns, which pins the version that declaration was generated against
 (`bal discover ballerina/crypto:2.9.3 type TrustStore`).
 
+## Proxy
+
+Requests to Central go through the HTTP proxy `bal pull` uses: the `[proxy]` table of `~/.ballerina/Settings.toml`
+(or of `$BALLERINA_HOME_DIR/Settings.toml` when that is set). A proxy needs `host` and `port`; `username` and
+`password`, when both are set, answer the proxy's own authentication challenge. With no such table, an empty
+`host` or no `port`, requests go direct.
+
+```toml
+[proxy]
+host = "proxy.example.com"
+port = 3128
+username = "alice"
+password = "secret"
+```
+
 ## Caching
 
 The raw Central payload is cached, keyed by package coordinates, with atomic writes, and so is what a

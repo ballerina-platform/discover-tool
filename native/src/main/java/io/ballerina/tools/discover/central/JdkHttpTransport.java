@@ -22,6 +22,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Authenticator;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -52,16 +56,47 @@ public final class JdkHttpTransport implements HttpTransport {
     private final long archiveLimit;
 
     public JdkHttpTransport() {
-        this(Bala.MAX_ARCHIVE_BYTES);
+        this(Bala.MAX_ARCHIVE_BYTES, null);
     }
 
-    /** A transport refusing any download past {@code archiveLimit} bytes. */
-    JdkHttpTransport(long archiveLimit) {
-        this.client = HttpClient.newBuilder()
+    /** A transport sending every request through {@code proxy}. */
+    public JdkHttpTransport(ProxySettings proxy) {
+        this(Bala.MAX_ARCHIVE_BYTES, proxy);
+    }
+
+    /**
+     * A transport refusing any download past {@code archiveLimit} bytes, through {@code proxy} unless it is
+     * {@code null}.
+     */
+    JdkHttpTransport(long archiveLimit, ProxySettings proxy) {
+        HttpClient.Builder builder = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(30))
-                .build();
+                .connectTimeout(Duration.ofSeconds(30));
+        if (proxy != null) {
+            builder.proxy(ProxySelector.of(InetSocketAddress.createUnresolved(proxy.host(), proxy.port())));
+            if (proxy.authenticates()) {
+                builder.authenticator(new ProxyAuthenticator(proxy));
+            }
+        }
+        this.client = builder.build();
         this.archiveLimit = archiveLimit;
+    }
+
+    /** Answers the proxy's challenge only; a server asking for credentials gets none. */
+    private static final class ProxyAuthenticator extends Authenticator {
+
+        private final ProxySettings proxy;
+
+        ProxyAuthenticator(ProxySettings proxy) {
+            this.proxy = proxy;
+        }
+
+        @Override
+        protected PasswordAuthentication getPasswordAuthentication() {
+            return getRequestorType() == RequestorType.PROXY
+                    ? new PasswordAuthentication(proxy.username(), proxy.password().toCharArray())
+                    : null;
+        }
     }
 
     @Override

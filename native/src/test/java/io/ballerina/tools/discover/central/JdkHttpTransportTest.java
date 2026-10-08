@@ -26,6 +26,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -34,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * A download past the transport's limit is no answer, whether the server declares its length up front or only
- * reveals it by sending too much.
+ * reveals it by sending too much. A configured proxy carries every request, with credentials only when asked.
  *
  * @since 0.1.0
  */
@@ -65,7 +69,7 @@ public class JdkHttpTransportTest {
         server.start();
         try {
             String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/package.bala";
-            return new JdkHttpTransport(LIMIT).openStream(url, timeoutMs);
+            return new JdkHttpTransport(LIMIT, null).openStream(url, timeoutMs);
         } finally {
             released.countDown();
             server.stop(0);
@@ -111,5 +115,67 @@ public class JdkHttpTransportTest {
     @Test
     public void anErrorStatusIsNoAnswer() throws IOException {
         Assert.assertTrue(download(404, 16, 16, 5000).isEmpty());
+    }
+
+    private static String basic(String username, String password) {
+        return "Basic " + Base64.getEncoder().encodeToString((username + ":" + password)
+                .getBytes(StandardCharsets.UTF_8));
+    }
+
+    private record Proxied(HttpTransport.Reply reply, List<String> requests, List<String> credentials) { }
+
+    // A plain-HTTP origin is reached through the proxy without a tunnel, so the proxy sees the absolute URI.
+    private static Proxied throughProxy(String username, String password) throws IOException {
+        List<String> requests = new ArrayList<>();
+        List<String> credentials = new ArrayList<>();
+        String expected = basic("alice", "secret");
+        HttpServer proxy = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        proxy.createContext("/", exchange -> {
+            String credential = exchange.getRequestHeaders().getFirst("Proxy-Authorization");
+            synchronized (requests) {
+                requests.add(exchange.getRequestURI().toString());
+                credentials.add(credential == null ? "" : credential);
+            }
+            byte[] body = "{\"via\":\"proxy\"}".getBytes(StandardCharsets.UTF_8);
+            if (!expected.equals(credential)) {
+                exchange.getResponseHeaders().add("Proxy-Authenticate", "Basic realm=\"test\"");
+                exchange.sendResponseHeaders(407, -1);
+                exchange.close();
+                return;
+            }
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        proxy.start();
+        try {
+            ProxySettings settings = new ProxySettings("127.0.0.1", proxy.getAddress().getPort(), username, password);
+            HttpTransport.Reply reply = new JdkHttpTransport(LIMIT, settings)
+                    .get("http://central.invalid/2.0/docs/ballerina/http", 5000);
+            synchronized (requests) {
+                return new Proxied(reply, List.copyOf(requests), List.copyOf(credentials));
+            }
+        } finally {
+            proxy.stop(0);
+        }
+    }
+
+    @Test
+    public void aRequestGoesThroughTheProxyAndAnswersItsChallengeWithTheConfiguredCredentials() throws IOException {
+        Proxied proxied = throughProxy("alice", "secret");
+        Assert.assertEquals(proxied.reply(), new HttpTransport.Reply.Answered(200, "{\"via\":\"proxy\"}", null));
+        Assert.assertTrue(proxied.requests().stream()
+                .allMatch("http://central.invalid/2.0/docs/ballerina/http"::equals), proxied.requests().toString());
+        Assert.assertEquals(proxied.credentials().get(proxied.credentials().size() - 1), basic("alice", "secret"));
+    }
+
+    @Test
+    public void aProxyWithoutCredentialsIsSentNone() throws IOException {
+        Proxied proxied = throughProxy("", "");
+        Assert.assertEquals(proxied.requests(), List.of("http://central.invalid/2.0/docs/ballerina/http"));
+        Assert.assertEquals(proxied.credentials(), List.of(""));
+        Assert.assertTrue(proxied.reply() instanceof HttpTransport.Reply.Answered answered
+                && answered.status() == 407, proxied.reply().toString());
     }
 }

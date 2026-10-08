@@ -25,12 +25,16 @@ import io.ballerina.tools.discover.cache.DiskCache;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
+import io.ballerina.tools.discover.central.JdkHttpTransport;
+import io.ballerina.tools.discover.central.ProxySettings;
+import org.wso2.ballerinalang.util.RepoUtils;
 import picocli.CommandLine;
 
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Entry point for the {@code bal discover} CLI tool: the process wrapper.
@@ -47,6 +51,8 @@ import java.util.List;
  */
 @CommandLine.Command(name = "discover")
 public class DiscoverTool implements BLauncherCmd {
+
+    private static final String TUNNELING_DISABLED_SCHEMES = "jdk.http.auth.tunneling.disabledSchemes";
 
     @CommandLine.Parameters(arity = "0..*")
     private List<String> argList;
@@ -98,7 +104,9 @@ public class DiscoverTool implements BLauncherCmd {
         if (helpFlag) {
             argv.add("--help");
         }
-        HttpOptions http = HttpOptions.builder().cache(buildCache()).build();
+        HttpOptions.Builder builder = HttpOptions.builder().cache(buildCache());
+        proxy().ifPresent(proxy -> builder.transport(new JdkHttpTransport(proxy)));
+        HttpOptions http = builder.build();
         Cli.Streams streams = new Cli.Streams(outStream::print, errStream::print);
 
         // Pre-JDK 22, System.console() is null if EITHER stream is redirected, so a terminal with redirected
@@ -130,6 +138,23 @@ public class DiscoverTool implements BLauncherCmd {
         return cause.getMessage() == null || cause.getMessage().isEmpty()
                 ? cause.getClass().getName()
                 : cause.getMessage();
+    }
+
+    /** The proxy {@code bal pull} would use, from the Ballerina home it would read it from. */
+    private static Optional<ProxySettings> proxy() {
+        Optional<ProxySettings> proxy;
+        try {
+            proxy = ProxySettings.read(RepoUtils.createAndGetHomeReposPath());
+        } catch (RuntimeException | LinkageError unavailable) {
+            return Optional.empty();
+        }
+        // Central is HTTPS, so the proxy is reached through a CONNECT tunnel, where the JDK refuses Basic
+        // credentials unless told otherwise; `bal pull` sends them.
+        if (proxy.isPresent() && proxy.get().authenticates()
+                && System.getProperty(TUNNELING_DISABLED_SCHEMES) == null) {
+            System.setProperty(TUNNELING_DISABLED_SCHEMES, "");
+        }
+        return proxy;
     }
 
     private static DocsCache buildCache() {
