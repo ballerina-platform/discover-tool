@@ -98,12 +98,7 @@ public final class JdkHttpTransport implements HttpTransport {
         this.authenticator = answering;
     }
 
-    /**
-     * Answers the proxy's challenge, once per request; a server asking for credentials gets none.
-     *
-     * <p>The JDK asks again after each rejected answer, up to three more times, so answering every ask would send
-     * a wrong password four times a request, and a proxy counting failed logins locks the account.
-     */
+    // Answers once per request: the JDK asks again after each rejection, and repeated failed logins lock accounts.
     private static final class ProxyAuthenticator extends Authenticator {
 
         private final ProxySettings proxy;

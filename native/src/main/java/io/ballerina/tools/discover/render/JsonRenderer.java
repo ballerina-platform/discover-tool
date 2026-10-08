@@ -41,7 +41,7 @@ public final class JsonRenderer {
         return toJson(result).toString();
     }
 
-    /** {@code result} led by the {@code version} it was read at, as every answer the CLI prints is. */
+    /** {@code result} with the version it was read at as its first field. */
     public static String render(DiscoverResult result, String version) {
         JsonObject answer = new JsonObject();
         answer.addProperty("version", version);

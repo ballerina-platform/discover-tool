@@ -127,8 +127,8 @@ public final class Types {
     }
 
     /**
-     * The failure for more than one name, or a name with {@code --filter}, which no package can read, or
-     * {@code null}: a fact about the command line, so the CLI finds it before the package is fetched.
+     * The failure for more than one name, or a name with {@code --filter}, or {@code null}; checked before the
+     * package is fetched.
      *
      * @param command the command the bucket is listed with, e.g. {@code bal discover ballerina/io type}
      */

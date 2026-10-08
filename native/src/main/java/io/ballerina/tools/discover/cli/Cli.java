@@ -240,7 +240,6 @@ public final class Cli {
         return null;
     }
 
-    // What follows the package and module in the caller's command: the bucket, the names, --filter and --page.
     private static String tail(List<String> rest, String filter, int page) {
         StringBuilder words = new StringBuilder();
         rest.forEach(word -> words.append(' ').append(Texts.shellWord(word)));
@@ -295,9 +294,8 @@ public final class Cli {
     }
 
     /**
-     * The one output mode of a run, for the answer and a failure alike: {@code --output} when argv carries a valid
-     * one, else JSON unless stdout is an interactive terminal. Read off argv rather than the parsed flag, so a
-     * failure to parse the arguments is still written in the mode the caller asked for.
+     * The run's output mode: a valid {@code --output} in argv, else JSON unless stdout is a terminal. Read off argv,
+     * not the parsed flag, so a parse failure is still written in the mode the caller asked for.
      */
     public static boolean jsonOutput(List<String> argv, boolean interactive) {
         return jsonOutput(argv, interactive, Commands.Grammar.create());
@@ -351,7 +349,6 @@ public final class Cli {
         return writtenVersion(message, root, coordinate.value().qualified(), root.version, tail(root));
     }
 
-    // The fix for a version given anywhere but the coordinate: the caller's command with it written there instead.
     private static Failure writtenVersion(String message, Commands.Root root, QualifiedName qualified,
             String version, String tail) {
         if (!Version.isComplete(version)) {
@@ -445,8 +442,6 @@ public final class Cli {
         return 1;
     }
 
-    // A malformed command line: the failure at exit 2, then in text mode the synopsis and, unless the suggestion
-    // already is one, a pointer to --help.
     private record UsageErrors(Commands.Grammar grammar, Streams streams, boolean json) {
 
         int error(Failure failure) {

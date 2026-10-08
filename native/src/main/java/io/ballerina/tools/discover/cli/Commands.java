@@ -92,7 +92,7 @@ final class Commands {
                         + "resolved as one literal, complete package coordinate.")
         String module;
 
-        /** Never valid: the package's version goes in the coordinate. Declared so the CLI can say so. */
+        // Hidden and never valid: declared only so the CLI can say the version goes in the coordinate.
         @CommandLine.Option(names = VERSION_FLAG, hidden = true, arity = "0..1", paramLabel = "<version>")
         String version;
 

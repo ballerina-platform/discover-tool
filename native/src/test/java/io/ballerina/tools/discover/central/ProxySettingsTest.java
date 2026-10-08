@@ -38,7 +38,6 @@ import java.util.Optional;
  */
 public class ProxySettingsTest {
 
-    // What bal pull's reader makes of the content, held to bal pull's rule; content it throws on is no proxy.
     private static Optional<ProxySettings> parse(String settingsToml) {
         try {
             return ProxySettings.of(SettingsBuilder.from(TomlDocument.from("Settings.toml", settingsToml))
@@ -104,7 +103,7 @@ public class ProxySettingsTest {
         }
     }
 
-    // A malformed file proxies through whatever bal pull's reader salvages from it, as it does for bal pull.
+    // bal pull's reader salvages the table from a malformed file, so it proxies as it does for bal pull.
     @Test
     public void theSettingsFileIsReadFromTheBallerinaHomeAsBalPullReadsItAndAMissingOneIsNoProxy()
             throws IOException {

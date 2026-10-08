@@ -132,8 +132,7 @@ public final class CentralClient {
         return status == BAD_GATEWAY || status == SERVICE_UNAVAILABLE || status == GATEWAY_TIMEOUT;
     }
 
-    // A name that does not resolve, a certificate that does not verify or a password the proxy rejected is the
-    // same on the next attempt, and retrying a rejected password counts against the account.
+    // These fail the same way again, and a rejected password retried counts against the proxy account.
     private static boolean isRetryable(HttpTransport.Reply.Failed failed) {
         return switch (failed.problem()) {
             case UNCONNECTED, OTHER -> true;
@@ -169,12 +168,7 @@ public final class CentralClient {
         return (long) Math.floor(baseDelayMs * Math.pow(2, attempt) * (1 + jitter * 0.25));
     }
 
-    /**
-     * What one attempt produced, before the attempt count is known.
-     *
-     * <p>Separate from {@link Failure} on purpose: the retry loop branches on {@code retryable} and
-     * {@code retryAfterMs}, which a finished {@code Failure} has no field for and no caller should see.
-     */
+    // Not a Failure: the retry loop branches on retryable and retryAfterMs, which no caller should see.
     private sealed interface Outcome {
 
         record Body(JsonElement value) implements Outcome { }
@@ -191,7 +185,7 @@ public final class CentralClient {
         }
     }
 
-    // What a failed attempt tells the caller; the message has no full stop.
+    // The message has no full stop: Failure.headline adds it.
     private record Report(String message, Integer status, boolean reached, String suggestion) {
 
         static Report unanswered(String message, String suggestion) {
@@ -232,8 +226,7 @@ public final class CentralClient {
         }
     }
 
-    // Central is HTTPS, reached through a CONNECT tunnel when there is a proxy: a status inside the tunnel is
-    // Central's own, so only the CONNECT's answer — a 407, or the tunnel failing — is the proxy's.
+    // Through a proxy, only the CONNECT's answer is the proxy's; a status inside the tunnel is Central's.
     private static Report noAnswer(HttpTransport.Reply.Failed failed, String url, HttpOptions options) {
         String host = host(url);
         String file = options.settingsFile();
@@ -681,7 +674,6 @@ public final class CentralClient {
         });
     }
 
-    // A version the caller chose is theirs to correct, unless the package itself is not published at all.
     private static Failure missingVersion(QualifiedName qualified, ResolvedVersion resolved, HttpOptions options) {
         Version version = resolved.version();
         if (!resolved.supplied()) {
@@ -710,7 +702,7 @@ public final class CentralClient {
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), null, suggestion);
     }
 
-    // The published versions around the one asked for, newest first: 2.9.99 is answered with the 2.9 and 2.10 lines.
+    // A window of published versions centred on the requested one, newest first.
     private static String nearest(List<String> versions, Version requested) {
         if (versions.size() <= LISTED_VERSIONS) {
             return "published versions are " + String.join(", ", versions);

@@ -117,8 +117,7 @@ public class TunnelAuthenticationTest {
         }
     }
 
-    // The tunnel opened is closed at once, so the request fails after it; the JDK may retry it once, with the
-    // credentials it now holds.
+    // The tunnel closes at once, so the JDK may retry the request once with the credentials it now holds.
     @Test
     public void aTransportAnswersTheTunnelsChallengeWithTheConfiguredCredentials()
             throws IOException, InterruptedException {

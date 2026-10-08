@@ -653,7 +653,6 @@ public final class FromCentral {
                 Failure.SCHEMA_DRIFT_SUGGESTION));
     }
 
-    // The command the failure offers is the default module's; the CLI lengthens it with the rest of the caller's.
     private static Failure noSuchSubmodule(
             CentralDocs docs, QualifiedName qualified, String submodule, Version version, Version pin) {
         String prefix = qualified.name() + ".";

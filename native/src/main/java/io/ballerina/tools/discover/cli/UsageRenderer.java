@@ -50,7 +50,6 @@ final class UsageRenderer {
         return wrap(label, slots(grammar), label.length());
     }
 
-    /** The {@code Usage:} line unwrapped, as a usage error repeats it under the failure. */
     static String usageLine(Commands.Grammar grammar) {
         return "Usage: bal discover " + String.join(" ", slots(grammar));
     }
@@ -100,8 +99,7 @@ final class UsageRenderer {
         return slots;
     }
 
-    // A positional's label is declared as the synopsis shows it, brackets and all: the package is optional to
-    // picocli only so that a bare `bal discover` is a usage request.
+    // Labels carry their own brackets: the package is optional to picocli only so a bare `bal discover` is help.
     private static String slot(PositionalParamSpec positional) {
         return positional.paramLabel();
     }

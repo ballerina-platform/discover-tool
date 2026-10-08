@@ -106,21 +106,16 @@ public record Coordinate(QualifiedName qualified, Version version) {
         return invalid.cast();
     }
 
-    // The command carries the corrected coordinate alone; the CLI lengthens it with the rest of the caller's.
     private static Result<Coordinate> fix(String message, String corrected) {
         String command = COMMAND + Texts.shellWord(corrected);
         return Result.err(new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command));
     }
 
-    /**
-     * The words that read this coordinate again, at {@code module} when it is not {@code null}, quoted for the shell:
-     * what every printed command starts with after {@code bal discover}.
-     */
+    /** This coordinate as shell-quoted command words, with {@code --module} when {@code module} is not null. */
     public String argument(String module) {
         return argument(qualified.qualified(), version == null ? null : version.text(), module);
     }
 
-    /** {@link #argument(String)} for a package and version already in text. */
     public static String argument(String qualified, String version, String module) {
         return Texts.shellWord(version == null ? qualified : qualified + VERSION_SEPARATOR + version)
                 + moduleArgument(module);

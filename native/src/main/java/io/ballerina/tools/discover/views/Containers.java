@@ -682,8 +682,7 @@ public final class Containers {
     }
 
     /**
-     * The failure for {@code funcs} given more than one name, which no package can read, or {@code null}: a fact
-     * about the command line, so it is found before the package is fetched.
+     * The failure for {@code funcs} given more than one name, or {@code null}; checked before the package is fetched.
      *
      * @param command the command the bucket is listed with, e.g. {@code bal discover ballerina/io funcs}
      */

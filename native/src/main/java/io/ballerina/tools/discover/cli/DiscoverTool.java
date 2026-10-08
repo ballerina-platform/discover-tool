@@ -124,8 +124,7 @@ public class DiscoverTool implements BLauncherCmd {
         try {
             code = Cli.run(argv, streams, http, discoverProject(), interactive);
         } catch (RuntimeException cause) {
-            // Nothing in the pipeline throws by design; if something does, it is a defect in this tool and the
-            // caller still needs a failure in the run's own mode rather than a Java stack trace on stdout.
+            // Nothing throws by design; a defect still reaches the caller as a failure in the run's own mode.
             Failure failure = new Failure.Internal(messageOf(cause), Failure.INTERNAL_SUGGESTION);
             errStream.print((Cli.jsonOutput(argv, interactive) ? failure.describe() : failure.describeText()) + "\n");
             code = 1;
@@ -141,13 +140,8 @@ public class DiscoverTool implements BLauncherCmd {
         }
     }
 
-    /**
-     * Lets a proxy's challenge to the {@code CONNECT} that every request to Central goes through be answered with
-     * Basic credentials, as {@code bal pull} answers it; the JDK refuses them there by default. A value the user set
-     * is kept. It must run before any HTTP client exists: the JDK reads the property once, when the first is built.
-     *
-     * @return whether Basic credentials can be sent in a tunnel
-     */
+    // Lets Basic answer a tunnel's proxy challenge, as bal pull does; keeps a value the user set. Must run before
+    // any HttpClient exists: the JDK reads the property once.
     static boolean allowBasicProxyAuthInTunnels() {
         Object chosen = System.getProperties().putIfAbsent(HttpOptions.TUNNELING_DISABLED_SCHEMES, "");
         return chosen == null || Arrays.stream(chosen.toString().split(","))
@@ -155,7 +149,6 @@ public class DiscoverTool implements BLauncherCmd {
                 .noneMatch(BASIC_SCHEME::equalsIgnoreCase);
     }
 
-    /** {@code file} as a message names it: under {@code userHome}, with {@code ~} in its place. */
     static String displayPath(Path file, String userHome) {
         if (userHome != null && !userHome.isEmpty()) {
             Path home = Path.of(userHome);

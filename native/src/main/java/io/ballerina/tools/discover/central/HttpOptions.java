@@ -139,10 +139,7 @@ public final class HttpOptions {
         return refresh;
     }
 
-    /**
-     * The proxy every request goes through, or {@code null}. Unless a transport is injected, the transport is built
-     * from it, so what a failure names is what the request used.
-     */
+    /** The proxy every request goes through, or {@code null}; the default transport is built from it. */
     public ProxySettings proxy() {
         return proxy;
     }
@@ -151,10 +148,7 @@ public final class HttpOptions {
         return settingsFile;
     }
 
-    /**
-     * Whether the process refuses Basic credentials inside a {@code CONNECT} tunnel, which every request to Central
-     * goes through when there is a proxy, so a proxy's username and password are never sent.
-     */
+    /** Whether the JDK refuses Basic credentials in a {@code CONNECT} tunnel, so proxy credentials are never sent. */
     public boolean basicProxyAuthDisabled() {
         return basicProxyAuthDisabled;
     }

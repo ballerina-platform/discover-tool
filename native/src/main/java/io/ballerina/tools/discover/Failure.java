@@ -156,7 +156,7 @@ public sealed interface Failure {
             List<String> candidates, String suggestion) implements Failure { }
 
     /**
-     * A defect in this tool: something in the pipeline threw, which nothing is designed to do.
+     * A defect in this tool: something in the pipeline threw.
      *
      * @param message what was thrown
      * @param suggestion what to do about it
@@ -218,10 +218,7 @@ public sealed interface Failure {
         };
     }
 
-    /**
-     * The failure as a text-mode run writes it to stderr: {@code error: <headline>}, then the suggestion and anything
-     * else the failure carries on lines of their own, indented, with no trailing newline.
-     */
+    /** The failure as text-mode stderr: {@code error: <headline>}, then indented detail lines, no final newline. */
     default String describeText() {
         List<String> lines = new ArrayList<>();
         lines.add("error: " + headline());
@@ -247,10 +244,7 @@ public sealed interface Failure {
         return (version == null ? qualified : qualified + ":" + version) + (module == null ? "" : ", module " + module);
     }
 
-    /**
-     * The one line a failing run writes to stderr in JSON mode: a single JSON object, whose {@code message} is the
-     * {@link #headline()}.
-     */
+    /** The one line a failing run writes to stderr in JSON mode, with {@link #headline()} as its message. */
     default String describe() {
         JsonObject json = new JsonObject();
         json.addProperty("kind", kind());
@@ -315,8 +309,8 @@ public sealed interface Failure {
     }
 
     /**
-     * This failure with its runnable command lengthened by {@code tail}, in {@code command} and where the suggestion
-     * quotes it: what a layer that knew only part of the caller's command leaves for the CLI to finish.
+     * This failure with {@code tail} appended to its {@code command} and the suggestion's quote of it: a layer below
+     * the CLI knows only the start of the caller's command.
      */
     default Failure lengthened(String tail) {
         return switch (this) {

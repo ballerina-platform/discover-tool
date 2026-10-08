@@ -115,7 +115,7 @@ public final class Loader {
                 repository -> repository.resolveVersion(qualified, options.http()));
     }
 
-    // The version the caller chose, written or locked, or null when it is Central's to resolve.
+    // null when the version is neither written nor locked, so the repositories resolve it.
     private static Result<CentralClient.ResolvedVersion> chosenVersion(QualifiedName qualified, LoadOptions options) {
         if (options.version() != null) {
             return Result.ok(CentralClient.ResolvedVersion.written(options.version()));

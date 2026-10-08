@@ -56,10 +56,7 @@ public final class Version {
 
     private static final int PRE_RELEASE_PART = 4;
 
-    /**
-     * SemVer precedence, lowest first, over version text: a version that is not {@code major.minor.patch} sorts by
-     * its text, after every one that is.
-     */
+    /** SemVer precedence, lowest first; text that is not {@code major.minor.patch} sorts after, by text. */
     public static final Comparator<String> PRECEDENCE = Version::comparePrecedence;
 
     private final String text;
@@ -80,10 +77,7 @@ public final class Version {
         return ".".equals(segment) || "..".equals(segment);
     }
 
-    /**
-     * Whether a version written by hand is a SemVer one Central could publish: {@code major.minor.patch}, with an
-     * optional pre-release and build suffix.
-     */
+    /** Whether {@code input} is a full SemVer version: {@code major.minor.patch[-pre-release][+build]}. */
     public static boolean isComplete(String input) {
         return COMPLETE.matcher(input).matches();
     }
@@ -134,7 +128,6 @@ public final class Version {
         return Integer.compare(a.length, b.length);
     }
 
-    // Numbers compare numerically and rank below words.
     private static int compareIdentifier(String left, String right) {
         boolean leftNumeric = left.matches(DIGITS);
         boolean rightNumeric = right.matches(DIGITS);
