@@ -63,7 +63,15 @@ public final class CentralClient {
     private static final String REGISTRY_PACKAGES_URL = CENTRAL_BASE_URL + "registry/packages/";
     private static final String DOCS_URL = CENTRAL_BASE_URL + "docs/";
 
+    private static final int BAD_REQUEST = 400;
+    private static final int NOT_FOUND = 404;
     private static final int PROXY_AUTHENTICATION_REQUIRED = 407;
+    private static final int TOO_MANY_REQUESTS = 429;
+    private static final int BAD_GATEWAY = 502;
+    private static final int SERVICE_UNAVAILABLE = 503;
+    private static final int GATEWAY_TIMEOUT = 504;
+
+    private static final long NO_RETRY_AFTER = -1;
 
     /**
      * How long Central's answer to "what is the latest version" is believed.
@@ -95,14 +103,19 @@ public final class CentralClient {
     }
 
     private static boolean isRetryableStatus(int status) {
-        return status == 429 || status == 502 || status == 503 || status == 504;
+        return status == TOO_MANY_REQUESTS || isGatewayStatus(status);
+    }
+
+    private static boolean isGatewayStatus(int status) {
+        return status == BAD_GATEWAY || status == SERVICE_UNAVAILABLE || status == GATEWAY_TIMEOUT;
     }
 
     // A name that does not resolve, a certificate that does not verify or a password the proxy rejected is the
     // same on the next attempt, and retrying a rejected password counts against the account.
-    private static boolean passes(HttpTransport.Reply.Problem problem) {
-        return switch (problem) {
-            case UNCONNECTED, TUNNEL, OTHER -> true;
+    private static boolean isRetryable(HttpTransport.Reply.Failed failed) {
+        return switch (failed.problem()) {
+            case UNCONNECTED, OTHER -> true;
+            case TUNNEL -> failed.status() != null && isGatewayStatus(failed.status());
             case UNRESOLVED, TLS, PROXY_REJECTED, BAD_URL -> false;
         };
     }
@@ -144,113 +157,114 @@ public final class CentralClient {
 
         record Body(JsonElement value) implements Outcome { }
 
-        /**
-         * A failed attempt.
-         *
-         * @param message what went wrong, as a sentence without its full stop, or {@code null} for a timeout
-         * @param status the HTTP status the attempt failed with, or {@code null}
-         * @param timedOut whether the attempt failed by timing out
-         * @param retryable whether another attempt is worth making
-         * @param retryAfterMs how long to wait before retrying, or negative when upstream did not say
-         * @param reached whether Central answered
-         * @param suggestion what to do next, or {@code null} for a timeout
-         */
-        record Spent(String message, Integer status, boolean timedOut, boolean retryable, long retryAfterMs,
-                boolean reached, String suggestion) implements Outcome { }
-
-        /**
-         * A failure no attempt can change, finished as it is.
-         *
-         * @param failure what to report
-         */
         record Broken(Failure failure) implements Outcome { }
+
+        record TimedOut() implements Outcome { }
+
+        record Spent(Report report, boolean retryable, long retryAfterMs) implements Outcome {
+
+            static Spent of(Report report, boolean retryable) {
+                return new Spent(report, retryable, NO_RETRY_AFTER);
+            }
+        }
+    }
+
+    /**
+     * What a failed attempt tells the caller.
+     *
+     * @param message what went wrong, as a sentence without its full stop
+     * @param status the HTTP status the attempt failed with, or {@code null}
+     * @param reached whether Central answered
+     * @param suggestion what to do next
+     */
+    private record Report(String message, Integer status, boolean reached, String suggestion) {
+
+        static Report unanswered(String message, String suggestion) {
+            return new Report(message, null, false, suggestion);
+        }
     }
 
     private static Outcome attemptFetch(String url, HttpOptions options) {
         HttpTransport.Reply reply = options.transport().get(url, options.timeoutMs());
         return switch (reply) {
-            case HttpTransport.Reply.TimedOut ignored -> new Outcome.Spent(null, null, true, true, -1, false, null);
+            case HttpTransport.Reply.TimedOut ignored -> new Outcome.TimedOut();
             case HttpTransport.Reply.Failed failed -> failed.problem() == HttpTransport.Reply.Problem.BAD_URL
                     ? new Outcome.Broken(new Failure.Internal(
-                            "Could not make a request of " + url + ": " + failed.message(),
+                            "Could not make a request to " + url + ": " + failed.message(),
                             Failure.INTERNAL_SUGGESTION))
-                    : unanswered(failed, url, options);
-            case HttpTransport.Reply.Answered answered -> {
-                if (answered.status() == PROXY_AUTHENTICATION_REQUIRED) {
-                    yield proxyAuthentication(options);
-                }
-                if (!answered.isOk()) {
-                    boolean retryable = isRetryableStatus(answered.status());
-                    long retryAfterMs =
-                            retryable ? parseRetryAfter(answered.retryAfter(), options.now()) : -1;
-                    yield new Outcome.Spent("Central answered " + url + " with HTTP " + answered.status(),
-                            answered.status(), false, retryable, retryAfterMs, true, Failure.UPSTREAM_SUGGESTION);
-                }
-                try {
-                    JsonElement parsed = JsonParser.parseString(answered.body());
-                    yield new Outcome.Body(parsed == null ? JsonNull.INSTANCE : parsed);
-                } catch (RuntimeException malformed) {
-                    // Upstream serving something that is not JSON is not a transient condition.
-                    yield new Outcome.Spent("Central answered " + url + " with a body that is not JSON: "
-                            + malformed.getMessage(), null, false, false, -1, true, Failure.UPSTREAM_SUGGESTION);
-                }
-            }
+                    : Outcome.Spent.of(noAnswer(failed, url, options), isRetryable(failed));
+            case HttpTransport.Reply.Answered answered -> answer(answered, url, options);
         };
+    }
+
+    private static Outcome answer(HttpTransport.Reply.Answered answered, String url, HttpOptions options) {
+        if (answered.status() == PROXY_AUTHENTICATION_REQUIRED) {
+            return Outcome.Spent.of(proxyAuthentication(options), false);
+        }
+        if (!answered.isOk()) {
+            boolean retryable = isRetryableStatus(answered.status());
+            long retryAfterMs = retryable ? parseRetryAfter(answered.retryAfter(), options.now()) : NO_RETRY_AFTER;
+            return new Outcome.Spent(new Report("Central answered " + url + " with HTTP " + answered.status(),
+                    answered.status(), true, Failure.UPSTREAM_SUGGESTION), retryable, retryAfterMs);
+        }
+        try {
+            JsonElement parsed = JsonParser.parseString(answered.body());
+            return new Outcome.Body(parsed == null ? JsonNull.INSTANCE : parsed);
+        } catch (RuntimeException malformed) {
+            // Upstream serving something that is not JSON is not a transient condition.
+            return Outcome.Spent.of(new Report("Central answered " + url + " with a body that is not JSON: "
+                    + malformed.getMessage(), null, true, Failure.UPSTREAM_SUGGESTION), false);
+        }
     }
 
     // Central is HTTPS, reached through a CONNECT tunnel when there is a proxy: a status inside the tunnel is
     // Central's own, so only the CONNECT's answer — a 407, or the tunnel failing — is the proxy's.
-    private static Outcome.Spent unanswered(HttpTransport.Reply.Failed failed, String url, HttpOptions options) {
+    private static Report noAnswer(HttpTransport.Reply.Failed failed, String url, HttpOptions options) {
         String host = host(url);
         String file = options.settingsFile();
         ProxySettings proxy = options.proxy();
         String through = proxy == null ? "" : " through the proxy " + address(proxy);
-        boolean retryable = passes(failed.problem());
         return switch (failed.problem()) {
             case UNCONNECTED -> proxy == null
-                    ? unanswered("Could not reach " + host + ": " + failed.message(), retryable, network(file))
-                    : unanswered("Could not connect to the proxy " + address(proxy) + " set in " + file + ": "
-                            + failed.message(), retryable, "Check that the proxy is running and that host and port "
-                            + "under [proxy] in " + file + " are right, then run the same command again.");
+                    ? Report.unanswered("Could not reach " + host + ": " + failed.message(), network(file))
+                    : Report.unanswered("Could not connect to the proxy " + address(proxy) + " set in " + file + ": "
+                            + failed.message(), "Check that the proxy is running and that host and port under "
+                            + "[proxy] in " + file + " are right, then run the same command again.");
             case UNRESOLVED -> proxy == null
-                    ? unanswered("Could not resolve the host " + host, retryable, network(file))
-                    : unanswered("Could not resolve the proxy host " + proxy.host(), retryable,
+                    ? Report.unanswered("Could not resolve the host " + host, network(file))
+                    : Report.unanswered("Could not resolve the proxy host " + proxy.host(),
                             "Check host under [proxy] in " + file + ", then run the same command again.");
-            case TLS -> unanswered("Could not open a secure connection to " + host + through + ": "
-                    + failed.message(), retryable, "Check the system clock, and any proxy or firewall that "
-                    + "intercepts HTTPS, then run the same command again.");
-            case TUNNEL -> new Outcome.Spent((proxy == null ? "The proxy" : "The proxy " + address(proxy) + " set in "
-                    + file) + " could not connect to " + host + ": HTTP " + failed.message(),
-                    statusIn(failed.message()), false, retryable, -1, false, "The proxy answered but could not "
-                            + "reach " + host + "; run the same command again later, or check that the proxy "
-                            + "allows it.");
+            case TLS -> Report.unanswered("Could not open a secure connection to " + host + through + ": "
+                    + failed.message(), "Check the system clock, and any proxy or firewall that intercepts HTTPS, "
+                    + "then run the same command again.");
+            case TUNNEL -> new Report((proxy == null ? "The proxy" : "The proxy " + address(proxy) + " set in "
+                    + file) + " could not connect to " + host + ": HTTP " + failed.status(), failed.status(), false,
+                    "The proxy answered but could not reach " + host + "; run the same command again later, or "
+                            + "check that the proxy allows it.");
             case PROXY_REJECTED -> rejected(options);
-            case BAD_URL, OTHER -> unanswered("Could not reach " + host + through + ": " + failed.message(),
-                    retryable, network(file));
+            case OTHER -> Report.unanswered("Could not reach " + host + through + ": " + failed.message(),
+                    network(file));
+            case BAD_URL -> throw new IllegalStateException("a malformed URL is not a network failure");
         };
     }
 
-    private static Outcome.Spent unanswered(String message, boolean retryable, String suggestion) {
-        return new Outcome.Spent(message, null, false, retryable, -1, false, suggestion);
-    }
-
-    private static Outcome.Spent proxyAuthentication(HttpOptions options) {
+    private static Report proxyAuthentication(HttpOptions options) {
         ProxySettings proxy = options.proxy();
         if (proxy != null && proxy.authenticates()) {
             return rejected(options);
         }
-        return new Outcome.Spent((proxy == null ? "A proxy" : "The proxy " + address(proxy))
-                + " requires authentication", PROXY_AUTHENTICATION_REQUIRED, false, false, -1, false,
+        return new Report((proxy == null ? "A proxy" : "The proxy " + address(proxy))
+                + " requires authentication", PROXY_AUTHENTICATION_REQUIRED, false,
                 "Set both username and password under [proxy] in " + options.settingsFile()
                         + ", then run the same command again.");
     }
 
-    private static Outcome.Spent rejected(HttpOptions options) {
+    private static Report rejected(HttpOptions options) {
         ProxySettings proxy = options.proxy();
         String file = options.settingsFile();
-        return new Outcome.Spent((proxy == null ? "The proxy" : "The proxy " + address(proxy))
+        return new Report((proxy == null ? "The proxy" : "The proxy " + address(proxy))
                 + " rejected the username and password in the [proxy] table of " + file,
-                PROXY_AUTHENTICATION_REQUIRED, false, false, -1, false,
+                PROXY_AUTHENTICATION_REQUIRED, false,
                 "Correct username and password under [proxy] in " + file + ", then run the same command again.");
     }
 
@@ -272,14 +286,6 @@ public final class CentralClient {
         }
     }
 
-    private static Integer statusIn(String text) {
-        try {
-            return Integer.valueOf(text);
-        } catch (NumberFormatException notAStatus) {
-            return null;
-        }
-    }
-
     /**
      * GET a JSON document, retrying the failures that are worth retrying and stopping at a wall-clock budget.
      *
@@ -288,7 +294,7 @@ public final class CentralClient {
      */
     public static Result<JsonElement> fetchJson(String url, HttpOptions options) {
         long deadline = options.now() + options.budgetMs();
-        Outcome.Spent last = null;
+        Outcome last = null;
         int made = 0;
 
         for (int attempt = 0; attempt < options.maxAttempts(); attempt++) {
@@ -297,43 +303,45 @@ public final class CentralClient {
                 if (remaining <= 0) {
                     break;
                 }
-                long wait = last != null && last.retryAfterMs() >= 0
-                        ? last.retryAfterMs()
+                long wait = last instanceof Outcome.Spent spent && spent.retryAfterMs() >= 0
+                        ? spent.retryAfterMs()
                         : backoffMs(attempt - 1, options.baseDelayMs(), options.jitter());
                 options.sleep(Math.min(remaining, wait));
             }
             made++;
-            switch (attemptFetch(url, options)) {
+            last = attemptFetch(url, options);
+            switch (last) {
                 case Outcome.Body body -> {
                     return Result.ok(body.value());
                 }
                 case Outcome.Broken broken -> {
                     return Result.err(broken.failure());
                 }
-                case Outcome.Spent spent -> {
-                    if (!spent.retryable()) {
-                        return Result.err(toFailure(spent, url, made, options));
-                    }
-                    last = spent;
+                case Outcome.Spent spent when !spent.retryable() -> {
+                    return Result.err(toFailure(spent, url, made, options));
+                }
+                case Outcome.Spent ignored -> {
+                }
+                case Outcome.TimedOut ignored -> {
                 }
             }
         }
 
         if (last == null) {
-            return Result.err(new Failure.Upstream(url, 0, "No request was made to " + url,
-                    Failure.INTERNAL_SUGGESTION, null, false));
+            return Result.err(new Failure.Internal("No request was made to " + url, Failure.INTERNAL_SUGGESTION));
         }
         return Result.err(toFailure(last, url, made, options));
     }
 
-    private static Failure toFailure(Outcome.Spent spent, String url, int attempts, HttpOptions options) {
-        if (spent.timedOut()) {
-            return new Failure.Timeout(url, options.budgetMs(), "A large package is slow on a cold fetch, so run the "
-                    + "same command again; if it keeps timing out, check your network connection and the [proxy] "
-                    + "table in " + options.settingsFile() + ".");
+    private static Failure toFailure(Outcome last, String url, int attempts, HttpOptions options) {
+        if (last instanceof Outcome.Spent spent) {
+            Report report = spent.report();
+            return new Failure.Upstream(url, attempts, report.message(), report.suggestion(), report.status(),
+                    report.reached());
         }
-        return new Failure.Upstream(url, attempts, spent.message(), spent.suggestion(), spent.status(),
-                spent.reached());
+        return new Failure.Timeout(url, options.budgetMs(), "A large package is slow on a cold fetch, so run the "
+                + "same command again; if it keeps timing out, check your network connection and the [proxy] "
+                + "table in " + options.settingsFile() + ".");
     }
 
     /**
@@ -447,7 +455,7 @@ public final class CentralClient {
             // package", and reporting it as a transport error would send the caller looking at the network for
             // a typo.
             Integer status = response.failure() instanceof Failure.Upstream upstream ? upstream.status() : null;
-            if (status != null && (status == 400 || status == 404)) {
+            if (status != null && (status == BAD_REQUEST || status == NOT_FOUND)) {
                 return Result.err(notFound(qualified));
             }
             Version offline = offlineVersion(cache, key, options);
@@ -537,7 +545,7 @@ public final class CentralClient {
             // caller can act on depends on who chose the version. A version they passed is theirs to correct.
             // One the reader resolved is not: telling them to "omit the version" names what they already did.
             if (response.failure() instanceof Failure.Upstream upstream
-                    && upstream.status() != null && upstream.status() == 404) {
+                    && upstream.status() != null && upstream.status() == NOT_FOUND) {
                 if (resolved.supplied() && isUnpublishedDottedName(qualified, options)) {
                     return Result.err(notAPackage(qualified, pinOf(resolved), options));
                 }
@@ -600,7 +608,7 @@ public final class CentralClient {
         Result<JsonElement> response = fetchJson(url, options);
         if (!response.isOk()) {
             if (response.failure() instanceof Failure.Upstream upstream
-                    && upstream.status() != null && upstream.status() == 404) {
+                    && upstream.status() != null && upstream.status() == NOT_FOUND) {
                 return Result.err(noSuchModulePage(version, qualified, pinOf(resolved), submodule));
             }
             return response.cast();

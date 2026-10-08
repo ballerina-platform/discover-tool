@@ -26,11 +26,17 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.CertificateNotYetValidException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -41,6 +47,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import javax.net.ssl.SSLHandshakeException;
 
 /**
  * A download past the transport's limit is no answer, whether the server declares its length up front or only
@@ -340,7 +348,9 @@ public class JdkHttpTransportTest {
             ProxySettings settings = new ProxySettings("127.0.0.1", proxy.port(), "", "");
             HttpTransport.Reply reply =
                     new JdkHttpTransport(LIMIT, settings).get("https://central.invalid/2.0/docs/ballerina/http", 5000);
-            Assert.assertEquals(reply, new HttpTransport.Reply.Failed(HttpTransport.Reply.Problem.TUNNEL, "502"));
+            HttpTransport.Reply.Failed failed = (HttpTransport.Reply.Failed) reply;
+            Assert.assertEquals(failed.problem(), HttpTransport.Reply.Problem.TUNNEL);
+            Assert.assertEquals(failed.status(), Integer.valueOf(502));
         }
     }
 
@@ -370,5 +380,35 @@ public class JdkHttpTransportTest {
         user.setProperty(JdkHttpTransport.TUNNELING_DISABLED_SCHEMES, "Basic");
         JdkHttpTransport.allowBasicInTunnels(user, new ProxySettings("127.0.0.1", 3128, "alice", "secret"));
         Assert.assertEquals(user.getProperty(JdkHttpTransport.TUNNELING_DISABLED_SCHEMES), "Basic");
+    }
+    private static HttpTransport.Reply.Failed classified(Throwable cause) {
+        return JdkHttpTransport.failure(new IOException("request failed", cause));
+    }
+
+    @Test
+    public void eachTransportFailureIsClassifiedByItsCause() {
+        Assert.assertEquals(classified(new UnresolvedAddressException()).problem(),
+                HttpTransport.Reply.Problem.UNRESOLVED);
+        Assert.assertEquals(classified(new UnknownHostException("central.invalid")).problem(),
+                HttpTransport.Reply.Problem.UNRESOLVED);
+        Assert.assertEquals(classified(new ConnectException("Connection refused")),
+                new HttpTransport.Reply.Failed(HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"));
+        Assert.assertEquals(classified(new ClosedChannelException()).problem(), HttpTransport.Reply.Problem.OTHER,
+                "a connection made and then closed was not refused");
+        Assert.assertEquals(classified(new SSLHandshakeException("PKIX path building failed")),
+                new HttpTransport.Reply.Failed(HttpTransport.Reply.Problem.TLS, "PKIX path building failed"));
+    }
+
+    @Test
+    public void aCertificateOutsideItsValidityIsNamedAsSuch() {
+        SSLHandshakeException expired = new SSLHandshakeException("handshake failed");
+        expired.initCause(new CertificateExpiredException("NotAfter: 2020"));
+        Assert.assertEquals(classified(expired),
+                new HttpTransport.Reply.Failed(HttpTransport.Reply.Problem.TLS, "its certificate has expired"));
+
+        SSLHandshakeException early = new SSLHandshakeException("handshake failed");
+        early.initCause(new CertificateNotYetValidException("NotBefore: 2099"));
+        Assert.assertEquals(classified(early),
+                new HttpTransport.Reply.Failed(HttpTransport.Reply.Problem.TLS, "its certificate is not valid yet"));
     }
 }

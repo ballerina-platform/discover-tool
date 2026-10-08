@@ -526,6 +526,31 @@ public class ClientTest {
         return new HttpTransport.Reply.Failed(problem, message);
     }
 
+    private static HttpTransport.Reply tunnel(int status) {
+        return new HttpTransport.Reply.Failed(HttpTransport.Reply.Problem.TUNNEL, "Tunnel failed, got: " + status,
+                status);
+    }
+
+    @Test
+    public void aTunnelTheProxyRefusesIsNotRetriedButOneItCouldNotOpenIs() {
+        FakeTransport refused = FakeTransport.always(tunnel(403));
+        Failure.Upstream policy = (Failure.Upstream) CentralClient.fetchJson(URL,
+                fast(refused).proxy(OPEN_PROXY).build()).failure();
+        Assert.assertEquals(refused.calls(), 1);
+        Assert.assertEquals(policy.status(), Integer.valueOf(403));
+
+        FakeTransport gateway = FakeTransport.always(tunnel(502));
+        CentralClient.fetchJson(URL, fast(gateway).proxy(OPEN_PROXY).build());
+        Assert.assertEquals(gateway.calls(), 3);
+    }
+
+    @Test
+    public void noAttemptAtAllIsADefect() {
+        Failure failure = CentralClient.fetchJson(URL,
+                fast(FakeTransport.always(FakeTransport.status(200))).maxAttempts(0).build()).failure();
+        Assert.assertEquals(failure.kind(), "internal");
+    }
+
     @Test
     public void aRequestWithNoAnswerNamesTheHostOrTheProxyAndWhatToCheck() {
         Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"), null)
@@ -548,7 +573,7 @@ public class ClientTest {
                 .describeText(), "error: Could not open a secure connection to api.central.ballerina.io: its "
                 + "certificate has expired.\n  Check the system clock, and any proxy or firewall that intercepts "
                 + "HTTPS, then run the same command again.");
-        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.TUNNEL, "502"), OPEN_PROXY).describeText(),
+        Assert.assertEquals(failing(tunnel(502), OPEN_PROXY).describeText(),
                 "error: The proxy 127.0.0.1:3128 set in ~/home/Settings.toml could not connect to "
                         + "api.central.ballerina.io: HTTP 502 (3 attempts).\n  The proxy answered but could not "
                         + "reach api.central.ballerina.io; run the same command again later, or check that the proxy "

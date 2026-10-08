@@ -34,7 +34,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.UnresolvedAddressException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
@@ -324,7 +323,7 @@ public final class JdkHttpTransport implements HttpTransport {
         }
     }
 
-    private static Reply.Failed failure(IOException failed) {
+    static Reply.Failed failure(IOException failed) {
         for (Throwable cause = failed; cause != null; cause = cause.getCause()) {
             if (cause instanceof UnresolvedAddressException || cause instanceof UnknownHostException) {
                 return new Reply.Failed(Reply.Problem.UNRESOLVED, describe(cause));
@@ -336,10 +335,10 @@ public final class JdkHttpTransport implements HttpTransport {
         String message = describe(failed);
         Matcher tunnel = TUNNEL_FAILED.matcher(message);
         if (tunnel.find()) {
-            return new Reply.Failed(Reply.Problem.TUNNEL, tunnel.group(1));
+            return new Reply.Failed(Reply.Problem.TUNNEL, message, Integer.valueOf(tunnel.group(1)));
         }
         for (Throwable cause = failed; cause != null; cause = cause.getCause()) {
-            if (cause instanceof ConnectException || cause instanceof ClosedChannelException) {
+            if (cause instanceof ConnectException) {
                 return new Reply.Failed(Reply.Problem.UNCONNECTED, messageIn(failed)
                         .map(text -> text.toLowerCase(Locale.ROOT)).orElse("connection refused"));
             }

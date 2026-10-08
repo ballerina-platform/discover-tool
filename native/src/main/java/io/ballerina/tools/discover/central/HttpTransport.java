@@ -71,8 +71,14 @@ public interface HttpTransport {
          *
          * @param problem what went wrong
          * @param message what the transport said
+         * @param status the proxy's answer to the {@code CONNECT} for {@link Problem#TUNNEL}, else {@code null}
          */
-        record Failed(Problem problem, String message) implements Reply { }
+        record Failed(Problem problem, String message, Integer status) implements Reply {
+
+            public Failed(Problem problem, String message) {
+                this(problem, message, null);
+            }
+        }
 
         /** Why a request produced no response from Central. */
         enum Problem {
@@ -80,18 +86,12 @@ public interface HttpTransport {
             UNCONNECTED,
             /** The proxy's host name, or Central's when there is no proxy, did not resolve. */
             UNRESOLVED,
-            /** The TLS handshake with Central failed. */
             TLS,
-            /**
-             * The proxy answered the {@code CONNECT} with an error status of its own, other than 407; the message
-             * is that status.
-             */
+            /** The proxy answered the {@code CONNECT} with an error status of its own, other than 407. */
             TUNNEL,
-            /** The proxy rejected the configured username and password. */
             PROXY_REJECTED,
             /** The URL could not be made into a request: a defect, not the network. */
             BAD_URL,
-            /** Anything else the transport reported. */
             OTHER
         }
     }
