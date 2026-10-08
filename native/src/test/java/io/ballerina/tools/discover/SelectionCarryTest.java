@@ -136,7 +136,7 @@ public class SelectionCarryTest {
         JsonObject service = answer("ballerinax__kafka", "bal discover ballerinax/kafka service");
         Assert.assertEquals(service.get("container").getAsString(), "Service", service.toString());
         Run text = run("ballerinax__kafka", "bal discover ballerinax/kafka service --output text");
-        Assert.assertTrue(text.out().startsWith("ballerinax/kafka · service · Service\n"), text.out());
+        Assert.assertTrue(text.out().startsWith("ballerinax/kafka:0.0.0-fixture · service · Service\n"), text.out());
 
         JsonObject groups = answer("ballerinax__github", "bal discover ballerinax/github client");
         Assert.assertEquals(groups.get("container").getAsString(), "Client", groups.toString());
@@ -406,7 +406,7 @@ public class SelectionCarryTest {
 
         Run text = run("ballerinax__redis", command + " --output text");
         Assert.assertTrue(text.out().startsWith(
-                "ballerinax/redis · client · Client\n111 remote methods, 1 normal method\n"), text.out());
+                "ballerinax/redis:0.0.0-fixture · client · Client\n111 remote methods, 1 normal method\n"), text.out());
     }
 
     /**

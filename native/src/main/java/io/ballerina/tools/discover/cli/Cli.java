@@ -79,7 +79,19 @@ public final class Cli {
 
     private static final String RUN_HELP = "Run `" + HELP + "` for usage.";
 
+    static final int FAILED = 1;
+
     private static final int USAGE_ERROR = 2;
+
+    private static final int FIRST_PAGE = 1;
+
+    private static final String COMMAND = "bal discover ";
+
+    private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
+
+    private static final String PLACEHOLDER_VERSION = "<version>";
+
+    private static final String WRITE_VERSION = "To read a specific version, write it after the package: ";
 
     private Cli() {
     }
@@ -150,7 +162,7 @@ public final class Cli {
 
         Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
         if (!coordinate.isOk()) {
-            return usage.error(coordinate.failure());
+            return usage.error(coordinate.failure().lengthened(Coordinate.moduleArgument(root.module) + tail(root)));
         }
         QualifiedName qualified = coordinate.value().qualified();
 
@@ -162,7 +174,7 @@ public final class Cli {
 
         // Checked before the package is ever fetched: a mistyped bucket is a fact about the argument list, not
         // about the package, and costs a round trip to Central if left until after the load.
-        List<String> rest = root.rest == null ? List.of() : root.rest;
+        List<String> rest = rest(root);
         String bucket = rest.isEmpty() ? null : rest.get(0);
         if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
             return usage.error(unknownBucket(bucket));
@@ -180,19 +192,21 @@ public final class Cli {
                 resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, version);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified, options);
         if (!loaded.isOk()) {
-            return fail(loaded.failure(), streams, json);
+            return fail(loaded.failure().lengthened(tail(root)), streams, json);
         }
 
         Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
         if (!answer.isOk()) {
             return fail(answer.failure(), streams, json);
         }
-        if (root.page != 1 && answer.value().paging() == null) {
+        if (root.page != FIRST_PAGE && answer.value().paging() == null) {
             return fail(notPaged(root, coordinate.value(), filter), streams, json);
         }
+        String read = loaded.value().version().text();
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
-                filter, version == null ? null : version.text());
-        emit(answer.value(), where, streams, json);
+                filter, Version.textOf(version), read);
+        streams.out().accept((json ? JsonRenderer.render(answer.value(), read)
+                : TextRenderer.render(answer.value(), where)) + "\n");
         return 0;
     }
 
@@ -220,7 +234,7 @@ public final class Cli {
             return null;
         }
         List<String> selectors = rest.subList(1, rest.size());
-        String command = "bal discover " + new Coordinate(qualified, version).argument(root.module) + " " + bucket;
+        String command = new Coordinate(qualified, version).command(root.module) + " " + bucket;
         if (Types.BUCKET.equals(bucket)) {
             return Types.misuse(command, new Types.Options(selectors, filter, root.page));
         }
@@ -230,21 +244,31 @@ public final class Cli {
         return null;
     }
 
-    private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
-        StringBuilder command = new StringBuilder("bal discover ").append(coordinate.argument(root.module));
-        if (root.rest != null) {
-            root.rest.forEach(word -> command.append(' ').append(Texts.shellWord(word)));
-        }
+    private static String tail(List<String> rest, String filter, int page) {
+        StringBuilder words = new StringBuilder();
+        rest.forEach(word -> words.append(' ').append(Texts.shellWord(word)));
         if (filter != null) {
-            command.append(" --filter ").append(Texts.shellWord(filter));
+            words.append(" --filter ").append(Texts.shellWord(filter));
         }
-        return new Failure.Validation(
-                "Page " + root.page + " is out of range: this answer is not paged.",
-                "Drop --page: `" + command + "`.");
+        if (page != FIRST_PAGE) {
+            words.append(" --page ").append(page);
+        }
+        return words.toString();
     }
 
-    private static void emit(DiscoverResult result, TextRenderer.Context where, Streams streams, boolean json) {
-        streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result, where)) + "\n");
+    private static String tail(Commands.Root root) {
+        return tail(rest(root), root.filter, root.page);
+    }
+
+    private static List<String> rest(Commands.Root root) {
+        return root.rest == null ? List.of() : root.rest;
+    }
+
+    private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
+        String command = coordinate.command(root.module) + tail(rest(root), filter, FIRST_PAGE);
+        return new Failure.Validation(
+                "Page " + root.page + " is out of range: this answer is not paged.",
+                "Drop --page: " + Failure.quoted(command) + ".", command);
     }
 
     private static Failure unknownBucket(String token) {
@@ -271,15 +295,14 @@ public final class Cli {
         List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.BucketList.Submodule(
                         submodule.name(), submodule.summary(),
-                        "bal discover " + loaded.pkgArgument(submodule.name())))
+                        COMMAND + loaded.pkgArgument(submodule.name())))
                 .toList();
         return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
     }
 
     /**
-     * The one output mode of a run, for the answer and a failure alike: {@code --output} when argv carries a valid
-     * one, else JSON unless stdout is an interactive terminal. Read off argv rather than the parsed flag, so a
-     * failure to parse the arguments is still written in the mode the caller asked for.
+     * The run's output mode: a valid {@code --output} in argv, else JSON unless stdout is a terminal. Read off argv,
+     * not the parsed flag, so a parse failure is still written in the mode the caller asked for.
      */
     public static boolean jsonOutput(List<String> argv, boolean interactive) {
         return jsonOutput(argv, interactive, Commands.Grammar.create());
@@ -315,7 +338,7 @@ public final class Cli {
             return new Failure.Validation("The --filter option needs a keyword.",
                     "Write --filter <keyword>, or drop it to list everything.");
         }
-        if (root.page < 1) {
+        if (root.page < FIRST_PAGE) {
             return new Failure.Validation(
                     "Page " + root.page + " is out of range: pages are numbered from 1.",
                     "Pass --page 1 or later, or drop it for the first page.");
@@ -324,12 +347,22 @@ public final class Cli {
     }
 
     private static Failure versionFlag(Commands.Root root) {
+        String message = "Unknown option '" + Commands.VERSION_FLAG + "'.";
         Result<Coordinate> coordinate = root.pkg == null ? null : Coordinate.parse(root.pkg);
-        String pkg = coordinate != null && coordinate.isOk() ? coordinate.value().qualified().qualified()
-                : "<org>/<name>";
-        String version = Version.isComplete(root.version) ? root.version : "<version>";
-        return new Failure.Validation("Unknown option '" + Commands.VERSION_FLAG + "'.",
-                "To read a specific version, write " + pkg + ":" + version);
+        if (coordinate == null || !coordinate.isOk()) {
+            return new Failure.Validation(message, "To read a specific version, write " + PLACEHOLDER_PACKAGE + ":"
+                    + PLACEHOLDER_VERSION);
+        }
+        return writtenVersion(message, root, coordinate.value().qualified(), root.version, tail(root));
+    }
+
+    private static Failure writtenVersion(String message, Commands.Root root, QualifiedName qualified,
+            String version, String tail) {
+        if (!Version.isComplete(version)) {
+            return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
+        }
+        String command = new Coordinate(qualified, Version.parse(version).value()).command(root.module) + tail;
+        return new Failure.Validation(message, WRITE_VERSION + Failure.quoted(command) + ".", command);
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
@@ -354,12 +387,13 @@ public final class Cli {
         if (misplaced == null) {
             return null;
         }
-        return new Failure.Validation(
-                "'" + misplaced + "' looks like a version.",
-                "Write it after the package: " + qualified.qualified() + ":" + misplaced);
+        List<String> others = new ArrayList<>(tokens);
+        others.remove(misplaced);
+        return writtenVersion("'" + misplaced + "' looks like a version.", root, qualified, misplaced,
+                tail(others, root.filter, root.page));
     }
 
-    /** The failure a parse error is, or {@code null} when picocli's own first line says it best. */
+    // The failure a parse error is, or null when picocli's own first line says it best.
     private static Failure describeParseError(CommandLine.ParameterException cause, Commands.Grammar grammar) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();
@@ -408,12 +442,10 @@ public final class Cli {
     }
 
     private static int fail(Failure failure, Streams streams, boolean json) {
-        streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + "\n");
-        return 1;
+        streams.errorOut().accept(failure.describe(json) + "\n");
+        return FAILED;
     }
 
-    // A malformed command line: the failure at exit 2, then in text mode the synopsis and, unless the suggestion
-    // already is one, a pointer to --help.
     private record UsageErrors(Commands.Grammar grammar, Streams streams, boolean json) {
 
         int error(Failure failure) {
@@ -427,7 +459,7 @@ public final class Cli {
         private int write(Failure failure, boolean pointToHelp) {
             String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar)
                     + (pointToHelp ? "\nRun `" + HELP + "` for details." : "");
-            streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + usage + "\n");
+            streams.errorOut().accept(failure.describe(json) + usage + "\n");
             return USAGE_ERROR;
         }
     }

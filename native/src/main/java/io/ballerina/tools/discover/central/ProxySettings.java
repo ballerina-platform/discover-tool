@@ -47,8 +47,7 @@ public record ProxySettings(String host, int port, String username, String passw
         }
     }
 
-    // bal pull's rule (ProjectUtils.initializeProxy) is kept rather than called: it resolves the host on the spot
-    // and drops the credentials, and an unresolvable proxy host has a failure of its own here.
+    // Mirrors ProjectUtils.initializeProxy rather than calling it: that resolves the host and drops credentials.
     static Optional<ProxySettings> of(Proxy proxy) {
         if (proxy == null || proxy.host() == null || proxy.host().isEmpty() || proxy.port() <= 0) {
             return Optional.empty();
