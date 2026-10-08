@@ -564,4 +564,9 @@ Types it names (2)
       int? leaderEpoch = ();
   |};
 == ballerinax__kafka type NoSuchType ==
-{"kind":"symbol-not-found","qualified":"ballerinax/kafka","version":"0.0.0-fixture","requested":["NoSuchType"],"candidates":["CompressionType","DeserializerType","SerializerType"],"suggestion":"No declaration matched. Re-run with one of the candidates if it is what you meant, or search by keyword with `bal discover ballerinax/kafka type --filter <keyword>`. Add --refresh if you believe the name exists and is newer than the cached copy."}
+error: no match for 'NoSuchType' in ballerinax/kafka:0.0.0-fixture
+  No declaration matched. Re-run with one of the candidates if it is what you meant, or search by keyword with `bal discover ballerinax/kafka type --filter <keyword>`. Add --refresh if you believe the name exists and is newer than the cached copy.
+  candidates:
+    CompressionType
+    DeserializerType
+    SerializerType

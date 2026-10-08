@@ -49,10 +49,11 @@ import java.util.function.Consumer;
  * <ul>
  *   <li>stdout — the requested document, and nothing else: no progress, no banner. A usage request is a request
  *       like any other, so {@code --help} is that document
- *   <li>stderr — on failure, one JSON object matching {@link Failure}, and nothing else
+ *   <li>stderr — on failure, one {@link Failure} and nothing else, in the run's output mode: one JSON object,
+ *       or {@code error: <message>} with the suggestion indented below it
  *   <li>exit 0 — success, and stdout is COMPLETE
  *   <li>exit 1 — every failure, whatever went wrong. What to do next is {@code kind} and {@code suggestion} in
- *       the JSON, never the code
+ *       the failure, never the code
  * </ul>
  *
  * <p>{@code bal discover <org/name>[:<version>] [bucket] [args...]} is one picocli command, and {@code bucket} a
@@ -102,6 +103,7 @@ public final class Cli {
             return 0;
         }
 
+        boolean json = jsonOutput(argv, interactive);
         Commands.Grammar grammar = Commands.Grammar.create();
         CommandLine.ParseResult parsed;
         try {
@@ -109,7 +111,7 @@ public final class Cli {
         } catch (CommandLine.ParameterException cause) {
             // picocli's own error printing is deliberately never used: stderr has to hold exactly one `Failure`
             // object, and picocli would write a usage block beside it.
-            return fail(describeParseError(cause, argv), streams);
+            return fail(describeParseError(cause, argv), streams, json);
         }
 
         // A usage request is answered, not failed: it goes to stdout at exit 0, because "exit 0 means stdout is
@@ -123,17 +125,17 @@ public final class Cli {
         if (root.pkg == null) {
             return fail(new Failure.Validation(
                     "A package is required.",
-                    "Pass '<org>/<name>', e.g. bal discover ballerinax/github."), streams);
+                    "Pass '<org>/<name>', e.g. bal discover ballerinax/github."), streams, json);
         }
 
         Failure argumentError = validate(root);
         if (argumentError != null) {
-            return fail(argumentError, streams);
+            return fail(argumentError, streams, json);
         }
 
         Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
         if (!coordinate.isOk()) {
-            return fail(coordinate.failure(), streams);
+            return fail(coordinate.failure(), streams, json);
         }
         QualifiedName qualified = coordinate.value().qualified();
         String version = coordinate.value().versionText();
@@ -143,7 +145,7 @@ public final class Cli {
         List<String> rest = root.rest == null ? List.of() : root.rest;
         String bucket = rest.isEmpty() ? null : rest.get(0);
         if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
-            return fail(unknownBucket(bucket), streams);
+            return fail(unknownBucket(bucket), streams, json);
         }
 
         // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
@@ -152,7 +154,7 @@ public final class Cli {
                 resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, version);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified, options);
         if (!loaded.isOk()) {
-            return fail(loaded.failure(), streams);
+            return fail(loaded.failure(), streams, json);
         }
 
         // A blank keyword filters nothing, so it is no filter at all — normalised once, here, so no header or
@@ -160,14 +162,14 @@ public final class Cli {
         String filter = root.filter == null || root.filter.isBlank() ? null : root.filter;
         Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
         if (!answer.isOk()) {
-            return fail(answer.failure(), streams);
+            return fail(answer.failure(), streams, json);
         }
         if (root.page != 1 && answer.value().paging() == null) {
-            return fail(notPaged(root, filter), streams);
+            return fail(notPaged(root, filter), streams, json);
         }
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
                 filter, version);
-        emit(answer.value(), where, streams, root.output, interactive);
+        emit(answer.value(), where, streams, json);
         return 0;
     }
 
@@ -205,9 +207,7 @@ public final class Cli {
                 "Drop --page: `" + command + "`.");
     }
 
-    private static void emit(
-            DiscoverResult result, TextRenderer.Context where, Streams streams, String output, boolean interactive) {
-        boolean json = jsonOutput(output, interactive);
+    private static void emit(DiscoverResult result, TextRenderer.Context where, Streams streams, boolean json) {
         streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result, where)) + "\n");
     }
 
@@ -240,8 +240,23 @@ public final class Cli {
         return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
     }
 
-    private static boolean jsonOutput(String output, boolean interactive) {
-        return output != null ? Commands.JSON_OUTPUT.equals(output) : !interactive;
+    /**
+     * The one output mode of a run, for the answer and a failure alike: {@code --output} when argv carries a valid
+     * one, else JSON unless stdout is an interactive terminal. Read off argv rather than the parsed flag, so a
+     * failure to parse the arguments is still written in the mode the caller asked for.
+     */
+    public static boolean jsonOutput(List<String> argv, boolean interactive) {
+        String flag = "--output";
+        for (int i = 0; i < argv.size(); i++) {
+            String token = argv.get(i);
+            String value = token.startsWith(flag + "=") ? token.substring(flag.length() + 1)
+                    : token.equals(flag) && i + 1 < argv.size() ? argv.get(i + 1)
+                    : null;
+            if (Commands.JSON_OUTPUT.equals(value) || Commands.TEXT_OUTPUT.equals(value)) {
+                return Commands.JSON_OUTPUT.equals(value);
+            }
+        }
+        return !interactive;
     }
 
     private static Failure validate(Commands.Root root) {
@@ -361,8 +376,8 @@ public final class Cli {
         return message.split("\n", -1)[0];
     }
 
-    private static int fail(Failure failure, Streams streams) {
-        streams.errorOut().accept(failure.describe() + "\n");
+    private static int fail(Failure failure, Streams streams, boolean json) {
+        streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + "\n");
         return 1;
     }
 }

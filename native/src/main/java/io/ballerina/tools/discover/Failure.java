@@ -21,7 +21,9 @@ package io.ballerina.tools.discover;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Failures are values, not thrown classes.
@@ -149,7 +151,44 @@ public sealed interface Failure {
         };
     }
 
-    /** The one line a failing run writes to stderr: a single JSON object. */
+    /** What to do next — every kind carries one. */
+    String suggestion();
+
+    /**
+     * The failure as a text-mode run writes it to stderr: {@code error: <what went wrong>}, then the suggestion
+     * and anything else the failure carries on lines of their own, indented, with no trailing newline.
+     */
+    default String describeText() {
+        List<String> lines = new ArrayList<>();
+        lines.add("error: " + switch (this) {
+            case Validation f -> f.message();
+            case PackageNotFound f -> "not found: " + coordinate(f.qualified(), f.version());
+            case Upstream f -> (f.message() == null ? "request failed" : f.message()) + " from " + f.url()
+                    + " after " + f.attempts() + (f.attempts() == 1 ? " attempt" : " attempts");
+            case Timeout f -> "no answer from " + f.url() + " within " + f.budgetMs() + " ms";
+            case SchemaDrift f -> "Central's payload for " + coordinate(f.qualified(), f.version())
+                    + " does not match this reader";
+            case SymbolNotFound f -> "no match for " + f.requested().stream()
+                    .map(name -> "'" + name + "'").collect(Collectors.joining(" ")) + " in "
+                    + coordinate(f.qualified(), f.version());
+        });
+        lines.add("  " + suggestion());
+        if (this instanceof SchemaDrift f) {
+            lines.add("  issues:");
+            f.issues().forEach(issue -> lines.add("    " + issue.path() + ": " + issue.message()));
+        }
+        if (this instanceof SymbolNotFound f && !f.candidates().isEmpty()) {
+            lines.add("  candidates:");
+            f.candidates().forEach(candidate -> lines.add("    " + candidate));
+        }
+        return String.join("\n", lines);
+    }
+
+    private static String coordinate(String qualified, String version) {
+        return version == null ? qualified : qualified + ":" + version;
+    }
+
+    /** The one line a failing run writes to stderr in JSON mode: a single JSON object. */
     default String describe() {
         JsonObject json = new JsonObject();
         json.addProperty("kind", kind());

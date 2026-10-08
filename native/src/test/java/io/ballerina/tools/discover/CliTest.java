@@ -1530,6 +1530,46 @@ public class CliTest {
     }
 
     @Test
+    public void aFailureIsWrittenInTheRunsOutputModeEvenWhenTheArgumentsDoNotParse() {
+        record Case(List<String> argv, boolean interactive, boolean json) { }
+        for (Case each : List.of(
+                new Case(List.of("ballerina/http", "nosuchbucket"), true, false),
+                new Case(List.of("ballerina/http", "nosuchbucket"), false, true),
+                new Case(List.of("ballerina/http", "nosuchbucket", "--output", "json"), true, true),
+                new Case(List.of("ballerina/http", "nosuchbucket", "--output", "text"), false, false),
+                new Case(List.of("ballerina/http", "--nonesuch", "--output", "text"), false, false),
+                new Case(List.of("ballerina/http", "--output=text", "--nonesuch"), false, false),
+                new Case(List.of("ballerina/http", "--nonesuch", "--output", "xml"), true, false),
+                new Case(List.of("ballerina/http", "--output", "xml"), false, true))) {
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never(), null, each.interactive()), 1,
+                    each.toString());
+            Assert.assertEquals(capture.stdout(), "", each.toString());
+            if (each.json()) {
+                Assert.assertEquals(capture.field("kind"), "validation", each.toString());
+            } else {
+                String[] lines = capture.stderr().split("\n", -1);
+                Assert.assertEquals(lines.length, 3, capture.stderr());
+                Assert.assertTrue(lines[0].startsWith("error: "), capture.stderr());
+                Assert.assertTrue(lines[1].startsWith("  ") && !lines[1].startsWith("   "), capture.stderr());
+                Assert.assertEquals(lines[2], "", capture.stderr());
+            }
+        }
+    }
+
+    @Test
+    public void aTextFailureListsItsCandidatesIndentedUnderTheSuggestion() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "type", "NoSuchType", "--output", "text"),
+                capture.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1);
+        Assert.assertEquals(capture.stdout(), "");
+        FixtureCorpus.matchesSnapshot(
+                Path.of("src", "test", "resources", "command-outputs", "unix", "failure-symbol-not-found.txt"),
+                capture.stderr(),
+                "symbol-not-found failure text, text mode");
+    }
+
+    @Test
     public void theSymbolNotFoundTextIsUnchanged() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "NoSuchContainer"),

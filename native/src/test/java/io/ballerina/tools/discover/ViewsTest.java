@@ -162,7 +162,7 @@ public class ViewsTest {
                         loaded.qualified().qualified(), null, List.of("type", leaf[1]), null, null))).append("\n");
                 json.append(JsonRenderer.render(answer.value())).append("\n");
             } else {
-                text.append(answer.failure().describe()).append("\n");
+                text.append(answer.failure().describeText()).append("\n");
                 json.append(answer.failure().describe()).append("\n");
             }
         }
