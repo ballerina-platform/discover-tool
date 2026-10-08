@@ -29,8 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Central page; the bare package lists its submodules, and a submodule named as the package (e.g.
   `ballerinax/aws.auth`) fails with the `--module` command that reads it
 - Add the `--filter` flag to narrow a bucket listing by keyword
-- Add the `--version` flag to read one exact version of a package; it outranks the version a project locks, and is
-  carried into every command the answer prints
+- Read one exact version of a package from the coordinate, `<org>/<package>:<version>`; it outranks the version a
+  project locks, and is carried into every command the answer prints
 - Cap every listing at 40 entries, with `--page` to page through any longer one; a text listing that continues also
   ends with the `--filter <keyword>` command that narrows it
 - List containers, service types, methods, resource paths and declarations alphabetically
@@ -38,5 +38,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   plus a `next` command when a listing continues
 - Add JSON output (one line per answer) and aligned human-readable text output, selected by `--output json|text` and
   defaulting to text on a terminal and JSON otherwise
-- Report failures as a single-line JSON object on stderr, with exit code 1
+- Report failures on stderr with exit code 1, in the run's output mode: a single-line JSON object, or
+  `error: <message>` with the suggestion indented below it
 - Cache Central responses under `$XDG_CACHE_HOME`, falling back to a live fetch on any cache failure
