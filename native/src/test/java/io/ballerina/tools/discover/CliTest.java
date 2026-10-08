@@ -451,7 +451,7 @@ public class CliTest {
     public void aFlagWithoutItsValueIsNamedWithBothSpellings() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerina/http", "--module"), capture.streams(), never()), 1);
-        Assert.assertEquals(capture.field("message"), "--module needs a value.");
+        Assert.assertEquals(capture.field("message"), "The --module option needs a value.");
         Assert.assertEquals(capture.field("suggestion"), "Write --module <name> or --module=<name>.");
     }
 
@@ -639,8 +639,8 @@ public class CliTest {
         Capture text = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Nope", "--output",
                 "text"), text.streams(), options(graphqlCentral())), 1);
-        Assert.assertTrue(text.stderr().startsWith("error: no match for 'Nope' in ballerina/graphql:"
-                + GRAPHQL_VERSION + ", module subgraph\n"), text.stderr());
+        Assert.assertTrue(text.stderr().startsWith("error: No match for 'Nope' in ballerina/graphql:"
+                + GRAPHQL_VERSION + ", module subgraph.\n"), text.stderr());
 
         Capture plain = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "type", "Nope"), plain.streams(),

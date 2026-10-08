@@ -87,7 +87,7 @@ public sealed interface Failure {
     record Timeout(String url, long budgetMs, String suggestion) implements Failure { }
 
     /**
-     * Central answered with a shape this reader does not understand.
+     * Central answered with a shape this tool does not understand.
      *
      * @param qualified the {@code org/name} whose payload drifted
      * @param version the version that payload was read at, or {@code null} when unknown
@@ -114,6 +114,17 @@ public sealed interface Failure {
             List<String> candidates, String suggestion) implements Failure { }
 
     /**
+     * A defect in this tool: something in the pipeline threw, which nothing is designed to do.
+     *
+     * @param message what was thrown
+     * @param suggestion what to do about it
+     */
+    record Internal(String message, String suggestion) implements Failure { }
+
+    String INTERNAL_SUGGESTION = "This is a defect in bal discover, not in the arguments. Report it with the "
+            + "command that produced it.";
+
+    /**
      * The route left when Central itself is the problem: a resolved version's {@code .bala} carries the same
      * signatures Central serves, but only if some build already pulled it, so it follows a retry. Every
      * suggestion that admits defeat must forbid writing the call from a remembered API — the failure this tool
@@ -136,10 +147,10 @@ public sealed interface Failure {
 
     /**
      * Addressed to a human on purpose: no argument the agent can change will make a payload this
-     * reader cannot parse. The fallback still applies — a package Central mis-serves is intact on
+     * tool cannot parse. The fallback still applies — a package Central mis-serves is intact on
      * disk — so reporting the drift and getting on with the work are not alternatives.
      */
-    String SCHEMA_DRIFT_SUGGESTION = "Central's payload no longer matches this reader, so no change "
+    String SCHEMA_DRIFT_SUGGESTION = "Central's answer no longer matches what this tool reads, so no change "
             + "of arguments will help. Report the `issues` paths, then " + OFFLINE_FALLBACK;
 
     /** The discriminator an agent branches on, and the JSON field of the same name. */
@@ -151,6 +162,7 @@ public sealed interface Failure {
             case Timeout ignored -> "timeout";
             case SchemaDrift ignored -> "schema-drift";
             case SymbolNotFound ignored -> "symbol-not-found";
+            case Internal ignored -> "internal";
         };
     }
 
@@ -158,22 +170,27 @@ public sealed interface Failure {
     String suggestion();
 
     /**
-     * The failure as a text-mode run writes it to stderr: {@code error: <what went wrong>}, then the suggestion
-     * and anything else the failure carries on lines of their own, indented, with no trailing newline.
+     * The failure as a text-mode run writes it to stderr: {@code error: <headline>}, a full sentence, then the
+     * suggestion and anything else the failure carries on lines of their own, indented, with no trailing newline.
      */
     default String describeText() {
         List<String> lines = new ArrayList<>();
         lines.add("error: " + switch (this) {
             case Validation f -> f.message();
-            case PackageNotFound f -> "not found: " + coordinate(f.qualified(), f.version(), f.module());
-            case Upstream f -> (f.message() == null ? "request failed" : f.message()) + " from " + f.url()
-                    + " after " + f.attempts() + (f.attempts() == 1 ? " attempt" : " attempts");
-            case Timeout f -> "no answer from " + f.url() + " within " + f.budgetMs() + " ms";
-            case SchemaDrift f -> "Central's payload for " + coordinate(f.qualified(), f.version(), f.module())
-                    + " does not match this reader";
-            case SymbolNotFound f -> "no match for " + f.requested().stream()
-                    .map(name -> "'" + name + "'").collect(Collectors.joining(" ")) + " in "
-                    + coordinate(f.qualified(), f.version(), f.module());
+            case PackageNotFound f -> (f.module() == null ? "Package" : "Module") + " not found on Central: "
+                    + coordinate(f.qualified(), f.version(), f.module()) + ".";
+            case Upstream f -> "Request to " + f.url() + " failed after " + f.attempts()
+                    + (f.attempts() == 1 ? " attempt" : " attempts")
+                    + (f.message() == null ? "." : ": " + f.message() + ".");
+            case Timeout f -> "Central did not answer " + f.url() + " within " + f.budgetMs() + " ms.";
+            case SchemaDrift f -> "Central's answer for " + coordinate(f.qualified(), f.version(), f.module())
+                    + " has a shape this tool does not understand; Central's docs format may have changed.";
+            case SymbolNotFound f -> f.module() != null && f.requested().equals(List.of(f.module()))
+                    ? "No module '" + f.module() + "' in " + coordinate(f.qualified(), f.version(), null) + "."
+                    : "No match for " + f.requested().stream().map(name -> "'" + name + "'")
+                            .collect(Collectors.joining(" ")) + " in "
+                            + coordinate(f.qualified(), f.version(), f.module()) + ".";
+            case Internal f -> "Unexpected internal failure: " + f.message() + (f.message().endsWith(".") ? "" : ".");
         });
         lines.add("  " + suggestion());
         if (this instanceof SchemaDrift f) {
@@ -234,6 +251,10 @@ public sealed interface Failure {
                 coordinates(json, f.qualified(), f.version(), f.module());
                 json.add("requested", strings(f.requested()));
                 json.add("candidates", strings(f.candidates()));
+                json.addProperty("suggestion", f.suggestion());
+            }
+            case Internal f -> {
+                json.addProperty("message", f.message());
                 json.addProperty("suggestion", f.suggestion());
             }
         }

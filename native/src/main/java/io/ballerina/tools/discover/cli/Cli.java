@@ -210,7 +210,7 @@ public final class Cli {
             command.append(" --filter ").append(Texts.shellWord(filter));
         }
         return new Failure.Validation(
-                "--page " + root.page + " is out of range: this answer is not paged.",
+                "Page " + root.page + " is out of range: this answer is not paged.",
                 "Drop --page: `" + command + "`.");
     }
 
@@ -280,7 +280,7 @@ public final class Cli {
         }
         if (root.page < 1) {
             return new Failure.Validation(
-                    "--page " + root.page + " is out of range: pages are numbered from 1.",
+                    "Page " + root.page + " is out of range: pages are numbered from 1.",
                     "Pass --page 1 or later, or drop it for the first page.");
         }
         return rejectVersionArguments(root, qualified);
@@ -368,15 +368,13 @@ public final class Cli {
         String name = option.longestName();
         String label = option.paramLabel();
         return new Failure.Validation(
-                name + " needs a value.",
+                "The " + name + " option needs a value.",
                 "Write " + name + " " + label + " or " + name + "=" + label + ".");
     }
 
     private static String firstLine(String message) {
-        if (message == null) {
-            return "invalid arguments";
-        }
-        return message.split("\n", -1)[0];
+        String line = message == null ? "Invalid arguments" : message.split("\n", -1)[0];
+        return line.endsWith(".") ? line : line + ".";
     }
 
     private static int fail(Failure failure, Streams streams, boolean json) {

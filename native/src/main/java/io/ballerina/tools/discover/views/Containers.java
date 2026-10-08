@@ -113,7 +113,7 @@ public final class Containers {
             int pages = Math.max(1, (total + MAX_ENTRIES - 1) / MAX_ENTRIES);
             if (requested < 1 || requested > pages) {
                 return Result.err(new Failure.Validation(
-                        "--page " + requested + " is out of range: this listing has " + total + " entries on "
+                        "Page " + requested + " is out of range: this listing has " + total + " entries on "
                                 + pages + (pages == 1 ? " page." : " pages."),
                         "Pass a page from 1 to " + pages + ", e.g. `" + command + " --page " + pages + "`."));
             }

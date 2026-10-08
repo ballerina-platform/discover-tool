@@ -39,29 +39,55 @@ public class FailureTest {
     @Test
     public void aMissingPackageNamesTheCoordinateItLookedFor() {
         Assert.assertEquals(new Failure.PackageNotFound("ballerina/http", "9.9.9", null, "Write one.").describeText(),
-                "error: not found: ballerina/http:9.9.9\n  Write one.");
+                "error: Package not found on Central: ballerina/http:9.9.9.\n  Write one.");
         Assert.assertEquals(new Failure.PackageNotFound("ballerina/htp", null, null, "Check it.").describeText(),
-                "error: not found: ballerina/htp\n  Check it.");
+                "error: Package not found on Central: ballerina/htp.\n  Check it.");
+        Assert.assertEquals(new Failure.PackageNotFound("ballerina/graphql", "1.17.0", "nosuch", "List them.")
+                        .describeText(),
+                "error: Module not found on Central: ballerina/graphql:1.17.0, module nosuch.\n  List them.");
     }
 
     @Test
     public void candidatesAndIssuesGetLinesOfTheirOwn() {
         Assert.assertEquals(new Failure.SymbolNotFound("ballerinax/kafka", "4.6.5", null, List.of("Prod"),
                         List.of("Producer", "Consumer"), "Pick one.").describeText(),
-                "error: no match for 'Prod' in ballerinax/kafka:4.6.5\n  Pick one.\n  candidates:\n    Producer\n"
+                "error: No match for 'Prod' in ballerinax/kafka:4.6.5.\n  Pick one.\n  candidates:\n    Producer\n"
                         + "    Consumer");
         Assert.assertEquals(new Failure.SchemaDrift("ballerinax/kafka", "4.6.5", null,
                         List.of(new Failure.SchemaIssue("docsData.modules", "expected an array")), "Report it.")
                         .describeText(),
-                "error: Central's payload for ballerinax/kafka:4.6.5 does not match this reader\n  Report it.\n"
+                "error: Central's answer for ballerinax/kafka:4.6.5 has a shape this tool does not understand; "
+                        + "Central's docs format may have changed.\n  Report it.\n"
                         + "  issues:\n    docsData.modules: expected an array");
+    }
+
+    @Test
+    public void aMissWithinAModuleNamesTheModuleAndAMissingModuleIsNamedAsOne() {
+        Assert.assertEquals(new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "subgraph", List.of("Nope"),
+                        List.of(), "Pick one.").describeText(),
+                "error: No match for 'Nope' in ballerina/graphql:1.17.0, module subgraph.\n  Pick one.");
+        Assert.assertEquals(new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "nosuch", List.of("nosuch"),
+                        List.of(), "Pick one.").describeText(),
+                "error: No module 'nosuch' in ballerina/graphql:1.17.0.\n  Pick one.");
+        Assert.assertTrue(new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "subgraph", List.of("Nope"),
+                List.of(), "Pick one.").describe().contains("\"module\":\"subgraph\""));
     }
 
     @Test
     public void anUpstreamFailureSaysWhereAndHowOften() {
         Assert.assertEquals(new Failure.Upstream("https://x.test/a", 3, "HTTP 503", "Retry.", 503).describeText(),
-                "error: HTTP 503 from https://x.test/a after 3 attempts\n  Retry.");
+                "error: Request to https://x.test/a failed after 3 attempts: HTTP 503.\n  Retry.");
         Assert.assertEquals(new Failure.Timeout("https://x.test/a", 30000, "Retry.").describeText(),
-                "error: no answer from https://x.test/a within 30000 ms\n  Retry.");
+                "error: Central did not answer https://x.test/a within 30000 ms.\n  Retry.");
+    }
+
+    @Test
+    public void anInternalFailureIsWrittenLikeAnyOtherInEitherMode() {
+        Failure internal = new Failure.Internal("boom", Failure.INTERNAL_SUGGESTION);
+        Assert.assertEquals(internal.describeText(), "error: Unexpected internal failure: boom.\n  This is a defect "
+                + "in bal discover, not in the arguments. Report it with the command that produced it.");
+        Assert.assertEquals(internal.describe(), "{\"kind\":\"internal\",\"message\":\"boom\",\"suggestion\":"
+                + "\"This is a defect in bal discover, not in the arguments. Report it with the command that produced "
+                + "it.\"}");
     }
 }
