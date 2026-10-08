@@ -110,16 +110,17 @@ public record Coordinate(QualifiedName qualified, Version version) {
         return Result.err(new Failure.Validation(message, "Run `" + COMMAND + corrected + "`."));
     }
 
-    /** {@code org/name}, then {@code :version} when one was written. */
-    public String text() {
-        return version == null ? qualified.qualified() : qualified.versioned(version);
-    }
-
     /**
      * The words that read this coordinate again, at {@code module} when it is not {@code null}, quoted for the shell:
      * what every printed command starts with after {@code bal discover}.
      */
     public String argument(String module) {
-        return Texts.shellWord(text()) + (module == null ? "" : " --module " + Texts.shellWord(module));
+        return argument(qualified.qualified(), version == null ? null : version.text(), module);
+    }
+
+    /** {@link #argument(String)} for a package and version already in text. */
+    public static String argument(String qualified, String version, String module) {
+        return Texts.shellWord(version == null ? qualified : qualified + VERSION_SEPARATOR + version)
+                + (module == null ? "" : " --module " + Texts.shellWord(module));
     }
 }

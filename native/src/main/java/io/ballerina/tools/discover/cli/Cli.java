@@ -184,7 +184,7 @@ public final class Cli {
             return fail(answer.failure(), streams, json);
         }
         if (root.page != 1 && answer.value().paging() == null) {
-            return fail(notPaged(root, filter), streams, json);
+            return fail(notPaged(root, coordinate.value(), filter), streams, json);
         }
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
                 filter, version == null ? null : version.text());
@@ -216,9 +216,7 @@ public final class Cli {
             return null;
         }
         List<String> selectors = rest.subList(1, rest.size());
-        String pkg = qualified.qualified() + (version == null ? "" : ":" + version.text());
-        String command = "bal discover " + Texts.shellWord(pkg)
-                + (root.module == null ? "" : " --module " + Texts.shellWord(root.module)) + " " + bucket;
+        String command = "bal discover " + new Coordinate(qualified, version).argument(root.module) + " " + bucket;
         if (Types.BUCKET.equals(bucket)) {
             return Types.misuse(command, new Types.Options(selectors, filter, root.page));
         }
@@ -228,11 +226,8 @@ public final class Cli {
         return null;
     }
 
-    private static Failure notPaged(Commands.Root root, String filter) {
-        StringBuilder command = new StringBuilder("bal discover ").append(root.pkg);
-        if (root.module != null) {
-            command.append(" --module ").append(Texts.shellWord(root.module));
-        }
+    private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
+        StringBuilder command = new StringBuilder("bal discover ").append(coordinate.argument(root.module));
         if (root.rest != null) {
             root.rest.forEach(word -> command.append(' ').append(Texts.shellWord(word)));
         }

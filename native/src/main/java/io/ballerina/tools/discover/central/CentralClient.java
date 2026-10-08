@@ -21,10 +21,10 @@ package io.ballerina.tools.discover.central;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonParser;
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
-import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
@@ -393,7 +393,7 @@ public final class CentralClient {
                 || containingPackages(qualified).isEmpty()) {
             return direct;
         }
-        return Result.err(notAPackage(qualified, null, options));
+        return Result.err(notAPackage(qualified, null, null, options));
     }
 
     private static List<QualifiedName> containingPackages(QualifiedName qualified) {
@@ -408,12 +408,12 @@ public final class CentralClient {
         return parents;
     }
 
-    private static Failure notAPackage(QualifiedName qualified, String pin, HttpOptions options) {
+    private static Failure notAPackage(QualifiedName qualified, Version version, Version pin, HttpOptions options) {
         List<QualifiedName> parents = containingPackages(qualified);
         for (QualifiedName parent : parents) {
             Result<ResolvedVersion> probed = resolvePublishedVersion(parent, options);
             if (probed.isOk()) {
-                return moduleOf(qualified, parent, probed.value().version(), pin, options);
+                return moduleOf(qualified, parent, probed.value().version(), version, pin, options);
             }
             if (!(probed.failure() instanceof Failure.PackageNotFound)) {
                 return notFound(qualified);
@@ -424,19 +424,19 @@ public final class CentralClient {
             tried.append(tried.isEmpty() ? "" : ", ").append(parent.qualified());
         }
         return new Failure.PackageNotFound(
-                qualified.qualified(), pin, null,
+                qualified.qualified(), textOf(version), null,
                 "Central publishes no package under this name, and none of the packages it could be a module "
                         + "of exists either (tried " + tried + "). Check the org/name spelling; "
                         + "`bal search <keyword>` lists what Central publishes.");
     }
 
     private static Failure moduleOf(
-            QualifiedName qualified, QualifiedName parent, Version version, String pin, HttpOptions options) {
+            QualifiedName qualified, QualifiedName parent, Version parentVersion, Version version, Version pin,
+            HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
-        String command = "`bal discover " + Texts.shellWord(pinned(parent, pin)) + " --module "
-                + Texts.shellWord(submodule) + "`";
+        String command = "`bal discover " + new Coordinate(parent, pin).argument(submodule) + "`";
         String url = REGISTRY_PACKAGES_URL + encode(parent.org()) + "/" + encode(parent.name())
-                + "/" + encode(version.text());
+                + "/" + encode(parentVersion.text());
         Result<JsonElement> response = fetchJson(url, options);
         Optional<List<String>> listed = response.isOk() ? Coordinates.moduleNames(response.value()) : Optional.empty();
         String suggestion;
@@ -453,7 +453,7 @@ public final class CentralClient {
                     + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
                     + "). Check the name; `bal search <keyword>` lists what Central publishes.";
         }
-        return new Failure.PackageNotFound(qualified.qualified(), pin, null, suggestion);
+        return new Failure.PackageNotFound(qualified.qualified(), textOf(version), null, suggestion);
     }
 
     // Asks for this package's row: listing the whole org (ballerinax) and filtering costs about 45 seconds.
@@ -576,7 +576,7 @@ public final class CentralClient {
             if (response.failure() instanceof Failure.Upstream upstream
                     && upstream.status() != null && upstream.status() == NOT_FOUND) {
                 if (resolved.supplied() && isUnpublishedDottedName(qualified, options)) {
-                    return Result.err(notAPackage(qualified, pinOf(resolved), options));
+                    return Result.err(notAPackage(qualified, version, pinOf(resolved), options));
                 }
                 return Result.err(new Failure.PackageNotFound(qualified.qualified(), version.text(), null,
                         missingVersion(qualified, resolved, options)));
@@ -586,7 +586,7 @@ public final class CentralClient {
         // A version for a module path can still arrive from a `latest` entry an older build of this reader wrote
         // under the module's own key; the page itself says what it is.
         if (Coordinates.describesSubmodule(response.value(), qualified)) {
-            return Result.err(notAPackage(qualified, pinOf(resolved), options));
+            return Result.err(notAPackage(qualified, version, pinOf(resolved), options));
         }
         Result<CentralDocs> parsed = Schema.parse(response.value(), qualified.qualified(), version.text());
         if (!parsed.isOk()) {
@@ -656,18 +656,18 @@ public final class CentralClient {
         return parsed;
     }
 
-    private static String pinOf(ResolvedVersion resolved) {
-        return resolved.source() == ResolvedVersion.Source.WRITTEN ? resolved.version().text() : null;
+    private static String textOf(Version version) {
+        return version == null ? null : version.text();
     }
 
-    private static String pinned(QualifiedName qualified, String pin) {
-        return qualified.qualified() + (pin == null ? "" : ":" + pin);
+    private static Version pinOf(ResolvedVersion resolved) {
+        return resolved.source() == ResolvedVersion.Source.WRITTEN ? resolved.version() : null;
     }
 
-    private static Failure noSuchModulePage(Version version, QualifiedName qualified, String pin, String submodule) {
+    private static Failure noSuchModulePage(Version version, QualifiedName qualified, Version pin, String submodule) {
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), submodule, qualified.qualified()
                 + " publishes no '" + submodule + "' module at this version. Run `bal discover "
-                + Texts.shellWord(pinned(qualified, pin)) + "` to list the submodules it does publish.");
+                + new Coordinate(qualified, pin).argument(null) + "` to list the submodules it does publish.");
     }
 
     // A name Central has no row for, with a package it could be a module of.

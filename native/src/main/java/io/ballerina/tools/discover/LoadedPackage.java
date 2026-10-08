@@ -79,8 +79,7 @@ public record LoadedPackage(
 
     /** {@link #pkgArgument()} for another module of this package, or its default one when {@code other} is null. */
     public String pkgArgument(String other) {
-        return Texts.shellWord(qualified.qualified() + (pinned == null ? "" : ":" + pinned.text()))
-                + (other == null ? "" : " --module " + Texts.shellWord(other));
+        return new Coordinate(qualified, pinned).argument(other);
     }
 
     /**
