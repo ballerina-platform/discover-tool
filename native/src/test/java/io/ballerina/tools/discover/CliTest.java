@@ -43,12 +43,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The command's contract, under the package-first grammar: {@code bal discover <org/name> [bucket] [args...]}.
+ * The command's contract, under the package-first grammar: {@code bal discover <org>/<name> [bucket] [name ...]}.
  *
  * <p>stdout carries the requested document and nothing else, stderr carries one JSON failure, and the exit code
- * says only whether stdout is complete. Every mistyped or version-skewed call must fail LOUDLY as
- * {@code validation} rather than resolving as something else and reporting a Central failure the agent will
- * retry.
+ * says only whether stdout is complete, and if not, whether the command line itself was malformed (2). Every
+ * mistyped or version-skewed call must fail LOUDLY as {@code validation} rather than resolving as something else
+ * and reporting a Central failure the agent will retry.
  *
  * <p>Every bucket wired into {@link Cli} is covered here, {@code readme} included: it is not built on
  * {@code Containers}, so its dispatch branch gets its own tests.
@@ -168,7 +168,7 @@ public class CliTest {
         // Distinct from truly empty argv: a caller who passed a flag clearly attempted something, so "needs a
         // package" is more useful than the whole usage block.
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("--refresh"), capture.streams(), never()), 1);
+        Assert.assertEquals(Cli.run(List.of("--refresh"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("package is required"), capture.stderr());
@@ -193,7 +193,7 @@ public class CliTest {
         // command can never succeed.
         Capture capture = new Capture();
         Assert.assertEquals(
-                Cli.run(List.of("ballerina/http", "--nonesuch"), capture.streams(), never()), 1);
+                Cli.run(List.of("ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("--nonesuch"), capture.stderr());
@@ -204,7 +204,7 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(
                 Cli.run(List.of("ballerinax/kafka", "nosuchbucket"), capture.streams(),
-                        centralFor("ballerinax__kafka", "4.6.5")), 1);
+                        centralFor("ballerinax__kafka", "4.6.5")), 2);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("nosuchbucket"), capture.stderr());
@@ -419,7 +419,7 @@ public class CliTest {
     @Test
     public void anUnknownFlagListsEveryFlagTheGrammarAccepts() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--nonesuch"), capture.streams(), never()), 1);
+        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
         String suggestion = capture.field("suggestion");
         for (String flag : List.of("--refresh", "--output", "--filter", "--page", "--module/-m", "--help/-h")) {
             Assert.assertTrue(suggestion.contains(flag), flag + " missing from: " + suggestion);
@@ -439,7 +439,7 @@ public class CliTest {
                         "To read a specific version, write ballerina/http:<version>"),
                 new Case(List.of("--version"), "To read a specific version, write <org>/<name>:<version>"))) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 1, each.argv().toString());
+            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, each.argv().toString());
             Assert.assertEquals(capture.stdout(), "");
             Assert.assertEquals(capture.field("kind"), "validation");
             Assert.assertEquals(capture.field("message"), "Unknown option '--version'.");
@@ -450,16 +450,26 @@ public class CliTest {
     @Test
     public void aFlagWithoutItsValueIsNamedWithBothSpellings() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--module"), capture.streams(), never()), 1);
+        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--module"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.field("message"), "The --module option needs a value.");
-        Assert.assertEquals(capture.field("suggestion"), "Write --module <name> or --module=<name>.");
+        Assert.assertEquals(capture.field("suggestion"), "Write --module <module> or --module=<module>.");
+    }
+
+    @Test
+    public void aFlagWithAValueOfTheWrongTypeIsAUsageError() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--page", "x"), capture.streams(), never()), 2);
+        Assert.assertEquals(capture.stdout(), "");
+        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertEquals(capture.field("message"), "'x' is not a valid --page value.");
+        Assert.assertEquals(capture.field("suggestion"), "Write --page <n>.");
     }
 
     @Test
     public void anIncompleteVersionIsAValidationFailureThatFetchesNothing() {
         for (String coordinate : List.of("ballerina/http:2.15", "ballerina/http:latest", "ballerina/http:")) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(List.of(coordinate, "client"), capture.streams(), never()), 1, coordinate);
+            Assert.assertEquals(Cli.run(List.of(coordinate, "client"), capture.streams(), never()), 2, coordinate);
             Assert.assertEquals(capture.stdout(), "");
             Assert.assertEquals(capture.field("kind"), "validation", coordinate);
             Assert.assertTrue(capture.field("message").contains("is not a complete version"), capture.stderr());
@@ -476,7 +486,7 @@ public class CliTest {
                 List.of("ballerinax/kafka", "class", "4.6.5"),
                 List.of("ballerinax/kafka", "funcs", "4.6.5"))) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(argv, capture.streams(), never()), 1, String.join(" ", argv));
+            Assert.assertEquals(Cli.run(argv, capture.streams(), never()), 2, String.join(" ", argv));
             Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
             Assert.assertEquals(capture.field("kind"), "validation", String.join(" ", argv));
             Assert.assertEquals(capture.field("message"), "'4.6.5' looks like a version.", capture.stderr());
@@ -1150,7 +1160,7 @@ public class CliTest {
         for (String page : List.of("0", "-1")) {
             Capture capture = new Capture();
             int exitCode = Cli.run(List.of("ballerinax/github", "client", "--page", page), capture.streams(), never());
-            Assert.assertEquals(exitCode, 1);
+            Assert.assertEquals(exitCode, 2);
             Assert.assertEquals(capture.field("kind"), "validation");
             Assert.assertTrue(capture.field("message").contains("numbered from 1"), capture.stderr());
         }
@@ -1468,7 +1478,7 @@ public class CliTest {
     public void anInvalidOutputValueIsAValidationFailure() {
         Capture capture = new Capture();
         Assert.assertEquals(
-                Cli.run(List.of("ballerinax/kafka", "--output", "xml"), capture.streams(), never()), 1);
+                Cli.run(List.of("ballerinax/kafka", "--output", "xml"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("xml"), capture.stderr());
     }
@@ -1476,7 +1486,7 @@ public class CliTest {
     @Test
     public void findIsGoneAsAVerb() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("find", "kafka"), capture.streams(), never()), 1);
+        Assert.assertEquals(Cli.run(List.of("find", "kafka"), capture.streams(), never()), 2);
         // `find` parses as a package-shaped positional (no `/`), so it fails the qualified-name pattern.
         Assert.assertEquals(capture.field("kind"), "validation");
     }
@@ -1502,7 +1512,7 @@ public class CliTest {
         for (List<String> argv : failures) {
             Capture capture = new Capture();
             int exitCode = Cli.run(argv, capture.streams(), never());
-            Assert.assertEquals(exitCode, 1, String.join(" ", argv));
+            Assert.assertEquals(exitCode, 2, String.join(" ", argv));
             Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
             Assert.assertEquals(capture.field("kind"), "validation", String.join(" ", argv));
             Assert.assertTrue(capture.stderr().endsWith("}\n"), String.join(" ", argv));
@@ -1510,8 +1520,8 @@ public class CliTest {
     }
 
     @Test
-    public void everyFailureIsExitOneAndTheKindSaysWhatWentWrong() {
-        record Case(String kind, List<String> argv, HttpOptions http) { }
+    public void aUsageErrorIsExitTwoEveryOtherFailureExitOneAndTheKindSaysWhatWentWrong() {
+        record Case(String kind, int code, List<String> argv, HttpOptions http) { }
         HttpOptions missing = HttpOptions.builder()
                 .transport(FakeTransport.always(FakeTransport.status(400)))
                 .maxAttempts(1).baseDelayMs(1).sleeper(millis -> { }).build();
@@ -1524,16 +1534,17 @@ public class CliTest {
         Assert.assertEquals(Cli.run(List.of("--help"), new Capture().streams(), never()), 0);
 
         List<Case> failures = List.of(
-                new Case("package-not-found", List.of("no-such-org/no-such-pkg"), missing),
-                new Case("upstream", List.of("ballerinax/kafka"), broken),
-                new Case("validation", List.of("ballerina/http:2.16"), never()),
-                new Case("validation", List.of("nonsense"), never()),
-                new Case("symbol-not-found",
+                new Case("package-not-found", 1, List.of("no-such-org/no-such-pkg"), missing),
+                new Case("upstream", 1, List.of("ballerinax/kafka"), broken),
+                new Case("validation", 2, List.of("ballerina/http:2.16"), never()),
+                new Case("validation", 2, List.of("nonsense"), never()),
+                new Case("validation", 1, List.of("ballerinax/kafka", "client", "--page", "2"), kafka),
+                new Case("symbol-not-found", 1,
                         List.of("ballerinax/kafka", "client", "NoSuchContainer"), kafka));
         for (Case failure : failures) {
             Capture capture = new Capture();
             String label = String.join(" ", failure.argv());
-            Assert.assertEquals(Cli.run(failure.argv(), capture.streams(), failure.http()), 1, label);
+            Assert.assertEquals(Cli.run(failure.argv(), capture.streams(), failure.http()), failure.code(), label);
             Assert.assertEquals(capture.field("kind"), failure.kind(), label);
         }
     }
@@ -1551,7 +1562,7 @@ public class CliTest {
 
         for (Case failure : cases) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(failure.argv(), capture.streams(), never()), 1,
+            Assert.assertEquals(Cli.run(failure.argv(), capture.streams(), never()), 2,
                     String.join(" ", failure.argv()));
             Assert.assertEquals(capture.stdout(), "", String.join(" ", failure.argv()));
             FixtureCorpus.matchesSnapshot(
@@ -1577,17 +1588,21 @@ public class CliTest {
                 new Case(List.of("ballerina/http", "nosuchbucket", "--filter", "--output", "text"), false, true),
                 new Case(List.of("ballerina/http", "-m", "--output", "text"), false, true))) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never(), null, each.interactive()), 1,
+            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never(), null, each.interactive()), 2,
                     each.toString());
             Assert.assertEquals(capture.stdout(), "", each.toString());
             if (each.json()) {
                 Assert.assertEquals(capture.field("kind"), "validation", each.toString());
             } else {
                 String[] lines = capture.stderr().split("\n", -1);
-                Assert.assertEquals(lines.length, 3, capture.stderr());
+                Assert.assertEquals(lines.length, 5, capture.stderr());
                 Assert.assertTrue(lines[0].startsWith("error: "), capture.stderr());
                 Assert.assertTrue(lines[1].startsWith("  ") && !lines[1].startsWith("   "), capture.stderr());
-                Assert.assertEquals(lines[2], "", capture.stderr());
+                Assert.assertEquals(lines[2], "Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...] "
+                        + "[--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]",
+                        capture.stderr());
+                Assert.assertEquals(lines[3], "Run 'bal discover --help' for details.", capture.stderr());
+                Assert.assertEquals(lines[4], "", capture.stderr());
             }
         }
     }
