@@ -659,17 +659,17 @@ public final class FromCentral {
                 .toList();
         String suggestion;
         if (candidates.isEmpty()) {
-            suggestion = "This package publishes no submodules at all. Drop --module.";
+            suggestion = qualified.qualified() + " publishes no submodules. Drop --module.";
         } else if (candidates.contains(submodule)) {
             suggestion = "Central's page for '" + submodule + "'" + (version == null ? "" : " at " + version.text())
                     + " cannot be confirmed as a submodule of this package. Drop --module for the default module, "
-                    + "or pass another of the candidates.";
+                    + "or pass another of its submodules: " + String.join(", ", candidates) + ".";
         } else {
-            suggestion = "No submodule answers to that. The candidates are every submodule this package "
-                    + "publishes; pass one of them, or drop --module for the default one.";
+            suggestion = qualified.qualified() + " publishes these submodules: " + String.join(", ", candidates)
+                    + ". Pass one of them to --module, or drop --module for the default module.";
         }
-        return new Failure.SymbolNotFound(qualified.qualified(), version == null ? null : version.text(),
-                submodule, List.of(submodule), candidates, suggestion);
+        return new Failure.PackageNotFound(qualified.qualified(), version == null ? null : version.text(),
+                submodule, suggestion);
     }
 
     /**

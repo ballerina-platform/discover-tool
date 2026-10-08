@@ -54,6 +54,8 @@ final class Commands {
             Arrays.stream(Surface.Scope.values()).map(Surface.Scope::verb),
             Stream.of(Types.BUCKET, Readme.BUCKET)).toList();
 
+    static final String VERSION_FLAG = "--version";
+
     static final String JSON_OUTPUT = "json";
     static final String TEXT_OUTPUT = "text";
 
@@ -89,6 +91,10 @@ final class Commands {
                         + "everywhere including readme. The bare submodule name only — <org>/<name> is always "
                         + "resolved as one literal, complete package coordinate.")
         String module;
+
+        /** Never valid: the package's version goes in the coordinate. Declared so the CLI can say so. */
+        @CommandLine.Option(names = VERSION_FLAG, hidden = true, arity = "0..1", paramLabel = "<version>")
+        String version;
 
         @CommandLine.Option(names = "--refresh",
                 description = "Ignore any cached copy and rewrite it. Worth passing only when a name should "

@@ -100,16 +100,10 @@ final class UsageRenderer {
         return slots;
     }
 
+    // A positional's label is declared as the synopsis shows it, brackets and all: the package is optional to
+    // picocli only so that a bare `bal discover` is a usage request.
     private static String slot(PositionalParamSpec positional) {
-        String label = positional.paramLabel();
-        if (label.contains("[")) {
-            return label;
-        }
-        boolean repeats = positional.index().max() == Integer.MAX_VALUE || positional.arity().max() > 1;
-        if (repeats) {
-            return "[" + label + "...]";
-        }
-        return positional.arity().min() == 0 ? "[" + label + "]" : label;
+        return positional.paramLabel();
     }
 
     private static String slot(OptionSpec option) {

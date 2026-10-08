@@ -76,9 +76,21 @@ public sealed interface Failure {
      * @param status the HTTP status the request failed with — Central's when {@code reached}, else the proxy's —
      *     or {@code null} when no status line came back
      * @param reached whether Central answered
+     * @param qualified the {@code org/name} the request was for, or {@code null} when not yet known
+     * @param version the version it was for, or {@code null} when none was reached
      */
-    record Upstream(String url, int attempts, String message, String suggestion, Integer status, boolean reached)
-            implements Failure { }
+    record Upstream(String url, int attempts, String message, String suggestion, Integer status, boolean reached,
+            String qualified, String version) implements Failure {
+
+        public Upstream(String url, int attempts, String message, String suggestion, Integer status,
+                boolean reached) {
+            this(url, attempts, message, suggestion, status, reached, null, null);
+        }
+
+        public Upstream about(String forPackage, String atVersion) {
+            return new Upstream(url, attempts, message, suggestion, status, reached, forPackage, atVersion);
+        }
+    }
 
     /**
      * Central did not answer inside the budget.
@@ -86,8 +98,20 @@ public sealed interface Failure {
      * @param url the request that timed out
      * @param budgetMs the budget it exceeded, in milliseconds
      * @param suggestion what to try next
+     * @param qualified the {@code org/name} the request was for, or {@code null} when not yet known
+     * @param version the version it was for, or {@code null} when none was reached
      */
-    record Timeout(String url, long budgetMs, String suggestion) implements Failure { }
+    record Timeout(String url, long budgetMs, String suggestion, String qualified, String version)
+            implements Failure {
+
+        public Timeout(String url, long budgetMs, String suggestion) {
+            this(url, budgetMs, suggestion, null, null);
+        }
+
+        public Timeout about(String forPackage, String atVersion) {
+            return new Timeout(url, budgetMs, suggestion, forPackage, atVersion);
+        }
+    }
 
     /**
      * Central answered with a shape this tool does not understand.
@@ -137,7 +161,6 @@ public sealed interface Failure {
             + "build already pulled the package — those are the signatures Central publishes. Never "
             + "fall back to a remembered signature.";
 
-    /** Central answered, with an error status or a body that is not JSON. */
     String UPSTREAM_SUGGESTION = "Central returned an error; run the same command again later.";
 
     /**
@@ -161,16 +184,11 @@ public sealed interface Failure {
         };
     }
 
-    /** What to do next — every kind carries one. */
     String suggestion();
 
-    /**
-     * The failure as a text-mode run writes it to stderr: {@code error: <headline>}, a full sentence, then the
-     * suggestion and anything else the failure carries on lines of their own, indented, with no trailing newline.
-     */
-    default String describeText() {
-        List<String> lines = new ArrayList<>();
-        lines.add("error: " + switch (this) {
+    /** What went wrong, as one full sentence: the {@code message} of either output mode. */
+    default String headline() {
+        return switch (this) {
             case Validation f -> f.message();
             case PackageNotFound f -> (f.module() == null ? "Package" : "Module") + " not found on Central: "
                     + coordinate(f.qualified(), f.version(), f.module()) + ".";
@@ -178,13 +196,20 @@ public sealed interface Failure {
             case Timeout f -> "Central did not answer " + f.url() + " within " + seconds(f.budgetMs()) + ".";
             case SchemaDrift f -> "Central's answer for " + coordinate(f.qualified(), f.version(), f.module())
                     + " has a shape this tool does not understand; Central's docs format may have changed.";
-            case SymbolNotFound f -> f.module() != null && f.requested().equals(List.of(f.module()))
-                    ? "No module '" + f.module() + "' in " + coordinate(f.qualified(), f.version(), null) + "."
-                    : "No match for " + f.requested().stream().map(name -> "'" + name + "'")
-                            .collect(Collectors.joining(" ")) + " in "
-                            + coordinate(f.qualified(), f.version(), f.module()) + ".";
+            case SymbolNotFound f -> "No match for " + f.requested().stream().map(name -> "'" + name + "'")
+                    .collect(Collectors.joining(" ")) + " in " + coordinate(f.qualified(), f.version(), f.module())
+                    + ".";
             case Internal f -> "Unexpected internal failure: " + f.message() + (f.message().endsWith(".") ? "" : ".");
-        });
+        };
+    }
+
+    /**
+     * The failure as a text-mode run writes it to stderr: {@code error: <headline>}, then the suggestion and anything
+     * else the failure carries on lines of their own, indented, with no trailing newline.
+     */
+    default String describeText() {
+        List<String> lines = new ArrayList<>();
+        lines.add("error: " + headline());
         lines.add("  " + suggestion());
         if (this instanceof SchemaDrift f) {
             lines.add("  issues:");
@@ -207,23 +232,26 @@ public sealed interface Failure {
         return (version == null ? qualified : qualified + ":" + version) + (module == null ? "" : ", module " + module);
     }
 
-    /** The one line a failing run writes to stderr in JSON mode: a single JSON object. */
+    /**
+     * The one line a failing run writes to stderr in JSON mode: a single JSON object, whose {@code message} is the
+     * {@link #headline()}.
+     */
     default String describe() {
         JsonObject json = new JsonObject();
         json.addProperty("kind", kind());
+        json.addProperty("message", headline());
         switch (this) {
-            case Validation f -> {
-                json.addProperty("message", f.message());
-                json.addProperty("suggestion", f.suggestion());
-            }
+            case Validation f -> json.addProperty("suggestion", f.suggestion());
             case PackageNotFound f -> {
                 coordinates(json, f.qualified(), f.version(), f.module());
                 json.addProperty("suggestion", f.suggestion());
             }
             case Upstream f -> {
+                if (f.qualified() != null) {
+                    coordinates(json, f.qualified(), f.version(), null);
+                }
                 json.addProperty("url", f.url());
                 json.addProperty("attempts", f.attempts());
-                json.addProperty("message", f.message());
                 json.addProperty("suggestion", f.suggestion());
                 if (f.status() != null) {
                     json.addProperty("status", f.status());
@@ -231,6 +259,9 @@ public sealed interface Failure {
                 json.addProperty("reached", f.reached());
             }
             case Timeout f -> {
+                if (f.qualified() != null) {
+                    coordinates(json, f.qualified(), f.version(), null);
+                }
                 json.addProperty("url", f.url());
                 json.addProperty("budgetMs", f.budgetMs());
                 json.addProperty("suggestion", f.suggestion());
@@ -253,10 +284,7 @@ public sealed interface Failure {
                 json.add("candidates", strings(f.candidates()));
                 json.addProperty("suggestion", f.suggestion());
             }
-            case Internal f -> {
-                json.addProperty("message", f.message());
-                json.addProperty("suggestion", f.suggestion());
-            }
+            case Internal f -> json.addProperty("suggestion", f.suggestion());
         }
         return json.toString();
     }

@@ -62,15 +62,30 @@ public class FailureTest {
     }
 
     @Test
-    public void aMissWithinAModuleNamesTheModuleAndAMissingModuleIsNamedAsOne() {
-        Assert.assertEquals(new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "subgraph", List.of("Nope"),
-                        List.of(), "Pick one.").describeText(),
+    public void aMissWithinAModuleNamesTheModule() {
+        Failure miss = new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "subgraph", List.of("Nope"),
+                List.of(), "Pick one.");
+        Assert.assertEquals(miss.describeText(),
                 "error: No match for 'Nope' in ballerina/graphql:1.17.0, module subgraph.\n  Pick one.");
-        Assert.assertEquals(new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "nosuch", List.of("nosuch"),
-                        List.of(), "Pick one.").describeText(),
-                "error: No module 'nosuch' in ballerina/graphql:1.17.0.\n  Pick one.");
-        Assert.assertTrue(new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "subgraph", List.of("Nope"),
-                List.of(), "Pick one.").describe().contains("\"module\":\"subgraph\""));
+        Assert.assertEquals(miss.describe(), "{\"kind\":\"symbol-not-found\",\"message\":\"No match for 'Nope' in "
+                + "ballerina/graphql:1.17.0, module subgraph.\",\"qualified\":\"ballerina/graphql\",\"version\":"
+                + "\"1.17.0\",\"module\":\"subgraph\",\"requested\":[\"Nope\"],\"candidates\":[],\"suggestion\":"
+                + "\"Pick one.\"}");
+    }
+
+    @Test
+    public void aRequestToCentralNamesThePackageItWasFor() {
+        Failure upstream = new Failure.Upstream("https://x.test/a", 3,
+                "Central answered https://x.test/a with HTTP 503", "Retry.", 503, true)
+                .about("ballerina/http", "2.15.7");
+        Assert.assertEquals(upstream.describe(), "{\"kind\":\"upstream\",\"message\":\"Central answered "
+                + "https://x.test/a with HTTP 503 (3 attempts).\",\"qualified\":\"ballerina/http\",\"version\":"
+                + "\"2.15.7\",\"url\":\"https://x.test/a\",\"attempts\":3,\"suggestion\":\"Retry.\",\"status\":503,"
+                + "\"reached\":true}");
+        Failure timeout = new Failure.Timeout("https://x.test/a", 1000, "Retry.").about("ballerina/http", null);
+        Assert.assertEquals(timeout.describe(), "{\"kind\":\"timeout\",\"message\":\"Central did not answer "
+                + "https://x.test/a within 1 second.\",\"qualified\":\"ballerina/http\",\"url\":\"https://x.test/a\","
+                + "\"budgetMs\":1000,\"suggestion\":\"Retry.\"}");
     }
 
     @Test
@@ -93,7 +108,8 @@ public class FailureTest {
         Failure internal = new Failure.Internal("boom", Failure.INTERNAL_SUGGESTION);
         Assert.assertEquals(internal.describeText(), "error: Unexpected internal failure: boom.\n  This is a defect "
                 + "in bal discover, not in the arguments. Report it with the command that produced it.");
-        Assert.assertEquals(internal.describe(), "{\"kind\":\"internal\",\"message\":\"boom\",\"suggestion\":"
+        Assert.assertEquals(internal.describe(), "{\"kind\":\"internal\",\"message\":\"Unexpected internal failure: "
+                + "boom.\",\"suggestion\":"
                 + "\"This is a defect in bal discover, not in the arguments. Report it with the command that produced "
                 + "it.\"}");
     }

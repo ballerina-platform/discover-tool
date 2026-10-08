@@ -98,7 +98,7 @@ public class CliTest {
 
     private static final String SUBGRAPH_UNCONFIRMED = "Central's page for 'subgraph' at " + GRAPHQL_VERSION
             + " cannot be confirmed as a submodule of this package. Drop --module for the default module, or pass "
-            + "another of the candidates.";
+            + "another of its submodules: dataloader, subgraph.";
 
     private static FakeTransport graphqlCentral(Map<String, JsonElement> modulePages) {
         return graphqlCentral(FixtureCorpus.loadRawFixture("ballerina__graphql"), modulePages);
@@ -176,7 +176,9 @@ public class CliTest {
 
     @Test
     public void aVersionInTheCoordinateIsReadExactlyWithoutAskingTheRegistryForTheLatest() {
-        FakeTransport transport = FakeTransport.always(FakeTransport.status(404));
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.status(404)
+                : FakeTransport.status(500));
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/github:6.0.0"), capture.streams(), options(transport)), 1);
         Assert.assertEquals(capture.stdout(), "");
@@ -465,7 +467,7 @@ public class CliTest {
 
     @Test
     public void anIncompleteVersionIsAValidationFailureThatFetchesNothing() {
-        for (String coordinate : List.of("ballerina/http:2.15", "ballerina/http:latest", "ballerina/http:")) {
+        for (String coordinate : List.of("ballerina/http:2.15", "ballerina/http:latest")) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(List.of(coordinate, "client"), capture.streams(), never()), 2, coordinate);
             Assert.assertEquals(capture.stdout(), "");
@@ -592,10 +594,12 @@ public class CliTest {
             Assert.assertEquals(Cli.run(List.of("ballerina/http"), capture.streams(), never(),
                     projectDir.toString()), 1, locked);
             Assert.assertEquals(capture.field("kind"), "validation", locked);
-            Assert.assertEquals(capture.field("message"),
-                    "Dependencies.toml locks ballerina/http at '" + locked + "', which is not a version.");
-            Assert.assertEquals(capture.field("suggestion"),
-                    "Fix the lock, or write a version: ballerina/http:<version>");
+            Path lock = projectDir.resolve("Dependencies.toml");
+            Assert.assertEquals(capture.field("message"), lock + " locks ballerina/http at '" + locked
+                    + "', which is not a complete version.");
+            Assert.assertEquals(capture.field("suggestion"), "Fix the ballerina/http entry in " + lock + ", or "
+                    + "delete the file and run `bal build` to regenerate it; or write a version after the package: "
+                    + "ballerina/http:<version>");
         }
     }
 
@@ -1194,15 +1198,12 @@ public class CliTest {
     }
 
     @Test
-    public void aBlankFilterIsNoFilterInEitherRendering() {
-        HttpOptions http = centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text());
-        Capture plain = new Capture();
-        Cli.run(List.of("ballerinax/kafka", "client"), plain.streams(), http, null, true);
-        for (String blank : List.of("", " ")) {
-            Capture text = new Capture();
-            Cli.run(List.of("ballerinax/kafka", "client", "--filter", blank), text.streams(), http, null, true);
-            Assert.assertEquals(text.stdout(), plain.stdout(), "'" + blank + "'");
-            Assert.assertFalse(text.stdout().contains("--filter"), text.stdout());
+    public void aBlankFilterIsAUsageError() {
+        for (String argument : List.of("--filter=", "--filter= ")) {
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", argument), capture.streams(), never()),
+                    2, argument);
+            Assert.assertEquals(capture.field("message"), "The --filter option needs a keyword.");
         }
     }
 
@@ -1275,9 +1276,9 @@ public class CliTest {
                 options(transport));
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");
-        Assert.assertEquals(capture.field("kind"), "symbol-not-found");
-        Assert.assertEquals(capture.failure().getAsJsonArray("candidates").toString(),
-                "[\"dataloader\",\"subgraph\"]", capture.stderr());
+        Assert.assertEquals(capture.field("kind"), "package-not-found");
+        Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
+                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
         // The submodule's own page first; the package's only once that is missing, to name what it does publish.
         Assert.assertEquals(transport.urls(), List.of(
                 CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
@@ -1291,8 +1292,8 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerinax/kafka", "--module", "nope"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 1);
-        Assert.assertEquals(capture.field("kind"), "symbol-not-found");
-        Assert.assertTrue(capture.field("suggestion").contains("publishes no submodules at all"), capture.stderr());
+        Assert.assertEquals(capture.field("kind"), "package-not-found");
+        Assert.assertTrue(capture.field("suggestion").contains("publishes no submodules"), capture.stderr());
     }
 
     @Test
@@ -1318,7 +1319,7 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 1, capture.stdout());
-        Assert.assertEquals(capture.field("kind"), "symbol-not-found");
+        Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertEquals(capture.field("suggestion"), SUBGRAPH_UNCONFIRMED, capture.stderr());
     }
 
@@ -1365,7 +1366,7 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 1, capture.stdout());
-        Assert.assertEquals(capture.field("kind"), "symbol-not-found");
+        Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertEquals(capture.field("suggestion"), SUBGRAPH_UNCONFIRMED, capture.stderr());
     }
 
