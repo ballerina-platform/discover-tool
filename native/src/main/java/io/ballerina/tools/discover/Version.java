@@ -33,7 +33,10 @@ public final class Version {
 
     private static final Pattern PATTERN = Pattern.compile("^[A-Za-z0-9_.+-]+$");
 
-    private static final Pattern COMPLETE = Pattern.compile("^\\d+\\.\\d+\\.\\d+([-+.].*)?$");
+    private static final String IDENTIFIERS = "[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*";
+
+    private static final Pattern COMPLETE = Pattern.compile(
+            "^\\d+\\.\\d+\\.\\d+(-" + IDENTIFIERS + ")?(\\+" + IDENTIFIERS + ")?$");
 
     private final String text;
 
@@ -54,12 +57,12 @@ public final class Version {
     }
 
     /**
-     * Whether a caller-typed version is one Central could publish: {@code major.minor.patch}, with any
-     * pre-release or build suffix. Stricter than {@link #parse}, which also reads versions off the network, and
-     * no bucket name, selector or path can look like one.
+     * Whether a version written by hand is a SemVer one Central could publish: {@code major.minor.patch}, with an
+     * optional pre-release and build suffix. Stricter than {@link #parse}, which also reads versions off the network,
+     * and no bucket name, selector or path can look like one.
      */
     public static boolean isComplete(String input) {
-        return COMPLETE.matcher(input).matches() && parse(input).isOk();
+        return COMPLETE.matcher(input).matches();
     }
 
     public static Result<Version> parse(String input) {

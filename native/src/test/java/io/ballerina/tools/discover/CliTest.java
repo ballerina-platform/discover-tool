@@ -575,17 +575,20 @@ public class CliTest {
 
     @Test
     public void aMalformedLockIsAValidationFailureNamingTheLockAndTheCoordinate() {
-        Path projectDir = tempDir();
-        write(projectDir.resolve("Ballerina.toml"), "[package]\norg = \"acme\"\nname = \"app\"\n");
-        write(projectDir.resolve("Dependencies.toml"),
-                "[[package]]\norg = \"ballerina\"\nname = \"http\"\nversion = \"2 15\"\n");
-        Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http"), capture.streams(), never(), projectDir.toString()), 1);
-        Assert.assertEquals(capture.field("kind"), "validation");
-        Assert.assertEquals(capture.field("message"),
-                "Dependencies.toml locks ballerina/http at '2 15', which is not a version.");
-        Assert.assertEquals(capture.field("suggestion"),
-                "Fix the lock, or write a version: ballerina/http:<version>");
+        for (String locked : List.of("2 15", "1.6", "2.15.7..")) {
+            Path projectDir = tempDir();
+            write(projectDir.resolve("Ballerina.toml"), "[package]\norg = \"acme\"\nname = \"app\"\n");
+            write(projectDir.resolve("Dependencies.toml"),
+                    "[[package]]\norg = \"ballerina\"\nname = \"http\"\nversion = \"" + locked + "\"\n");
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(List.of("ballerina/http"), capture.streams(), never(),
+                    projectDir.toString()), 1, locked);
+            Assert.assertEquals(capture.field("kind"), "validation", locked);
+            Assert.assertEquals(capture.field("message"),
+                    "Dependencies.toml locks ballerina/http at '" + locked + "', which is not a version.");
+            Assert.assertEquals(capture.field("suggestion"),
+                    "Fix the lock, or write a version: ballerina/http:<version>");
+        }
     }
 
     @Test
@@ -629,9 +632,17 @@ public class CliTest {
         write(projectDir.resolve("Ballerina.toml"), "[package]\norg = \"acme\"\nname = \"app\"\n");
         write(projectDir.resolve("Dependencies.toml"),
                 "[[package]]\norg = \"ballerinax\"\nname = \"kafka\"\nversion = \"4.6.5\"\n");
+        String docs = FixtureCorpus.loadRawFixture("ballerinax__kafka").toString();
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.ok(docs)
+                : FakeTransport.status(404));
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client"), capture.streams(),
-                docsOnlyFor("ballerinax__kafka"), projectDir.toString()), 0, capture.stderr());
+                options(transport), projectDir.toString()), 0, capture.stderr());
+        Assert.assertTrue(transport.urls().stream().anyMatch(url -> url.endsWith("/docs/ballerinax/kafka/4.6.5")),
+                transport.urls().toString());
+        Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/registry/")),
+                transport.urls().toString());
         Assert.assertTrue(capture.stdout().contains("\"bal discover ballerinax/kafka client Producer\""),
                 capture.stdout());
         Assert.assertFalse(capture.stdout().contains("4.6.5"), capture.stdout());

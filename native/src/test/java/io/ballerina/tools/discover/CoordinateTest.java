@@ -58,7 +58,8 @@ public class CoordinateTest {
     @Test
     public void anIncompleteVersionIsRejectedWithTheFullForm() {
         for (String input : List.of("ballerina/http:2.15", "ballerina/http:2", "ballerina/http:latest",
-                "ballerina/http:", "ballerina/http:2.15.7:1")) {
+                "ballerina/http:", "ballerina/http:2.15.7:1", "ballerina/http:2.15.7..", "ballerina/http:2.15.7-",
+                "ballerina/http:2.15.7.1", "ballerina/http:2.15.7+", "ballerina/http:2.15.7-alpha..1")) {
             Result<Coordinate> parsed = Coordinate.parse(input);
             Assert.assertFalse(parsed.isOk(), input);
             Failure.Validation failure = (Failure.Validation) parsed.failure();

@@ -122,11 +122,11 @@ public final class Loader {
     }
 
     private static Result<CentralClient.ResolvedVersion> fixed(QualifiedName qualified, String input, boolean pinned) {
-        Result<Version> parsed = Version.parse(input);
-        if (parsed.isOk()) {
-            return Result.ok(new CentralClient.ResolvedVersion(parsed.value(), false, true, pinned));
+        // A written version was checked by Coordinate already, so only a lock can be incomplete here.
+        if (Version.isComplete(input)) {
+            return Result.ok(new CentralClient.ResolvedVersion(Version.parse(input).value(), false, true, pinned));
         }
-        return pinned ? parsed.cast() : Result.err(new Failure.Validation(
+        return Result.err(new Failure.Validation(
                 "Dependencies.toml locks " + qualified.qualified() + " at '" + input + "', which is not a version.",
                 "Fix the lock, or write a version: " + qualified.qualified() + ":<version>"));
     }
