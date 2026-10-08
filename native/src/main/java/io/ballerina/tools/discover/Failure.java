@@ -48,12 +48,19 @@ public sealed interface Failure {
     record SchemaIssue(String path, String message) { }
 
     /**
-     * The caller's arguments are wrong — nothing upstream was contacted.
+     * The caller's arguments are wrong.
      *
      * @param message what was wrong with the arguments
-     * @param suggestion the corrected command to run instead
+     * @param suggestion what to do instead
+     * @param command the caller's command with the fix applied, ready to run, or {@code null} when there is no one
+     *     fix; the suggestion quotes it
      */
-    record Validation(String message, String suggestion) implements Failure { }
+    record Validation(String message, String suggestion, String command) implements Failure {
+
+        public Validation(String message, String suggestion) {
+            this(message, suggestion, null);
+        }
+    }
 
     /**
      * Central has no such package, no such version of it, or no such module at that version.
@@ -62,8 +69,16 @@ public sealed interface Failure {
      * @param version the version that was looked for, or {@code null} when none was reached
      * @param module the {@code --module} that was looked for, or {@code null} for the package's default module
      * @param suggestion what to try instead
+     * @param command the caller's command with the fix applied, ready to run, or {@code null} when there is no one
+     *     fix; the suggestion quotes it
      */
-    record PackageNotFound(String qualified, String version, String module, String suggestion) implements Failure { }
+    record PackageNotFound(String qualified, String version, String module, String suggestion, String command)
+            implements Failure {
+
+        public PackageNotFound(String qualified, String version, String module, String suggestion) {
+            this(qualified, version, module, suggestion, null);
+        }
+    }
 
     /**
      * A request to Central failed: Central answered with an error status or a body that is not JSON, or no answer
@@ -141,7 +156,7 @@ public sealed interface Failure {
             List<String> candidates, String suggestion) implements Failure { }
 
     /**
-     * A defect in this tool: something in the pipeline threw, which nothing is designed to do.
+     * A defect in this tool: something in the pipeline threw.
      *
      * @param message what was thrown
      * @param suggestion what to do about it
@@ -203,10 +218,7 @@ public sealed interface Failure {
         };
     }
 
-    /**
-     * The failure as a text-mode run writes it to stderr: {@code error: <headline>}, then the suggestion and anything
-     * else the failure carries on lines of their own, indented, with no trailing newline.
-     */
+    /** The failure as text-mode stderr: {@code error: <headline>}, then indented detail lines, no final newline. */
     default String describeText() {
         List<String> lines = new ArrayList<>();
         lines.add("error: " + headline());
@@ -223,28 +235,32 @@ public sealed interface Failure {
     }
 
     private static String seconds(long millis) {
-        String amount = millis % 1000 == 0 ? Long.toString(millis / 1000)
-                : BigDecimal.valueOf(millis, 3).stripTrailingZeros().toPlainString();
-        return amount + (millis == 1000 ? " second" : " seconds");
+        String amount = BigDecimal.valueOf(millis, 3).stripTrailingZeros().toPlainString();
+        return amount + ("1".equals(amount) ? " second" : " seconds");
     }
 
     private static String coordinate(String qualified, String version, String module) {
         return (version == null ? qualified : qualified + ":" + version) + (module == null ? "" : ", module " + module);
     }
 
-    /**
-     * The one line a failing run writes to stderr in JSON mode: a single JSON object, whose {@code message} is the
-     * {@link #headline()}.
-     */
+    default String describe(boolean json) {
+        return json ? describe() : describeText();
+    }
+
+    /** The one line a failing run writes to stderr in JSON mode, with {@link #headline()} as its message. */
     default String describe() {
         JsonObject json = new JsonObject();
         json.addProperty("kind", kind());
         json.addProperty("message", headline());
         switch (this) {
-            case Validation f -> json.addProperty("suggestion", f.suggestion());
+            case Validation f -> {
+                json.addProperty("suggestion", f.suggestion());
+                command(json, f.command());
+            }
             case PackageNotFound f -> {
                 coordinates(json, f.qualified(), f.version(), f.module());
                 json.addProperty("suggestion", f.suggestion());
+                command(json, f.command());
             }
             case Upstream f -> {
                 if (f.qualified() != null) {
@@ -287,6 +303,34 @@ public sealed interface Failure {
             case Internal f -> json.addProperty("suggestion", f.suggestion());
         }
         return json.toString();
+    }
+
+    private static void command(JsonObject json, String command) {
+        if (command != null) {
+            json.addProperty("command", command);
+        }
+    }
+
+    /**
+     * This failure with {@code tail} appended to its {@code command} and the suggestion's quote of it: a layer below
+     * the CLI knows only the start of the caller's command.
+     */
+    default Failure lengthened(String tail) {
+        return switch (this) {
+            case Validation f when f.command() != null && !tail.isEmpty() -> new Validation(f.message(),
+                    lengthened(f.suggestion(), f.command(), tail), f.command() + tail);
+            case PackageNotFound f when f.command() != null && !tail.isEmpty() -> new PackageNotFound(f.qualified(),
+                    f.version(), f.module(), lengthened(f.suggestion(), f.command(), tail), f.command() + tail);
+            default -> this;
+        };
+    }
+
+    private static String lengthened(String suggestion, String command, String tail) {
+        return suggestion.replace(quoted(command), quoted(command + tail));
+    }
+
+    static String quoted(String command) {
+        return "`" + command + "`";
     }
 
     private static void coordinates(JsonObject json, String qualified, String version, String module) {

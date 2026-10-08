@@ -206,13 +206,13 @@ public class ClientTest {
         Assert.assertEquals(withPin.qualified(), "ballerina/graphql");
         Assert.assertEquals(withPin.version(), "1.17.0");
         Assert.assertEquals(withPin.module(), "nosuch");
-        Assert.assertTrue(withPin.suggestion().contains("Run `bal discover ballerina/graphql:1.17.0` "),
+        Assert.assertTrue(withPin.suggestion().endsWith("module: `bal discover ballerina/graphql:1.17.0`."),
                 withPin.suggestion());
 
         for (CentralClient.ResolvedVersion unpinned : List.of(locked, resolved("1.17.0"))) {
             Failure.PackageNotFound without = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
                     graphql, "nosuch", unpinned, fast(transport).build()).failure();
-            Assert.assertTrue(without.suggestion().contains("Run `bal discover ballerina/graphql` to list"),
+            Assert.assertTrue(without.suggestion().endsWith("module: `bal discover ballerina/graphql`."),
                     without.suggestion());
             Assert.assertFalse(without.suggestion().contains("1.17.0"), without.suggestion());
         }

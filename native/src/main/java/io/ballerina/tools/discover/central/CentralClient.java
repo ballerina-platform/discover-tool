@@ -77,6 +77,10 @@ public final class CentralClient {
 
     private static final int LISTED_VERSIONS = 10;
 
+    private static final String RUN_AGAIN = "then run the same command again.";
+
+    private static final String SEARCH_HINT = "`bal search <keyword>` lists what Central publishes.";
+
     /**
      * How long Central's answer to "what is the latest version" is believed.
      *
@@ -99,13 +103,10 @@ public final class CentralClient {
      */
     public record ResolvedVersion(Version version, Source source, boolean stale, Path lock) {
 
-        /** Who chose a version. */
         public enum Source {
             /** The caller wrote it in the coordinate, so a command printed for them repeats it. */
             WRITTEN,
-            /** The project's {@code Dependencies.toml} locks it. */
             LOCKED,
-            /** Central's newest. */
             LATEST
         }
 
@@ -135,8 +136,7 @@ public final class CentralClient {
         return status == BAD_GATEWAY || status == SERVICE_UNAVAILABLE || status == GATEWAY_TIMEOUT;
     }
 
-    // A name that does not resolve, a certificate that does not verify or a password the proxy rejected is the
-    // same on the next attempt, and retrying a rejected password counts against the account.
+    // These fail the same way again, and a rejected password retried counts against the proxy account.
     private static boolean isRetryable(HttpTransport.Reply.Failed failed) {
         return switch (failed.problem()) {
             case UNCONNECTED, OTHER -> true;
@@ -172,12 +172,7 @@ public final class CentralClient {
         return (long) Math.floor(baseDelayMs * Math.pow(2, attempt) * (1 + jitter * 0.25));
     }
 
-    /**
-     * What one attempt produced, before the attempt count is known.
-     *
-     * <p>Separate from {@link Failure} on purpose: the retry loop branches on {@code retryable} and
-     * {@code retryAfterMs}, which a finished {@code Failure} has no field for and no caller should see.
-     */
+    // Not a Failure: the retry loop branches on retryable and retryAfterMs, which no caller should see.
     private sealed interface Outcome {
 
         record Body(JsonElement value) implements Outcome { }
@@ -194,14 +189,7 @@ public final class CentralClient {
         }
     }
 
-    /**
-     * What a failed attempt tells the caller.
-     *
-     * @param message what went wrong, as a sentence without its full stop
-     * @param status the HTTP status the attempt failed with, or {@code null}
-     * @param reached whether Central answered
-     * @param suggestion what to do next
-     */
+    // The message has no full stop: Failure.headline adds it.
     private record Report(String message, Integer status, boolean reached, String suggestion) {
 
         static Report unanswered(String message, String suggestion) {
@@ -242,8 +230,7 @@ public final class CentralClient {
         }
     }
 
-    // Central is HTTPS, reached through a CONNECT tunnel when there is a proxy: a status inside the tunnel is
-    // Central's own, so only the CONNECT's answer — a 407, or the tunnel failing — is the proxy's.
+    // Through a proxy, only the CONNECT's answer is the proxy's; a status inside the tunnel is Central's.
     private static Report noAnswer(HttpTransport.Reply.Failed failed, String url, HttpOptions options) {
         String host = host(url);
         String file = options.settingsFile();
@@ -254,16 +241,16 @@ public final class CentralClient {
                     ? Report.unanswered("Could not reach " + host + ": " + failed.message(), network(file))
                     : Report.unanswered("Could not connect to the proxy " + address(proxy) + " set in " + file + ": "
                             + failed.message(), "Check that the proxy is running and that host and port under "
-                            + "[proxy] in " + file + " are right, then run the same command again.");
+                            + "[proxy] in " + file + " are right, " + RUN_AGAIN);
             case UNRESOLVED -> proxy == null
                     ? Report.unanswered("Could not resolve the host " + host, network(file))
                     : Report.unanswered("Could not resolve the proxy host " + proxy.host(),
-                            "Check host under [proxy] in " + file + ", then run the same command again.");
+                            "Check host under [proxy] in " + file + ", " + RUN_AGAIN);
             case TLS -> Report.unanswered("Could not open a secure connection to " + host + through + ": "
                     + failed.message(), "Check the system clock, and any proxy or firewall that intercepts HTTPS, "
-                    + "then run the same command again.");
-            case TUNNEL -> new Report((proxy == null ? "The proxy" : "The proxy " + address(proxy) + " set in "
-                    + file) + " could not connect to " + host + ": HTTP " + failed.status(), failed.status(), false,
+                    + RUN_AGAIN);
+            case TUNNEL -> new Report(theProxy(proxy) + (proxy == null ? "" : " set in " + file)
+                    + " could not connect to " + host + ": HTTP " + failed.status(), failed.status(), false,
                     "The proxy answered but could not reach " + host + "; run the same command again later, or "
                             + "check that the proxy allows it.");
             case PROXY_REJECTED -> rejected(options);
@@ -280,7 +267,7 @@ public final class CentralClient {
             return new Report("The proxy " + address(proxy) + " requires authentication, and the username and "
                     + "password in the [proxy] table of " + options.settingsFile() + " were not sent: the "
                     + property + " system property disables Basic", PROXY_AUTHENTICATION_REQUIRED, false,
-                    "Remove Basic from the " + property + " system property, then run the same command again.");
+                    "Remove Basic from the " + property + " system property, " + RUN_AGAIN);
         }
         if (proxy != null && proxy.authenticates()) {
             return rejected(options);
@@ -288,21 +275,24 @@ public final class CentralClient {
         return new Report((proxy == null ? "A proxy" : "The proxy " + address(proxy))
                 + " requires authentication", PROXY_AUTHENTICATION_REQUIRED, false,
                 "Set both username and password under [proxy] in " + options.settingsFile()
-                        + ", then run the same command again.");
+                        + ", " + RUN_AGAIN);
     }
 
     private static Report rejected(HttpOptions options) {
         ProxySettings proxy = options.proxy();
         String file = options.settingsFile();
-        return new Report((proxy == null ? "The proxy" : "The proxy " + address(proxy))
-                + " rejected the username and password in the [proxy] table of " + file,
+        return new Report(theProxy(proxy) + " rejected the username and password in the [proxy] table of " + file,
                 PROXY_AUTHENTICATION_REQUIRED, false,
-                "Correct username and password under [proxy] in " + file + ", then run the same command again.");
+                "Correct username and password under [proxy] in " + file + ", " + RUN_AGAIN);
     }
 
     private static String network(String settingsFile) {
         return "Check your network connection, and the [proxy] table in " + settingsFile
-                + " if your network needs a proxy, then run the same command again.";
+                + " if your network needs a proxy, " + RUN_AGAIN;
+    }
+
+    private static String theProxy(ProxySettings proxy) {
+        return proxy == null ? "The proxy" : "The proxy " + address(proxy);
     }
 
     private static String address(ProxySettings proxy) {
@@ -427,36 +417,36 @@ public final class CentralClient {
             tried.append(tried.isEmpty() ? "" : ", ").append(parent.qualified());
         }
         return new Failure.PackageNotFound(
-                qualified.qualified(), textOf(version), null,
+                qualified.qualified(), Version.textOf(version), null,
                 "Central publishes no package under this name, and none of the packages it could be a module "
                         + "of exists either (tried " + tried + "). Check the org/name spelling; "
-                        + "`bal search <keyword>` lists what Central publishes.");
+                        + SEARCH_HINT);
     }
 
     private static Failure moduleOf(
             QualifiedName qualified, QualifiedName parent, Version parentVersion, Version version, Version pin,
             HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
-        String command = "`bal discover " + new Coordinate(parent, pin).argument(submodule) + "`";
+        String command = new Coordinate(parent, pin).command(submodule);
         String url = REGISTRY_PACKAGES_URL + encode(parent.org()) + "/" + encode(parent.name())
                 + "/" + encode(parentVersion.text());
         Result<JsonElement> response = fetchJson(url, options);
         Optional<List<String>> listed = response.isOk() ? Coordinates.moduleNames(response.value()) : Optional.empty();
-        String suggestion;
         if (listed.isEmpty()) {
-            suggestion = "'" + qualified.qualified() + "' is not a package, but " + parent.qualified()
-                    + " is, and Central could not say which modules it publishes. If '" + submodule
-                    + "' is one of them, read it with " + command + ".";
-        } else if (listed.get().contains(qualified.name())) {
-            suggestion = "'" + qualified.qualified() + "' is not a package: it is the '" + submodule
-                    + "' module of the " + parent.qualified() + " package. Read it with " + command + ".";
-        } else {
-            List<String> modules = listed.get();
-            suggestion = "'" + qualified.qualified() + "' is not a package, and " + parent.qualified()
-                    + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
-                    + "). Check the name; `bal search <keyword>` lists what Central publishes.";
+            return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
+                    + qualified.qualified() + "' is not a package, but " + parent.qualified() + " is, and Central "
+                    + "could not say which modules it publishes. If '" + submodule + "' is one of them, read it with "
+                    + Failure.quoted(command) + ".", command);
         }
-        return new Failure.PackageNotFound(qualified.qualified(), textOf(version), null, suggestion);
+        if (listed.get().contains(qualified.name())) {
+            return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
+                    + qualified.qualified() + "' is not a package: it is the '" + submodule + "' module of the "
+                    + parent.qualified() + " package. Read it with " + Failure.quoted(command) + ".", command);
+        }
+        return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
+                + qualified.qualified() + "' is not a package, and " + parent.qualified() + " publishes no '"
+                + submodule + "' module (its modules are " + String.join(", ", listed.get()) + "). Check the name; "
+                + SEARCH_HINT);
     }
 
     // Asks for this package's row: listing the whole org (ballerinax) and filtering costs about 45 seconds.
@@ -532,8 +522,8 @@ public final class CentralClient {
 
     private static Failure notFound(QualifiedName qualified, Version version) {
         return new Failure.PackageNotFound(
-                qualified.qualified(), textOf(version), null,
-                "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
+                qualified.qualified(), Version.textOf(version), null,
+                "Check the org/name spelling; " + SEARCH_HINT);
     }
 
     /**
@@ -654,18 +644,15 @@ public final class CentralClient {
         return parsed;
     }
 
-    private static String textOf(Version version) {
-        return version == null ? null : version.text();
-    }
-
     private static Version pinOf(ResolvedVersion resolved) {
         return resolved.source() == ResolvedVersion.Source.WRITTEN ? resolved.version() : null;
     }
 
     private static Failure noSuchModulePage(Version version, QualifiedName qualified, Version pin, String submodule) {
+        String command = new Coordinate(qualified, pin).command(null);
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), submodule, qualified.qualified()
-                + " publishes no '" + submodule + "' module at this version. Run `bal discover "
-                + new Coordinate(qualified, pin).argument(null) + "` to list the submodules it does publish.");
+                + " publishes no '" + submodule + "' module at this version. Drop --module to read its default "
+                + "module: " + Failure.quoted(command) + ".", command);
     }
 
     private static boolean isNotFound(Result<?> response) {
@@ -684,20 +671,18 @@ public final class CentralClient {
 
     private static <T> Result<T> about(Result<?> failed, QualifiedName qualified, Version version) {
         return Result.err(switch (failed.failure()) {
-            case Failure.Upstream upstream -> upstream.about(qualified.qualified(), textOf(version));
-            case Failure.Timeout timeout -> timeout.about(qualified.qualified(), textOf(version));
+            case Failure.Upstream upstream -> upstream.about(qualified.qualified(), Version.textOf(version));
+            case Failure.Timeout timeout -> timeout.about(qualified.qualified(), Version.textOf(version));
             default -> failed.failure();
         });
     }
 
-    // A version the caller chose is theirs to correct, unless the package itself is not published at all.
     private static Failure missingVersion(QualifiedName qualified, ResolvedVersion resolved, HttpOptions options) {
         Version version = resolved.version();
         if (!resolved.supplied()) {
             return new Failure.PackageNotFound(qualified.qualified(), version.text(), null,
                     "Central published no '" + qualified.qualified() + "' at " + version.text() + ", the version "
-                            + "resolved for it. Check the name — `bal search <keyword>` lists what Central "
-                            + "publishes.");
+                            + "resolved for it. Check the name — " + SEARCH_HINT);
         }
         Result<JsonElement> registry = fetchJson(registryUrl(qualified), options);
         List<String> versions = registry.isOk() ? Coordinates.publishedVersions(registry.value()) : List.of();
@@ -719,7 +704,7 @@ public final class CentralClient {
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), null, suggestion);
     }
 
-    // The published versions around the one asked for, newest first: 2.9.99 is answered with the 2.9 and 2.10 lines.
+    // A window of published versions centred on the requested one, newest first.
     private static String nearest(List<String> versions, Version requested) {
         if (versions.size() <= LISTED_VERSIONS) {
             return "published versions are " + String.join(", ", versions);

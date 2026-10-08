@@ -69,6 +69,11 @@ public record LoadedPackage(
         return qualified.versioned(version);
     }
 
+    public Failure symbolNotFound(List<String> requested, List<String> candidates, String suggestion) {
+        return new Failure.SymbolNotFound(qualified.qualified(), version.text(), module, requested, candidates,
+                suggestion);
+    }
+
     /**
      * The argument a caller types to reach this SAME (package, module) pair again — what every "next command"
      * this tool prints builds on, so drilling further never silently falls back to the default module.
