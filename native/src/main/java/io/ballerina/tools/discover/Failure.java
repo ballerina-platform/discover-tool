@@ -55,10 +55,11 @@ public sealed interface Failure {
     /**
      * Central has no such package, or no such version of it.
      *
-     * @param qualified the coordinate that was not found
+     * @param qualified the {@code org/name} that was not found
+     * @param version the version that was looked for, or {@code null} when none was reached
      * @param suggestion what to try instead
      */
-    record PackageNotFound(String qualified, String suggestion) implements Failure { }
+    record PackageNotFound(String qualified, String version, String suggestion) implements Failure { }
 
     /**
      * Central answered, but not usefully — a 4xx/5xx, a network error, a bad body. {@code status} is
@@ -85,24 +86,27 @@ public sealed interface Failure {
     /**
      * Central answered with a shape this reader does not understand.
      *
-     * @param qualified the package coordinate whose payload drifted
+     * @param qualified the {@code org/name} whose payload drifted
+     * @param version the version that payload was read at, or {@code null} when unknown
      * @param issues every place the payload stopped matching the schema
      * @param suggestion what to try next
      */
-    record SchemaDrift(String qualified, List<SchemaIssue> issues, String suggestion) implements Failure { }
+    record SchemaDrift(String qualified, String version, List<SchemaIssue> issues, String suggestion)
+            implements Failure { }
 
     /**
      * The package parsed, but no declaration matched the name the caller asked for. {@code
      * candidates} is what the index does hold — either near-misses of the requested name, or the
      * whole roster when there were none.
      *
-     * @param qualified the package coordinate that was searched
+     * @param qualified the {@code org/name} that was searched
+     * @param version the version that was searched, or {@code null} when unknown
      * @param requested the name (or names) the caller asked for
      * @param candidates the near-misses, or the whole roster when there were none
      * @param suggestion what to try next
      */
-    record SymbolNotFound(String qualified, List<String> requested, List<String> candidates, String suggestion)
-            implements Failure { }
+    record SymbolNotFound(String qualified, String version, List<String> requested, List<String> candidates,
+            String suggestion) implements Failure { }
 
     /**
      * The route left when Central itself is the problem: a resolved version's {@code .bala} carries the same
@@ -155,7 +159,7 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
             }
             case PackageNotFound f -> {
-                json.addProperty("qualified", f.qualified());
+                coordinates(json, f.qualified(), f.version());
                 json.addProperty("suggestion", f.suggestion());
             }
             case Upstream f -> {
@@ -173,7 +177,7 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
             }
             case SchemaDrift f -> {
-                json.addProperty("qualified", f.qualified());
+                coordinates(json, f.qualified(), f.version());
                 JsonArray issues = new JsonArray();
                 for (SchemaIssue issue : f.issues()) {
                     JsonObject entry = new JsonObject();
@@ -185,13 +189,20 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
             }
             case SymbolNotFound f -> {
-                json.addProperty("qualified", f.qualified());
+                coordinates(json, f.qualified(), f.version());
                 json.add("requested", strings(f.requested()));
                 json.add("candidates", strings(f.candidates()));
                 json.addProperty("suggestion", f.suggestion());
             }
         }
         return json.toString();
+    }
+
+    private static void coordinates(JsonObject json, String qualified, String version) {
+        json.addProperty("qualified", qualified);
+        if (version != null) {
+            json.addProperty("version", version);
+        }
     }
 
     private static JsonArray strings(List<String> values) {

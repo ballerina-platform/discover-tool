@@ -63,6 +63,11 @@ public final class Schema {
 
     /** Validate a raw payload, reporting every mismatch at once. */
     public static Result<CentralDocs> parse(JsonElement raw, String qualified) {
+        return parse(raw, qualified, null);
+    }
+
+    /** {@link #parse(JsonElement, String)} for a payload read at a known version. */
+    public static Result<CentralDocs> parse(JsonElement raw, String qualified, String version) {
         Cursor cursor = new Cursor();
         JsonObject root = cursor.object(raw, "");
         JsonObject docsData = cursor.object(root.get(DOCS_DATA), DOCS_DATA);
@@ -73,7 +78,7 @@ public final class Schema {
         }
         if (!cursor.issues.isEmpty()) {
             return Result.err(new Failure.SchemaDrift(
-                    qualified, List.copyOf(cursor.issues), Failure.SCHEMA_DRIFT_SUGGESTION));
+                    qualified, version, List.copyOf(cursor.issues), Failure.SCHEMA_DRIFT_SUGGESTION));
         }
         return Result.ok(new CentralDocs(modules));
     }

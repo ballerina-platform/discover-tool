@@ -603,6 +603,24 @@ public class CliTest {
         Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("4.0.0")),
                 transport.urls().toString());
         Assert.assertEquals(capture.field("kind"), "package-not-found");
+        Assert.assertEquals(capture.field("qualified"), "ballerinax/googleapis.gmail");
+        Assert.assertEquals(capture.field("version"), "4.2.1");
+    }
+
+    @Test
+    public void aFailureNamesThePackageAndTheVersionApartAndOmitsAVersionItNeverReached() {
+        Capture missing = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "NoSuchContainer"),
+                missing.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1);
+        Assert.assertEquals(missing.field("qualified"), "ballerinax/kafka");
+        Assert.assertEquals(missing.field("version"), "4.6.5");
+
+        Capture unknown = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/htp"), unknown.streams(),
+                options(FakeTransport.always(FakeTransport.status(404)))), 1);
+        Assert.assertEquals(unknown.field("kind"), "package-not-found");
+        Assert.assertEquals(unknown.field("qualified"), "ballerina/htp");
+        Assert.assertFalse(unknown.failure().has("version"), unknown.stderr());
     }
 
     @Test

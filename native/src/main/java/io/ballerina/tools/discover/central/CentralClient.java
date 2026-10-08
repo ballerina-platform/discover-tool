@@ -271,7 +271,7 @@ public final class CentralClient {
             tried.append(tried.isEmpty() ? "" : ", ").append(parent.qualified());
         }
         return new Failure.PackageNotFound(
-                qualified.qualified(),
+                qualified.qualified(), null,
                 "Central publishes no package under this name, and none of the packages it could be a module "
                         + "of exists either (tried " + tried + "). Check the org/name spelling; "
                         + "`bal search <keyword>` lists what Central publishes.");
@@ -300,7 +300,7 @@ public final class CentralClient {
                     + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
                     + "). Check the name; `bal search <keyword>` lists what Central publishes.";
         }
-        return new Failure.PackageNotFound(qualified.qualified(), suggestion);
+        return new Failure.PackageNotFound(qualified.qualified(), null, suggestion);
     }
 
     // Asks for this package's row: listing the whole org (ballerinax) and filtering costs about 45 seconds.
@@ -375,7 +375,7 @@ public final class CentralClient {
 
     private static Failure notFound(QualifiedName qualified) {
         return new Failure.PackageNotFound(
-                qualified.qualified(),
+                qualified.qualified(), null,
                 "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
     }
 
@@ -399,13 +399,12 @@ public final class CentralClient {
         DocsCache cache = options.cache();
         DocsCache.DocsKey key =
                 new DocsCache.DocsKey(REPOSITORY_ID, qualified.org(), qualified.name(), version.text());
-        String label = qualified.versioned(version);
 
         if (!options.refresh()) {
             JsonElement cached = cache.readDocs(key);
             if (cached != null) {
                 Result<CentralDocs> parsed = Coordinates.match(cached, qualified, version)
-                        ? Schema.parse(cached, label)
+                        ? Schema.parse(cached, qualified.qualified(), version.text())
                         : null;
                 if (parsed != null && parsed.isOk()) {
                     return parsed;
@@ -423,8 +422,8 @@ public final class CentralClient {
             // One the reader resolved is not: telling them to "omit the version" names what they already did.
             if (response.failure() instanceof Failure.Upstream upstream
                     && upstream.status() != null && upstream.status() == 404) {
-                return Result.err(new Failure.PackageNotFound(label, missingVersion(
-                        qualified, resolved, options)));
+                return Result.err(new Failure.PackageNotFound(qualified.qualified(), version.text(),
+                        missingVersion(qualified, resolved, options)));
             }
             return response.cast();
         }
@@ -433,7 +432,7 @@ public final class CentralClient {
         if (Coordinates.describesSubmodule(response.value(), qualified)) {
             return Result.err(notAPackage(qualified, pinOf(resolved), options));
         }
-        Result<CentralDocs> parsed = Schema.parse(response.value(), label);
+        Result<CentralDocs> parsed = Schema.parse(response.value(), qualified.qualified(), version.text());
         if (!parsed.isOk()) {
             return parsed.cast();
         }
@@ -463,13 +462,13 @@ public final class CentralClient {
         DocsCache.ModuleKey key = new DocsCache.ModuleKey(
                 REPOSITORY_ID, qualified.org(), qualified.name(), submodule, version.text());
         String moduleName = qualified.name() + "." + submodule;
-        String label = qualified.org() + "/" + moduleName + ":" + version.text();
+        String label = qualified.org() + "/" + moduleName;
 
         if (!options.refresh()) {
             JsonElement cached = cache.readModuleDocs(key);
             if (cached != null) {
                 Result<CentralDocs> parsed = Coordinates.isModulePage(cached, qualified, submodule, version)
-                        ? Schema.parse(cached, label)
+                        ? Schema.parse(cached, label, version.text())
                         : null;
                 if (parsed != null && parsed.isOk()) {
                     return parsed;
@@ -484,14 +483,14 @@ public final class CentralClient {
         if (!response.isOk()) {
             if (response.failure() instanceof Failure.Upstream upstream
                     && upstream.status() != null && upstream.status() == 404) {
-                return Result.err(noSuchModulePage(label, qualified, pinOf(resolved), submodule));
+                return Result.err(noSuchModulePage(label, version, qualified, pinOf(resolved), submodule));
             }
             return response.cast();
         }
         if (!Coordinates.isModulePage(response.value(), qualified, submodule, version)) {
-            return Result.err(noSuchModulePage(label, qualified, pinOf(resolved), submodule));
+            return Result.err(noSuchModulePage(label, version, qualified, pinOf(resolved), submodule));
         }
-        Result<CentralDocs> parsed = Schema.parse(response.value(), label);
+        Result<CentralDocs> parsed = Schema.parse(response.value(), label, version.text());
         if (!parsed.isOk()) {
             return parsed.cast();
         }
@@ -507,8 +506,9 @@ public final class CentralClient {
         return qualified.qualified() + (pin == null ? "" : ":" + pin);
     }
 
-    private static Failure noSuchModulePage(String label, QualifiedName qualified, String pin, String submodule) {
-        return new Failure.PackageNotFound(label, qualified.qualified() + " publishes no '" + submodule
+    private static Failure noSuchModulePage(
+            String label, Version version, QualifiedName qualified, String pin, String submodule) {
+        return new Failure.PackageNotFound(label, version.text(), qualified.qualified() + " publishes no '" + submodule
                 + "' module at this version. Run `bal discover " + Texts.shellWord(pinned(qualified, pin))
                 + "` to list the submodules it does publish.");
     }

@@ -151,7 +151,8 @@ public class ClientTest {
                 GITHUB, supplied("9.9.9"), fast(transport).build());
         Assert.assertFalse(result.isOk());
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
-        Assert.assertEquals(failure.qualified(), "ballerinax/github:9.9.9");
+        Assert.assertEquals(failure.qualified(), "ballerinax/github");
+        Assert.assertEquals(failure.version(), "9.9.9");
         Assert.assertTrue(failure.suggestion().contains("the version your project's Dependencies.toml locks"),
                 failure.suggestion());
         Assert.assertTrue(failure.suggestion().endsWith("write a published version after the package: "
