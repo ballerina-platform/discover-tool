@@ -30,6 +30,7 @@ import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.source.SourceInclusions;
 import io.ballerina.tools.discover.views.Readmes;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -69,7 +70,7 @@ public final class Loader {
      *     resolve one
      */
     public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
-            String module, String version) {
+            String module, Version version) {
 
         public LoadOptions {
             if (repositories.isEmpty()) {
@@ -106,29 +107,35 @@ public final class Loader {
      */
     public static Result<CentralClient.ResolvedVersion> resolveVersion(
             QualifiedName qualified, LoadOptions options) {
-        String chosen = chosenVersion(qualified, options);
+        Result<CentralClient.ResolvedVersion> chosen = chosenVersion(qualified, options);
         if (chosen != null) {
-            return fixed(qualified, chosen, options.version() != null);
+            return chosen;
         }
         return tryEachRepository(options.repositories(),
                 repository -> repository.resolveVersion(qualified, options.http()));
     }
 
-    private static String chosenVersion(QualifiedName qualified, LoadOptions options) {
+    /** The version the caller chose, written or locked, or {@code null} when it is Central's to resolve. */
+    private static Result<CentralClient.ResolvedVersion> chosenVersion(QualifiedName qualified, LoadOptions options) {
         if (options.version() != null) {
-            return options.version();
+            return Result.ok(CentralClient.ResolvedVersion.written(options.version()));
         }
-        return options.projectDir() == null ? null : DependenciesToml.lockedVersion(options.projectDir(), qualified);
-    }
-
-    private static Result<CentralClient.ResolvedVersion> fixed(QualifiedName qualified, String input, boolean pinned) {
-        // A written version was checked by Coordinate already, so only a lock can be incomplete here.
-        if (Version.isComplete(input)) {
-            return Result.ok(new CentralClient.ResolvedVersion(Version.parse(input).value(), false, true, pinned));
+        if (options.projectDir() == null) {
+            return null;
+        }
+        String locked = DependenciesToml.lockedVersion(options.projectDir(), qualified);
+        if (locked == null) {
+            return null;
+        }
+        Path lock = DependenciesToml.lockFile(options.projectDir());
+        if (Version.isComplete(locked)) {
+            return Result.ok(CentralClient.ResolvedVersion.locked(Version.parse(locked).value(), lock));
         }
         return Result.err(new Failure.Validation(
-                "Dependencies.toml locks " + qualified.qualified() + " at '" + input + "', which is not a version.",
-                "Fix the lock, or write a version: " + qualified.qualified() + ":<version>"));
+                lock + " locks " + qualified.qualified() + " at '" + locked + "', which is not a complete version.",
+                "Fix the " + qualified.qualified() + " entry in " + lock + ", or delete the file and run `bal build` "
+                        + "to regenerate it; or write a version after the package: " + qualified.qualified()
+                        + ":<version>"));
     }
 
     /**
@@ -163,13 +170,12 @@ public final class Loader {
     public static Result<LoadedPackage> loadPackage(QualifiedName qualified, LoadOptions options) {
         Function<PackageRepository, Result<CentralClient.ResolvedVersion>> resolve = repository ->
                 repository.resolveVersion(qualified, options.http());
-        String chosen = chosenVersion(qualified, options);
+        Result<CentralClient.ResolvedVersion> chosen = chosenVersion(qualified, options);
         if (chosen != null) {
-            Result<CentralClient.ResolvedVersion> fixed = fixed(qualified, chosen, options.version() != null);
-            if (!fixed.isOk()) {
-                return fixed.cast();
+            if (!chosen.isOk()) {
+                return chosen.cast();
             }
-            resolve = repository -> fixed;
+            resolve = repository -> chosen;
         }
         Result<Fetched> fetched = options.module() == null
                 ? fetchPackage(qualified, options, resolve)

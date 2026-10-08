@@ -33,6 +33,7 @@ import io.ballerina.tools.discover.central.schema.Schema;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -86,19 +87,40 @@ public final class CentralClient {
     }
 
     /**
-     * A version, and what a caller may need to know about where it came from.
+     * A version, and where it came from.
      *
      * @param version the resolved version
+     * @param source who chose it
      * @param stale the registry was unreachable and this came off disk unverified
-     * @param supplied the CALLER chose this version — in the coordinate or {@code Dependencies.toml} — so a
-     *     later 404 from the docs endpoint is theirs to correct, not the reader's
-     * @param pinned the version was written in the coordinate itself, so a command printed for the caller must
-     *     repeat it
+     * @param lock the {@code Dependencies.toml} that locks it, for {@link Source#LOCKED}, else {@code null}
      */
-    public record ResolvedVersion(Version version, boolean stale, boolean supplied, boolean pinned) {
+    public record ResolvedVersion(Version version, Source source, boolean stale, Path lock) {
 
-        public ResolvedVersion(Version version, boolean stale) {
-            this(version, stale, false, false);
+        /** Who chose a version. */
+        public enum Source {
+            /** The caller wrote it in the coordinate, so a command printed for them repeats it. */
+            WRITTEN,
+            /** The project's {@code Dependencies.toml} locks it. */
+            LOCKED,
+            /** Central's newest. */
+            LATEST
+        }
+
+        public static ResolvedVersion latest(Version version, boolean stale) {
+            return new ResolvedVersion(version, Source.LATEST, stale, null);
+        }
+
+        public static ResolvedVersion written(Version version) {
+            return new ResolvedVersion(version, Source.WRITTEN, false, null);
+        }
+
+        public static ResolvedVersion locked(Version version, Path lock) {
+            return new ResolvedVersion(version, Source.LOCKED, false, lock);
+        }
+
+        /** Whether the caller chose it, so a later 404 from the docs endpoint is theirs to correct. */
+        public boolean supplied() {
+            return source != Source.LATEST;
         }
     }
 
@@ -449,7 +471,7 @@ public final class CentralClient {
                     && options.now() - entry.atMs() < LATEST_TTL_MS) {
                 Result<Version> cached = Version.parse(entry.version());
                 if (cached.isOk()) {
-                    return Result.ok(new ResolvedVersion(cached.value(), false));
+                    return Result.ok(ResolvedVersion.latest(cached.value(), false));
                 }
             }
         }
@@ -467,7 +489,7 @@ public final class CentralClient {
             }
             Version offline = offlineVersion(cache, key, options);
             if (offline != null) {
-                return Result.ok(new ResolvedVersion(offline, true));
+                return Result.ok(ResolvedVersion.latest(offline, true));
             }
             return response.cast();
         }
@@ -483,7 +505,7 @@ public final class CentralClient {
             return parsed.cast();
         }
         cache.writeLatest(key, new DocsCache.LatestEntry(parsed.value().text(), options.now()));
-        return Result.ok(new ResolvedVersion(parsed.value(), false));
+        return Result.ok(ResolvedVersion.latest(parsed.value(), false));
     }
 
     private static Version offlineVersion(DocsCache cache, DocsCache.PackageKey key, HttpOptions options) {
@@ -635,7 +657,7 @@ public final class CentralClient {
     }
 
     private static String pinOf(ResolvedVersion resolved) {
-        return resolved.pinned() ? resolved.version().text() : null;
+        return resolved.source() == ResolvedVersion.Source.WRITTEN ? resolved.version().text() : null;
     }
 
     private static String pinned(QualifiedName qualified, String pin) {
@@ -668,15 +690,15 @@ public final class CentralClient {
         String published = publishedVersions(qualified, options);
         String listed = published == null ? "" : "; published versions are " + published;
         String coordinate = qualified.qualified() + ":<version>";
-        if (resolved.pinned()) {
+        if (resolved.source() == ResolvedVersion.Source.WRITTEN) {
             return "Central does not publish '" + qualified.qualified() + "' at " + version.text() + listed
                     + (published == null ? ". Write a published version" : ". Write one of them")
                     + " after the package: " + coordinate;
         }
         return "Central does not publish '" + qualified.qualified() + "' at " + version.text()
-                + ", the version your project's Dependencies.toml locks" + listed
-                + ". Reconcile Dependencies.toml with the registry so a lookup and a build see the same one, or "
-                + "write a published version after the package: " + coordinate;
+                + ", the version " + resolved.lock() + " locks" + listed + ". Fix the " + qualified.qualified()
+                + " entry there, or delete the file and run `bal build` to regenerate it; or write a published "
+                + "version after the package: " + coordinate;
     }
 
     private static final int LISTED_VERSIONS = 10;

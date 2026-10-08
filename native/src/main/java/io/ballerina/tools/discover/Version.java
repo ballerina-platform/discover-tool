@@ -33,10 +33,15 @@ public final class Version {
 
     private static final Pattern PATTERN = Pattern.compile("^[A-Za-z0-9_.+-]+$");
 
-    private static final String IDENTIFIERS = "[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*";
+    private static final String NUMBER = "(0|[1-9]\\d*)";
 
-    private static final Pattern COMPLETE = Pattern.compile(
-            "^\\d+\\.\\d+\\.\\d+(-" + IDENTIFIERS + ")?(\\+" + IDENTIFIERS + ")?$");
+    private static final String PRE_RELEASE_IDENTIFIER = "(0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)";
+
+    private static final String BUILD_IDENTIFIER = "[0-9A-Za-z-]+";
+
+    private static final Pattern COMPLETE = Pattern.compile("^" + NUMBER + "\\." + NUMBER + "\\." + NUMBER
+            + "(-" + PRE_RELEASE_IDENTIFIER + "(\\." + PRE_RELEASE_IDENTIFIER + ")*)?"
+            + "(\\+" + BUILD_IDENTIFIER + "(\\." + BUILD_IDENTIFIER + ")*)?$");
 
     private final String text;
 
@@ -58,8 +63,7 @@ public final class Version {
 
     /**
      * Whether a version written by hand is a SemVer one Central could publish: {@code major.minor.patch}, with an
-     * optional pre-release and build suffix. Stricter than {@link #parse}, which also reads versions off the network,
-     * and no bucket name, selector or path can look like one.
+     * optional pre-release and build suffix.
      */
     public static boolean isComplete(String input) {
         return COMPLETE.matcher(input).matches();

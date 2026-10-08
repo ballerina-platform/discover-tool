@@ -154,7 +154,7 @@ public final class Cli {
         if (argumentError != null) {
             return usageError(argumentError, streams, json);
         }
-        String version = coordinate.value().versionText();
+        Version version = coordinate.value().version();
 
         // Checked before the package is ever fetched: a mistyped bucket is a fact about the argument list, not
         // about the package, and costs a round trip to Central if left until after the load.
@@ -164,9 +164,7 @@ public final class Cli {
             return usageError(unknownBucket(bucket), streams, json);
         }
 
-        // A blank keyword filters nothing, so it is no filter at all — normalised once, here, so no header or
-        // printed command downstream ever spells an empty `--filter`.
-        String filter = root.filter == null || root.filter.isBlank() ? null : root.filter;
+        String filter = root.filter;
         Failure extra = extraNames(bucket, rest, filter, root, qualified, version);
         if (extra != null) {
             return usageError(extra, streams, json);
@@ -189,7 +187,7 @@ public final class Cli {
             return fail(notPaged(root, filter), streams, json);
         }
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
-                filter, version);
+                filter, version == null ? null : version.text());
         emit(answer.value(), where, streams, json);
         return 0;
     }
@@ -213,12 +211,12 @@ public final class Cli {
     }
 
     private static Failure extraNames(String bucket, List<String> rest, String filter, Commands.Root root,
-            QualifiedName qualified, String version) {
+            QualifiedName qualified, Version version) {
         if (bucket == null) {
             return null;
         }
         List<String> selectors = rest.subList(1, rest.size());
-        String pkg = qualified.qualified() + (version == null ? "" : ":" + version);
+        String pkg = qualified.qualified() + (version == null ? "" : ":" + version.text());
         String command = "bal discover " + Texts.shellWord(pkg)
                 + (root.module == null ? "" : " --module " + Texts.shellWord(root.module)) + " " + bucket;
         if (Types.BUCKET.equals(bucket)) {
@@ -309,6 +307,10 @@ public final class Cli {
         Failure output = rejectInvalidOutput(root);
         if (output != null) {
             return output;
+        }
+        if (root.filter != null && root.filter.isBlank()) {
+            return new Failure.Validation("The --filter option needs a keyword.",
+                    "Write --filter <keyword>, or drop it to list everything.");
         }
         if (root.page < 1) {
             return new Failure.Validation(

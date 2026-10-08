@@ -30,6 +30,7 @@ import io.ballerina.tools.discover.central.schema.Schema;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +43,8 @@ import java.util.Map;
 public class ClientTest {
 
     private static final QualifiedName GITHUB = QualifiedName.parse("ballerinax/github").value();
+
+    private static final Path LOCK = Path.of("/work/app/Dependencies.toml");
 
     private static HttpOptions.Builder fast(HttpTransport transport) {
         return HttpOptions.builder()
@@ -154,8 +157,8 @@ public class ClientTest {
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
         Assert.assertEquals(failure.qualified(), "ballerinax/github");
         Assert.assertEquals(failure.version(), "9.9.9");
-        Assert.assertTrue(failure.suggestion().contains("the version your project's Dependencies.toml locks"),
-                failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("the version " + LOCK + " locks"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("run `bal build` to regenerate it"), failure.suggestion());
         Assert.assertTrue(failure.suggestion().endsWith("write a published version after the package: "
                 + "ballerinax/github:<version>"), failure.suggestion());
         Assert.assertTrue(failure.suggestion().contains("published versions are 6.0.0, 5.1.0"),
@@ -194,7 +197,7 @@ public class ClientTest {
         QualifiedName graphql = QualifiedName.parse("ballerina/graphql").value();
         FakeTransport transport = FakeTransport.always(FakeTransport.status(404));
         CentralClient.ResolvedVersion pinned =
-                new CentralClient.ResolvedVersion(Version.parse("1.17.0").value(), false, true, true);
+                CentralClient.ResolvedVersion.written(Version.parse("1.17.0").value());
         CentralClient.ResolvedVersion locked = supplied("1.17.0");
 
         Failure.PackageNotFound withPin = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
@@ -220,7 +223,7 @@ public class ClientTest {
                 ? FakeTransport.status(404)
                 : FakeTransport.ok("[\"6.0.0\", \"5.1.0\"]"));
         CentralClient.ResolvedVersion written =
-                new CentralClient.ResolvedVersion(Version.parse("9.9.9").value(), false, true, true);
+                CentralClient.ResolvedVersion.written(Version.parse("9.9.9").value());
         Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
                 GITHUB, written, fast(transport).build()).failure();
         Assert.assertEquals(failure.suggestion(), "Central does not publish 'ballerinax/github' at 9.9.9; published "
@@ -234,7 +237,7 @@ public class ClientTest {
                 "ballerinax/aws", "[\"1.0.2\"]",
                 "ballerinax/aws/1.0.2", modules("aws", "aws.auth")));
         CentralClient.ResolvedVersion written =
-                new CentralClient.ResolvedVersion(Version.parse("9.9.9").value(), false, true, true);
+                CentralClient.ResolvedVersion.written(Version.parse("9.9.9").value());
         Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
                 auth, written, fast(transport).build()).failure();
         Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
@@ -244,11 +247,11 @@ public class ClientTest {
     }
 
     private static CentralClient.ResolvedVersion supplied(String version) {
-        return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, true, false);
+        return CentralClient.ResolvedVersion.locked(Version.parse(version).value(), LOCK);
     }
 
     private static CentralClient.ResolvedVersion resolved(String version) {
-        return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, false, false);
+        return CentralClient.ResolvedVersion.latest(Version.parse(version).value(), false);
     }
 
     @Test

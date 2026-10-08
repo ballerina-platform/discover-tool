@@ -124,7 +124,7 @@ public class PackageRepositoryTest {
     public void loaderReadsExclusivelyThroughTheInjectedRepository() {
         Version version = Version.parse("4.6.5").value();
         FakeRepository repository = new FakeRepository(
-                Result.ok(new CentralClient.ResolvedVersion(version, false)),
+                Result.ok(CentralClient.ResolvedVersion.latest(version, false)),
                 Result.ok(FixtureCorpus.loadFixture(SLUG)));
         Loader.LoadOptions options =
                 new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null);
@@ -146,7 +146,7 @@ public class PackageRepositoryTest {
 
     private static FakeRepository http(Optional<Map<String, String>> sources) {
         return new FakeRepository("fake",
-                Result.ok(new CentralClient.ResolvedVersion(Version.parse("2.16.6").value(), false)),
+                Result.ok(CentralClient.ResolvedVersion.latest(Version.parse("2.16.6").value(), false)),
                 Result.ok(FixtureCorpus.loadFixture("ballerina__http")), sources);
     }
 
@@ -216,7 +216,7 @@ public class PackageRepositoryTest {
     @Test
     public void aDocsFailureFromTheRepositoryPropagatesUnchanged() {
         FakeRepository repository = new FakeRepository(
-                Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
+                Result.ok(CentralClient.ResolvedVersion.latest(Version.parse("4.6.5").value(), false)),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "4.6.5", null,
                         "gone from this repository")));
         Loader.LoadOptions options =
@@ -238,7 +238,7 @@ public class PackageRepositoryTest {
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "not on this repository")),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "must not be reached")));
         FakeRepository second = new FakeRepository(
-                Result.ok(new CentralClient.ResolvedVersion(version, false)),
+                Result.ok(CentralClient.ResolvedVersion.latest(version, false)),
                 Result.ok(FixtureCorpus.loadFixture(SLUG)));
         Loader.LoadOptions options = new Loader.LoadOptions(
                 httpThatMustNotReachTheNetwork(), null, List.of(first, second), null, null);
@@ -260,7 +260,7 @@ public class PackageRepositoryTest {
         // `tryEachRepository`'s documented last-wins policy makes ITS failure the one that surfaces — the pairing
         // itself is what `resolvesButFailsToFetch.fetchCalls` below actually pins down.
         FakeRepository resolvesButFailsToFetch = new FakeRepository(
-                Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
+                Result.ok(CentralClient.ResolvedVersion.latest(Version.parse("4.6.5").value(), false)),
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", "4.6.5", null,
                         "gone from this repository")));
         FakeRepository second = new FakeRepository(
@@ -289,7 +289,7 @@ public class PackageRepositoryTest {
         // immutable version would disagree with the caller the same way, so trying `second` at all would only
         // risk `tryEachRepository`'s last-wins policy burying this failure under an unrelated one.
         FakeRepository answersButWrongModule = new FakeRepository(
-                Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
+                Result.ok(CentralClient.ResolvedVersion.latest(Version.parse("4.6.5").value(), false)),
                 Result.ok(FixtureCorpus.loadFixture(SLUG)));
         FakeRepository second = new FakeRepository(
                 Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "must not be reached")),
@@ -310,7 +310,7 @@ public class PackageRepositoryTest {
 
     private static FakeRepository graphqlRepository(String id, Result<CentralDocs> modulePage) {
         FakeRepository repository = new FakeRepository(id,
-                Result.ok(new CentralClient.ResolvedVersion(Version.parse("1.17.0").value(), false)),
+                Result.ok(CentralClient.ResolvedVersion.latest(Version.parse("1.17.0").value(), false)),
                 Result.ok(FixtureCorpus.loadFixture("ballerina__graphql")));
         repository.modulePage = modulePage;
         return repository;
@@ -391,7 +391,7 @@ public class PackageRepositoryTest {
     @Test
     public void aPackagePageThatCouldNotBeReadIsReportedOverOneThatIsMissing() {
         CentralClient.ResolvedVersion version =
-                new CentralClient.ResolvedVersion(Version.parse("1.17.0").value(), false);
+                CentralClient.ResolvedVersion.latest(Version.parse("1.17.0").value(), false);
         FakeRepository first = new FakeRepository("first", Result.ok(version), Result.err(unreachable()));
         first.modulePage = noModulePage();
         FakeRepository second = new FakeRepository("second", Result.ok(version),

@@ -55,7 +55,7 @@ public record LoadedPackage(
         List<Submodule> submodules,
         List<String> modules,
         String warning,
-        String pinned,
+        Version pinned,
         Supplier<Library> bound) {
 
     /**
@@ -79,7 +79,7 @@ public record LoadedPackage(
 
     /** {@link #pkgArgument()} for another module of this package, or its default one when {@code other} is null. */
     public String pkgArgument(String other) {
-        return Texts.shellWord(qualified.qualified() + (pinned == null ? "" : ":" + pinned))
+        return Texts.shellWord(qualified.qualified() + (pinned == null ? "" : ":" + pinned.text()))
                 + (other == null ? "" : " --module " + Texts.shellWord(other));
     }
 

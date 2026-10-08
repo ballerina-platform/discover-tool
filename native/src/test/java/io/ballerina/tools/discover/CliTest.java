@@ -465,7 +465,7 @@ public class CliTest {
 
     @Test
     public void anIncompleteVersionIsAValidationFailureThatFetchesNothing() {
-        for (String coordinate : List.of("ballerina/http:2.15", "ballerina/http:latest", "ballerina/http:")) {
+        for (String coordinate : List.of("ballerina/http:2.15", "ballerina/http:latest")) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(List.of(coordinate, "client"), capture.streams(), never()), 2, coordinate);
             Assert.assertEquals(capture.stdout(), "");
@@ -592,10 +592,12 @@ public class CliTest {
             Assert.assertEquals(Cli.run(List.of("ballerina/http"), capture.streams(), never(),
                     projectDir.toString()), 1, locked);
             Assert.assertEquals(capture.field("kind"), "validation", locked);
-            Assert.assertEquals(capture.field("message"),
-                    "Dependencies.toml locks ballerina/http at '" + locked + "', which is not a version.");
-            Assert.assertEquals(capture.field("suggestion"),
-                    "Fix the lock, or write a version: ballerina/http:<version>");
+            Path lock = projectDir.resolve("Dependencies.toml");
+            Assert.assertEquals(capture.field("message"), lock + " locks ballerina/http at '" + locked
+                    + "', which is not a complete version.");
+            Assert.assertEquals(capture.field("suggestion"), "Fix the ballerina/http entry in " + lock + ", or "
+                    + "delete the file and run `bal build` to regenerate it; or write a version after the package: "
+                    + "ballerina/http:<version>");
         }
     }
 
@@ -1194,15 +1196,12 @@ public class CliTest {
     }
 
     @Test
-    public void aBlankFilterIsNoFilterInEitherRendering() {
-        HttpOptions http = centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text());
-        Capture plain = new Capture();
-        Cli.run(List.of("ballerinax/kafka", "client"), plain.streams(), http, null, true);
-        for (String blank : List.of("", " ")) {
-            Capture text = new Capture();
-            Cli.run(List.of("ballerinax/kafka", "client", "--filter", blank), text.streams(), http, null, true);
-            Assert.assertEquals(text.stdout(), plain.stdout(), "'" + blank + "'");
-            Assert.assertFalse(text.stdout().contains("--filter"), text.stdout());
+    public void aBlankFilterIsAUsageError() {
+        for (String argument : List.of("--filter=", "--filter= ")) {
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", argument), capture.streams(), never()),
+                    2, argument);
+            Assert.assertEquals(capture.field("message"), "The --filter option needs a keyword.");
         }
     }
 
