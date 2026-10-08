@@ -24,6 +24,7 @@ import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.HttpTransport;
+import io.ballerina.tools.discover.central.ProxySettings;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.central.schema.Schema;
 import org.testng.Assert;
@@ -501,38 +502,116 @@ public class ClientTest {
         Assert.assertTrue(failure.suggestion().contains("Report the"));
     }
 
-    /**
-     * A failure object must not contradict {@code --help}'s "no failure is licence to guess": it is what an agent
-     * reads at the moment it is blocked, so the content is asserted, not merely that a suggestion is present.
-     */
     @Test
-    public void noFailureOffersARememberedSignatureAsTheWayOut() {
-        List<String> whenCentralIsTheProblem = List.of(
-                Failure.UPSTREAM_SUGGESTION, Failure.TIMEOUT_SUGGESTION, Failure.SCHEMA_DRIFT_SUGGESTION);
-        for (String suggestion : whenCentralIsTheProblem) {
-            Assert.assertTrue(suggestion.contains("bala/<org>/<name>/"),
-                    "a lookup Central blocked still has an answer on disk, and has to name it: " + suggestion);
-            Assert.assertTrue(suggestion.contains("Never fall back to a remembered signature"),
-                    "a blocked agent guesses unless something forbids it: " + suggestion);
-        }
-
-        // Retryability is the one thing these three do not share, so it is asserted per kind.
-        Assert.assertTrue(Failure.UPSTREAM_SUGGESTION.contains("once more"));
-        Assert.assertTrue(Failure.TIMEOUT_SUGGESTION.contains("once more"));
-        Assert.assertFalse(Failure.SCHEMA_DRIFT_SUGGESTION.contains("once more"),
+    public void schemaDriftIsAnsweredFromDiskNeverFromMemoryAndIsNotARetry() {
+        Assert.assertTrue(Failure.SCHEMA_DRIFT_SUGGESTION.contains("bala/<org>/<name>/"),
+                Failure.SCHEMA_DRIFT_SUGGESTION);
+        Assert.assertTrue(Failure.SCHEMA_DRIFT_SUGGESTION.contains("Never fall back to a remembered signature"),
+                Failure.SCHEMA_DRIFT_SUGGESTION);
+        Assert.assertFalse(Failure.SCHEMA_DRIFT_SUGGESTION.contains("run the same command"),
                 "schema drift is not a retry: no change of arguments will help");
+    }
+
+    private static final String URL = "https://api.central.ballerina.io/2.0/docs/ballerina/http";
+    private static final String SETTINGS = "~/home/Settings.toml";
+    private static final ProxySettings OPEN_PROXY = new ProxySettings("127.0.0.1", 3128, "", "");
+    private static final ProxySettings AUTHENTICATING_PROXY = new ProxySettings("127.0.0.1", 3128, "alice", "pw");
+
+    private static Failure failing(HttpTransport.Reply reply, ProxySettings proxy) {
+        return CentralClient.fetchJson(URL,
+                fast(FakeTransport.always(reply)).proxy(proxy).settingsFile(SETTINGS).build()).failure();
+    }
+
+    private static HttpTransport.Reply failed(HttpTransport.Reply.Problem problem, String message) {
+        return new HttpTransport.Reply.Failed(problem, message);
+    }
+
+    @Test
+    public void aRequestWithNoAnswerNamesTheHostOrTheProxyAndWhatToCheck() {
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"), null)
+                .describeText(), "error: Could not reach api.central.ballerina.io: connection refused (3 attempts).\n"
+                + "  Check your network connection, and the [proxy] table in ~/home/Settings.toml if your network "
+                + "needs a proxy, then run the same command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"), OPEN_PROXY)
+                .describeText(), "error: Could not connect to the proxy 127.0.0.1:3128 set in ~/home/Settings.toml: "
+                + "connection refused (3 attempts).\n  Check that the proxy is running and that host and port under "
+                + "[proxy] in ~/home/Settings.toml are right, then run the same command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNRESOLVED, "x"), null).describeText(),
+                "error: Could not resolve the host api.central.ballerina.io.\n  Check your network connection, and "
+                        + "the [proxy] table in ~/home/Settings.toml if your network needs a proxy, then run the same "
+                        + "command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNRESOLVED, "x"),
+                        new ProxySettings("no-such-proxy.invalid", 3128, "", "")).describeText(),
+                "error: Could not resolve the proxy host no-such-proxy.invalid.\n  Check host under [proxy] in "
+                        + "~/home/Settings.toml, then run the same command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.TLS, "its certificate has expired"), null)
+                .describeText(), "error: Could not open a secure connection to api.central.ballerina.io: its "
+                + "certificate has expired.\n  Check the system clock, and any proxy or firewall that intercepts "
+                + "HTTPS, then run the same command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.TUNNEL, "502"), OPEN_PROXY).describeText(),
+                "error: The proxy 127.0.0.1:3128 set in ~/home/Settings.toml could not connect to "
+                        + "api.central.ballerina.io: HTTP 502 (3 attempts).\n  The proxy answered but could not "
+                        + "reach api.central.ballerina.io; run the same command again later, or check that the proxy "
+                        + "allows it.");
+    }
+
+    @Test
+    public void aProxyAskingForCredentialsSaysWhetherTheyWereMissingOrWrongAndIsNotRetried() {
+        Failure.Upstream missing = (Failure.Upstream) failing(FakeTransport.status(407), OPEN_PROXY);
+        Assert.assertEquals(missing.describeText(), "error: The proxy 127.0.0.1:3128 requires authentication.\n"
+                + "  Set both username and password under [proxy] in ~/home/Settings.toml, then run the same command "
+                + "again.");
+        Assert.assertEquals(missing.attempts(), 1);
+        Assert.assertFalse(missing.reached());
+
+        Failure.Upstream wrong = (Failure.Upstream) failing(
+                failed(HttpTransport.Reply.Problem.PROXY_REJECTED, "No credentials provided"), AUTHENTICATING_PROXY);
+        Assert.assertEquals(wrong.describeText(), "error: The proxy 127.0.0.1:3128 rejected the username and "
+                + "password in the [proxy] table of ~/home/Settings.toml.\n  Correct username and password under "
+                + "[proxy] in ~/home/Settings.toml, then run the same command again.");
+        Assert.assertEquals(wrong.attempts(), 1);
+        Assert.assertEquals(failing(FakeTransport.status(407), AUTHENTICATING_PROXY).describeText(),
+                wrong.describeText());
+    }
+
+    @Test
+    public void anAnswerFromCentralIsBlamedOnCentralAndATimeoutNamesTheSettingsFile() {
+        Failure.Upstream status = (Failure.Upstream) failing(FakeTransport.status(503), OPEN_PROXY);
+        Assert.assertEquals(status.describeText(), "error: Central answered " + URL + " with HTTP 503 (3 attempts).\n"
+                + "  Central returned an error; run the same command again later.");
+        Assert.assertTrue(status.reached());
+        Assert.assertEquals(status.status(), Integer.valueOf(503));
+
+        Failure.Upstream malformed = (Failure.Upstream) failing(FakeTransport.ok("{"), null);
+        Assert.assertTrue(malformed.describeText().startsWith("error: Central answered " + URL
+                + " with a body that is not JSON: "), malformed.describeText());
+        Assert.assertTrue(malformed.reached());
+        Assert.assertNull(malformed.status());
+
+        Assert.assertEquals(failing(new HttpTransport.Reply.TimedOut(), null).suggestion(), "A large package is slow "
+                + "on a cold fetch, so run the same command again; if it keeps timing out, check your network "
+                + "connection and the [proxy] table in ~/home/Settings.toml.");
+    }
+
+    @Test
+    public void aRequestThatCannotBeMadeIsADefectNotANetworkProblem() {
+        Failure failure = failing(failed(HttpTransport.Reply.Problem.BAD_URL, "Illegal character in path"), null);
+        Assert.assertEquals(failure.kind(), "internal");
+        Assert.assertEquals(failure.suggestion(), Failure.INTERNAL_SUGGESTION);
     }
 
     @Test
     public void aNetworkErrorIsRetriedAndThenReportedAsUpstream() {
-        FakeTransport transport =
-                FakeTransport.always(new HttpTransport.Reply.Failed("network error: connection refused"));
+        FakeTransport transport = FakeTransport.always(failed(HttpTransport.Reply.Problem.UNCONNECTED,
+                "connection refused"));
         Result<JsonElement> result =
                 CentralClient.fetchJson("https://example.invalid/x", fast(transport).build());
         Assert.assertFalse(result.isOk());
         Failure.Upstream failure = (Failure.Upstream) result.failure();
         Assert.assertEquals(failure.attempts(), 3);
         Assert.assertNull(failure.status(), "a request that never answered has no status line");
+        Assert.assertFalse(failure.reached());
+        Assert.assertTrue(failure.describe().contains("\"reached\":false"), failure.describe());
     }
 
     @Test

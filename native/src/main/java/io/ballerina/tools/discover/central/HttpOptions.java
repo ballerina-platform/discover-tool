@@ -45,6 +45,8 @@ public final class HttpOptions {
 
     private static final long DEFAULT_BASE_DELAY_MS = 200;
 
+    private static final String DEFAULT_SETTINGS_FILE = "~/.ballerina/Settings.toml";
+
     private final HttpTransport transport;
     private final long timeoutMs;
     private final int maxAttempts;
@@ -55,6 +57,8 @@ public final class HttpOptions {
     private final LongSupplier clock;
     private final DoubleSupplier jitter;
     private final Sleeper sleeper;
+    private final ProxySettings proxy;
+    private final String settingsFile;
 
     /**
      * The real transport, created on first use.
@@ -81,6 +85,8 @@ public final class HttpOptions {
         this.clock = builder.clock;
         this.jitter = builder.jitter;
         this.sleeper = builder.sleeper;
+        this.proxy = builder.proxy;
+        this.settingsFile = builder.settingsFile;
     }
 
     /** How the retry loop waits. Injectable so a test never actually sleeps. */
@@ -126,6 +132,16 @@ public final class HttpOptions {
         return refresh;
     }
 
+    /** The proxy the transport sends requests through, or {@code null}: what a failure names. */
+    public ProxySettings proxy() {
+        return proxy;
+    }
+
+    /** The {@code Settings.toml} a proxy is configured in, as a failure's suggestion names it. */
+    public String settingsFile() {
+        return settingsFile;
+    }
+
     /**
      * The same options with {@code --refresh} applied.
      *
@@ -133,9 +149,15 @@ public final class HttpOptions {
      * is not known until the arguments are parsed.
      */
     public HttpOptions withRefresh(boolean value) {
-        if (value == refresh) {
-            return this;
-        }
+        return value == refresh ? this : toBuilder().refresh(value).build();
+    }
+
+    /** The same options, allowing at most {@code value} attempts per request. */
+    public HttpOptions withMaxAttempts(int value) {
+        return toBuilder().maxAttempts(value).build();
+    }
+
+    private Builder toBuilder() {
         return builder()
                 .transport(transport)
                 .timeoutMs(timeoutMs)
@@ -143,27 +165,12 @@ public final class HttpOptions {
                 .budgetMs(budgetMs)
                 .baseDelayMs(baseDelayMs)
                 .cache(cache)
-                .refresh(value)
-                .clock(clock)
-                .jitter(jitter)
-                .sleeper(sleeper)
-                .build();
-    }
-
-    /** The same options, allowing at most {@code value} attempts per request. */
-    public HttpOptions withMaxAttempts(int value) {
-        return builder()
-                .transport(transport)
-                .timeoutMs(timeoutMs)
-                .maxAttempts(value)
-                .budgetMs(budgetMs)
-                .baseDelayMs(baseDelayMs)
-                .cache(cache)
                 .refresh(refresh)
                 .clock(clock)
                 .jitter(jitter)
                 .sleeper(sleeper)
-                .build();
+                .proxy(proxy)
+                .settingsFile(settingsFile);
     }
 
     public long now() {
@@ -191,6 +198,8 @@ public final class HttpOptions {
         private LongSupplier clock = System::currentTimeMillis;
         private DoubleSupplier jitter = () -> ThreadLocalRandom.current().nextDouble();
         private Sleeper sleeper = Builder::sleepQuietly;
+        private ProxySettings proxy;
+        private String settingsFile = DEFAULT_SETTINGS_FILE;
 
         private Builder() {
         }
@@ -250,6 +259,16 @@ public final class HttpOptions {
 
         public Builder sleeper(Sleeper value) {
             this.sleeper = value;
+            return this;
+        }
+
+        public Builder proxy(ProxySettings value) {
+            this.proxy = value;
+            return this;
+        }
+
+        public Builder settingsFile(String value) {
+            this.settingsFile = value;
             return this;
         }
 
