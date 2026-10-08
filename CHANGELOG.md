@@ -29,8 +29,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Central page; the bare package lists its submodules, and a submodule named as the package (e.g.
   `ballerinax/aws.auth`) fails with the `--module` command that reads it
 - Add the `--filter` flag to narrow a bucket listing by keyword
-- Read one exact version of a package from the coordinate, `<org>/<package>:<version>`; it outranks the version a
-  project locks, and is carried into every command the answer prints
+- Read one exact version of a package from the coordinate, `<org>/<package>:<version>`, written as complete SemVer;
+  it outranks the version a project locks, and is carried into every command the answer prints
+- Name the version every answer was read at: a leading `version` key in JSON, and `org/name:version` in the text
+  header, whether it was written, locked or Central's latest
+- State in `--help` which version is read without one, and the exit codes
 - Cap every listing at 40 entries, with `--page` to page through any longer one; a text listing that continues also
   ends with the `--filter <keyword>` command that narrows it
 - List containers, service types, methods, resource paths and declarations alphabetically
@@ -40,7 +43,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   defaulting to text on a terminal and JSON otherwise
 - Report failures on stderr in the run's output mode: a single-line JSON object, or `error: <message>` with the
   suggestion indented below it; a usage error (a malformed command line, rejected before anything is looked up)
-  exits 2 and, in text, ends with the synopsis and a pointer to `--help`, and every other failure exits 1
+  exits 2 and, in text, ends with the synopsis and a pointer to `--help`, and every other failure exits 1; every
+  JSON failure carries a one-sentence `message`, and the package and version it was for
+- Quote the caller's whole command with the fix applied in a failure that has one fix, and carry it as `command` in
+  JSON: a version given as `--version` or a positional, a mistyped coordinate, a module path, a `--module` the
+  package does not publish, a selector nothing reads, `--page` on an answer that does not page
+- Answer a version Central does not publish with the published versions nearest it, a misspelled package with or
+  without a version with the same spelling hint, and a bad lock with the `Dependencies.toml` it was read from
 - Send requests to Ballerina Central through the HTTP proxy `bal pull` uses, the `[proxy]` table of
   `~/.ballerina/Settings.toml`, with its `username` and `password` for proxy authentication, sent once per request
 - Name what failed when a request to Central gets no answer — the host, or the proxy and the `Settings.toml` that
