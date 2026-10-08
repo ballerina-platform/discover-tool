@@ -392,7 +392,7 @@ public final class Cli {
                 tail(others, root.filter, root.page));
     }
 
-    /** The failure a parse error is, or {@code null} when picocli's own first line says it best. */
+    // The failure a parse error is, or null when picocli's own first line says it best.
     private static Failure describeParseError(CommandLine.ParameterException cause, Commands.Grammar grammar) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();

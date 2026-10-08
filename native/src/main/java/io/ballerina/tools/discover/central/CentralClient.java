@@ -99,13 +99,10 @@ public final class CentralClient {
      */
     public record ResolvedVersion(Version version, Source source, boolean stale, Path lock) {
 
-        /** Who chose a version. */
         public enum Source {
             /** The caller wrote it in the coordinate, so a command printed for them repeats it. */
             WRITTEN,
-            /** The project's {@code Dependencies.toml} locks it. */
             LOCKED,
-            /** Central's newest. */
             LATEST
         }
 
@@ -194,14 +191,7 @@ public final class CentralClient {
         }
     }
 
-    /**
-     * What a failed attempt tells the caller.
-     *
-     * @param message what went wrong, as a sentence without its full stop
-     * @param status the HTTP status the attempt failed with, or {@code null}
-     * @param reached whether Central answered
-     * @param suggestion what to do next
-     */
+    // What a failed attempt tells the caller; the message has no full stop.
     private record Report(String message, Integer status, boolean reached, String suggestion) {
 
         static Report unanswered(String message, String suggestion) {

@@ -332,7 +332,6 @@ public sealed interface Failure {
         return suggestion.replace(quoted(command), quoted(command + tail));
     }
 
-    /** {@code command} as a suggestion quotes it. */
     static String quoted(String command) {
         return "`" + command + "`";
     }
