@@ -227,8 +227,6 @@ public class CliTest {
                         "extra", twilio),
                 new Unread("ballerinax__kafka", List.of("ballerinax/kafka", "client", "close", "extra"), "extra",
                         "bal discover ballerinax/kafka client close"),
-                new Unread("ballerina__log", List.of("ballerina/log", "funcs", "printInfo", "junk"), "junk",
-                        "bal discover ballerina/log funcs printInfo"),
                 new Unread("ballerina__http", List.of("ballerina/http", "class", "Cookie", "isValid", "junk"),
                         "junk", "bal discover ballerina/http class Cookie isValid"),
                 new Unread("ballerina__http", List.of("ballerina/http", "client", "Cookie", "isValid", "junk"),
@@ -1539,6 +1537,10 @@ public class CliTest {
                 new Case("validation", 2, List.of("ballerina/http:2.16"), never()),
                 new Case("validation", 2, List.of("nonsense"), never()),
                 new Case("validation", 1, List.of("ballerinax/kafka", "client", "--page", "2"), kafka),
+                new Case("validation", 2, List.of("ballerinax/kafka", "funcs", "a", "b"), never()),
+                new Case("validation", 2, List.of("ballerinax/kafka", "type", "A", "B"), never()),
+                new Case("validation", 2, List.of("ballerinax/kafka", "type", "A", "--filter", "x"), never()),
+                new Case("validation", 1, List.of("ballerinax/kafka", "client", "Consumer", "poll", "x"), kafka),
                 new Case("symbol-not-found", 1,
                         List.of("ballerinax/kafka", "client", "NoSuchContainer"), kafka));
         for (Case failure : failures) {
@@ -1547,6 +1549,28 @@ public class CliTest {
             Assert.assertEquals(Cli.run(failure.argv(), capture.streams(), failure.http()), failure.code(), label);
             Assert.assertEquals(capture.field("kind"), failure.kind(), label);
         }
+    }
+
+    @Test
+    public void extraNamesNoPackageCanReadAreAUsageErrorNamingTheCommandToRunInstead() {
+        Capture funcs = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/io:1.8.2", "-m", "sub", "funcs", "println", "extra",
+                "--filter", "x"), funcs.streams(), never()), 2);
+        Assert.assertEquals(funcs.field("message"), "Unexpected argument 'extra' after 'println': funcs takes one "
+                + "function name.");
+        Assert.assertEquals(funcs.field("suggestion"),
+                "Drop it: `bal discover ballerina/io:1.8.2 --module sub funcs println --filter x`.");
+
+        Capture types = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/io", "type", "A", "B"), types.streams(), never()), 2);
+        Assert.assertEquals(types.field("suggestion"), "Name one declaration, or list them all: "
+                + "`bal discover ballerina/io type`.");
+
+        Capture filtered = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/io", "type", "Error", "--filter", "x"), filtered.streams(),
+                never()), 2);
+        Assert.assertEquals(filtered.field("suggestion"), "Drop --filter, or drop the name: "
+                + "`bal discover ballerina/io type --filter x`.");
     }
 
     @Test

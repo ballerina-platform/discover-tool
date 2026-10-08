@@ -157,6 +157,14 @@ public final class Cli {
             return usageError(unknownBucket(bucket), streams, json);
         }
 
+        // A blank keyword filters nothing, so it is no filter at all — normalised once, here, so no header or
+        // printed command downstream ever spells an empty `--filter`.
+        String filter = root.filter == null || root.filter.isBlank() ? null : root.filter;
+        Failure extra = extraNames(bucket, rest, filter, root, qualified, version);
+        if (extra != null) {
+            return usageError(extra, streams, json);
+        }
+
         // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
         HttpOptions resolved = http.withRefresh(root.refresh);
         Loader.LoadOptions options = new Loader.LoadOptions(
@@ -166,9 +174,6 @@ public final class Cli {
             return fail(loaded.failure(), streams, json);
         }
 
-        // A blank keyword filters nothing, so it is no filter at all — normalised once, here, so no header or
-        // printed command downstream ever spells an empty `--filter`.
-        String filter = root.filter == null || root.filter.isBlank() ? null : root.filter;
         Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
         if (!answer.isOk()) {
             return fail(answer.failure(), streams, json);
@@ -198,6 +203,24 @@ public final class Cli {
         Surface.Scope scope = Surface.Scope.ofVerb(bucket)
                 .orElseThrow(() -> new IllegalStateException("unreachable: validated above"));
         return Containers.render(loaded, scope, new Containers.Options(selectors, filter, page));
+    }
+
+    private static Failure extraNames(String bucket, List<String> rest, String filter, Commands.Root root,
+            QualifiedName qualified, String version) {
+        if (bucket == null) {
+            return null;
+        }
+        List<String> selectors = rest.subList(1, rest.size());
+        String pkg = qualified.qualified() + (version == null ? "" : ":" + version);
+        String command = "bal discover " + Texts.shellWord(pkg)
+                + (root.module == null ? "" : " --module " + Texts.shellWord(root.module)) + " " + bucket;
+        if (Types.BUCKET.equals(bucket)) {
+            return Types.misuse(command, new Types.Options(selectors, filter, root.page));
+        }
+        if (Surface.Scope.MODULE.verb().equals(bucket)) {
+            return Containers.extraFunctionNames(command, new Containers.Options(selectors, filter, root.page));
+        }
+        return null;
     }
 
     private static Failure notPaged(Commands.Root root, String filter) {

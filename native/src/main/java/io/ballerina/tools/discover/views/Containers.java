@@ -681,6 +681,21 @@ public final class Containers {
                         "bal discover " + loaded.pkgArgument() + " " + scope.verb(), options));
     }
 
+    /**
+     * The failure for {@code funcs} given more than one name, which no package can read, or {@code null}: a fact
+     * about the command line, so it is found before the package is fetched.
+     *
+     * @param command the command the bucket is listed with, e.g. {@code bal discover ballerina/io funcs}
+     */
+    public static Failure extraFunctionNames(String command, Options options) {
+        List<String> selectors = options.selectors();
+        if (selectors.size() < 2) {
+            return null;
+        }
+        return unread(selectors, 1, Surface.Scope.MODULE.verb() + " takes one function name",
+                drop(selectors.subList(0, 1), selectors.size() - 1, command, options));
+    }
+
     private static Failure unread(List<String> selectors, int consumed, String reason, String suggestion) {
         List<String> unread = selectors.subList(consumed, selectors.size());
         return new Failure.Validation(
