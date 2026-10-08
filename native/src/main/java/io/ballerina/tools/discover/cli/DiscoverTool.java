@@ -26,7 +26,6 @@ import io.ballerina.tools.discover.cache.DiskCache;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
-import io.ballerina.tools.discover.central.JdkHttpTransport;
 import io.ballerina.tools.discover.central.ProxySettings;
 import org.wso2.ballerinalang.util.RepoUtils;
 import picocli.CommandLine;
@@ -34,6 +33,7 @@ import picocli.CommandLine;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -51,6 +51,8 @@ import java.util.List;
  */
 @CommandLine.Command(name = "discover")
 public class DiscoverTool implements BLauncherCmd {
+
+    private static final String BASIC_SCHEME = "Basic";
 
     @CommandLine.Parameters(arity = "0..*")
     private List<String> argList;
@@ -98,16 +100,18 @@ public class DiscoverTool implements BLauncherCmd {
 
     @Override
     public void execute() {
+        boolean basicProxyAuthAllowed = allowBasicProxyAuthInTunnels();
         List<String> argv = new ArrayList<>(argList == null ? List.of() : argList);
         if (helpFlag) {
             argv.add("--help");
         }
+        HttpOptions.Builder builder = HttpOptions.builder()
+                .cache(buildCache())
+                .basicProxyAuthDisabled(!basicProxyAuthAllowed)
+                .proxy(ProxySettings.configured().orElse(null));
         Path home = ballerinaHome();
-        HttpOptions.Builder builder = HttpOptions.builder().cache(buildCache());
         if (home != null) {
-            builder.settingsFile(ProxySettings.displayPath(home.resolve(ProjectConstants.SETTINGS_FILE_NAME),
-                    property("user.home")));
-            ProxySettings.read(home).ifPresent(proxy -> builder.transport(new JdkHttpTransport(proxy)).proxy(proxy));
+            builder.settingsFile(displayPath(home.resolve(ProjectConstants.SETTINGS_FILE_NAME), property("user.home")));
         }
         HttpOptions http = builder.build();
         Cli.Streams streams = new Cli.Streams(outStream::print, errStream::print);
@@ -135,6 +139,31 @@ public class DiscoverTool implements BLauncherCmd {
         if (exits && code != 0) {
             System.exit(code);
         }
+    }
+
+    /**
+     * Lets a proxy's challenge to the {@code CONNECT} that every request to Central goes through be answered with
+     * Basic credentials, as {@code bal pull} answers it; the JDK refuses them there by default. A value the user set
+     * is kept. It must run before any HTTP client exists: the JDK reads the property once, when the first is built.
+     *
+     * @return whether Basic credentials can be sent in a tunnel
+     */
+    static boolean allowBasicProxyAuthInTunnels() {
+        Object chosen = System.getProperties().putIfAbsent(HttpOptions.TUNNELING_DISABLED_SCHEMES, "");
+        return chosen == null || Arrays.stream(chosen.toString().split(","))
+                .map(String::trim)
+                .noneMatch(BASIC_SCHEME::equalsIgnoreCase);
+    }
+
+    /** {@code file} as a message names it: under {@code userHome}, with {@code ~} in its place. */
+    static String displayPath(Path file, String userHome) {
+        if (userHome != null && !userHome.isEmpty()) {
+            Path home = Path.of(userHome);
+            if (file.startsWith(home) && !file.equals(home)) {
+                return "~" + file.getFileSystem().getSeparator() + home.relativize(file);
+            }
+        }
+        return file.toString();
     }
 
     private static String messageOf(Throwable cause) {

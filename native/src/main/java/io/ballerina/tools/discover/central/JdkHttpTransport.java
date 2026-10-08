@@ -34,7 +34,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.UnresolvedAddressException;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
@@ -42,7 +41,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -69,7 +67,7 @@ public final class JdkHttpTransport implements HttpTransport {
     // The JDK reports a proxy's error answer to a CONNECT only in this message.
     private static final Pattern TUNNEL_FAILED = Pattern.compile("Tunnel failed, got: (\\d+)");
 
-    static final String TUNNELING_DISABLED_SCHEMES = "jdk.http.auth.tunneling.disabledSchemes";
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
 
     private final HttpClient client;
     private final long archiveLimit;
@@ -79,23 +77,17 @@ public final class JdkHttpTransport implements HttpTransport {
         this(Bala.MAX_ARCHIVE_BYTES, null);
     }
 
-    /** A transport sending every request through {@code proxy}. */
     public JdkHttpTransport(ProxySettings proxy) {
         this(Bala.MAX_ARCHIVE_BYTES, proxy);
     }
 
-    /**
-     * A transport refusing any download past {@code archiveLimit} bytes, through {@code proxy} unless it is
-     * {@code null}.
-     */
     JdkHttpTransport(long archiveLimit, ProxySettings proxy) {
         HttpClient.Builder builder = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(30));
+                .connectTimeout(CONNECT_TIMEOUT);
         ProxyAuthenticator answering = null;
         if (proxy != null) {
             builder.proxy(ProxySelector.of(InetSocketAddress.createUnresolved(proxy.host(), proxy.port())));
-            allowBasicInTunnels(System.getProperties(), proxy);
             if (proxy.authenticates()) {
                 answering = new ProxyAuthenticator(proxy);
                 builder.authenticator(answering);
@@ -104,17 +96,6 @@ public final class JdkHttpTransport implements HttpTransport {
         this.client = builder.build();
         this.archiveLimit = archiveLimit;
         this.authenticator = answering;
-    }
-
-    /**
-     * Lets Basic credentials answer a proxy's challenge to a {@code CONNECT}, which Central's HTTPS always goes
-     * through and the JDK refuses them in by default; {@code bal pull} sends them. Only a proxy with credentials
-     * needs it, and a value the user set is kept.
-     */
-    static void allowBasicInTunnels(Properties properties, ProxySettings proxy) {
-        if (proxy.authenticates()) {
-            properties.putIfAbsent(TUNNELING_DISABLED_SCHEMES, "");
-        }
     }
 
     /**
@@ -150,15 +131,16 @@ public final class JdkHttpTransport implements HttpTransport {
             return rejected.contains(request.toString());
         }
 
-        void finished(URI request) {
-            answered.remove(request.toString());
-            rejected.remove(request.toString());
+        // Requests are made one at a time, so a finished one takes every ask with it, a redirect's included.
+        void finished() {
+            answered.clear();
+            rejected.clear();
         }
     }
 
-    private void finished(HttpRequest request) {
+    private void finished() {
         if (authenticator != null) {
-            authenticator.finished(request.uri());
+            authenticator.finished();
         }
     }
 
@@ -189,7 +171,7 @@ public final class JdkHttpTransport implements HttpTransport {
             Thread.currentThread().interrupt();
             return new Reply.Failed(Reply.Problem.OTHER, "interrupted");
         } finally {
-            finished(request);
+            finished();
         }
     }
 
@@ -219,7 +201,7 @@ public final class JdkHttpTransport implements HttpTransport {
             return Optional.empty();
         } finally {
             download.cancel(true);
-            finished(request);
+            finished();
         }
     }
 
@@ -324,7 +306,7 @@ public final class JdkHttpTransport implements HttpTransport {
         }
     }
 
-    private static Reply.Failed failure(IOException failed) {
+    static Reply.Failed failure(IOException failed) {
         for (Throwable cause = failed; cause != null; cause = cause.getCause()) {
             if (cause instanceof UnresolvedAddressException || cause instanceof UnknownHostException) {
                 return new Reply.Failed(Reply.Problem.UNRESOLVED, describe(cause));
@@ -336,10 +318,10 @@ public final class JdkHttpTransport implements HttpTransport {
         String message = describe(failed);
         Matcher tunnel = TUNNEL_FAILED.matcher(message);
         if (tunnel.find()) {
-            return new Reply.Failed(Reply.Problem.TUNNEL, tunnel.group(1));
+            return new Reply.Failed(Reply.Problem.TUNNEL, message, Integer.valueOf(tunnel.group(1)));
         }
         for (Throwable cause = failed; cause != null; cause = cause.getCause()) {
-            if (cause instanceof ConnectException || cause instanceof ClosedChannelException) {
+            if (cause instanceof ConnectException) {
                 return new Reply.Failed(Reply.Problem.UNCONNECTED, messageIn(failed)
                         .map(text -> text.toLowerCase(Locale.ROOT)).orElse("connection refused"));
             }

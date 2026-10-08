@@ -18,7 +18,8 @@
 
 package io.ballerina.tools.discover.central;
 
-import io.ballerina.projects.internal.model.Proxy;
+import io.ballerina.projects.TomlDocument;
+import io.ballerina.projects.internal.SettingsBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import org.wso2.ballerinalang.util.RepoUtils;
@@ -37,9 +38,19 @@ import java.util.Optional;
  */
 public class ProxySettingsTest {
 
+    // What bal pull's reader makes of the content, held to bal pull's rule; content it throws on is no proxy.
+    private static Optional<ProxySettings> parse(String settingsToml) {
+        try {
+            return ProxySettings.of(SettingsBuilder.from(TomlDocument.from("Settings.toml", settingsToml))
+                    .settings().getProxy());
+        } catch (RuntimeException unreadable) {
+            return Optional.empty();
+        }
+    }
+
     @Test
     public void aHostAndPortMakeAProxyWithoutCredentials() {
-        Optional<ProxySettings> proxy = ProxySettings.parse("""
+        Optional<ProxySettings> proxy = parse("""
                 [proxy]
                 host = "proxy.example.com"
                 port = 3128
@@ -50,7 +61,7 @@ public class ProxySettingsTest {
 
     @Test
     public void aUsernameAndPasswordTogetherAuthenticate() {
-        ProxySettings proxy = ProxySettings.parse("""
+        ProxySettings proxy = parse("""
                 [central]
                 accesstoken = "token"
 
@@ -67,7 +78,7 @@ public class ProxySettingsTest {
 
     @Test
     public void aUsernameWithoutAPasswordDoesNotAuthenticate() {
-        ProxySettings proxy = ProxySettings.parse("""
+        ProxySettings proxy = parse("""
                 [proxy]
                 host = "proxy.example.com"
                 port = 3128
@@ -89,69 +100,24 @@ public class ProxySettingsTest {
                 "[proxy]\nhost = \"proxy.example.com\"\nport = \"3128\"\n",
                 "[proxy]\nhost = 42\nport = 3128\n",
                 "proxy = \"proxy.example.com:3128\"\n"}) {
-            Assert.assertEquals(ProxySettings.parse(settings), Optional.empty(), settings);
+            Assert.assertEquals(parse(settings), Optional.empty(), settings);
         }
     }
 
-    // bal pull reads the file with RepoUtils.readSettings() and ignores its diagnostics, so a malformed file
-    // proxies through whatever the parser salvages from it; this tool must take the same route, not a stricter one.
+    // A malformed file proxies through whatever bal pull's reader salvages from it, as it does for bal pull.
     @Test
-    public void everyFileIsReadAsBalPullReadsItMalformedOnesIncluded() throws IOException {
+    public void theSettingsFileIsReadFromTheBallerinaHomeAsBalPullReadsItAndAMissingOneIsNoProxy()
+            throws IOException {
         Path home = Files.createDirectories(RepoUtils.createAndGetHomeReposPath());
         Path settings = home.resolve("Settings.toml");
         Assert.assertFalse(Files.exists(settings), "the test Ballerina home must not carry a Settings.toml");
+        Assert.assertEquals(ProxySettings.configured(), Optional.empty());
         try {
-            for (String content : new String[] {
-                    "[proxy]\nhost = \"proxy.example.com\"\nport = 3128\nusername = \"alice\"\npassword = \"s\"\n",
-                    "[proxy]\nhost = \"proxy.example.com\"\nport = 3128\nusername = \n",
-                    "[proxy\nhost = \"proxy.example.com\"\nport = 3128\n",
-                    "[proxy]\nhost = \"proxy.example.com\"\nport = \"3128\"\n",
-                    "[proxy]\nhost = \"proxy.example.com\"\nport = 3128\n[proxy]\nhost = \"other.example.com\"\n",
-                    "proxy = \"proxy.example.com:3128\"\n"}) {
-                Files.writeString(settings, content, StandardCharsets.UTF_8);
-                Assert.assertEquals(ProxySettings.read(home), balPull(), content);
-            }
+            Files.writeString(settings, "[proxy\nhost = \"proxy.example.com\"\nport = 3128\n", StandardCharsets.UTF_8);
+            Assert.assertEquals(ProxySettings.configured(),
+                    Optional.of(new ProxySettings("proxy.example.com", 3128, "", "")));
         } finally {
             Files.deleteIfExists(settings);
         }
-        Assert.assertEquals(ProxySettings.parse("[proxy\nhost = \"proxy.example.com\"\nport = 3128\n"),
-                Optional.of(new ProxySettings("proxy.example.com", 3128, "", "")), "salvaged, as bal pull does");
-    }
-
-    // What bal pull's own reader makes of the file, held to the rule bal pull applies before using a proxy. A
-    // file its reader throws on is no proxy.
-    private static Optional<ProxySettings> balPull() {
-        Proxy balPull;
-        try {
-            balPull = RepoUtils.readSettings().getProxy();
-        } catch (RuntimeException unreadable) {
-            return Optional.empty();
-        }
-        return balPull == null || balPull.host() == null || balPull.host().isEmpty() || balPull.port() <= 0
-                ? Optional.empty()
-                : Optional.of(new ProxySettings(balPull.host(), balPull.port(),
-                        balPull.username() == null ? "" : balPull.username(),
-                        balPull.password() == null ? "" : balPull.password()));
-    }
-
-    @Test
-    public void theSettingsFileIsReadFromTheBallerinaHomeAndAMissingOneIsNoProxy() throws IOException {
-        Path home = Files.createTempDirectory("bal-discover-home-");
-        Assert.assertEquals(ProxySettings.read(home), Optional.empty());
-        Files.writeString(home.resolve("Settings.toml"), "[proxy]\nhost = \"127.0.0.1\"\nport = 3128\n",
-                StandardCharsets.UTF_8);
-        Assert.assertEquals(ProxySettings.read(home), Optional.of(new ProxySettings("127.0.0.1", 3128, "", "")));
-    }
-
-    @Test
-    public void theSettingsFileIsNamedWithATildeOnlyUnderTheUsersHome() {
-        Assert.assertEquals(ProxySettings.displayPath(Path.of("/home/alice/.ballerina/Settings.toml"), "/home/alice"),
-                "~/.ballerina/Settings.toml");
-        Assert.assertEquals(ProxySettings.displayPath(Path.of("/opt/bal-home/Settings.toml"), "/home/alice"),
-                "/opt/bal-home/Settings.toml");
-        Assert.assertEquals(ProxySettings.displayPath(Path.of("/home/alicia/Settings.toml"), "/home/alice"),
-                "/home/alicia/Settings.toml");
-        Assert.assertEquals(ProxySettings.displayPath(Path.of("/home/alice/Settings.toml"), ""),
-                "/home/alice/Settings.toml");
     }
 }

@@ -18,26 +18,14 @@
 
 package io.ballerina.tools.discover.central;
 
-import io.ballerina.projects.TomlDocument;
-import io.ballerina.projects.internal.SettingsBuilder;
 import io.ballerina.projects.internal.model.Proxy;
-import io.ballerina.projects.util.ProjectConstants;
+import org.wso2.ballerinalang.util.RepoUtils;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * The HTTP proxy {@code bal pull} would use: the {@code [proxy]} table of the Ballerina home's
- * {@code Settings.toml}, keys {@code host}, {@code port}, {@code username} and {@code password}.
- *
- * <p>Read with {@code bal}'s own {@link SettingsBuilder}, and held to the rule {@code bal pull} applies before
- * using one: a proxy needs a non-empty host and a positive port, and authenticates only when both a username and
- * a password are set. Everything short of that — no file, no table, a value of the wrong type — is no proxy,
- * silently, as it is for {@code bal pull}; a malformed file counts for what the parser salvages from it, since
- * {@code bal pull} ignores its diagnostics too.
+ * The HTTP proxy {@code bal pull} would use, from the {@code [proxy]} table of the Ballerina home's
+ * {@code Settings.toml}, read and held to the same rule {@code bal pull} applies before using one.
  *
  * @param host the proxy's host name or address
  * @param port the proxy's port
@@ -47,42 +35,30 @@ import java.util.Optional;
  */
 public record ProxySettings(String host, int port, String username, String password) {
 
-    /** The proxy the {@code Settings.toml} under {@code home} configures, if it configures a usable one. */
-    public static Optional<ProxySettings> read(Path home) {
-        String content;
+    /**
+     * The proxy the Ballerina home's {@code Settings.toml} configures, read by {@code bal pull}'s own reader. A
+     * file it cannot read is no proxy, as it is for {@code bal pull}.
+     */
+    public static Optional<ProxySettings> configured() {
         try {
-            content = Files.readString(home.resolve(ProjectConstants.SETTINGS_FILE_NAME), StandardCharsets.UTF_8);
-        } catch (IOException | RuntimeException unreadable) {
+            return of(RepoUtils.readSettings().getProxy());
+        } catch (RuntimeException | LinkageError unreadable) {
             return Optional.empty();
         }
-        return parse(content);
     }
 
-    /** The proxy a {@code Settings.toml}'s content configures, if it configures a usable one. */
-    public static Optional<ProxySettings> parse(String settingsToml) {
-        Proxy proxy;
-        try {
-            proxy = SettingsBuilder.from(TomlDocument.from(ProjectConstants.SETTINGS_FILE_NAME, settingsToml))
-                    .settings().getProxy();
-        } catch (RuntimeException unparsable) {
-            return Optional.empty();
-        }
+    // bal pull's rule (ProjectUtils.initializeProxy) is kept rather than called: it resolves the host on the spot
+    // and drops the credentials, and an unresolvable proxy host has a failure of its own here.
+    static Optional<ProxySettings> of(Proxy proxy) {
         if (proxy == null || proxy.host() == null || proxy.host().isEmpty() || proxy.port() <= 0) {
             return Optional.empty();
         }
-        return Optional.of(new ProxySettings(proxy.host(), proxy.port(),
-                proxy.username() == null ? "" : proxy.username(), proxy.password() == null ? "" : proxy.password()));
+        return Optional.of(new ProxySettings(proxy.host(), proxy.port(), orEmpty(proxy.username()),
+                orEmpty(proxy.password())));
     }
 
-    /** {@code file} as a message names it: under {@code userHome}, with {@code ~} in its place. */
-    public static String displayPath(Path file, String userHome) {
-        if (userHome != null && !userHome.isEmpty()) {
-            Path home = Path.of(userHome);
-            if (file.startsWith(home) && !file.equals(home)) {
-                return "~" + file.getFileSystem().getSeparator() + home.relativize(file);
-            }
-        }
-        return file.toString();
+    private static String orEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     /** Whether the proxy is sent credentials: only with both a username and a password, as for {@code bal pull}. */
