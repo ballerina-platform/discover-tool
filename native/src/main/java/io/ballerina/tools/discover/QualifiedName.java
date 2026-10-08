@@ -71,7 +71,7 @@ public final class QualifiedName {
     }
 
     public static Result<QualifiedName> parse(String input) {
-        Matcher match = PATTERN.matcher(input.trim());
+        Matcher match = PATTERN.matcher(input);
         if (!match.matches() || Version.isTraversal(match.group(1)) || Version.isTraversal(match.group(2))) {
             return Result.err(new Failure.Validation(
                     "Invalid package name '" + input + "'. Expected '<org>/<name>'.",

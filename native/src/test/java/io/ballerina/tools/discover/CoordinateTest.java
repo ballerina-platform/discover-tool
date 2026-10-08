@@ -47,12 +47,26 @@ public class CoordinateTest {
     }
 
     @Test
-    public void anImportsKeywordEscapeIsDropped() {
-        Coordinate escaped = Coordinate.parse("ballerinax/'client.config:1.0.0").value();
-        Assert.assertEquals(escaped.qualified().qualified(), "ballerinax/client.config");
-        Assert.assertEquals(escaped.versionText(), "1.0.0");
-        Assert.assertEquals(Coordinate.parse("ballerina/lang.'int").value().qualified().qualified(),
-                "ballerina/lang.int");
+    public void anImportsKeywordEscapeIsRejectedWithTheUnescapedForm() {
+        for (String[] each : new String[][] {
+                {"ballerinax/'client.config:1.0.0", "Drop the quote: ballerinax/client.config:1.0.0"},
+                {"ballerina/lang.'int", "Drop the quote: ballerina/lang.int"},
+                {"'ballerina/http", "Drop the quote: ballerina/http"}}) {
+            Result<Coordinate> parsed = Coordinate.parse(each[0]);
+            Assert.assertFalse(parsed.isOk(), each[0]);
+            Failure.Validation failure = (Failure.Validation) parsed.failure();
+            Assert.assertEquals(failure.message(), "'" + each[0] + "' quotes a name the way an import does; a "
+                    + "package name is written unescaped.");
+            Assert.assertEquals(failure.suggestion(), each[1]);
+        }
+    }
+
+    @Test
+    public void surroundingWhitespaceIsNotTrimmedAway() {
+        for (String input : List.of(" ballerina/http", "ballerina/http ", "ballerina/http: 2.15.7",
+                "ballerina/http:2.15.7 ")) {
+            Assert.assertFalse(Coordinate.parse(input).isOk(), "'" + input + "'");
+        }
     }
 
     @Test

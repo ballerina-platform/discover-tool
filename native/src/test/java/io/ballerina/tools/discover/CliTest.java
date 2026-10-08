@@ -1551,7 +1551,9 @@ public class CliTest {
                 new Case(List.of("ballerina/http", "--nonesuch", "--output", "text"), false, false),
                 new Case(List.of("ballerina/http", "--output=text", "--nonesuch"), false, false),
                 new Case(List.of("ballerina/http", "--nonesuch", "--output", "xml"), true, false),
-                new Case(List.of("ballerina/http", "--output", "xml"), false, true))) {
+                new Case(List.of("ballerina/http", "--output", "xml"), false, true),
+                new Case(List.of("ballerina/http", "nosuchbucket", "--filter", "--output", "text"), false, true),
+                new Case(List.of("ballerina/http", "-m", "--output", "text"), false, true))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never(), null, each.interactive()), 1,
                     each.toString());

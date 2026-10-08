@@ -38,8 +38,11 @@ import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * {@code bal discover} — argv in, exit code out.
@@ -67,6 +70,10 @@ import java.util.function.Consumer;
  * @since 0.1.0
  */
 public final class Cli {
+
+    private static final String VERSION_FLAG = "--version";
+
+    private static final String OUTPUT_FLAG = "--output";
 
     private Cli() {
     }
@@ -128,16 +135,16 @@ public final class Cli {
                     "Pass '<org>/<name>', e.g. bal discover ballerinax/github."), streams, json);
         }
 
-        Failure argumentError = validate(root);
-        if (argumentError != null) {
-            return fail(argumentError, streams, json);
-        }
-
         Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
         if (!coordinate.isOk()) {
             return fail(coordinate.failure(), streams, json);
         }
         QualifiedName qualified = coordinate.value().qualified();
+
+        Failure argumentError = validate(root, qualified);
+        if (argumentError != null) {
+            return fail(argumentError, streams, json);
+        }
         String version = coordinate.value().versionText();
 
         // Checked before the package is ever fetched: a mistyped bucket is a fact about the argument list, not
@@ -246,12 +253,19 @@ public final class Cli {
      * failure to parse the arguments is still written in the mode the caller asked for.
      */
     public static boolean jsonOutput(List<String> argv, boolean interactive) {
-        String flag = "--output";
+        Set<String> takesValue = Commands.Grammar.create().line().getCommandSpec().options().stream()
+                .filter(option -> option.arity().max() > 0)
+                .flatMap(option -> Arrays.stream(option.names()))
+                .collect(Collectors.toSet());
         for (int i = 0; i < argv.size(); i++) {
             String token = argv.get(i);
-            String value = token.startsWith(flag + "=") ? token.substring(flag.length() + 1)
-                    : token.equals(flag) && i + 1 < argv.size() ? argv.get(i + 1)
-                    : null;
+            String value = null;
+            if (token.startsWith(OUTPUT_FLAG + "=")) {
+                value = token.substring(OUTPUT_FLAG.length() + 1);
+            } else if (takesValue.contains(token) && i + 1 < argv.size()) {
+                i++;
+                value = token.equals(OUTPUT_FLAG) ? argv.get(i) : null;
+            }
             if (Commands.JSON_OUTPUT.equals(value) || Commands.TEXT_OUTPUT.equals(value)) {
                 return Commands.JSON_OUTPUT.equals(value);
             }
@@ -259,7 +273,7 @@ public final class Cli {
         return !interactive;
     }
 
-    private static Failure validate(Commands.Root root) {
+    private static Failure validate(Commands.Root root, QualifiedName qualified) {
         Failure output = rejectInvalidOutput(root);
         if (output != null) {
             return output;
@@ -269,7 +283,7 @@ public final class Cli {
                     "--page " + root.page + " is out of range: pages are numbered from 1.",
                     "Pass --page 1 or later, or drop it for the first page.");
         }
-        return rejectVersionArguments(root);
+        return rejectVersionArguments(root, qualified);
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
@@ -282,7 +296,7 @@ public final class Cli {
                 "Pass --output " + Commands.JSON_OUTPUT + " or --output " + Commands.TEXT_OUTPUT + ".");
     }
 
-    private static Failure rejectVersionArguments(Commands.Root root) {
+    private static Failure rejectVersionArguments(Commands.Root root, QualifiedName qualified) {
         List<String> tokens = root.rest;
         if (tokens == null) {
             return null;
@@ -296,13 +310,7 @@ public final class Cli {
         }
         return new Failure.Validation(
                 "'" + misplaced + "' looks like a version.",
-                "Write it after the package: " + packageOf(root.pkg) + ":" + misplaced);
-    }
-
-    /** The {@code <org>/<name>} part of a coordinate as typed, whatever follows it. */
-    private static String packageOf(String coordinate) {
-        int colon = coordinate.indexOf(':');
-        return colon < 0 ? coordinate : coordinate.substring(0, colon);
+                "Write it after the package: " + qualified.qualified() + ":" + misplaced);
     }
 
     private static Failure describeParseError(CommandLine.ParameterException cause, List<String> argv) {
@@ -335,30 +343,25 @@ public final class Cli {
                 "Run with --help for usage.");
     }
 
-    private static final String VERSION_FLAG = "--version";
-
-    /**
-     * {@code --version} is not a flag of this command: by convention it asks for a program's own version, so the
-     * package version goes in the coordinate instead — what the caller is told to type, built from their own
-     * package and value where argv carries them.
-     */
+    // `--version` conventionally asks for a program's own version, so the package's goes in the coordinate.
     private static Failure versionFlag(List<String> argv) {
-        String pkg = "<org>/<name>";
+        String pkg = null;
         String version = "<version>";
         for (int i = 0; i < argv.size(); i++) {
             String token = argv.get(i);
             String attached = token.startsWith(VERSION_FLAG + "=") ? token.substring(VERSION_FLAG.length() + 1) : "";
+            Result<Coordinate> coordinate = Coordinate.parse(token);
             if (Version.isComplete(attached)) {
                 version = attached;
             } else if (token.equals(VERSION_FLAG) && i + 1 < argv.size() && Version.isComplete(argv.get(i + 1))) {
                 version = argv.get(i + 1);
-            } else if (pkg.startsWith("<") && !token.startsWith("-") && token.contains("/")) {
-                pkg = packageOf(token);
+            } else if (pkg == null && coordinate.isOk()) {
+                pkg = coordinate.value().qualified().qualified();
             }
         }
         return new Failure.Validation(
                 "Unknown option '" + VERSION_FLAG + "'.",
-                "To read a specific version, write " + pkg + ":" + version);
+                "To read a specific version, write " + (pkg == null ? "<org>/<name>" : pkg) + ":" + version);
     }
 
     private static Failure missingValue(CommandLine.Model.OptionSpec option) {
