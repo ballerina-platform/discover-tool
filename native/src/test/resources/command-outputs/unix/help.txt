@@ -17,6 +17,10 @@ Typical session:
 Buckets, addressed as the second positional: client, service, class, funcs, type,
 readme. No bucket lists which of them this package has.
 
+With no version after the package, the one your project's Dependencies.toml locks is
+read (found from the current directory up), else Central's latest.
+Exit codes: 0 an answer, 1 a failure, 2 a usage error.
+
   --output json|text      Override the TTY-detected default: human text at an
                           interactive terminal, JSON otherwise.
   --filter <keyword>      Narrow an already-selected bucket to entries whose name,
