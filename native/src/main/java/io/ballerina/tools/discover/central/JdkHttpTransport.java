@@ -336,7 +336,7 @@ public final class JdkHttpTransport implements HttpTransport {
         String message = describe(failed);
         Matcher tunnel = TUNNEL_FAILED.matcher(message);
         if (tunnel.find()) {
-            return new Reply.Failed(Reply.Problem.TUNNEL, "HTTP " + tunnel.group(1));
+            return new Reply.Failed(Reply.Problem.TUNNEL, tunnel.group(1));
         }
         for (Throwable cause = failed; cause != null; cause = cause.getCause()) {
             if (cause instanceof ConnectException || cause instanceof ClosedChannelException) {

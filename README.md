@@ -620,10 +620,13 @@ incomplete version, `--version`, a version typed as a positional, or an unknown 
 that depends on what the package holds — an extra selector the container does not read, a page past the end
 of the listing, a module with no readme — is exit 1.
 
-`upstream` and `timeout` are worth re-running unchanged — once the network and the [proxy](#proxy) settings
-are checked, when no answer came back at all (an `upstream` failure without a `status`); `validation`,
-`package-not-found` and `symbol-not-found` need a different command; `schema-drift` means Central's payload changed shape and is for
-a maintainer.
+`upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
+`package-not-found` and `symbol-not-found` need a different command; `schema-drift` means Central's payload
+changed shape and is for a maintainer. An `upstream` failure's `message` names what failed: the host, or the
+proxy and the `Settings.toml` that sets it. Its `reached` is `true` when Central answered, with an error status
+(in `status`) or a body that is not JSON, and `false` when no answer from Central came back: the connection, DNS,
+TLS or the proxy failed, and `status` is then the proxy's own answer when it gave one (407 when it wants a
+username and password).
 
 **Which version is read.** The one written in the coordinate (`ballerina/http:2.15.7`), even inside a project that
 locks another. Otherwise, inside a Ballerina project the tool walks up to `Ballerina.toml` and uses the version
@@ -641,8 +644,8 @@ package owns, which pins the version that declaration was generated against
 
 Requests to Central go through the HTTP proxy `bal pull` uses: the `[proxy]` table of `~/.ballerina/Settings.toml`
 (or of `$BALLERINA_HOME_DIR/Settings.toml` when that is set). A proxy needs `host` and `port`; `username` and
-`password`, when both are set, answer the proxy's own authentication challenge. With no such table, an empty
-`host` or no `port`, requests go direct.
+`password`, when both are set, answer the proxy's own authentication challenge, once per request: a rejected
+password is a failure, never retried. With no such table, an empty `host` or no `port`, requests go direct.
 
 ```toml
 [proxy]

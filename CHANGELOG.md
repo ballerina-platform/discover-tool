@@ -42,5 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   suggestion indented below it; a usage error (a malformed command line, rejected before anything is looked up)
   exits 2 and, in text, ends with the synopsis and a pointer to `--help`, and every other failure exits 1
 - Send requests to Ballerina Central through the HTTP proxy `bal pull` uses, the `[proxy]` table of
-  `~/.ballerina/Settings.toml`, with its `username` and `password` for proxy authentication
+  `~/.ballerina/Settings.toml`, with its `username` and `password` for proxy authentication, sent once per request
+- Name what failed when a request to Central gets no answer — the host, or the proxy and the `Settings.toml` that
+  sets it, and the cause — with `reached` in the JSON failure telling an answer from Central from none
 - Cache Central responses under `$XDG_CACHE_HOME`, falling back to a live fetch on any cache failure

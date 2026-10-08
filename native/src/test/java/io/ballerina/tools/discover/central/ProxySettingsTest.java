@@ -142,4 +142,16 @@ public class ProxySettingsTest {
                 StandardCharsets.UTF_8);
         Assert.assertEquals(ProxySettings.read(home), Optional.of(new ProxySettings("127.0.0.1", 3128, "", "")));
     }
+
+    @Test
+    public void theSettingsFileIsNamedWithATildeOnlyUnderTheUsersHome() {
+        Assert.assertEquals(ProxySettings.displayPath(Path.of("/home/alice/.ballerina/Settings.toml"), "/home/alice"),
+                "~/.ballerina/Settings.toml");
+        Assert.assertEquals(ProxySettings.displayPath(Path.of("/opt/bal-home/Settings.toml"), "/home/alice"),
+                "/opt/bal-home/Settings.toml");
+        Assert.assertEquals(ProxySettings.displayPath(Path.of("/home/alicia/Settings.toml"), "/home/alice"),
+                "/home/alicia/Settings.toml");
+        Assert.assertEquals(ProxySettings.displayPath(Path.of("/home/alice/Settings.toml"), ""),
+                "/home/alice/Settings.toml");
+    }
 }

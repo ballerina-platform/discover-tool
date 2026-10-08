@@ -66,16 +66,18 @@ public sealed interface Failure {
     record PackageNotFound(String qualified, String version, String module, String suggestion) implements Failure { }
 
     /**
-     * Central answered, but not usefully — a 4xx/5xx, a network error, a bad body. {@code status} is
-     * {@code null} when the failure happened before a status line existed.
+     * A request to Central failed: Central answered with an error status or a body that is not JSON, or no answer
+     * from Central came back at all — the connection, DNS, TLS or the proxy failed.
      *
      * @param url the request that failed
-     * @param attempts how many times it was retried before giving up
-     * @param message what Central's answer, or the transport, said
+     * @param attempts how many attempts were made before giving up
+     * @param message what went wrong, as a sentence without its full stop
      * @param suggestion what to try next
-     * @param status the HTTP status Central answered with, or {@code null}
+     * @param status the HTTP status the request failed with — Central's when {@code reached}, else the proxy's —
+     *     or {@code null} when no status line came back
+     * @param reached whether Central answered
      */
-    record Upstream(String url, int attempts, String message, String suggestion, Integer status)
+    record Upstream(String url, int attempts, String message, String suggestion, Integer status, boolean reached)
             implements Failure { }
 
     /**
@@ -135,16 +137,8 @@ public sealed interface Failure {
             + "build already pulled the package — those are the signatures Central publishes. Never "
             + "fall back to a remembered signature.";
 
-    /** No answer came back at all: the connection, the proxy, DNS or TLS failed. */
-    String NETWORK_SUGGESTION = "Check your network connection and the [proxy] settings in "
-            + "~/.ballerina/Settings.toml, then run the same command again.";
-
     /** Central answered, with an error status or a body that is not JSON. */
     String UPSTREAM_SUGGESTION = "Central returned an error; run the same command again later.";
-
-    String TIMEOUT_SUGGESTION = "A large package is slow on a cold fetch, so run the same command again; if it "
-            + "keeps timing out, check your network connection and the [proxy] settings in "
-            + "~/.ballerina/Settings.toml.";
 
     /**
      * Addressed to a human on purpose: no argument the agent can change will make a payload this
@@ -180,9 +174,7 @@ public sealed interface Failure {
             case Validation f -> f.message();
             case PackageNotFound f -> (f.module() == null ? "Package" : "Module") + " not found on Central: "
                     + coordinate(f.qualified(), f.version(), f.module()) + ".";
-            case Upstream f -> "Request to " + f.url() + " failed after " + f.attempts()
-                    + (f.attempts() == 1 ? " attempt" : " attempts")
-                    + (f.message() == null ? "." : ": " + f.message() + ".");
+            case Upstream f -> f.message() + (f.attempts() > 1 ? " (" + f.attempts() + " attempts)." : ".");
             case Timeout f -> "Central did not answer " + f.url() + " within " + seconds(f.budgetMs()) + ".";
             case SchemaDrift f -> "Central's answer for " + coordinate(f.qualified(), f.version(), f.module())
                     + " has a shape this tool does not understand; Central's docs format may have changed.";
@@ -236,6 +228,7 @@ public sealed interface Failure {
                 if (f.status() != null) {
                     json.addProperty("status", f.status());
                 }
+                json.addProperty("reached", f.reached());
             }
             case Timeout f -> {
                 json.addProperty("url", f.url());

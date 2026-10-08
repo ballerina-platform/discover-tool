@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover.cli;
 
 import io.ballerina.cli.BLauncherCmd;
+import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.cache.CacheLocation;
 import io.ballerina.tools.discover.cache.DiskCache;
@@ -34,7 +35,6 @@ import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Entry point for the {@code bal discover} CLI tool: the process wrapper.
@@ -102,8 +102,13 @@ public class DiscoverTool implements BLauncherCmd {
         if (helpFlag) {
             argv.add("--help");
         }
+        Path home = ballerinaHome();
         HttpOptions.Builder builder = HttpOptions.builder().cache(buildCache());
-        proxy().ifPresent(proxy -> builder.transport(new JdkHttpTransport(proxy)));
+        if (home != null) {
+            builder.settingsFile(ProxySettings.displayPath(home.resolve(ProjectConstants.SETTINGS_FILE_NAME),
+                    property("user.home")));
+            ProxySettings.read(home).ifPresent(proxy -> builder.transport(new JdkHttpTransport(proxy)).proxy(proxy));
+        }
         HttpOptions http = builder.build();
         Cli.Streams streams = new Cli.Streams(outStream::print, errStream::print);
 
@@ -138,11 +143,11 @@ public class DiscoverTool implements BLauncherCmd {
                 : cause.getMessage();
     }
 
-    private static Optional<ProxySettings> proxy() {
+    private static Path ballerinaHome() {
         try {
-            return ProxySettings.read(RepoUtils.createAndGetHomeReposPath());
+            return RepoUtils.createAndGetHomeReposPath();
         } catch (RuntimeException | LinkageError unavailable) {
-            return Optional.empty();
+            return null;
         }
     }
 

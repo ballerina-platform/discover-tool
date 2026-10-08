@@ -214,8 +214,9 @@ public class JdkHttpTransportTest {
     }
 
     /**
-     * A proxy that reads one {@code CONNECT} per connection, answers 407 unless it carries {@code expected}, and
-     * otherwise opens a tunnel it closes at once: enough to see what the client sent, with no origin behind it.
+     * A proxy that reads one {@code CONNECT} per connection, answers {@code refusal} (a 407 by default) unless it
+     * carries {@code expected}, and otherwise opens a tunnel it closes at once: enough to see what the client sent,
+     * with no origin behind it.
      */
     private static final class ConnectProxy implements AutoCloseable {
 
@@ -224,6 +225,11 @@ public class JdkHttpTransportTest {
         private final Thread acceptor;
 
         ConnectProxy(String expected) throws IOException {
+            this(expected, "HTTP/1.1 407 Proxy Authentication Required\r\n"
+                    + "Proxy-Authenticate: Basic realm=\"test\"\r\nContent-Length: 0\r\n\r\n");
+        }
+
+        ConnectProxy(String expected, String refusal) throws IOException {
             acceptor = new Thread(() -> {
                 while (!socket.isClosed()) {
                     try (Socket connection = socket.accept()) {
@@ -238,8 +244,7 @@ public class JdkHttpTransportTest {
                         }
                         String reply = expected.equals(credential)
                                 ? "HTTP/1.1 200 Connection Established\r\n\r\n"
-                                : "HTTP/1.1 407 Proxy Authentication Required\r\n"
-                                        + "Proxy-Authenticate: Basic realm=\"test\"\r\nContent-Length: 0\r\n\r\n";
+                                : refusal;
                         connection.getOutputStream().write(reply.getBytes(StandardCharsets.ISO_8859_1));
                         connection.getOutputStream().flush();
                     } catch (IOException closed) {
@@ -326,6 +331,29 @@ public class JdkHttpTransportTest {
             Assert.assertEquals(proxy.requests().stream().filter(request -> request.endsWith(basic("alice", "wrong")))
                     .count(), 2, proxy.requests().toString());
         }
+    }
+
+    @Test
+    public void aProxyThatCannotOpenTheTunnelIsReportedWithItsStatus() throws IOException {
+        String badGateway = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n";
+        try (ConnectProxy proxy = new ConnectProxy("never", badGateway)) {
+            ProxySettings settings = new ProxySettings("127.0.0.1", proxy.port(), "", "");
+            HttpTransport.Reply reply =
+                    new JdkHttpTransport(LIMIT, settings).get("https://central.invalid/2.0/docs/ballerina/http", 5000);
+            Assert.assertEquals(reply, new HttpTransport.Reply.Failed(HttpTransport.Reply.Problem.TUNNEL, "502"));
+        }
+    }
+
+    @Test
+    public void aProxyThatIsNotListeningIsAConnectionNotMade() throws IOException {
+        int port;
+        try (ServerSocket closed = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            port = closed.getLocalPort();
+        }
+        HttpTransport.Reply reply = new JdkHttpTransport(LIMIT, new ProxySettings("127.0.0.1", port, "", ""))
+                .get("https://central.invalid/2.0/docs/ballerina/http", 5000);
+        Assert.assertEquals(((HttpTransport.Reply.Failed) reply).problem(), HttpTransport.Reply.Problem.UNCONNECTED,
+                reply.toString());
     }
 
     @Test

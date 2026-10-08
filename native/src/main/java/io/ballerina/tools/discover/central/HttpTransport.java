@@ -82,7 +82,10 @@ public interface HttpTransport {
             UNRESOLVED,
             /** The TLS handshake with Central failed. */
             TLS,
-            /** The proxy answered the {@code CONNECT} with an error status of its own, other than 407. */
+            /**
+             * The proxy answered the {@code CONNECT} with an error status of its own, other than 407; the message
+             * is that status.
+             */
             TUNNEL,
             /** The proxy rejected the configured username and password. */
             PROXY_REJECTED,

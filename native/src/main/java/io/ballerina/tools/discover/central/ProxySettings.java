@@ -74,6 +74,17 @@ public record ProxySettings(String host, int port, String username, String passw
                 proxy.username() == null ? "" : proxy.username(), proxy.password() == null ? "" : proxy.password()));
     }
 
+    /** {@code file} as a message names it: under {@code userHome}, with {@code ~} in its place. */
+    public static String displayPath(Path file, String userHome) {
+        if (userHome != null && !userHome.isEmpty()) {
+            Path home = Path.of(userHome);
+            if (file.startsWith(home) && !file.equals(home)) {
+                return "~" + file.getFileSystem().getSeparator() + home.relativize(file);
+            }
+        }
+        return file.toString();
+    }
+
     /** Whether the proxy is sent credentials: only with both a username and a password, as for {@code bal pull}. */
     public boolean authenticates() {
         return !username.isEmpty() && !password.isEmpty();
