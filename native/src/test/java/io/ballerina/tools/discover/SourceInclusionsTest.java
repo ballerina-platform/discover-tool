@@ -61,7 +61,7 @@ public class SourceInclusionsTest {
 
     private static final Version VERSION = Version.parse("2.16.6").value();
 
-    private static final CentralClient.ResolvedVersion RESOLVED = new CentralClient.ResolvedVersion(VERSION, false);
+    private static final CentralClient.ResolvedVersion RESOLVED = CentralClient.ResolvedVersion.latest(VERSION, false);
 
     /** Central with nothing local to look in — no test here reads a real Ballerina home or distribution. */
     private static final CentralRepository CENTRAL = CentralRepository.withLocalSources(List.of());

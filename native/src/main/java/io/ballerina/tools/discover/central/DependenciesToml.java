@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.central;
 
+import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.tools.discover.QualifiedName;
 
 import java.io.IOException;
@@ -98,6 +99,10 @@ public final class DependenciesToml {
         return null;
     }
 
+    public static Path lockFile(String projectDir) {
+        return Path.of(projectDir, ProjectConstants.DEPENDENCIES_TOML);
+    }
+
     /**
      * The locked version of one package in a component directory, or {@code null} if a build has not written
      * one. A missing file is not an error — most lookups happen before the first build.
@@ -108,7 +113,7 @@ public final class DependenciesToml {
     public static String lockedVersion(String projectDir, QualifiedName qualified) {
         String content;
         try {
-            content = Files.readString(Path.of(projectDir, "Dependencies.toml"), StandardCharsets.UTF_8);
+            content = Files.readString(lockFile(projectDir), StandardCharsets.UTF_8);
         } catch (IOException | RuntimeException ignored) {
             return null;
         }

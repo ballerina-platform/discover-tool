@@ -69,7 +69,7 @@ public class LocalBalasTest {
 
     private static final Version VERSION = Version.parse("2.16.6").value();
 
-    private static final CentralClient.ResolvedVersion RESOLVED = new CentralClient.ResolvedVersion(VERSION, false);
+    private static final CentralClient.ResolvedVersion RESOLVED = CentralClient.ResolvedVersion.latest(VERSION, false);
 
     private static final String BALA_URL = "https://files.example/http.bala";
 
@@ -211,7 +211,7 @@ public class LocalBalasTest {
 
     @Test
     public void anUnverifiedVersionNeverReachesTheNetwork() throws IOException {
-        CentralClient.ResolvedVersion offline = new CentralClient.ResolvedVersion(VERSION, true);
+        CentralClient.ResolvedVersion offline = CentralClient.ResolvedVersion.latest(VERSION, true);
         Assert.assertTrue(fetch(List.of(), offline, FakeTransport.never()).isEmpty());
         Assert.assertEquals(fetch(List.of(LocalBalas.homeRepository(home("2.16.6", "java21", "http"))), offline,
                 FakeTransport.never()), Optional.of(httpSources()), "a local copy is still read");

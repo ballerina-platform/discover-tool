@@ -21,10 +21,10 @@ package io.ballerina.tools.discover.central;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonParser;
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
-import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
@@ -33,10 +33,12 @@ import io.ballerina.tools.discover.central.schema.Schema;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,6 +75,8 @@ public final class CentralClient {
 
     private static final long NO_RETRY_AFTER = -1;
 
+    private static final int LISTED_VERSIONS = 10;
+
     /**
      * How long Central's answer to "what is the latest version" is believed.
      *
@@ -86,19 +90,40 @@ public final class CentralClient {
     }
 
     /**
-     * A version, and what a caller may need to know about where it came from.
+     * A version, and where it came from.
      *
      * @param version the resolved version
+     * @param source who chose it
      * @param stale the registry was unreachable and this came off disk unverified
-     * @param supplied the CALLER chose this version — in the coordinate or {@code Dependencies.toml} — so a
-     *     later 404 from the docs endpoint is theirs to correct, not the reader's
-     * @param pinned the version was written in the coordinate itself, so a command printed for the caller must
-     *     repeat it
+     * @param lock the {@code Dependencies.toml} that locks it, for {@link Source#LOCKED}, else {@code null}
      */
-    public record ResolvedVersion(Version version, boolean stale, boolean supplied, boolean pinned) {
+    public record ResolvedVersion(Version version, Source source, boolean stale, Path lock) {
 
-        public ResolvedVersion(Version version, boolean stale) {
-            this(version, stale, false, false);
+        /** Who chose a version. */
+        public enum Source {
+            /** The caller wrote it in the coordinate, so a command printed for them repeats it. */
+            WRITTEN,
+            /** The project's {@code Dependencies.toml} locks it. */
+            LOCKED,
+            /** Central's newest. */
+            LATEST
+        }
+
+        public static ResolvedVersion latest(Version version, boolean stale) {
+            return new ResolvedVersion(version, Source.LATEST, stale, null);
+        }
+
+        public static ResolvedVersion written(Version version) {
+            return new ResolvedVersion(version, Source.WRITTEN, false, null);
+        }
+
+        public static ResolvedVersion locked(Version version, Path lock) {
+            return new ResolvedVersion(version, Source.LOCKED, false, lock);
+        }
+
+        /** Whether the caller chose it, so a later 404 from the docs endpoint is theirs to correct. */
+        public boolean supplied() {
+            return source != Source.LATEST;
         }
     }
 
@@ -371,7 +396,7 @@ public final class CentralClient {
                 || containingPackages(qualified).isEmpty()) {
             return direct;
         }
-        return Result.err(notAPackage(qualified, null, options));
+        return Result.err(notAPackage(qualified, null, null, options));
     }
 
     private static List<QualifiedName> containingPackages(QualifiedName qualified) {
@@ -386,12 +411,12 @@ public final class CentralClient {
         return parents;
     }
 
-    private static Failure notAPackage(QualifiedName qualified, String pin, HttpOptions options) {
+    private static Failure notAPackage(QualifiedName qualified, Version version, Version pin, HttpOptions options) {
         List<QualifiedName> parents = containingPackages(qualified);
         for (QualifiedName parent : parents) {
             Result<ResolvedVersion> probed = resolvePublishedVersion(parent, options);
             if (probed.isOk()) {
-                return moduleOf(qualified, parent, probed.value().version(), pin, options);
+                return moduleOf(qualified, parent, probed.value().version(), version, pin, options);
             }
             if (!(probed.failure() instanceof Failure.PackageNotFound)) {
                 return notFound(qualified);
@@ -402,19 +427,19 @@ public final class CentralClient {
             tried.append(tried.isEmpty() ? "" : ", ").append(parent.qualified());
         }
         return new Failure.PackageNotFound(
-                qualified.qualified(), pin, null,
+                qualified.qualified(), textOf(version), null,
                 "Central publishes no package under this name, and none of the packages it could be a module "
                         + "of exists either (tried " + tried + "). Check the org/name spelling; "
                         + "`bal search <keyword>` lists what Central publishes.");
     }
 
     private static Failure moduleOf(
-            QualifiedName qualified, QualifiedName parent, Version version, String pin, HttpOptions options) {
+            QualifiedName qualified, QualifiedName parent, Version parentVersion, Version version, Version pin,
+            HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
-        String command = "`bal discover " + Texts.shellWord(pinned(parent, pin)) + " --module "
-                + Texts.shellWord(submodule) + "`";
+        String command = "`bal discover " + new Coordinate(parent, pin).argument(submodule) + "`";
         String url = REGISTRY_PACKAGES_URL + encode(parent.org()) + "/" + encode(parent.name())
-                + "/" + encode(version.text());
+                + "/" + encode(parentVersion.text());
         Result<JsonElement> response = fetchJson(url, options);
         Optional<List<String>> listed = response.isOk() ? Coordinates.moduleNames(response.value()) : Optional.empty();
         String suggestion;
@@ -431,7 +456,7 @@ public final class CentralClient {
                     + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
                     + "). Check the name; `bal search <keyword>` lists what Central publishes.";
         }
-        return new Failure.PackageNotFound(qualified.qualified(), pin, null, suggestion);
+        return new Failure.PackageNotFound(qualified.qualified(), textOf(version), null, suggestion);
     }
 
     // Asks for this package's row: listing the whole org (ballerinax) and filtering costs about 45 seconds.
@@ -449,27 +474,24 @@ public final class CentralClient {
                     && options.now() - entry.atMs() < LATEST_TTL_MS) {
                 Result<Version> cached = Version.parse(entry.version());
                 if (cached.isOk()) {
-                    return Result.ok(new ResolvedVersion(cached.value(), false));
+                    return Result.ok(ResolvedVersion.latest(cached.value(), false));
                 }
             }
         }
 
-        String url = REGISTRY_PACKAGES_URL + encode(qualified.org())
-                + "/" + encode(qualified.name());
-        Result<JsonElement> response = fetchJson(url, options);
+        Result<JsonElement> response = fetchJson(registryUrl(qualified), options);
         if (!response.isOk()) {
             // Central answers an unpublished org/name with a 400, not a 404. Either way the fact is "no such
             // package", and reporting it as a transport error would send the caller looking at the network for
             // a typo.
-            Integer status = response.failure() instanceof Failure.Upstream upstream ? upstream.status() : null;
-            if (status != null && (status == BAD_REQUEST || status == NOT_FOUND)) {
+            if (isNoSuchPackage(response)) {
                 return Result.err(notFound(qualified));
             }
             Version offline = offlineVersion(cache, key, options);
             if (offline != null) {
-                return Result.ok(new ResolvedVersion(offline, true));
+                return Result.ok(ResolvedVersion.latest(offline, true));
             }
-            return response.cast();
+            return about(response, qualified, null);
         }
 
         String latest = Coordinates.newestVersion(response.value());
@@ -483,7 +505,7 @@ public final class CentralClient {
             return parsed.cast();
         }
         cache.writeLatest(key, new DocsCache.LatestEntry(parsed.value().text(), options.now()));
-        return Result.ok(new ResolvedVersion(parsed.value(), false));
+        return Result.ok(ResolvedVersion.latest(parsed.value(), false));
     }
 
     private static Version offlineVersion(DocsCache cache, DocsCache.PackageKey key, HttpOptions options) {
@@ -505,8 +527,12 @@ public final class CentralClient {
     }
 
     private static Failure notFound(QualifiedName qualified) {
+        return notFound(qualified, null);
+    }
+
+    private static Failure notFound(QualifiedName qualified, Version version) {
         return new Failure.PackageNotFound(
-                qualified.qualified(), null, null,
+                qualified.qualified(), textOf(version), null,
                 "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
     }
 
@@ -551,20 +577,15 @@ public final class CentralClient {
             // 404 here is specific: the org/name may well exist, this VERSION does not — and which half the
             // caller can act on depends on who chose the version. A version they passed is theirs to correct.
             // One the reader resolved is not: telling them to "omit the version" names what they already did.
-            if (response.failure() instanceof Failure.Upstream upstream
-                    && upstream.status() != null && upstream.status() == NOT_FOUND) {
-                if (resolved.supplied() && isUnpublishedDottedName(qualified, options)) {
-                    return Result.err(notAPackage(qualified, pinOf(resolved), options));
-                }
-                return Result.err(new Failure.PackageNotFound(qualified.qualified(), version.text(), null,
-                        missingVersion(qualified, resolved, options)));
+            if (isNotFound(response)) {
+                return Result.err(missingVersion(qualified, resolved, options));
             }
-            return response.cast();
+            return about(response, qualified, version);
         }
         // A version for a module path can still arrive from a `latest` entry an older build of this reader wrote
         // under the module's own key; the page itself says what it is.
         if (Coordinates.describesSubmodule(response.value(), qualified)) {
-            return Result.err(notAPackage(qualified, pinOf(resolved), options));
+            return Result.err(notAPackage(qualified, version, pinOf(resolved), options));
         }
         Result<CentralDocs> parsed = Schema.parse(response.value(), qualified.qualified(), version.text());
         if (!parsed.isOk()) {
@@ -614,11 +635,10 @@ public final class CentralClient {
                 + "/" + encode(moduleName) + "/" + encode(version.text());
         Result<JsonElement> response = fetchJson(url, options);
         if (!response.isOk()) {
-            if (response.failure() instanceof Failure.Upstream upstream
-                    && upstream.status() != null && upstream.status() == NOT_FOUND) {
+            if (isNotFound(response)) {
                 return Result.err(noSuchModulePage(version, qualified, pinOf(resolved), submodule));
             }
-            return response.cast();
+            return about(response, qualified, version);
         }
         if (!Coordinates.isModulePage(response.value(), qualified, submodule, version)) {
             return Result.err(noSuchModulePage(version, qualified, pinOf(resolved), submodule));
@@ -634,68 +654,90 @@ public final class CentralClient {
         return parsed;
     }
 
-    private static String pinOf(ResolvedVersion resolved) {
-        return resolved.pinned() ? resolved.version().text() : null;
+    private static String textOf(Version version) {
+        return version == null ? null : version.text();
     }
 
-    private static String pinned(QualifiedName qualified, String pin) {
-        return qualified.qualified() + (pin == null ? "" : ":" + pin);
+    private static Version pinOf(ResolvedVersion resolved) {
+        return resolved.source() == ResolvedVersion.Source.WRITTEN ? resolved.version() : null;
     }
 
-    private static Failure noSuchModulePage(Version version, QualifiedName qualified, String pin, String submodule) {
+    private static Failure noSuchModulePage(Version version, QualifiedName qualified, Version pin, String submodule) {
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), submodule, qualified.qualified()
                 + " publishes no '" + submodule + "' module at this version. Run `bal discover "
-                + Texts.shellWord(pinned(qualified, pin)) + "` to list the submodules it does publish.");
+                + new Coordinate(qualified, pin).argument(null) + "` to list the submodules it does publish.");
     }
 
-    // A name Central has no row for, with a package it could be a module of.
-    private static boolean isUnpublishedDottedName(QualifiedName qualified, HttpOptions options) {
-        if (containingPackages(qualified).isEmpty()) {
-            return false;
-        }
-        Result<ResolvedVersion> published = resolvePublishedVersion(qualified, options);
-        return !published.isOk() && published.failure() instanceof Failure.PackageNotFound;
+    private static boolean isNotFound(Result<?> response) {
+        return statusOf(response) == NOT_FOUND;
     }
 
-    private static String missingVersion(
-            QualifiedName qualified, ResolvedVersion resolved, HttpOptions options) {
+    private static boolean isNoSuchPackage(Result<?> registry) {
+        return statusOf(registry) == BAD_REQUEST || isNotFound(registry);
+    }
+
+    private static int statusOf(Result<?> response) {
+        return !response.isOk() && response.failure() instanceof Failure.Upstream upstream && upstream.status() != null
+                ? upstream.status()
+                : 0;
+    }
+
+    private static <T> Result<T> about(Result<?> failed, QualifiedName qualified, Version version) {
+        return Result.err(switch (failed.failure()) {
+            case Failure.Upstream upstream -> upstream.about(qualified.qualified(), textOf(version));
+            case Failure.Timeout timeout -> timeout.about(qualified.qualified(), textOf(version));
+            default -> failed.failure();
+        });
+    }
+
+    // A version the caller chose is theirs to correct, unless the package itself is not published at all.
+    private static Failure missingVersion(QualifiedName qualified, ResolvedVersion resolved, HttpOptions options) {
         Version version = resolved.version();
         if (!resolved.supplied()) {
-            return "Central published no '" + qualified.qualified() + "' at " + version.text()
-                    + ", the version resolved for it. Check the name — `bal search <keyword>` lists what Central "
-                    + "publishes.";
+            return new Failure.PackageNotFound(qualified.qualified(), version.text(), null,
+                    "Central published no '" + qualified.qualified() + "' at " + version.text() + ", the version "
+                            + "resolved for it. Check the name — `bal search <keyword>` lists what Central "
+                            + "publishes.");
         }
-        String published = publishedVersions(qualified, options);
-        String listed = published == null ? "" : "; published versions are " + published;
+        Result<JsonElement> registry = fetchJson(registryUrl(qualified), options);
+        List<String> versions = registry.isOk() ? Coordinates.publishedVersions(registry.value()) : List.of();
+        if (isNoSuchPackage(registry) || registry.isOk() && versions.isEmpty()) {
+            return containingPackages(qualified).isEmpty()
+                    ? notFound(qualified, version)
+                    : notAPackage(qualified, version, pinOf(resolved), options);
+        }
+        String listed = versions.isEmpty() ? "" : "; " + nearest(versions, version);
         String coordinate = qualified.qualified() + ":<version>";
-        if (resolved.pinned()) {
-            return "Central does not publish '" + qualified.qualified() + "' at " + version.text() + listed
-                    + (published == null ? ". Write a published version" : ". Write one of them")
-                    + " after the package: " + coordinate;
-        }
-        return "Central does not publish '" + qualified.qualified() + "' at " + version.text()
-                + ", the version your project's Dependencies.toml locks" + listed
-                + ". Reconcile Dependencies.toml with the registry so a lookup and a build see the same one, or "
-                + "write a published version after the package: " + coordinate;
+        String suggestion = resolved.source() == ResolvedVersion.Source.WRITTEN
+                ? "Central does not publish '" + qualified.qualified() + "' at " + version.text() + listed
+                        + (versions.isEmpty() ? ". Write a published version" : ". Write one of them")
+                        + " after the package: " + coordinate
+                : "Central does not publish '" + qualified.qualified() + "' at " + version.text() + ", the version "
+                        + resolved.lock() + " locks" + listed + ". Fix the " + qualified.qualified() + " entry "
+                        + "there, or delete the file and run `bal build` to regenerate it; or write a published "
+                        + "version after the package: " + coordinate;
+        return new Failure.PackageNotFound(qualified.qualified(), version.text(), null, suggestion);
     }
 
-    private static final int LISTED_VERSIONS = 10;
+    // The published versions around the one asked for, newest first: 2.9.99 is answered with the 2.9 and 2.10 lines.
+    private static String nearest(List<String> versions, Version requested) {
+        if (versions.size() <= LISTED_VERSIONS) {
+            return "published versions are " + String.join(", ", versions);
+        }
+        List<String> ascending = new ArrayList<>(versions);
+        ascending.sort(Version.PRECEDENCE);
+        int below = (int) ascending.stream()
+                .filter(published -> Version.PRECEDENCE.compare(published, requested.text()) < 0)
+                .count();
+        int from = Math.max(0, Math.min(below - LISTED_VERSIONS / 2, ascending.size() - LISTED_VERSIONS));
+        List<String> window = new ArrayList<>(ascending.subList(from, from + LISTED_VERSIONS));
+        Collections.reverse(window);
+        return "the published versions nearest it are " + String.join(", ", window) + " and "
+                + (versions.size() - LISTED_VERSIONS) + " others";
+    }
 
-    private static String publishedVersions(QualifiedName qualified, HttpOptions options) {
-        String url = REGISTRY_PACKAGES_URL + encode(qualified.org())
-                + "/" + encode(qualified.name());
-        Result<JsonElement> response = fetchJson(url, options);
-        if (!response.isOk()) {
-            return null;
-        }
-        List<String> versions = Coordinates.publishedVersions(response.value());
-        if (versions.isEmpty()) {
-            return null;
-        }
-        return versions.size() <= LISTED_VERSIONS
-                ? String.join(", ", versions)
-                : String.join(", ", versions.subList(0, LISTED_VERSIONS)) + " and "
-                        + (versions.size() - LISTED_VERSIONS) + " older";
+    private static String registryUrl(QualifiedName qualified) {
+        return REGISTRY_PACKAGES_URL + encode(qualified.org()) + "/" + encode(qualified.name());
     }
 
     /**

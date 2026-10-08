@@ -17,6 +17,7 @@
  */
 package io.ballerina.tools.discover.views;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
@@ -440,7 +441,7 @@ public final class Types {
 
     private static String pinnedTo(LoadedPackage loaded, ModuleRef module, String target) {
         return target.equals(module.coordinate()) && !module.coordinate().equals(loaded.qualified().qualified())
-                ? target + module.pinnedVersion().map(version -> ":" + version).orElse("")
+                ? Coordinate.argument(target, module.pinnedVersion().orElse(null), null)
                 : target;
     }
 }

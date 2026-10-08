@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.render;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.symbols.Names;
 import io.ballerina.tools.discover.symbols.Surface;
@@ -147,9 +148,7 @@ public final class TextRenderer {
         }
         layout.warning(bucketList.warning());
         if (where.pkg() != null && !bucketList.buckets().isEmpty()) {
-            layout.next("bal discover "
-                    + Texts.shellWord(where.pkg() + (where.version() == null ? "" : ":" + where.version()))
-                    + (where.module() == null ? "" : " --module " + Texts.shellWord(where.module()))
+            layout.next("bal discover " + Coordinate.argument(where.pkg(), where.version(), where.module())
                     + " <bucket>");
         }
     }
