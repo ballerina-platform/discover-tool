@@ -588,7 +588,8 @@ answer whose `next` is the joined command, and three or more are that failure, s
 | stdout | the answer, and nothing else                                                     |
 | stderr | on failure, exactly one failure, and nothing else                                |
 | exit 0 | success, and stdout is complete                                                  |
-| exit 1 | every failure: stdout is empty, and the failure's `kind` and `suggestion` say what to do next |
+| exit 2 | a usage error — the command line itself is malformed, so nothing was looked up: stdout is empty |
+| exit 1 | every other failure: stdout is empty, and the failure's `kind` and `suggestion` say what to do next |
 
 A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
 forced with `--output` (honoured even when the rest of the arguments fail to parse). In JSON it is one object,
@@ -601,13 +602,21 @@ $ bal discover ballerinax/kafka client NoSuchContainer | cat
 ```
 
 In text it is `error: <message>`, then the suggestion and anything else the failure carries (candidates, schema
-issues) indented below it:
+issues) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
 
 ```
 $ bal discover ballerina/http:2.15
 error: '2.15' in 'ballerina/http:2.15' is not a complete version.
   Write it in full, ballerina/http:<major>.<minor>.<patch>, or drop it to read the version your project locks or Central's latest: ballerina/http
+Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...] [--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
+Run 'bal discover --help' for details.
 ```
+
+A usage error is a `validation` failure found before anything is looked up: an unknown option, an option with
+a missing or invalid value (`--output xml`, `--page x`, `--page 0`), no package, a malformed package name or
+incomplete version, `--version`, a version typed as a positional, or an unknown bucket. A `validation` failure
+that depends on what the package holds — an extra selector the container does not read, a page past the end
+of the listing, a module with no readme — is exit 1.
 
 `upstream` and `timeout` are worth re-running unchanged; `validation`, `package-not-found` and
 `symbol-not-found` need a different command; `schema-drift` means Central's payload changed shape and is for
