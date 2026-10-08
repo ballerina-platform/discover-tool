@@ -493,7 +493,7 @@ public class ClientTest {
         Assert.assertFalse(((Failure.Upstream) upstream.failure()).suggestion().isEmpty());
 
         Result<CentralDocs> drift = Schema.parse(
-                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y:1.0.0");
+                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y", "1.0.0");
         Assert.assertFalse(drift.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) drift.failure();
         // Addressed to a human on purpose: no argument the agent can change will make a payload this reader
@@ -543,7 +543,7 @@ public class ClientTest {
         int configurablesBefore = module.getAsJsonArray("configurables").size();
         module.remove("records");
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertTrue(result.isOk(), "an omitted bucket must not refuse the whole package");
         CentralDocs.Module parsed = result.value().modules().get(0);
         Assert.assertTrue(parsed.records().isEmpty());
@@ -561,7 +561,7 @@ public class ClientTest {
         JsonObject module = onlyModule("ballerinax__sap");
         module.addProperty("records", "no longer an array");
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertFalse(result.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) result.failure();
         Assert.assertEquals(
@@ -587,7 +587,7 @@ public class ClientTest {
     @Test
     public void aPayloadWithNoModulesAtAllIsDriftNotAnEmptyLibrary() {
         Result<CentralDocs> result = Schema.parse(
-                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y:1.0.0");
+                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y", "1.0.0");
         Assert.assertFalse(result.isOk());
     }
 
@@ -602,7 +602,7 @@ public class ClientTest {
             module.addProperty(bucket, "no longer an array");
         }
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertFalse(result.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) result.failure();
         Assert.assertEquals(failure.issues().size(), 6,
@@ -616,7 +616,7 @@ public class ClientTest {
         // The shape Central actually serves for a package with nothing in most buckets.
         String payload = "{\"docsData\":{\"modules\":[{\"id\":\"kafka\",\"orgName\":\"ballerinax\"}]}}";
         Result<CentralDocs> result =
-                Schema.parse(com.google.gson.JsonParser.parseString(payload), "ballerinax/kafka:4.6.5");
+                Schema.parse(com.google.gson.JsonParser.parseString(payload), "ballerinax/kafka", "4.6.5");
         Assert.assertTrue(result.isOk(), "a module with no declarations is empty, not drifted");
         Assert.assertTrue(result.value().modules().get(0).clients().isEmpty());
     }

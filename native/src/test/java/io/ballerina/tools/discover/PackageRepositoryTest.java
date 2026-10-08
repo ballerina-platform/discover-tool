@@ -317,7 +317,7 @@ public class PackageRepositoryTest {
     }
 
     private static Result<CentralDocs> subgraphPage() {
-        return Schema.parse(FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph"), "subgraph");
+        return Schema.parse(FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph"), "subgraph", null);
     }
 
     private static Result<CentralDocs> noModulePage() {

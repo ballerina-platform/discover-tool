@@ -146,7 +146,7 @@ public final class Payload {
     /** The parsed module, before the pipeline — for a case about one of the pipeline's own inputs. */
     public CentralDocs.Module module() {
         String qualified = module.get("orgName").getAsString() + "/" + module.get("id").getAsString();
-        Result<CentralDocs> parsed = Schema.parse(raw(), qualified);
+        Result<CentralDocs> parsed = Schema.parse(raw(), qualified, null);
         if (!parsed.isOk()) {
             throw new AssertionError(
                     "the synthetic payload does not parse: " + parsed.failure().describe());

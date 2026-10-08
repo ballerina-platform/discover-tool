@@ -66,7 +66,7 @@ public class FromCentralTest {
         JsonObject wrapper = new JsonObject();
         wrapper.add("docsData", docsData);
 
-        Result<CentralDocs> parsed = Schema.parse(wrapper, "assembled");
+        Result<CentralDocs> parsed = Schema.parse(wrapper, "assembled", null);
         Assert.assertTrue(parsed.isOk(), parsed.isOk() ? "" : parsed.failure().describe());
         return parsed.value();
     }
@@ -124,7 +124,7 @@ public class FromCentralTest {
 
     @Test
     public void aModuleFlagIsReachedByComposingItOntoThePackageName() {
-        CentralDocs page = Schema.parse(FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader"), "page")
+        CentralDocs page = Schema.parse(FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader"), "page", null)
                 .value();
         Result<CentralDocs.Module> selected =
                 FromCentral.selectModule(page, qualified("ballerina/graphql"), "dataloader", null);

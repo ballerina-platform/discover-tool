@@ -61,12 +61,11 @@ public final class Schema {
     private Schema() {
     }
 
-    /** Validate a raw payload, reporting every mismatch at once. */
-    public static Result<CentralDocs> parse(JsonElement raw, String qualified) {
-        return parse(raw, qualified, null);
-    }
-
-    /** {@link #parse(JsonElement, String)} for a payload read at a known version. */
+    /**
+     * Validate a raw payload, reporting every mismatch at once.
+     *
+     * @param version the version the payload was read at, or {@code null} when unknown
+     */
     public static Result<CentralDocs> parse(JsonElement raw, String qualified, String version) {
         Cursor cursor = new Cursor();
         JsonObject root = cursor.object(raw, "");
