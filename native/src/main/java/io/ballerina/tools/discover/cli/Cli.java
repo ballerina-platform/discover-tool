@@ -55,11 +55,13 @@ import java.util.stream.Collectors;
  *   <li>stderr — on failure, one {@link Failure} and nothing else, in the run's output mode: one JSON object,
  *       or {@code error: <message>} with the suggestion indented below it
  *   <li>exit 0 — success, and stdout is COMPLETE
- *   <li>exit 1 — every failure, whatever went wrong. What to do next is {@code kind} and {@code suggestion} in
- *       the failure, never the code
+ *   <li>exit 2 — a usage error: the command line itself is malformed, so nothing was looked up. In text mode
+ *       the failure is followed by the synopsis and a pointer to {@code --help}
+ *   <li>exit 1 — every other failure. What to do next is {@code kind} and {@code suggestion} in the failure,
+ *       never the code
  * </ul>
  *
- * <p>{@code bal discover <org/name>[:<version>] [bucket] [args...]} is one picocli command, and {@code bucket} a
+ * <p>{@code bal discover <org>/<name>[:<version>] [bucket] [name ...]} is one picocli command, and {@code bucket} a
  * plain positional value rather than a subcommand: package, then bucket, then member is one drill-down, not a mode
  * switch.
  *
@@ -118,7 +120,7 @@ public final class Cli {
         } catch (CommandLine.ParameterException cause) {
             // picocli's own error printing is deliberately never used: stderr has to hold exactly one `Failure`
             // object, and picocli would write a usage block beside it.
-            return fail(describeParseError(cause, argv), streams, json);
+            return usageError(describeParseError(cause, argv), streams, json);
         }
 
         // A usage request is answered, not failed: it goes to stdout at exit 0, because "exit 0 means stdout is
@@ -130,20 +132,20 @@ public final class Cli {
 
         Commands.Root root = grammar.root();
         if (root.pkg == null) {
-            return fail(new Failure.Validation(
+            return usageError(new Failure.Validation(
                     "A package is required.",
                     "Pass '<org>/<name>', e.g. bal discover ballerinax/github."), streams, json);
         }
 
         Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
         if (!coordinate.isOk()) {
-            return fail(coordinate.failure(), streams, json);
+            return usageError(coordinate.failure(), streams, json);
         }
         QualifiedName qualified = coordinate.value().qualified();
 
         Failure argumentError = validate(root, qualified);
         if (argumentError != null) {
-            return fail(argumentError, streams, json);
+            return usageError(argumentError, streams, json);
         }
         String version = coordinate.value().versionText();
 
@@ -152,7 +154,7 @@ public final class Cli {
         List<String> rest = root.rest == null ? List.of() : root.rest;
         String bucket = rest.isEmpty() ? null : rest.get(0);
         if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
-            return fail(unknownBucket(bucket), streams, json);
+            return usageError(unknownBucket(bucket), streams, json);
         }
 
         // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
@@ -323,11 +325,11 @@ public final class Cli {
             if (token.startsWith("-")) {
                 return new Failure.Validation(
                         "Unknown option '" + token + "'.",
-                        UsageRenderer.knownFlags(Commands.Grammar.create()) + " Run with --help for usage.");
+                        UsageRenderer.knownFlags(Commands.Grammar.create()));
             }
             return new Failure.Validation(
                     "Unexpected argument '" + token + "'.",
-                    "Run `bal discover --help` for usage.");
+                    "Drop it, or run `bal discover --help` for usage.");
         }
         if (cause instanceof CommandLine.MissingParameterException missing) {
             return missing.getMissing().stream()
@@ -336,11 +338,16 @@ public final class Cli {
                     .findFirst()
                     .map(Cli::missingValue)
                     .orElseGet(() -> new Failure.Validation(firstLine(missing.getMessage()),
-                            "Run with --help for usage."));
+                            "Run `bal discover --help` for usage."));
+        }
+        if (cause.getArgSpec() instanceof CommandLine.Model.OptionSpec option && cause.getValue() != null) {
+            return new Failure.Validation(
+                    "'" + cause.getValue() + "' is not a valid " + option.longestName() + " value.",
+                    "Write " + option.longestName() + " " + option.paramLabel() + ".");
         }
         return new Failure.Validation(
                 firstLine(cause.getMessage()),
-                "Run with --help for usage.");
+                "Run `bal discover --help` for usage.");
     }
 
     // `--version` conventionally asks for a program's own version, so the package's goes in the coordinate.
@@ -380,5 +387,12 @@ public final class Cli {
     private static int fail(Failure failure, Streams streams, boolean json) {
         streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + "\n");
         return 1;
+    }
+
+    private static int usageError(Failure failure, Streams streams, boolean json) {
+        String usage = json ? "" : "\n" + UsageRenderer.usageLine(Commands.Grammar.create())
+                + "\nRun 'bal discover --help' for details.";
+        streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + usage + "\n");
+        return 2;
     }
 }

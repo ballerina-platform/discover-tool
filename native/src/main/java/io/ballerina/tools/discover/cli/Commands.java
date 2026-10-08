@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * The argument grammar, declared once: {@code bal discover <org/name>[:<version>] [bucket] [args...] [flags]}.
+ * The argument grammar, declared once: {@code bal discover <org>/<name>[:<version>] [bucket] [name ...] [flags]}.
  *
  * <p>{@code --module}/{@code -m} applies uniformly across every bucket including {@code readme}: {@link Cli} reads
  * it once before any bucket is dispatched, since which module a coordinate resolves to is a fact about the package
@@ -67,12 +67,7 @@ final class Commands {
         @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "This text.")
         boolean help;
 
-        @CommandLine.Option(names = "--refresh",
-                description = "Ignore any cached copy and rewrite it. Worth passing only when a name should "
-                        + "exist and does not.")
-        boolean refresh;
-
-        @CommandLine.Option(names = "--output", paramLabel = "<" + JSON_OUTPUT + "|" + TEXT_OUTPUT + ">",
+        @CommandLine.Option(names = "--output", paramLabel = JSON_OUTPUT + "|" + TEXT_OUTPUT,
                 description = "Override the TTY-detected default: human text at an interactive terminal, JSON "
                         + "otherwise.")
         String output;
@@ -89,13 +84,18 @@ final class Commands {
                         + "page outside the listing, or against an answer that does not page, is an error.")
         int page;
 
-        @CommandLine.Option(names = {"--module", "-m"}, paramLabel = "<name>",
+        @CommandLine.Option(names = {"--module", "-m"}, paramLabel = "<module>",
                 description = "Target this submodule instead of the package's default module, the same "
-                        + "everywhere including readme. The bare submodule name only — <org/name> is always "
+                        + "everywhere including readme. The bare submodule name only — <org>/<name> is always "
                         + "resolved as one literal, complete package coordinate.")
         String module;
 
-        @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org/name>[:<version>]")
+        @CommandLine.Option(names = "--refresh",
+                description = "Ignore any cached copy and rewrite it. Worth passing only when a name should "
+                        + "exist and does not.")
+        boolean refresh;
+
+        @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org>/<name>[:<version>]")
         String pkg;
 
         /**
@@ -104,7 +104,7 @@ final class Commands {
          * <p>No minimum arity: picocli 4.0.1 lets a variable-arity positional with a minimum consume an
          * unrecognised flag as its value, so {@link Cli} tells a bare package from a package with a bucket.
          */
-        @CommandLine.Parameters(index = "1..*", paramLabel = "[bucket] [args...]")
+        @CommandLine.Parameters(index = "1..*", paramLabel = "[bucket] [name ...]")
         List<String> rest;
     }
 }

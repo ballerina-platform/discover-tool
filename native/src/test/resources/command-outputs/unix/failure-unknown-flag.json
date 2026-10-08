@@ -1,1 +1,1 @@
-{"kind":"validation","message":"Unknown option '--nonesuch'.","suggestion":"Known flags are --refresh, --output, --filter, --page, --module/-m and --help/-h. Run with --help for usage."}
+{"kind":"validation","message":"Unknown option '--nonesuch'.","suggestion":"Known flags are --output, --filter, --page, --module/-m, --refresh and --help/-h."}

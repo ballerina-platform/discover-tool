@@ -50,6 +50,11 @@ final class UsageRenderer {
         return wrap(label, slots(grammar), label.length());
     }
 
+    /** The {@code Usage:} line unwrapped, as a usage error repeats it under the failure. */
+    static String usageLine(Commands.Grammar grammar) {
+        return "Usage: bal discover " + String.join(" ", slots(grammar));
+    }
+
     /** The synopsis on one unwrapped line, {@code --help} included, for the launcher's one-line usage. */
     static String synopsisLine(Commands.Grammar grammar) {
         List<String> slots = new ArrayList<>(slots(grammar));
@@ -97,7 +102,7 @@ final class UsageRenderer {
 
     private static String slot(PositionalParamSpec positional) {
         String label = positional.paramLabel();
-        if (label.startsWith("[")) {
+        if (label.contains("[")) {
             return label;
         }
         boolean repeats = positional.index().max() == Integer.MAX_VALUE || positional.arity().max() > 1;
