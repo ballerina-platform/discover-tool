@@ -69,6 +69,10 @@ public final class Version {
         return text;
     }
 
+    public static String textOf(Version version) {
+        return version == null ? null : version.text();
+    }
+
     /**
      * {@code .} and {@code ..} pass the pattern but are path traversal once the docs cache joins a segment
      * into a file path. The cache re-checks its segments; this is the outer of two independent guards.

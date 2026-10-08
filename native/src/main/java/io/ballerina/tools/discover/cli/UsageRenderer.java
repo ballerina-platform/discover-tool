@@ -41,17 +41,20 @@ final class UsageRenderer {
 
     private static final int GAP = 3;
 
+    private static final String COMMAND = "bal discover ";
+
+    private static final String USAGE = "Usage: " + COMMAND;
+
     private UsageRenderer() {
     }
 
     /** The {@code Usage:} line for {@code --help}, wrapped to {@link #WIDTH}. */
     static String synopsis(Commands.Grammar grammar) {
-        String label = "Usage: bal discover ";
-        return wrap(label, slots(grammar), label.length());
+        return wrap(USAGE, slots(grammar), USAGE.length());
     }
 
     static String usageLine(Commands.Grammar grammar) {
-        return "Usage: bal discover " + String.join(" ", slots(grammar));
+        return USAGE + String.join(" ", slots(grammar));
     }
 
     /** The synopsis on one unwrapped line, {@code --help} included, for the launcher's one-line usage. */
@@ -60,7 +63,7 @@ final class UsageRenderer {
         grammar.line().getCommandSpec().options().stream()
                 .filter(OptionSpec::usageHelp)
                 .forEach(help -> slots.add("[" + String.join("|", help.names()) + "]"));
-        return "bal discover " + String.join(" ", slots);
+        return COMMAND + String.join(" ", slots);
     }
 
     /** Every flag the grammar accepts, {@code --help} last, as one sentence for an unknown-option failure. */

@@ -42,6 +42,7 @@ public record Coordinate(QualifiedName qualified, Version version) {
     private static final String ORG_PLACEHOLDER = "org";
     private static final String COMMAND = "bal discover ";
     private static final String COMPLETE_FORM = ":<major>.<minor>.<patch>";
+    private static final String LOCKED_OR_LATEST = " to read the version your project locks or Central's latest: ";
     private static final Pattern THREE_NUMBERS = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)$");
 
     public static Result<Coordinate> parse(String input) {
@@ -68,24 +69,26 @@ public record Coordinate(QualifiedName qualified, Version version) {
         String pkg = qualified.qualified();
         if (version.isEmpty()) {
             return Result.err(new Failure.Validation("Nothing follows the ':' in '" + input + "'.",
-                    "Write a version after it, " + pkg + COMPLETE_FORM + ", or drop the ':' to read the version "
-                            + "your project locks or Central's latest: " + pkg));
+                    "Write a version after it, " + pkg + COMPLETE_FORM + ", or drop the ':'" + LOCKED_OR_LATEST + pkg));
         }
         String unprefixed = version.substring(VERSION_PREFIX.length());
         if (version.toLowerCase(Locale.ROOT).startsWith(VERSION_PREFIX) && Version.isComplete(unprefixed)) {
-            return fix("'" + version + "' in '" + input + "' is not a version: a version has no leading v.",
+            return fix(quoted(version, input) + " is not a version: a version has no leading v.",
                     pkg + VERSION_SEPARATOR + unprefixed);
         }
         Matcher numbers = THREE_NUMBERS.matcher(version);
         if (numbers.matches()) {
             String stripped = new BigInteger(numbers.group(1)) + "." + new BigInteger(numbers.group(2)) + "."
                     + new BigInteger(numbers.group(3));
-            return fix("'" + version + "' in '" + input + "' is not a version: a number in a version has no "
-                    + "leading zero.", pkg + VERSION_SEPARATOR + stripped);
+            return fix(quoted(version, input) + " is not a version: a number in a version has no leading zero.",
+                    pkg + VERSION_SEPARATOR + stripped);
         }
-        return Result.err(new Failure.Validation("'" + version + "' in '" + input + "' is not a complete version.",
-                "Write it in full, " + pkg + COMPLETE_FORM + ", or drop it to read the version your project locks "
-                        + "or Central's latest: " + pkg));
+        return Result.err(new Failure.Validation(quoted(version, input) + " is not a complete version.",
+                "Write it in full, " + pkg + COMPLETE_FORM + ", or drop it" + LOCKED_OR_LATEST + pkg));
+    }
+
+    private static String quoted(String version, String input) {
+        return "'" + version + "' in '" + input + "'";
     }
 
     private static Result<Coordinate> invalidName(String input, Result<QualifiedName> invalid) {
@@ -114,6 +117,10 @@ public record Coordinate(QualifiedName qualified, Version version) {
     /** This coordinate as shell-quoted command words, with {@code --module} when {@code module} is not null. */
     public String argument(String module) {
         return argument(qualified.qualified(), version == null ? null : version.text(), module);
+    }
+
+    public String command(String module) {
+        return COMMAND + argument(module);
     }
 
     public static String argument(String qualified, String version, String module) {

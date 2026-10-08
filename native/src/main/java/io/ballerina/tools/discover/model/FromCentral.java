@@ -647,7 +647,7 @@ public final class FromCentral {
                 .map(module -> module.orgName() + "/" + module.id())
                 .collect(Collectors.joining(", "));
         return Result.err(new Failure.SchemaDrift(
-                qualified.qualified(), version == null ? null : version.text(), null,
+                qualified.qualified(), Version.textOf(version), null,
                 List.of(new Failure.SchemaIssue(
                         "docsData.modules", "no module matches; Central returned " + returned)),
                 Failure.SCHEMA_DRIFT_SUGGESTION));
@@ -659,7 +659,7 @@ public final class FromCentral {
         List<String> candidates = submodulesOf(docs, qualified).stream()
                 .map(module -> module.id().substring(prefix.length()))
                 .toList();
-        String command = "bal discover " + new Coordinate(qualified, pin).argument(null);
+        String command = new Coordinate(qualified, pin).command(null);
         String dropped = "drop --module for the default module: " + Failure.quoted(command) + ".";
         String suggestion;
         if (candidates.isEmpty()) {
@@ -672,7 +672,7 @@ public final class FromCentral {
             suggestion = qualified.qualified() + " publishes these submodules: " + String.join(", ", candidates)
                     + ". Pass one of them to --module, or " + dropped;
         }
-        return new Failure.PackageNotFound(qualified.qualified(), version == null ? null : version.text(),
+        return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version),
                 submodule, suggestion, command);
     }
 

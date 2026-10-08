@@ -79,6 +79,8 @@ public final class Cli {
 
     private static final String RUN_HELP = "Run `" + HELP + "` for usage.";
 
+    static final int FAILED = 1;
+
     private static final int USAGE_ERROR = 2;
 
     private static final int FIRST_PAGE = 1;
@@ -88,6 +90,8 @@ public final class Cli {
     private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
 
     private static final String PLACEHOLDER_VERSION = "<version>";
+
+    private static final String WRITE_VERSION = "To read a specific version, write it after the package: ";
 
     private Cli() {
     }
@@ -170,7 +174,7 @@ public final class Cli {
 
         // Checked before the package is ever fetched: a mistyped bucket is a fact about the argument list, not
         // about the package, and costs a round trip to Central if left until after the load.
-        List<String> rest = root.rest == null ? List.of() : root.rest;
+        List<String> rest = rest(root);
         String bucket = rest.isEmpty() ? null : rest.get(0);
         if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
             return usage.error(unknownBucket(bucket));
@@ -195,12 +199,12 @@ public final class Cli {
         if (!answer.isOk()) {
             return fail(answer.failure(), streams, json);
         }
-        if (root.page != 1 && answer.value().paging() == null) {
+        if (root.page != FIRST_PAGE && answer.value().paging() == null) {
             return fail(notPaged(root, coordinate.value(), filter), streams, json);
         }
         String read = loaded.value().version().text();
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
-                filter, version == null ? null : version.text(), read);
+                filter, Version.textOf(version), read);
         streams.out().accept((json ? JsonRenderer.render(answer.value(), read)
                 : TextRenderer.render(answer.value(), where)) + "\n");
         return 0;
@@ -230,7 +234,7 @@ public final class Cli {
             return null;
         }
         List<String> selectors = rest.subList(1, rest.size());
-        String command = COMMAND + new Coordinate(qualified, version).argument(root.module) + " " + bucket;
+        String command = new Coordinate(qualified, version).command(root.module) + " " + bucket;
         if (Types.BUCKET.equals(bucket)) {
             return Types.misuse(command, new Types.Options(selectors, filter, root.page));
         }
@@ -253,12 +257,15 @@ public final class Cli {
     }
 
     private static String tail(Commands.Root root) {
-        return tail(root.rest == null ? List.of() : root.rest, root.filter, root.page);
+        return tail(rest(root), root.filter, root.page);
+    }
+
+    private static List<String> rest(Commands.Root root) {
+        return root.rest == null ? List.of() : root.rest;
     }
 
     private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
-        String command = COMMAND + coordinate.argument(root.module)
-                + tail(root.rest == null ? List.of() : root.rest, filter, FIRST_PAGE);
+        String command = coordinate.command(root.module) + tail(rest(root), filter, FIRST_PAGE);
         return new Failure.Validation(
                 "Page " + root.page + " is out of range: this answer is not paged.",
                 "Drop --page: " + Failure.quoted(command) + ".", command);
@@ -331,7 +338,7 @@ public final class Cli {
             return new Failure.Validation("The --filter option needs a keyword.",
                     "Write --filter <keyword>, or drop it to list everything.");
         }
-        if (root.page < 1) {
+        if (root.page < FIRST_PAGE) {
             return new Failure.Validation(
                     "Page " + root.page + " is out of range: pages are numbered from 1.",
                     "Pass --page 1 or later, or drop it for the first page.");
@@ -352,13 +359,10 @@ public final class Cli {
     private static Failure writtenVersion(String message, Commands.Root root, QualifiedName qualified,
             String version, String tail) {
         if (!Version.isComplete(version)) {
-            return new Failure.Validation(message, "To read a specific version, write it after the package: "
-                    + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
+            return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
         }
-        String command = COMMAND + new Coordinate(qualified, Version.parse(version).value()).argument(root.module)
-                + tail;
-        return new Failure.Validation(message, "To read a specific version, write it after the package: "
-                + Failure.quoted(command) + ".", command);
+        String command = new Coordinate(qualified, Version.parse(version).value()).command(root.module) + tail;
+        return new Failure.Validation(message, WRITE_VERSION + Failure.quoted(command) + ".", command);
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
@@ -438,8 +442,8 @@ public final class Cli {
     }
 
     private static int fail(Failure failure, Streams streams, boolean json) {
-        streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + "\n");
-        return 1;
+        streams.errorOut().accept(failure.describe(json) + "\n");
+        return FAILED;
     }
 
     private record UsageErrors(Commands.Grammar grammar, Streams streams, boolean json) {
@@ -455,7 +459,7 @@ public final class Cli {
         private int write(Failure failure, boolean pointToHelp) {
             String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar)
                     + (pointToHelp ? "\nRun `" + HELP + "` for details." : "");
-            streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + usage + "\n");
+            streams.errorOut().accept(failure.describe(json) + usage + "\n");
             return USAGE_ERROR;
         }
     }

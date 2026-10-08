@@ -235,13 +235,16 @@ public sealed interface Failure {
     }
 
     private static String seconds(long millis) {
-        String amount = millis % 1000 == 0 ? Long.toString(millis / 1000)
-                : BigDecimal.valueOf(millis, 3).stripTrailingZeros().toPlainString();
-        return amount + (millis == 1000 ? " second" : " seconds");
+        String amount = BigDecimal.valueOf(millis, 3).stripTrailingZeros().toPlainString();
+        return amount + ("1".equals(amount) ? " second" : " seconds");
     }
 
     private static String coordinate(String qualified, String version, String module) {
         return (version == null ? qualified : qualified + ":" + version) + (module == null ? "" : ", module " + module);
+    }
+
+    default String describe(boolean json) {
+        return json ? describe() : describeText();
     }
 
     /** The one line a failing run writes to stderr in JSON mode, with {@link #headline()} as its message. */

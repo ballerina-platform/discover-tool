@@ -409,8 +409,7 @@ public final class Containers {
                         + "`bal discover " + pkg + " " + scope.verb() + "`."
                 : "The candidates are the closest names in the package. Re-run with one of them, or list what "
                         + "is there: `bal discover " + pkg + " " + scope.verb() + "`.";
-        return new Failure.SymbolNotFound(loaded.qualified().qualified(), loaded.version().text(), loaded.module(),
-                List.of(token), near, suggestion);
+        return loaded.symbolNotFound(List.of(token), near, suggestion);
     }
 
     private static DiscoverResult emptyBucket(LoadedPackage loaded, Surface.Scope scope) {

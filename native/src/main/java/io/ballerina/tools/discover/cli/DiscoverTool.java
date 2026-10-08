@@ -126,8 +126,8 @@ public class DiscoverTool implements BLauncherCmd {
         } catch (RuntimeException cause) {
             // Nothing throws by design; a defect still reaches the caller as a failure in the run's own mode.
             Failure failure = new Failure.Internal(messageOf(cause), Failure.INTERNAL_SUGGESTION);
-            errStream.print((Cli.jsonOutput(argv, interactive) ? failure.describe() : failure.describeText()) + "\n");
-            code = 1;
+            errStream.print(failure.describe(Cli.jsonOutput(argv, interactive)) + "\n");
+            code = Cli.FAILED;
         }
 
         outStream.flush();
