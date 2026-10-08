@@ -106,8 +106,10 @@ public record Coordinate(QualifiedName qualified, Version version) {
         return invalid.cast();
     }
 
+    // The command carries the corrected coordinate alone; the CLI lengthens it with the rest of the caller's.
     private static Result<Coordinate> fix(String message, String corrected) {
-        return Result.err(new Failure.Validation(message, "Run `" + COMMAND + corrected + "`."));
+        String command = COMMAND + Texts.shellWord(corrected);
+        return Result.err(new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command));
     }
 
     /**
@@ -121,6 +123,11 @@ public record Coordinate(QualifiedName qualified, Version version) {
     /** {@link #argument(String)} for a package and version already in text. */
     public static String argument(String qualified, String version, String module) {
         return Texts.shellWord(version == null ? qualified : qualified + VERSION_SEPARATOR + version)
-                + (module == null ? "" : " --module " + Texts.shellWord(module));
+                + moduleArgument(module);
+    }
+
+    /** {@code --module} and its value with a leading space, or empty for the default module. */
+    public static String moduleArgument(String module) {
+        return module == null ? "" : " --module " + Texts.shellWord(module);
     }
 }

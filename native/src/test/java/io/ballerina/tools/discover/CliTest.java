@@ -97,8 +97,8 @@ public class CliTest {
     private static final String GRAPHQL_VERSION = "1.17.0";
 
     private static final String SUBGRAPH_UNCONFIRMED = "Central's page for 'subgraph' at " + GRAPHQL_VERSION
-            + " cannot be confirmed as a submodule of this package. Drop --module for the default module, or pass "
-            + "another of its submodules: dataloader, subgraph.";
+            + " cannot be confirmed as a submodule of this package. Pass another of its submodules (dataloader, "
+            + "subgraph), or drop --module for the default module: `bal discover ballerina/graphql`.";
 
     private static FakeTransport graphqlCentral(Map<String, JsonElement> modulePages) {
         return graphqlCentral(FixtureCorpus.loadRawFixture("ballerina__graphql"), modulePages);
@@ -431,12 +431,12 @@ public class CliTest {
     public void theVersionFlagIsUnknownAndPointsAtTheCoordinate() {
         record Case(List<String> argv, String suggestion) { }
         for (Case each : List.of(
-                new Case(List.of("ballerina/http", "--version", "2.15.7"),
-                        "To read a specific version, write ballerina/http:2.15.7"),
-                new Case(List.of("ballerina/http", "client", "--version=2.15.7"),
-                        "To read a specific version, write ballerina/http:2.15.7"),
+                new Case(List.of("ballerina/http", "--version", "2.15.7"), "To read a specific version, write it "
+                        + "after the package: `bal discover ballerina/http:2.15.7`."),
+                new Case(List.of("ballerina/http", "client", "--version=2.15.7"), "To read a specific version, write "
+                        + "it after the package: `bal discover ballerina/http:2.15.7 client`."),
                 new Case(List.of("ballerina/http:2.15.6", "--version"),
-                        "To read a specific version, write ballerina/http:<version>"),
+                        "To read a specific version, write it after the package: ballerina/http:<version>"),
                 new Case(List.of("--version"), "To read a specific version, write <org>/<name>:<version>"))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, each.argv().toString());
@@ -490,9 +490,39 @@ public class CliTest {
             Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
             Assert.assertEquals(capture.field("kind"), "validation", String.join(" ", argv));
             Assert.assertEquals(capture.field("message"), "'4.6.5' looks like a version.", capture.stderr());
-            Assert.assertEquals(capture.field("suggestion"), "Write it after the package: ballerinax/kafka:4.6.5",
-                    capture.stderr());
+            String command = "bal discover ballerinax/kafka:4.6.5 " + argv.get(1);
+            Assert.assertEquals(capture.field("suggestion"),
+                    "To read a specific version, write it after the package: `" + command + "`.", capture.stderr());
+            Assert.assertEquals(capture.field("command"), command, capture.stderr());
         }
+    }
+
+    @Test
+    public void aFixIsTheCallersWholeCommandWithItApplied() {
+        record Case(List<String> argv, String command) { }
+        for (Case each : List.of(
+                new Case(List.of("ballerinax/kafka", "client", "--version", "4.6.5", "Producer"),
+                        "bal discover ballerinax/kafka:4.6.5 client Producer"),
+                new Case(List.of("ballerinax/kafka", "client", "4.6.5", "Producer", "--filter", "send"),
+                        "bal discover ballerinax/kafka:4.6.5 client Producer --filter send"),
+                new Case(List.of("ballerinax/kafka@4.6.5", "-m", "sub", "client", "--page", "2"),
+                        "bal discover ballerinax/kafka:4.6.5 --module sub client --page 2"))) {
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, each.argv().toString());
+            Assert.assertEquals(capture.field("command"), each.command(), capture.stderr());
+            Assert.assertTrue(capture.field("suggestion").contains("`" + each.command() + "`"), capture.stderr());
+        }
+    }
+
+    @Test
+    public void aModuleThePackageDoesNotPublishOffersTheWholeCommandOnItsDefaultModule() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "nosuch", "type", "--filter", "x"),
+                capture.streams(), options(graphqlCentral())), 1, capture.stderr());
+        Assert.assertEquals(capture.field("command"), "bal discover ballerina/graphql type --filter x");
+        Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
+                + "subgraph. Pass one of them to --module, or drop --module for the default module: "
+                + "`bal discover ballerina/graphql type --filter x`.");
     }
 
     @Test
@@ -1298,7 +1328,8 @@ public class CliTest {
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
-                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
+                + "subgraph. Pass one of them to --module, or drop --module for the default module: "
+                + "`bal discover ballerina/graphql`.");
         // The submodule's own page first; the package's only once that is missing, to name what it does publish.
         Assert.assertEquals(transport.urls(), List.of(
                 CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",

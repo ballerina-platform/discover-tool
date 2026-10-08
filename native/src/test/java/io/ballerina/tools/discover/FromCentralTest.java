@@ -126,7 +126,7 @@ public class FromCentralTest {
         CentralDocs page = Schema.parse(FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader"), "page", null)
                 .value();
         Result<CentralDocs.Module> selected =
-                FromCentral.selectModule(page, qualified("ballerina/graphql"), "dataloader", null);
+                FromCentral.selectModule(page, qualified("ballerina/graphql"), "dataloader", null, null);
         Assert.assertTrue(selected.isOk());
         Assert.assertEquals(selected.value().id(), "graphql.dataloader");
     }
@@ -144,12 +144,13 @@ public class FromCentralTest {
     public void aModuleFlagThatNamesNoSubmoduleFailsWithEveryBareSubmoduleName() {
         CentralDocs docs = FixtureCorpus.loadFixture("ballerina__graphql");
         Result<CentralDocs.Module> selected =
-                FromCentral.selectModule(docs, qualified("ballerina/graphql"), "nosuch", null);
+                FromCentral.selectModule(docs, qualified("ballerina/graphql"), "nosuch", null, null);
         Assert.assertFalse(selected.isOk());
         Failure.PackageNotFound failure = (Failure.PackageNotFound) selected.failure();
         Assert.assertEquals(failure.module(), "nosuch");
         Assert.assertEquals(failure.suggestion(), "ballerina/graphql publishes these submodules: dataloader, "
-                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
+                + "subgraph. Pass one of them to --module, or drop --module for the default module: "
+                + "`bal discover ballerina/graphql`.");
     }
 
     @Test

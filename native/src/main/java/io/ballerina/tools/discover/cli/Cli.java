@@ -81,6 +81,14 @@ public final class Cli {
 
     private static final int USAGE_ERROR = 2;
 
+    private static final int FIRST_PAGE = 1;
+
+    private static final String COMMAND = "bal discover ";
+
+    private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
+
+    private static final String PLACEHOLDER_VERSION = "<version>";
+
     private Cli() {
     }
 
@@ -150,7 +158,7 @@ public final class Cli {
 
         Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
         if (!coordinate.isOk()) {
-            return usage.error(coordinate.failure());
+            return usage.error(coordinate.failure().lengthened(Coordinate.moduleArgument(root.module) + tail(root)));
         }
         QualifiedName qualified = coordinate.value().qualified();
 
@@ -180,7 +188,7 @@ public final class Cli {
                 resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, version);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified, options);
         if (!loaded.isOk()) {
-            return fail(loaded.failure(), streams, json);
+            return fail(loaded.failure().lengthened(tail(root)), streams, json);
         }
 
         Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
@@ -222,7 +230,7 @@ public final class Cli {
             return null;
         }
         List<String> selectors = rest.subList(1, rest.size());
-        String command = "bal discover " + new Coordinate(qualified, version).argument(root.module) + " " + bucket;
+        String command = COMMAND + new Coordinate(qualified, version).argument(root.module) + " " + bucket;
         if (Types.BUCKET.equals(bucket)) {
             return Types.misuse(command, new Types.Options(selectors, filter, root.page));
         }
@@ -232,17 +240,29 @@ public final class Cli {
         return null;
     }
 
-    private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
-        StringBuilder command = new StringBuilder("bal discover ").append(coordinate.argument(root.module));
-        if (root.rest != null) {
-            root.rest.forEach(word -> command.append(' ').append(Texts.shellWord(word)));
-        }
+    // What follows the package and module in the caller's command: the bucket, the names, --filter and --page.
+    private static String tail(List<String> rest, String filter, int page) {
+        StringBuilder words = new StringBuilder();
+        rest.forEach(word -> words.append(' ').append(Texts.shellWord(word)));
         if (filter != null) {
-            command.append(" --filter ").append(Texts.shellWord(filter));
+            words.append(" --filter ").append(Texts.shellWord(filter));
         }
+        if (page != FIRST_PAGE) {
+            words.append(" --page ").append(page);
+        }
+        return words.toString();
+    }
+
+    private static String tail(Commands.Root root) {
+        return tail(root.rest == null ? List.of() : root.rest, root.filter, root.page);
+    }
+
+    private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
+        String command = COMMAND + coordinate.argument(root.module)
+                + tail(root.rest == null ? List.of() : root.rest, filter, FIRST_PAGE);
         return new Failure.Validation(
                 "Page " + root.page + " is out of range: this answer is not paged.",
-                "Drop --page: `" + command + "`.");
+                "Drop --page: " + Failure.quoted(command) + ".", command);
     }
 
     private static Failure unknownBucket(String token) {
@@ -269,7 +289,7 @@ public final class Cli {
         List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.BucketList.Submodule(
                         submodule.name(), submodule.summary(),
-                        "bal discover " + loaded.pkgArgument(submodule.name())))
+                        COMMAND + loaded.pkgArgument(submodule.name())))
                 .toList();
         return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
     }
@@ -322,12 +342,26 @@ public final class Cli {
     }
 
     private static Failure versionFlag(Commands.Root root) {
+        String message = "Unknown option '" + Commands.VERSION_FLAG + "'.";
         Result<Coordinate> coordinate = root.pkg == null ? null : Coordinate.parse(root.pkg);
-        String pkg = coordinate != null && coordinate.isOk() ? coordinate.value().qualified().qualified()
-                : "<org>/<name>";
-        String version = Version.isComplete(root.version) ? root.version : "<version>";
-        return new Failure.Validation("Unknown option '" + Commands.VERSION_FLAG + "'.",
-                "To read a specific version, write " + pkg + ":" + version);
+        if (coordinate == null || !coordinate.isOk()) {
+            return new Failure.Validation(message, "To read a specific version, write " + PLACEHOLDER_PACKAGE + ":"
+                    + PLACEHOLDER_VERSION);
+        }
+        return writtenVersion(message, root, coordinate.value().qualified(), root.version, tail(root));
+    }
+
+    // The fix for a version given anywhere but the coordinate: the caller's command with it written there instead.
+    private static Failure writtenVersion(String message, Commands.Root root, QualifiedName qualified,
+            String version, String tail) {
+        if (!Version.isComplete(version)) {
+            return new Failure.Validation(message, "To read a specific version, write it after the package: "
+                    + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
+        }
+        String command = COMMAND + new Coordinate(qualified, Version.parse(version).value()).argument(root.module)
+                + tail;
+        return new Failure.Validation(message, "To read a specific version, write it after the package: "
+                + Failure.quoted(command) + ".", command);
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
@@ -352,9 +386,10 @@ public final class Cli {
         if (misplaced == null) {
             return null;
         }
-        return new Failure.Validation(
-                "'" + misplaced + "' looks like a version.",
-                "Write it after the package: " + qualified.qualified() + ":" + misplaced);
+        List<String> others = new ArrayList<>(tokens);
+        others.remove(misplaced);
+        return writtenVersion("'" + misplaced + "' looks like a version.", root, qualified, misplaced,
+                tail(others, root.filter, root.page));
     }
 
     /** The failure a parse error is, or {@code null} when picocli's own first line says it best. */

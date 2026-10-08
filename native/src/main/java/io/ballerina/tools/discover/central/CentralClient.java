@@ -437,26 +437,26 @@ public final class CentralClient {
             QualifiedName qualified, QualifiedName parent, Version parentVersion, Version version, Version pin,
             HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
-        String command = "`bal discover " + new Coordinate(parent, pin).argument(submodule) + "`";
+        String command = "bal discover " + new Coordinate(parent, pin).argument(submodule);
         String url = REGISTRY_PACKAGES_URL + encode(parent.org()) + "/" + encode(parent.name())
                 + "/" + encode(parentVersion.text());
         Result<JsonElement> response = fetchJson(url, options);
         Optional<List<String>> listed = response.isOk() ? Coordinates.moduleNames(response.value()) : Optional.empty();
-        String suggestion;
         if (listed.isEmpty()) {
-            suggestion = "'" + qualified.qualified() + "' is not a package, but " + parent.qualified()
-                    + " is, and Central could not say which modules it publishes. If '" + submodule
-                    + "' is one of them, read it with " + command + ".";
-        } else if (listed.get().contains(qualified.name())) {
-            suggestion = "'" + qualified.qualified() + "' is not a package: it is the '" + submodule
-                    + "' module of the " + parent.qualified() + " package. Read it with " + command + ".";
-        } else {
-            List<String> modules = listed.get();
-            suggestion = "'" + qualified.qualified() + "' is not a package, and " + parent.qualified()
-                    + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
-                    + "). Check the name; `bal search <keyword>` lists what Central publishes.";
+            return new Failure.PackageNotFound(qualified.qualified(), textOf(version), null, "'"
+                    + qualified.qualified() + "' is not a package, but " + parent.qualified() + " is, and Central "
+                    + "could not say which modules it publishes. If '" + submodule + "' is one of them, read it with "
+                    + Failure.quoted(command) + ".", command);
         }
-        return new Failure.PackageNotFound(qualified.qualified(), textOf(version), null, suggestion);
+        if (listed.get().contains(qualified.name())) {
+            return new Failure.PackageNotFound(qualified.qualified(), textOf(version), null, "'"
+                    + qualified.qualified() + "' is not a package: it is the '" + submodule + "' module of the "
+                    + parent.qualified() + " package. Read it with " + Failure.quoted(command) + ".", command);
+        }
+        return new Failure.PackageNotFound(qualified.qualified(), textOf(version), null, "'" + qualified.qualified()
+                + "' is not a package, and " + parent.qualified() + " publishes no '" + submodule + "' module (its "
+                + "modules are " + String.join(", ", listed.get()) + "). Check the name; `bal search <keyword>` lists "
+                + "what Central publishes.");
     }
 
     // Asks for this package's row: listing the whole org (ballerinax) and filtering costs about 45 seconds.
@@ -663,9 +663,10 @@ public final class CentralClient {
     }
 
     private static Failure noSuchModulePage(Version version, QualifiedName qualified, Version pin, String submodule) {
+        String command = "bal discover " + new Coordinate(qualified, pin).argument(null);
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), submodule, qualified.qualified()
-                + " publishes no '" + submodule + "' module at this version. Run `bal discover "
-                + new Coordinate(qualified, pin).argument(null) + "` to list the submodules it does publish.");
+                + " publishes no '" + submodule + "' module at this version. Drop --module to read its default "
+                + "module: " + Failure.quoted(command) + ".", command);
     }
 
     private static boolean isNotFound(Result<?> response) {

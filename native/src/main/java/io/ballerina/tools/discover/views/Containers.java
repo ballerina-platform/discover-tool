@@ -659,9 +659,9 @@ public final class Containers {
                 : "one " + (container.isModule() ? "function" : "member") + " name";
         String where = container.isModule() ? scope.verb() : container.name();
         String base = baseCommand(loaded, scope, container);
-        Optional<String> joined = joinedPath(container, selectors)
-                .map(path -> "Join the path's segments with `/` in one argument: `" + base + path.arguments()
-                        + filterArgument(options) + "`.");
+        Optional<Fix> joined = joinedPath(container, selectors)
+                .map(path -> new Fix("Join the path's segments with `/` in one argument",
+                        base + path.arguments() + filterArgument(options)));
         List<String> read = selectors.subList(0, consumed);
         List<Entry> selected = select(container, read);
         List<String> kept = selected.size() == 1 ? spelled(selected.get(0), read) : read;
@@ -696,18 +696,19 @@ public final class Containers {
                 drop(selectors.subList(0, 1), selectors.size() - 1, command, options));
     }
 
-    private static Failure unread(List<String> selectors, int consumed, String reason, String suggestion) {
+    private record Fix(String change, String command) { }
+
+    private static Failure unread(List<String> selectors, int consumed, String reason, Fix fix) {
         List<String> unread = selectors.subList(consumed, selectors.size());
         return new Failure.Validation(
                 "Unexpected " + (unread.size() == 1 ? "argument " : "arguments ")
                         + unread.stream().map(word -> "'" + word + "'").collect(Collectors.joining(" "))
                         + " after '" + String.join(" ", selectors.subList(0, consumed)) + "': " + reason + ".",
-                suggestion);
+                fix.change() + ": " + Failure.quoted(fix.command()) + ".", fix.command());
     }
 
-    private static String drop(List<String> kept, int dropped, String base, Options options) {
-        return "Drop " + (dropped == 1 ? "it" : "them") + ": `" + base + shellWords(kept) + filterArgument(options)
-                + "`.";
+    private static Fix drop(List<String> kept, int dropped, String base, Options options) {
+        return new Fix("Drop " + (dropped == 1 ? "it" : "them"), base + shellWords(kept) + filterArgument(options));
     }
 
     /**
