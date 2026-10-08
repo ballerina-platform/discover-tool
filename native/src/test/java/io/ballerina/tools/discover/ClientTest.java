@@ -502,25 +502,40 @@ public class ClientTest {
     }
 
     /**
-     * A failure object must not contradict {@code --help}'s "no failure is licence to guess": it is what an agent
-     * reads at the moment it is blocked, so the content is asserted, not merely that a suggestion is present.
+     * A failure Central's payload caused is answered from disk, never from memory; one the network or Central's
+     * availability caused is a retry, after checking the network and proxy when no answer came back.
      */
     @Test
-    public void noFailureOffersARememberedSignatureAsTheWayOut() {
-        List<String> whenCentralIsTheProblem = List.of(
-                Failure.UPSTREAM_SUGGESTION, Failure.TIMEOUT_SUGGESTION, Failure.SCHEMA_DRIFT_SUGGESTION);
-        for (String suggestion : whenCentralIsTheProblem) {
-            Assert.assertTrue(suggestion.contains("bala/<org>/<name>/"),
-                    "a lookup Central blocked still has an answer on disk, and has to name it: " + suggestion);
-            Assert.assertTrue(suggestion.contains("Never fall back to a remembered signature"),
-                    "a blocked agent guesses unless something forbids it: " + suggestion);
-        }
-
-        // Retryability is the one thing these three do not share, so it is asserted per kind.
-        Assert.assertTrue(Failure.UPSTREAM_SUGGESTION.contains("once more"));
-        Assert.assertTrue(Failure.TIMEOUT_SUGGESTION.contains("once more"));
-        Assert.assertFalse(Failure.SCHEMA_DRIFT_SUGGESTION.contains("once more"),
+    public void eachCentralFailureSaysWhatToDoNext() {
+        Assert.assertTrue(Failure.SCHEMA_DRIFT_SUGGESTION.contains("bala/<org>/<name>/"),
+                Failure.SCHEMA_DRIFT_SUGGESTION);
+        Assert.assertTrue(Failure.SCHEMA_DRIFT_SUGGESTION.contains("Never fall back to a remembered signature"),
+                Failure.SCHEMA_DRIFT_SUGGESTION);
+        Assert.assertFalse(Failure.SCHEMA_DRIFT_SUGGESTION.contains("run the same command"),
                 "schema drift is not a retry: no change of arguments will help");
+
+        Assert.assertEquals(Failure.NETWORK_SUGGESTION, "Check your network connection and the [proxy] settings in "
+                + "~/.ballerina/Settings.toml, then run the same command again.");
+        Assert.assertEquals(Failure.UPSTREAM_SUGGESTION, "Central returned an error; run the same command again "
+                + "later.");
+        Assert.assertTrue(Failure.TIMEOUT_SUGGESTION.contains("run the same command again"));
+        Assert.assertTrue(Failure.TIMEOUT_SUGGESTION.contains("[proxy] settings"));
+    }
+
+    @Test
+    public void noAnswerAtAllPointsAtTheNetworkAndAnErrorStatusAtCentral() {
+        Result<JsonElement> unreached = CentralClient.fetchJson("https://example.invalid/x",
+                fast(FakeTransport.always(new HttpTransport.Reply.Failed("network error: Connection refused")))
+                        .maxAttempts(1).build());
+        Failure.Upstream network = (Failure.Upstream) unreached.failure();
+        Assert.assertNull(network.status());
+        Assert.assertEquals(network.suggestion(), Failure.NETWORK_SUGGESTION);
+
+        Result<JsonElement> answered = CentralClient.fetchJson("https://example.invalid/x",
+                fast(FakeTransport.always(FakeTransport.status(503))).maxAttempts(1).build());
+        Failure.Upstream status = (Failure.Upstream) answered.failure();
+        Assert.assertEquals(status.status(), Integer.valueOf(503));
+        Assert.assertEquals(status.suggestion(), Failure.UPSTREAM_SUGGESTION);
     }
 
     @Test

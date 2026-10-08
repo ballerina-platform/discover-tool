@@ -140,24 +140,25 @@ public final class CentralClient {
          * @param timedOut whether the attempt failed by timing out
          * @param retryable whether another attempt is worth making
          * @param retryAfterMs how long to wait before retrying, or negative when upstream did not say
+         * @param unreached whether no answer came back at all: the connection, the proxy, DNS or TLS failed
          */
-        record Spent(String message, Integer status, boolean timedOut, boolean retryable, long retryAfterMs)
-                implements Outcome { }
+        record Spent(String message, Integer status, boolean timedOut, boolean retryable, long retryAfterMs,
+                boolean unreached) implements Outcome { }
     }
 
     private static Outcome attemptFetch(String url, HttpOptions options) {
         HttpTransport.Reply reply = options.transport().get(url, options.timeoutMs());
         return switch (reply) {
-            case HttpTransport.Reply.TimedOut ignored -> new Outcome.Spent(null, null, true, true, -1);
+            case HttpTransport.Reply.TimedOut ignored -> new Outcome.Spent(null, null, true, true, -1, false);
             case HttpTransport.Reply.Failed failed ->
-                    new Outcome.Spent(failed.message(), null, false, true, -1);
+                    new Outcome.Spent(failed.message(), null, false, true, -1, true);
             case HttpTransport.Reply.Answered answered -> {
                 if (!answered.isOk()) {
                     boolean retryable = isRetryableStatus(answered.status());
                     long retryAfterMs =
                             retryable ? parseRetryAfter(answered.retryAfter(), options.now()) : -1;
                     yield new Outcome.Spent(
-                            "HTTP " + answered.status(), answered.status(), false, retryable, retryAfterMs);
+                            "HTTP " + answered.status(), answered.status(), false, retryable, retryAfterMs, false);
                 }
                 try {
                     JsonElement parsed = JsonParser.parseString(answered.body());
@@ -165,7 +166,7 @@ public final class CentralClient {
                 } catch (RuntimeException malformed) {
                     // Upstream serving something that is not JSON is not a transient condition.
                     yield new Outcome.Spent(
-                            "malformed JSON: " + malformed.getMessage(), null, false, false, -1);
+                            "malformed JSON: " + malformed.getMessage(), null, false, false, -1, false);
                 }
             }
         };
@@ -216,8 +217,8 @@ public final class CentralClient {
         if (spent.timedOut()) {
             return new Failure.Timeout(url, budgetMs, Failure.TIMEOUT_SUGGESTION);
         }
-        return new Failure.Upstream(
-                url, attempts, spent.message(), Failure.UPSTREAM_SUGGESTION, spent.status());
+        return new Failure.Upstream(url, attempts, spent.message(),
+                spent.unreached() ? Failure.NETWORK_SUGGESTION : Failure.UPSTREAM_SUGGESTION, spent.status());
     }
 
     /**

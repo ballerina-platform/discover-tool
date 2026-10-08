@@ -21,6 +21,7 @@ package io.ballerina.tools.discover;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -125,25 +126,25 @@ public sealed interface Failure {
             + "command that produced it.";
 
     /**
-     * The route left when Central itself is the problem: a resolved version's {@code .bala} carries the same
-     * signatures Central serves, but only if some build already pulled it, so it follows a retry. Every
-     * suggestion that admits defeat must forbid writing the call from a remembered API — the failure this tool
-     * exists to prevent, and measurably what a blocked agent does otherwise.
+     * The route left when Central's payload itself is unreadable: a resolved version's {@code .bala} carries the
+     * same signatures Central serves, but only if some build already pulled it. It forbids writing the call from a
+     * remembered API — the failure this tool exists to prevent, and measurably what a blocked agent does otherwise.
      */
     String OFFLINE_FALLBACK = "read the resolved version's sources under "
             + "`~/.ballerina/repositories/central.ballerina.io/bala/<org>/<name>/`, which exist if a "
             + "build already pulled the package — those are the signatures Central publishes. Never "
             + "fall back to a remembered signature.";
 
-    /**
-     * Shared rather than written at each construction site: more than one module raises each of these, and one
-     * {@code kind} must never carry two different instructions.
-     */
-    String UPSTREAM_SUGGESTION = "Central answered badly. Run the same command once more; if it "
-            + "persists, " + OFFLINE_FALLBACK;
+    /** No answer came back at all: the connection, the proxy, DNS or TLS failed. */
+    String NETWORK_SUGGESTION = "Check your network connection and the [proxy] settings in "
+            + "~/.ballerina/Settings.toml, then run the same command again.";
 
-    String TIMEOUT_SUGGESTION = "Central did not answer in time. Run the same command once more — a "
-            + "large package is slow on a cold fetch. If it persists, " + OFFLINE_FALLBACK;
+    /** Central answered, with an error status or a body that is not JSON. */
+    String UPSTREAM_SUGGESTION = "Central returned an error; run the same command again later.";
+
+    String TIMEOUT_SUGGESTION = "A large package is slow on a cold fetch, so run the same command again; if it "
+            + "keeps timing out, check your network connection and the [proxy] settings in "
+            + "~/.ballerina/Settings.toml.";
 
     /**
      * Addressed to a human on purpose: no argument the agent can change will make a payload this
@@ -182,7 +183,7 @@ public sealed interface Failure {
             case Upstream f -> "Request to " + f.url() + " failed after " + f.attempts()
                     + (f.attempts() == 1 ? " attempt" : " attempts")
                     + (f.message() == null ? "." : ": " + f.message() + ".");
-            case Timeout f -> "Central did not answer " + f.url() + " within " + f.budgetMs() + " ms.";
+            case Timeout f -> "Central did not answer " + f.url() + " within " + seconds(f.budgetMs()) + ".";
             case SchemaDrift f -> "Central's answer for " + coordinate(f.qualified(), f.version(), f.module())
                     + " has a shape this tool does not understand; Central's docs format may have changed.";
             case SymbolNotFound f -> f.module() != null && f.requested().equals(List.of(f.module()))
@@ -202,6 +203,12 @@ public sealed interface Failure {
             f.candidates().forEach(candidate -> lines.add("    " + candidate));
         }
         return String.join("\n", lines);
+    }
+
+    private static String seconds(long millis) {
+        String amount = millis % 1000 == 0 ? Long.toString(millis / 1000)
+                : BigDecimal.valueOf(millis, 3).stripTrailingZeros().toPlainString();
+        return amount + (millis == 1000 ? " second" : " seconds");
     }
 
     private static String coordinate(String qualified, String version, String module) {

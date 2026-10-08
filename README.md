@@ -620,8 +620,9 @@ incomplete version, `--version`, a version typed as a positional, or an unknown 
 that depends on what the package holds — an extra selector the container does not read, a page past the end
 of the listing, a module with no readme — is exit 1.
 
-`upstream` and `timeout` are worth re-running unchanged; `validation`, `package-not-found` and
-`symbol-not-found` need a different command; `schema-drift` means Central's payload changed shape and is for
+`upstream` and `timeout` are worth re-running unchanged — once the network and the [proxy](#proxy) settings
+are checked, when no answer came back at all (an `upstream` failure without a `status`); `validation`,
+`package-not-found` and `symbol-not-found` need a different command; `schema-drift` means Central's payload changed shape and is for
 a maintainer.
 
 **Which version is read.** The one written in the coordinate (`ballerina/http:2.15.7`), even inside a project that

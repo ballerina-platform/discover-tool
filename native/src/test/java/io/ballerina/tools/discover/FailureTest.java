@@ -78,7 +78,11 @@ public class FailureTest {
         Assert.assertEquals(new Failure.Upstream("https://x.test/a", 3, "HTTP 503", "Retry.", 503).describeText(),
                 "error: Request to https://x.test/a failed after 3 attempts: HTTP 503.\n  Retry.");
         Assert.assertEquals(new Failure.Timeout("https://x.test/a", 30000, "Retry.").describeText(),
-                "error: Central did not answer https://x.test/a within 30000 ms.\n  Retry.");
+                "error: Central did not answer https://x.test/a within 30 seconds.\n  Retry.");
+        Assert.assertEquals(new Failure.Timeout("https://x.test/a", 1000, "Retry.").describeText(),
+                "error: Central did not answer https://x.test/a within 1 second.\n  Retry.");
+        Assert.assertEquals(new Failure.Timeout("https://x.test/a", 1500, "Retry.").describeText(),
+                "error: Central did not answer https://x.test/a within 1.5 seconds.\n  Retry.");
     }
 
     @Test
