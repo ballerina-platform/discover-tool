@@ -250,6 +250,13 @@ public final class CentralClient {
 
     private static Report proxyAuthentication(HttpOptions options) {
         ProxySettings proxy = options.proxy();
+        if (proxy != null && proxy.authenticates() && options.basicProxyAuthDisabled()) {
+            String property = HttpOptions.TUNNELING_DISABLED_SCHEMES;
+            return new Report("The proxy " + address(proxy) + " requires authentication, and the username and "
+                    + "password in the [proxy] table of " + options.settingsFile() + " were not sent: the "
+                    + property + " system property disables Basic", PROXY_AUTHENTICATION_REQUIRED, false,
+                    "Remove Basic from the " + property + " system property, then run the same command again.");
+        }
         if (proxy != null && proxy.authenticates()) {
             return rejected(options);
         }

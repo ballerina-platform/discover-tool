@@ -22,7 +22,6 @@ import com.sun.net.httpserver.HttpServer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -30,7 +29,6 @@ import java.net.ConnectException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.UnresolvedAddressException;
@@ -38,11 +36,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.cert.CertificateExpiredException;
 import java.security.cert.CertificateNotYetValidException;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -131,18 +126,13 @@ public class JdkHttpTransportTest {
         Assert.assertTrue(download(404, 16, 16, 5000).isEmpty());
     }
 
-    private static String basic(String username, String password) {
-        return "Basic " + Base64.getEncoder().encodeToString((username + ":" + password)
-                .getBytes(StandardCharsets.UTF_8));
-    }
-
     private record Proxied(HttpTransport.Reply reply, List<String> requests, List<String> credentials) { }
 
     // A plain-HTTP origin is reached through the proxy without a tunnel, so the proxy sees the absolute URI.
     private static Proxied throughProxy(String username, String password) throws IOException {
         List<String> requests = new ArrayList<>();
         List<String> credentials = new ArrayList<>();
-        String expected = basic("alice", "secret");
+        String expected = ConnectProxy.basic("alice", "secret");
         HttpServer proxy = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         proxy.createContext("/", exchange -> {
             String credential = exchange.getRequestHeaders().getFirst("Proxy-Authorization");
@@ -181,7 +171,8 @@ public class JdkHttpTransportTest {
         Assert.assertEquals(proxied.reply(), new HttpTransport.Reply.Answered(200, "{\"via\":\"proxy\"}", null));
         Assert.assertTrue(proxied.requests().stream()
                 .allMatch("http://central.invalid/2.0/docs/ballerina/http"::equals), proxied.requests().toString());
-        Assert.assertEquals(proxied.credentials().get(proxied.credentials().size() - 1), basic("alice", "secret"));
+        Assert.assertEquals(proxied.credentials().get(proxied.credentials().size() - 1),
+                ConnectProxy.basic("alice", "secret"));
     }
 
     @Test
@@ -221,126 +212,6 @@ public class JdkHttpTransportTest {
         }
     }
 
-    /**
-     * A proxy that reads one {@code CONNECT} per connection, answers {@code refusal} (a 407 by default) unless it
-     * carries {@code expected}, and otherwise opens a tunnel it closes at once: enough to see what the client sent,
-     * with no origin behind it.
-     */
-    private static final class ConnectProxy implements AutoCloseable {
-
-        private final ServerSocket socket = new ServerSocket(0, 16, InetAddress.getLoopbackAddress());
-        private final List<String> requests = new ArrayList<>();
-        private final Thread acceptor;
-
-        ConnectProxy(String expected) throws IOException {
-            this(expected, "HTTP/1.1 407 Proxy Authentication Required\r\n"
-                    + "Proxy-Authenticate: Basic realm=\"test\"\r\nContent-Length: 0\r\n\r\n");
-        }
-
-        ConnectProxy(String expected, String refusal) throws IOException {
-            acceptor = new Thread(() -> {
-                while (!socket.isClosed()) {
-                    try (Socket connection = socket.accept()) {
-                        String head = readHead(connection.getInputStream());
-                        String request = head.lines().findFirst().orElse("");
-                        String credential = head.lines()
-                                .filter(line -> line.toLowerCase(Locale.ROOT).startsWith("proxy-authorization:"))
-                                .map(line -> line.substring(line.indexOf(':') + 1).trim())
-                                .findFirst().orElse("");
-                        synchronized (requests) {
-                            requests.add(request + " " + credential);
-                        }
-                        String reply = expected.equals(credential)
-                                ? "HTTP/1.1 200 Connection Established\r\n\r\n"
-                                : refusal;
-                        connection.getOutputStream().write(reply.getBytes(StandardCharsets.ISO_8859_1));
-                        connection.getOutputStream().flush();
-                    } catch (IOException closed) {
-                        // The test is over, or the client gave up on this connection.
-                    }
-                }
-            });
-            acceptor.setDaemon(true);
-            acceptor.start();
-        }
-
-        private static String readHead(InputStream in) throws IOException {
-            ByteArrayOutputStream head = new ByteArrayOutputStream();
-            int matched = 0;
-            byte[] end = "\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1);
-            for (int next = in.read(); next >= 0; next = in.read()) {
-                head.write(next);
-                matched = next == end[matched] ? matched + 1 : (next == end[0] ? 1 : 0);
-                if (matched == end.length) {
-                    break;
-                }
-            }
-            return head.toString(StandardCharsets.ISO_8859_1);
-        }
-
-        int port() {
-            return socket.getLocalPort();
-        }
-
-        List<String> requests() {
-            synchronized (requests) {
-                return List.copyOf(requests);
-            }
-        }
-
-        @Override
-        public void close() throws IOException {
-            socket.close();
-        }
-    }
-
-    private record Tunnelled(HttpTransport.Reply reply, List<String> requests) { }
-
-    private static Tunnelled tunnel(String password) throws IOException {
-        try (ConnectProxy proxy = new ConnectProxy(basic("alice", "secret"))) {
-            ProxySettings settings = new ProxySettings("127.0.0.1", proxy.port(), "alice", password);
-            HttpTransport.Reply reply = new JdkHttpTransport(LIMIT, settings)
-                    .get("https://central.invalid/2.0/docs/ballerina/http", 5000);
-            return new Tunnelled(reply, proxy.requests());
-        }
-    }
-
-    // The tunnel opened is closed at once, so the request fails after it; the JDK may retry it once, with the
-    // credentials it now holds.
-    @Test
-    public void anHttpsRequestAnswersTheTunnelsChallengeWithTheConfiguredCredentials() throws IOException {
-        List<String> requests = tunnel("secret").requests();
-        Assert.assertTrue(requests.size() >= 2, requests.toString());
-        Assert.assertEquals(requests.get(0), "CONNECT central.invalid:443 HTTP/1.1 ");
-        Assert.assertTrue(requests.subList(1, requests.size()).stream()
-                .allMatch(("CONNECT central.invalid:443 HTTP/1.1 " + basic("alice", "secret"))::equals),
-                requests.toString());
-    }
-
-    @Test
-    public void aRejectedPasswordIsSentOnceARequestAndSaysSo() throws IOException {
-        Tunnelled tunnelled = tunnel("wrong");
-        Assert.assertEquals(tunnelled.requests(), List.of(
-                "CONNECT central.invalid:443 HTTP/1.1 ",
-                "CONNECT central.invalid:443 HTTP/1.1 " + basic("alice", "wrong")));
-        Assert.assertEquals(((HttpTransport.Reply.Failed) tunnelled.reply()).problem(),
-                HttpTransport.Reply.Problem.PROXY_REJECTED, tunnelled.reply().toString());
-    }
-
-    @Test
-    public void aSecondRequestSendsTheRejectedPasswordOnceMore() throws IOException {
-        try (ConnectProxy proxy = new ConnectProxy(basic("alice", "secret"))) {
-            JdkHttpTransport transport =
-                    new JdkHttpTransport(LIMIT, new ProxySettings("127.0.0.1", proxy.port(), "alice", "wrong"));
-            transport.get("https://central.invalid/2.0/docs/ballerina/http", 5000);
-            HttpTransport.Reply second = transport.get("https://central.invalid/2.0/docs/ballerina/http", 5000);
-            Assert.assertEquals(((HttpTransport.Reply.Failed) second).problem(),
-                    HttpTransport.Reply.Problem.PROXY_REJECTED);
-            Assert.assertEquals(proxy.requests().stream().filter(request -> request.endsWith(basic("alice", "wrong")))
-                    .count(), 2, proxy.requests().toString());
-        }
-    }
-
     @Test
     public void aProxyThatCannotOpenTheTunnelIsReportedWithItsStatus() throws IOException {
         String badGateway = "HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n";
@@ -366,21 +237,6 @@ public class JdkHttpTransportTest {
                 reply.toString());
     }
 
-    @Test
-    public void basicCredentialsAreAllowedInTunnelsOnlyForAProxyWithCredentialsAndNeverOverAUserValue() {
-        Properties none = new Properties();
-        JdkHttpTransport.allowBasicInTunnels(none, new ProxySettings("127.0.0.1", 3128, "", ""));
-        Assert.assertNull(none.getProperty(JdkHttpTransport.TUNNELING_DISABLED_SCHEMES));
-
-        Properties unset = new Properties();
-        JdkHttpTransport.allowBasicInTunnels(unset, new ProxySettings("127.0.0.1", 3128, "alice", "secret"));
-        Assert.assertEquals(unset.getProperty(JdkHttpTransport.TUNNELING_DISABLED_SCHEMES), "");
-
-        Properties user = new Properties();
-        user.setProperty(JdkHttpTransport.TUNNELING_DISABLED_SCHEMES, "Basic");
-        JdkHttpTransport.allowBasicInTunnels(user, new ProxySettings("127.0.0.1", 3128, "alice", "secret"));
-        Assert.assertEquals(user.getProperty(JdkHttpTransport.TUNNELING_DISABLED_SCHEMES), "Basic");
-    }
     private static HttpTransport.Reply.Failed classified(Throwable cause) {
         return JdkHttpTransport.failure(new IOException("request failed", cause));
     }

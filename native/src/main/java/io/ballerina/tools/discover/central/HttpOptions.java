@@ -35,6 +35,9 @@ import java.util.function.LongSupplier;
  */
 public final class HttpOptions {
 
+    /** The system property naming the authentication schemes the JDK refuses inside a {@code CONNECT} tunnel. */
+    public static final String TUNNELING_DISABLED_SCHEMES = "jdk.http.auth.tunneling.disabledSchemes";
+
     /** Per-attempt ceiling. Central is slow for large packages; this is not a p99. */
     private static final long DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -59,6 +62,7 @@ public final class HttpOptions {
     private final Sleeper sleeper;
     private final ProxySettings proxy;
     private final String settingsFile;
+    private final boolean basicProxyAuthDisabled;
 
     /**
      * The real transport, created on first use.
@@ -75,7 +79,9 @@ public final class HttpOptions {
     }
 
     private HttpOptions(Builder builder) {
-        this.transport = builder.transport == null ? RealTransport.INSTANCE : builder.transport;
+        this.transport = builder.transport != null ? builder.transport
+                : builder.proxy != null ? new JdkHttpTransport(builder.proxy)
+                : RealTransport.INSTANCE;
         this.timeoutMs = builder.timeoutMs;
         this.maxAttempts = builder.maxAttempts;
         this.budgetMs = builder.budgetMs;
@@ -87,6 +93,7 @@ public final class HttpOptions {
         this.sleeper = builder.sleeper;
         this.proxy = builder.proxy;
         this.settingsFile = builder.settingsFile;
+        this.basicProxyAuthDisabled = builder.basicProxyAuthDisabled;
     }
 
     /** How the retry loop waits. Injectable so a test never actually sleeps. */
@@ -132,14 +139,24 @@ public final class HttpOptions {
         return refresh;
     }
 
-    /** The proxy the transport sends requests through, or {@code null}: what a failure names. */
+    /**
+     * The proxy every request goes through, or {@code null}. Unless a transport is injected, the transport is built
+     * from it, so what a failure names is what the request used.
+     */
     public ProxySettings proxy() {
         return proxy;
     }
 
-    /** The {@code Settings.toml} a proxy is configured in, as a failure's suggestion names it. */
     public String settingsFile() {
         return settingsFile;
+    }
+
+    /**
+     * Whether the process refuses Basic credentials inside a {@code CONNECT} tunnel, which every request to Central
+     * goes through when there is a proxy, so a proxy's username and password are never sent.
+     */
+    public boolean basicProxyAuthDisabled() {
+        return basicProxyAuthDisabled;
     }
 
     /**
@@ -170,7 +187,8 @@ public final class HttpOptions {
                 .jitter(jitter)
                 .sleeper(sleeper)
                 .proxy(proxy)
-                .settingsFile(settingsFile);
+                .settingsFile(settingsFile)
+                .basicProxyAuthDisabled(basicProxyAuthDisabled);
     }
 
     public long now() {
@@ -200,6 +218,7 @@ public final class HttpOptions {
         private Sleeper sleeper = Builder::sleepQuietly;
         private ProxySettings proxy;
         private String settingsFile = DEFAULT_SETTINGS_FILE;
+        private boolean basicProxyAuthDisabled;
 
         private Builder() {
         }
@@ -269,6 +288,11 @@ public final class HttpOptions {
 
         public Builder settingsFile(String value) {
             this.settingsFile = value;
+            return this;
+        }
+
+        public Builder basicProxyAuthDisabled(boolean value) {
+            this.basicProxyAuthDisabled = value;
             return this;
         }
 
