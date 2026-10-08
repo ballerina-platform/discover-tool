@@ -55,7 +55,7 @@ public final class Loader {
     /**
      * How the version is pinned, on top of the transport options.
      *
-     * <p>The version is resolved, not asked for, unless the caller pins one with {@code --version}: an explicit
+     * <p>The version is resolved, not asked for, unless the caller writes one in the coordinate: an explicit
      * version outranks a locked {@code Dependencies.toml} one, which outranks Central's latest.
      *
      * @param http the transport options to fetch and cache through
@@ -65,7 +65,8 @@ public final class Loader {
      *     several sources for ONE lookup, not one source picked ahead of time.
      * @param module the {@code --module} value, or {@code null} for the package's own default module — read from
      *     the submodule's own page, since a package's page carries its default module alone
-     * @param version the {@code --version} value, or {@code null} to resolve one
+     * @param version the version written in the coordinate ({@code org/name:version}), or {@code null} to
+     *     resolve one
      */
     public record LoadOptions(HttpOptions http, String projectDir, List<PackageRepository> repositories,
             String module, String version) {
@@ -107,7 +108,7 @@ public final class Loader {
             QualifiedName qualified, LoadOptions options) {
         String chosen = chosenVersion(qualified, options);
         if (chosen != null) {
-            return fixed(chosen, options.version() != null);
+            return fixed(qualified, chosen, options.version() != null);
         }
         return tryEachRepository(options.repositories(),
                 repository -> repository.resolveVersion(qualified, options.http()));
@@ -120,11 +121,14 @@ public final class Loader {
         return options.projectDir() == null ? null : DependenciesToml.lockedVersion(options.projectDir(), qualified);
     }
 
-    private static Result<CentralClient.ResolvedVersion> fixed(String input, boolean pinned) {
+    private static Result<CentralClient.ResolvedVersion> fixed(QualifiedName qualified, String input, boolean pinned) {
         Result<Version> parsed = Version.parse(input);
-        return parsed.isOk()
-                ? Result.ok(new CentralClient.ResolvedVersion(parsed.value(), false, true, pinned))
-                : parsed.cast();
+        if (parsed.isOk()) {
+            return Result.ok(new CentralClient.ResolvedVersion(parsed.value(), false, true, pinned));
+        }
+        return pinned ? parsed.cast() : Result.err(new Failure.Validation(
+                "Dependencies.toml locks " + qualified.qualified() + " at '" + input + "', which is not a version.",
+                "Fix the lock, or write a version: " + qualified.qualified() + ":<version>"));
     }
 
     /**
@@ -161,7 +165,7 @@ public final class Loader {
                 repository.resolveVersion(qualified, options.http());
         String chosen = chosenVersion(qualified, options);
         if (chosen != null) {
-            Result<CentralClient.ResolvedVersion> fixed = fixed(chosen, options.version() != null);
+            Result<CentralClient.ResolvedVersion> fixed = fixed(qualified, chosen, options.version() != null);
             if (!fixed.isOk()) {
                 return fixed.cast();
             }

@@ -33,6 +33,8 @@ public final class Version {
 
     private static final Pattern PATTERN = Pattern.compile("^[A-Za-z0-9_.+-]+$");
 
+    private static final Pattern COMPLETE = Pattern.compile("^\\d+\\.\\d+\\.\\d+([-+.].*)?$");
+
     private final String text;
 
     private Version(String text) {
@@ -49,6 +51,15 @@ public final class Version {
      */
     static boolean isTraversal(String segment) {
         return ".".equals(segment) || "..".equals(segment);
+    }
+
+    /**
+     * Whether a caller-typed version is one Central could publish: {@code major.minor.patch}, with any
+     * pre-release or build suffix. Stricter than {@link #parse}, which also reads versions off the network, and
+     * no bucket name, selector or path can look like one.
+     */
+    public static boolean isComplete(String input) {
+        return COMPLETE.matcher(input).matches() && parse(input).isOk();
     }
 
     public static Result<Version> parse(String input) {
