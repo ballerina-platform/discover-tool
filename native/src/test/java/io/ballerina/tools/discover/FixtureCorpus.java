@@ -176,7 +176,7 @@ public final class FixtureCorpus {
     }
 
     public static CentralDocs loadFixture(String slug) {
-        Result<CentralDocs> parsed = Schema.parse(loadRawFixture(slug), slug);
+        Result<CentralDocs> parsed = Schema.parse(loadRawFixture(slug), slug, null);
         if (!parsed.isOk()) {
             throw new AssertionError("fixture " + slug + " no longer parses: " + parsed.failure().describe());
         }

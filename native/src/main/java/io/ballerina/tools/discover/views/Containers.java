@@ -113,7 +113,7 @@ public final class Containers {
             int pages = Math.max(1, (total + MAX_ENTRIES - 1) / MAX_ENTRIES);
             if (requested < 1 || requested > pages) {
                 return Result.err(new Failure.Validation(
-                        "--page " + requested + " is out of range: this listing has " + total + " entries on "
+                        "Page " + requested + " is out of range: this listing has " + total + " entries on "
                                 + pages + (pages == 1 ? " page." : " pages."),
                         "Pass a page from 1 to " + pages + ", e.g. `" + command + " --page " + pages + "`."));
             }
@@ -409,8 +409,8 @@ public final class Containers {
                         + "`bal discover " + pkg + " " + scope.verb() + "`."
                 : "The candidates are the closest names in the package. Re-run with one of them, or list what "
                         + "is there: `bal discover " + pkg + " " + scope.verb() + "`.";
-        return new Failure.SymbolNotFound(loaded.qualified().qualified(), loaded.version().text(), List.of(token),
-                near, suggestion);
+        return new Failure.SymbolNotFound(loaded.qualified().qualified(), loaded.version().text(), loaded.module(),
+                List.of(token), near, suggestion);
     }
 
     private static DiscoverResult emptyBucket(LoadedPackage loaded, Surface.Scope scope) {

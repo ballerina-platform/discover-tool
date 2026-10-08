@@ -51,7 +51,7 @@ public class SchemaTest {
     }
 
     private static List<Failure.SchemaIssue> issues(JsonObject raw) {
-        Result<CentralDocs> parsed = Schema.parse(raw, "test/pkg");
+        Result<CentralDocs> parsed = Schema.parse(raw, "test/pkg", null);
         Assert.assertFalse(parsed.isOk(), "expected drift");
         return ((Failure.SchemaDrift) parsed.failure()).issues();
     }
@@ -95,7 +95,7 @@ public class SchemaTest {
 
         JsonObject raw = withOneField();
         field(raw).getAsJsonObject("type").addProperty("arrayDimensions", 2);
-        Result<CentralDocs> parsed = Schema.parse(raw, "test/pkg");
+        Result<CentralDocs> parsed = Schema.parse(raw, "test/pkg", null);
         Assert.assertTrue(parsed.isOk(), parsed.isOk() ? "" : parsed.failure().describe());
         CentralDocs.Field.Declared id = (CentralDocs.Field.Declared)
                 parsed.value().modules().get(0).records().get(0).declaredFields().get(0);

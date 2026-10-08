@@ -18,8 +18,6 @@
 
 package io.ballerina.tools.discover;
 
-import java.util.regex.Pattern;
-
 /**
  * What the caller typed for the package: {@code <org>/<name>[:<version>]}, the form {@code bal pull} takes.
  *
@@ -32,13 +30,14 @@ import java.util.regex.Pattern;
  */
 public record Coordinate(QualifiedName qualified, Version version) {
 
-    /** An import's keyword escape, {@code ballerinax/'client.config}: the package itself is unquoted. */
-    private static final Pattern ESCAPE = Pattern.compile("(^|[/.])'");
-
     public static Result<Coordinate> parse(String input) {
-        String trimmed = input.trim();
-        int colon = trimmed.indexOf(':');
-        String pkg = ESCAPE.matcher(colon < 0 ? trimmed : trimmed.substring(0, colon)).replaceAll("$1");
+        int colon = input.indexOf(':');
+        String pkg = colon < 0 ? input : input.substring(0, colon);
+        if (pkg.contains("'")) {
+            return Result.err(new Failure.Validation(
+                    "'" + input + "' quotes a name the way an import does; a package name is written unescaped.",
+                    "Drop the quote: " + pkg.replace("'", "") + (colon < 0 ? "" : input.substring(colon))));
+        }
         Result<QualifiedName> qualified = QualifiedName.parse(pkg);
         if (!qualified.isOk()) {
             return qualified.cast();
@@ -46,7 +45,7 @@ public record Coordinate(QualifiedName qualified, Version version) {
         if (colon < 0) {
             return Result.ok(new Coordinate(qualified.value(), null));
         }
-        String version = trimmed.substring(colon + 1);
+        String version = input.substring(colon + 1);
         if (!Version.isComplete(version)) {
             return Result.err(new Failure.Validation(
                     "'" + version + "' in '" + input + "' is not a complete version.",

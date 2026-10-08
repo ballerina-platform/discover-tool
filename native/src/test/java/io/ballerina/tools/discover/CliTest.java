@@ -183,8 +183,8 @@ public class CliTest {
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertTrue(transport.urls().get(0).endsWith("/docs/ballerinax/github/6.0.0"),
                 transport.urls().toString());
-        Assert.assertTrue(capture.field("suggestion").endsWith("Write one of them after the package: "
-                + "ballerinax/github:<version>"), capture.stderr());
+        Assert.assertEquals(capture.field("suggestion"), "Central does not publish 'ballerinax/github' at 6.0.0. "
+                + "Write a published version after the package: ballerinax/github:<version>", capture.stderr());
     }
 
     @Test
@@ -451,7 +451,7 @@ public class CliTest {
     public void aFlagWithoutItsValueIsNamedWithBothSpellings() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerina/http", "--module"), capture.streams(), never()), 1);
-        Assert.assertEquals(capture.field("message"), "--module needs a value.");
+        Assert.assertEquals(capture.field("message"), "The --module option needs a value.");
         Assert.assertEquals(capture.field("suggestion"), "Write --module <name> or --module=<name>.");
     }
 
@@ -575,17 +575,20 @@ public class CliTest {
 
     @Test
     public void aMalformedLockIsAValidationFailureNamingTheLockAndTheCoordinate() {
-        Path projectDir = tempDir();
-        write(projectDir.resolve("Ballerina.toml"), "[package]\norg = \"acme\"\nname = \"app\"\n");
-        write(projectDir.resolve("Dependencies.toml"),
-                "[[package]]\norg = \"ballerina\"\nname = \"http\"\nversion = \"2 15\"\n");
-        Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http"), capture.streams(), never(), projectDir.toString()), 1);
-        Assert.assertEquals(capture.field("kind"), "validation");
-        Assert.assertEquals(capture.field("message"),
-                "Dependencies.toml locks ballerina/http at '2 15', which is not a version.");
-        Assert.assertEquals(capture.field("suggestion"),
-                "Fix the lock, or write a version: ballerina/http:<version>");
+        for (String locked : List.of("2 15", "1.6", "2.15.7..")) {
+            Path projectDir = tempDir();
+            write(projectDir.resolve("Ballerina.toml"), "[package]\norg = \"acme\"\nname = \"app\"\n");
+            write(projectDir.resolve("Dependencies.toml"),
+                    "[[package]]\norg = \"ballerina\"\nname = \"http\"\nversion = \"" + locked + "\"\n");
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(List.of("ballerina/http"), capture.streams(), never(),
+                    projectDir.toString()), 1, locked);
+            Assert.assertEquals(capture.field("kind"), "validation", locked);
+            Assert.assertEquals(capture.field("message"),
+                    "Dependencies.toml locks ballerina/http at '" + locked + "', which is not a version.");
+            Assert.assertEquals(capture.field("suggestion"),
+                    "Fix the lock, or write a version: ballerina/http:<version>");
+        }
     }
 
     @Test
@@ -624,14 +627,44 @@ public class CliTest {
     }
 
     @Test
+    public void aFailureUnderAModuleNamesThePackageAndTheModuleApart() {
+        Capture json = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Nope"),
+                json.streams(), options(graphqlCentral())), 1);
+        Assert.assertEquals(json.field("kind"), "symbol-not-found");
+        Assert.assertEquals(json.field("qualified"), "ballerina/graphql");
+        Assert.assertEquals(json.field("version"), GRAPHQL_VERSION);
+        Assert.assertEquals(json.field("module"), "subgraph");
+
+        Capture text = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Nope", "--output",
+                "text"), text.streams(), options(graphqlCentral())), 1);
+        Assert.assertTrue(text.stderr().startsWith("error: No match for 'Nope' in ballerina/graphql:"
+                + GRAPHQL_VERSION + ", module subgraph.\n"), text.stderr());
+
+        Capture plain = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "type", "Nope"), plain.streams(),
+                options(graphqlCentral())), 1);
+        Assert.assertFalse(plain.failure().has("module"), plain.stderr());
+    }
+
+    @Test
     public void aCommandIsPinnedOnlyWhenTheCallerWroteAVersion() {
         Path projectDir = tempDir();
         write(projectDir.resolve("Ballerina.toml"), "[package]\norg = \"acme\"\nname = \"app\"\n");
         write(projectDir.resolve("Dependencies.toml"),
                 "[[package]]\norg = \"ballerinax\"\nname = \"kafka\"\nversion = \"4.6.5\"\n");
+        String docs = FixtureCorpus.loadRawFixture("ballerinax__kafka").toString();
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.ok(docs)
+                : FakeTransport.status(404));
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client"), capture.streams(),
-                docsOnlyFor("ballerinax__kafka"), projectDir.toString()), 0, capture.stderr());
+                options(transport), projectDir.toString()), 0, capture.stderr());
+        Assert.assertTrue(transport.urls().stream().anyMatch(url -> url.endsWith("/docs/ballerinax/kafka/4.6.5")),
+                transport.urls().toString());
+        Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/registry/")),
+                transport.urls().toString());
         Assert.assertTrue(capture.stdout().contains("\"bal discover ballerinax/kafka client Producer\""),
                 capture.stdout());
         Assert.assertFalse(capture.stdout().contains("4.6.5"), capture.stdout());
@@ -1540,7 +1573,9 @@ public class CliTest {
                 new Case(List.of("ballerina/http", "--nonesuch", "--output", "text"), false, false),
                 new Case(List.of("ballerina/http", "--output=text", "--nonesuch"), false, false),
                 new Case(List.of("ballerina/http", "--nonesuch", "--output", "xml"), true, false),
-                new Case(List.of("ballerina/http", "--output", "xml"), false, true))) {
+                new Case(List.of("ballerina/http", "--output", "xml"), false, true),
+                new Case(List.of("ballerina/http", "nosuchbucket", "--filter", "--output", "text"), false, true),
+                new Case(List.of("ballerina/http", "-m", "--output", "text"), false, true))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never(), null, each.interactive()), 1,
                     each.toString());

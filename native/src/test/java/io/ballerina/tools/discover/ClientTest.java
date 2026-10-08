@@ -198,6 +198,9 @@ public class ClientTest {
 
         Failure.PackageNotFound withPin = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
                 graphql, "nosuch", pinned, fast(transport).build()).failure();
+        Assert.assertEquals(withPin.qualified(), "ballerina/graphql");
+        Assert.assertEquals(withPin.version(), "1.17.0");
+        Assert.assertEquals(withPin.module(), "nosuch");
         Assert.assertTrue(withPin.suggestion().contains("Run `bal discover ballerina/graphql:1.17.0` "),
                 withPin.suggestion());
 
@@ -208,6 +211,35 @@ public class ClientTest {
                     without.suggestion());
             Assert.assertFalse(without.suggestion().contains("1.17.0"), without.suggestion());
         }
+    }
+
+    @Test
+    public void aWrittenVersionCentralDoesNotPublishNamesTheOnesItDoes() {
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.status(404)
+                : FakeTransport.ok("[\"6.0.0\", \"5.1.0\"]"));
+        CentralClient.ResolvedVersion written =
+                new CentralClient.ResolvedVersion(Version.parse("9.9.9").value(), false, true, true);
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
+                GITHUB, written, fast(transport).build()).failure();
+        Assert.assertEquals(failure.suggestion(), "Central does not publish 'ballerinax/github' at 9.9.9; published "
+                + "versions are 6.0.0, 5.1.0. Write one of them after the package: ballerinax/github:<version>");
+    }
+
+    @Test
+    public void aWrittenVersionOfANameCentralDoesNotPublishIsReportedAsAModuleOfItsPackage() {
+        QualifiedName auth = QualifiedName.parse("ballerinax/aws.auth").value();
+        FakeTransport transport = registry(Map.of(
+                "ballerinax/aws", "[\"1.0.2\"]",
+                "ballerinax/aws/1.0.2", modules("aws", "aws.auth")));
+        CentralClient.ResolvedVersion written =
+                new CentralClient.ResolvedVersion(Version.parse("9.9.9").value(), false, true, true);
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
+                auth, written, fast(transport).build()).failure();
+        Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
+        Assert.assertEquals(failure.version(), "9.9.9");
+        Assert.assertEquals(failure.suggestion(), "'ballerinax/aws.auth' is not a package: it is the 'auth' module "
+                + "of the ballerinax/aws package. Read it with `bal discover ballerinax/aws:9.9.9 --module auth`.");
     }
 
     private static CentralClient.ResolvedVersion supplied(String version) {
@@ -461,7 +493,7 @@ public class ClientTest {
         Assert.assertFalse(((Failure.Upstream) upstream.failure()).suggestion().isEmpty());
 
         Result<CentralDocs> drift = Schema.parse(
-                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y:1.0.0");
+                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y", "1.0.0");
         Assert.assertFalse(drift.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) drift.failure();
         // Addressed to a human on purpose: no argument the agent can change will make a payload this reader
@@ -511,7 +543,7 @@ public class ClientTest {
         int configurablesBefore = module.getAsJsonArray("configurables").size();
         module.remove("records");
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertTrue(result.isOk(), "an omitted bucket must not refuse the whole package");
         CentralDocs.Module parsed = result.value().modules().get(0);
         Assert.assertTrue(parsed.records().isEmpty());
@@ -529,7 +561,7 @@ public class ClientTest {
         JsonObject module = onlyModule("ballerinax__sap");
         module.addProperty("records", "no longer an array");
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertFalse(result.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) result.failure();
         Assert.assertEquals(
@@ -555,7 +587,7 @@ public class ClientTest {
     @Test
     public void aPayloadWithNoModulesAtAllIsDriftNotAnEmptyLibrary() {
         Result<CentralDocs> result = Schema.parse(
-                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y:1.0.0");
+                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y", "1.0.0");
         Assert.assertFalse(result.isOk());
     }
 
@@ -570,7 +602,7 @@ public class ClientTest {
             module.addProperty(bucket, "no longer an array");
         }
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertFalse(result.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) result.failure();
         Assert.assertEquals(failure.issues().size(), 6,
@@ -584,7 +616,7 @@ public class ClientTest {
         // The shape Central actually serves for a package with nothing in most buckets.
         String payload = "{\"docsData\":{\"modules\":[{\"id\":\"kafka\",\"orgName\":\"ballerinax\"}]}}";
         Result<CentralDocs> result =
-                Schema.parse(com.google.gson.JsonParser.parseString(payload), "ballerinax/kafka:4.6.5");
+                Schema.parse(com.google.gson.JsonParser.parseString(payload), "ballerinax/kafka", "4.6.5");
         Assert.assertTrue(result.isOk(), "a module with no declarations is empty, not drifted");
         Assert.assertTrue(result.value().modules().get(0).clients().isEmpty());
     }
