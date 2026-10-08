@@ -1,0 +1,1 @@
+{"kind":"validation","message":"'6.0' in 'ballerinax/github:6.0' is not a complete version.","suggestion":"Write it in full, ballerinax/github:<major>.<minor>.<patch>, or drop it to read the version your project locks or Central's latest: ballerinax/github"}

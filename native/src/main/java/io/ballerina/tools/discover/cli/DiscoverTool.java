@@ -101,17 +101,17 @@ public class DiscoverTool implements BLauncherCmd {
         HttpOptions http = HttpOptions.builder().cache(buildCache()).build();
         Cli.Streams streams = new Cli.Streams(outStream::print, errStream::print);
 
+        // Pre-JDK 22, System.console() is null if EITHER stream is redirected, so a terminal with redirected
+        // stdin is under-detected. That is the safe direction: a human gets JSON (recoverable with
+        // --output text) rather than an agent's parser getting prose.
+        boolean interactive = System.console() != null;
         int code;
         try {
-            // Pre-JDK 22, System.console() is null if EITHER stream is redirected, so a terminal with redirected
-            // stdin is under-detected. That is the safe direction: a human gets JSON (recoverable with
-            // --output text) rather than an agent's parser getting prose.
-            boolean interactive = System.console() != null;
             code = Cli.run(argv, streams, http, discoverProject(), interactive);
         } catch (RuntimeException cause) {
             // Nothing in the pipeline throws by design; if something does, it is a defect in this tool and the
-            // caller still needs a machine-readable line rather than a Java stack trace on stdout.
-            errStream.print(internalFailure(cause) + "\n");
+            // caller still needs a failure in the run's own mode rather than a Java stack trace on stdout.
+            errStream.print(internalFailure(cause, Cli.jsonOutput(argv, interactive)) + "\n");
             code = 1;
         }
 
@@ -125,13 +125,16 @@ public class DiscoverTool implements BLauncherCmd {
         }
     }
 
-    private static String internalFailure(Throwable cause) {
-        String message = cause.getMessage();
+    private static String internalFailure(Throwable cause, boolean asJson) {
+        String message = cause.getMessage() == null || cause.getMessage().isEmpty()
+                ? cause.getClass().getName()
+                : cause.getMessage();
+        if (!asJson) {
+            return "error: " + message;
+        }
         JsonObject json = new JsonObject();
         json.addProperty("kind", "internal");
-        json.addProperty("message", message == null || message.isEmpty()
-                ? cause.getClass().getName()
-                : message);
+        json.addProperty("message", message);
         return json.toString();
     }
 

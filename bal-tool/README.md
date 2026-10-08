@@ -12,7 +12,7 @@ bal discover --help
 ## Usage
 
 ```
-bal discover <org>/<package> [bucket] [selector ...] [flags]
+bal discover <org>/<package>[:<version>] [bucket] [selector ...] [flags]
 ```
 
 The package comes first and every further positional drills one level down. With no bucket, the answer is
@@ -20,7 +20,8 @@ the list of buckets the package has.
 
 `<org>/<package>` always names a package, never a module of one: `bal discover ballerinax/aws.auth` fails with
 the command that reads that module, `bal discover ballerinax/aws --module auth`. To find a package in the first
-place, use `bal search <keyword>`; `bal discover` only drills into one you already know.
+place, use `bal search <keyword>`; `bal discover` only drills into one you already know. A version goes in the
+coordinate, the form `bal pull` takes: `bal discover ballerina/http:2.15.7` (see Which version is read, below).
 
 | Bucket    | What it holds                                                                                            |
 | --------- | -------------------------------------------------------------------------------------------------------- |
@@ -57,7 +58,6 @@ left out.
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
 | `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, the `type` declarations, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
-| `--version <version>`  | Read this exact version of the package, ahead of the one the project locks and Central's latest. Carried into every command the answer prints. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. |
 
 ## Walkthrough
@@ -583,29 +583,46 @@ answer whose `next` is the joined command, and three or more are that failure, s
 
 ## The contract
 
-|        |                                                                       |
-| ------ | --------------------------------------------------------------------- |
-| stdout | the answer, and nothing else                                          |
-| stderr | on failure, exactly one JSON object, and nothing else                 |
-| exit 0 | success, and stdout is complete                                       |
-| exit 1 | every failure; the JSON's `kind` and `suggestion` say what to do next |
+|        |                                                                                  |
+| ------ | -------------------------------------------------------------------------------- |
+| stdout | the answer, and nothing else                                                     |
+| stderr | on failure, exactly one failure, and nothing else                                |
+| exit 0 | success, and stdout is complete                                                  |
+| exit 1 | every failure: stdout is empty, and the failure's `kind` and `suggestion` say what to do next |
+
+A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
+forced with `--output` (honoured even when the rest of the arguments fail to parse). In JSON it is one object,
+whose `qualified` is always `org/name` and whose `version`, when one was reached, is a key of its own:
 
 ```
-$ bal discover ballerinax/kafka client NoSuchContainer
-{"kind":"symbol-not-found","qualified":"ballerinax/kafka:4.6.5","requested":["NoSuchContainer"],"candidates":[],"suggestion":"Nothing in ballerinax/kafka:4.6.5 is named anything like that. List what is there: `bal discover ballerinax/kafka client`."}
+$ bal discover ballerinax/kafka client NoSuchContainer | cat
+{"kind":"symbol-not-found","qualified":"ballerinax/kafka","version":"4.6.5","requested":["NoSuchContainer"],"candidates":[],"suggestion":"Nothing in ballerinax/kafka:4.6.5 is named anything like that. List what is there: `bal discover ballerinax/kafka client`."}
+```
+
+In text it is `error: <message>`, then the suggestion and anything else the failure carries (candidates, schema
+issues) indented below it:
+
+```
+$ bal discover ballerina/http:2.15
+error: '2.15' in 'ballerina/http:2.15' is not a complete version.
+  Write it in full, ballerina/http:<major>.<minor>.<patch>, or drop it to read the version your project locks or Central's latest: ballerina/http
 ```
 
 `upstream` and `timeout` are worth re-running unchanged; `validation`, `package-not-found` and
 `symbol-not-found` need a different command; `schema-drift` means Central's payload changed shape and is for
 a maintainer.
 
-**Which version is read.** `--version <version>` if given. Otherwise, inside a Ballerina project the tool walks up
-to `Ballerina.toml` and uses the version `Dependencies.toml` locks, so a lookup sees what `bal build` compiles
-against, and outside one it uses Central's latest. A version is a flag, never a positional: `bal discover
-ballerina/http client 2.16.6` and `ballerina/http:2.16.6` are `validation` failures that name `--version`. Under
-`--version` every command the answer prints carries it (`bal discover ballerina/http --version 2.15.0 client
-Client`), so drilling in stays on that version; without it the printed commands are unpinned, except one that opens a
-declaration another package owns, which pins the version that declaration was generated against.
+**Which version is read.** The one written in the coordinate (`ballerina/http:2.15.7`), even inside a project that
+locks another. Otherwise, inside a Ballerina project the tool walks up to `Ballerina.toml` and uses the version
+`Dependencies.toml` locks, so a lookup sees what `bal build` compiles against, and outside one (or for a package
+the project does not depend on yet) it uses Central's latest. A written version must be complete:
+`ballerina/http:2.15` is a `validation` failure, and so is a version typed as a positional (`bal discover
+ballerina/http 2.15.0`) or as `--version`, each suggesting the coordinate to type. `--module` composes unchanged:
+`bal discover ballerina/http:2.15.7 --module httpscerr`. A written version is carried into every command the
+answer prints (`bal discover ballerina/http:2.15.7 client Client`), so drilling in stays on it; without one the
+printed commands are unpinned (a locked version is resolved again), except one that opens a declaration another
+package owns, which pins the version that declaration was generated against
+(`bal discover ballerina/crypto:2.9.3 type TrustStore`).
 
 ## Caching
 

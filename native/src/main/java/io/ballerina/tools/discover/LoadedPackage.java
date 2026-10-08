@@ -40,7 +40,7 @@ import java.util.function.Supplier;
  *     reaching another module of this package is checked against, whichever module is being read
  * @param warning why this version cannot be trusted, or {@code null} when it was confirmed against the
  *     registry — see {@link Loader#unverifiedWarning}
- * @param pinned the {@code --version} the caller supplied, or {@code null} when it was resolved — carried into
+ * @param pinned the version the caller wrote in the coordinate, or {@code null} when it was resolved — carried into
  *     every command this lookup prints, so drilling further stays on the version being read
  * @param bound {@code library} with its service bindings read from the package source — deferred, since only an
  *     answer that shows a service type needs it, and reading it can mean a download
@@ -79,11 +79,8 @@ public record LoadedPackage(
 
     /** {@link #pkgArgument()} for another module of this package, or its default one when {@code other} is null. */
     public String pkgArgument(String other) {
-        return qualified.qualified() + (other == null ? "" : " --module " + Texts.shellWord(other)) + pin();
-    }
-
-    private String pin() {
-        return pinned == null ? "" : " --version " + Texts.shellWord(pinned);
+        return Texts.shellWord(qualified.qualified() + (pinned == null ? "" : ":" + pinned))
+                + (other == null ? "" : " --module " + Texts.shellWord(other));
     }
 
     /**

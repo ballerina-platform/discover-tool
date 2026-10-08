@@ -63,7 +63,7 @@ public final class TextRenderer {
      * @param module the {@code --module} submodule, or {@code null}
      * @param trail the bucket and selectors, as typed
      * @param filter the {@code --filter} keyword, or {@code null}
-     * @param version the {@code --version} the caller pinned, or {@code null}
+     * @param version the version the caller wrote in the coordinate, or {@code null}
      */
     public record Context(String pkg, String module, List<String> trail, String filter, String version) {
 
@@ -147,9 +147,9 @@ public final class TextRenderer {
         }
         layout.warning(bucketList.warning());
         if (where.pkg() != null && !bucketList.buckets().isEmpty()) {
-            layout.next("bal discover " + Texts.shellWord(where.pkg())
+            layout.next("bal discover "
+                    + Texts.shellWord(where.pkg() + (where.version() == null ? "" : ":" + where.version()))
                     + (where.module() == null ? "" : " --module " + Texts.shellWord(where.module()))
-                    + (where.version() == null ? "" : " --version " + Texts.shellWord(where.version()))
                     + " <bucket>");
         }
     }
