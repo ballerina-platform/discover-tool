@@ -64,11 +64,13 @@ public final class TextRenderer {
      * @param module the {@code --module} submodule, or {@code null}
      * @param trail the bucket and selectors, as typed
      * @param filter the {@code --filter} keyword, or {@code null}
-     * @param version the version the caller wrote in the coordinate, or {@code null}
+     * @param pin the version the caller wrote in the coordinate, or {@code null}
+     * @param version the version that was read, shown after the package, or {@code null} when unknown
      */
-    public record Context(String pkg, String module, List<String> trail, String filter, String version) {
+    public record Context(String pkg, String module, List<String> trail, String filter, String pin,
+            String version) {
 
-        public static final Context NONE = new Context(null, null, List.of(), null, null);
+        public static final Context NONE = new Context(null, null, List.of(), null, null, null);
 
         public Context {
             trail = trail == null ? List.of() : List.copyOf(trail);
@@ -148,7 +150,7 @@ public final class TextRenderer {
         }
         layout.warning(bucketList.warning());
         if (where.pkg() != null && !bucketList.buckets().isEmpty()) {
-            layout.next("bal discover " + Coordinate.argument(where.pkg(), where.version(), where.module())
+            layout.next("bal discover " + Coordinate.argument(where.pkg(), where.pin(), where.module())
                     + " <bucket>");
         }
     }
@@ -479,7 +481,7 @@ public final class TextRenderer {
     private static String header(Context where, String container, String member) {
         List<String> parts = new ArrayList<>();
         if (where.pkg() != null) {
-            parts.add(where.pkg());
+            parts.add(where.version() == null ? where.pkg() : where.pkg() + ":" + where.version());
         }
         if (where.module() != null) {
             parts.add("module " + where.module());

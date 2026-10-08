@@ -55,7 +55,8 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aBucketListAtATerminalNamesThePackageAndTheCommandThatOpensABucket() {
         DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"), List.of(), null);
-        TextRenderer.Context where = new TextRenderer.Context("ballerina/graphql", "subgraph", List.of(), null, null);
+        TextRenderer.Context where =
+                new TextRenderer.Context("ballerina/graphql", "subgraph", List.of(), null, null, null);
         Assert.assertEquals(TextRenderer.render(result, where), lines(
                 "ballerina/graphql · module subgraph",
                 "2 buckets",
@@ -572,7 +573,7 @@ public class DiscoverResultRenderingTest {
                 "resource isolated function get client() returns error?;", List.of(), "error?", false, List.of(),
                 List.of(), 0, null, List.of(), DiscoverResult.Documented.NONE, null, null, null, null);
         String text = TextRenderer.render(result, new TextRenderer.Context("pkg", null,
-                List.of("client", "client", "client", "get"), null, null));
+                List.of("client", "client", "client", "get"), null, null, null));
         Assert.assertTrue(text.startsWith("pkg · client · Client · client · get\n"), text);
     }
 
@@ -584,7 +585,7 @@ public class DiscoverResultRenderingTest {
                 1, 199, new DiscoverResult.Paging(1, 5, 159), "bal discover ballerinax/twilio client Client --page 2",
                 DiscoverResult.Documented.NONE, null, null);
         String text = TextRenderer.render(result, new TextRenderer.Context("ballerinax/twilio", null,
-                List.of("client", "client"), null, null));
+                List.of("client", "client"), null, null, null));
         Assert.assertTrue(text.startsWith("ballerinax/twilio · client · Client\n"), text);
         Assert.assertTrue(text.contains("\nNext: bal discover ballerinax/twilio client Client --filter <keyword>"),
                 text);

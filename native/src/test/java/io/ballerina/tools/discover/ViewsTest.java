@@ -126,7 +126,7 @@ public class ViewsTest {
         for (Surface.Scope scope : Surface.Scope.values()) {
             DiscoverResult listing = render(loaded, scope, List.of());
             TextRenderer.Context where = new TextRenderer.Context(
-                    loaded.qualified().qualified(), null, List.of(scope.verb()), null, null);
+                    loaded.qualified().qualified(), null, List.of(scope.verb()), null, null, null);
             text.append("== ").append(scope.verb()).append(" ==\n").append(TextRenderer.render(listing, where))
                     .append("\n");
             json.append(JsonRenderer.render(listing)).append("\n");
@@ -134,7 +134,7 @@ public class ViewsTest {
         Result<DiscoverResult> types = Types.render(loaded, new Types.Options(List.of(), null, 1));
         Assert.assertTrue(types.isOk(), slug + ": " + (types.isOk() ? "" : types.failure().describe()));
         text.append("== type ==\n").append(TextRenderer.render(types.value(), new TextRenderer.Context(
-                loaded.qualified().qualified(), null, List.of("type"), null, null))).append("\n");
+                loaded.qualified().qualified(), null, List.of("type"), null, null, null))).append("\n");
         json.append(JsonRenderer.render(types.value())).append("\n");
         FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + ".buckets.txt"),
                 text.toString(), slug + " text");
@@ -159,7 +159,8 @@ public class ViewsTest {
             text.append("== ").append(leaf[0]).append(" type ").append(leaf[1]).append(" ==\n");
             if (answer.isOk()) {
                 text.append(TextRenderer.render(answer.value(), new TextRenderer.Context(
-                        loaded.qualified().qualified(), null, List.of("type", leaf[1]), null, null))).append("\n");
+                        loaded.qualified().qualified(), null, List.of("type", leaf[1]), null, null, null)))
+                        .append("\n");
                 json.append(JsonRenderer.render(answer.value())).append("\n");
             } else {
                 text.append(answer.failure().describeText()).append("\n");
@@ -820,7 +821,7 @@ public class ViewsTest {
         Assert.assertEquals(json.get("omittedNext").getAsString(), "bal discover ballerina/http type");
         Assert.assertEquals(json.getAsJsonArray("omitted").size(), 40);
         String text = TextRenderer.render(status, new TextRenderer.Context(
-                http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null, null));
+                http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null, null, null));
         Assert.assertTrue(text.contains("Past the closure budget (40 of 47)"), text);
         Assert.assertTrue(text.contains("\n... 7 more past the closure budget, listed by the type roster\n"
                 + "Next: bal discover ballerina/http type"), text);
@@ -915,7 +916,7 @@ public class ViewsTest {
                         "bal discover ballerina/http:2.1.0 type Thing2"),
                 new DiscoverResult.Foreign("Thing3", "ballerinax/kafka.unlisted", "1.0.0", null)));
         String text = TextRenderer.render(holder, new TextRenderer.Context(
-                loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null, null));
+                loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null, null, null));
         Assert.assertTrue(text.contains("(no command: package not known)"), text);
     }
 
@@ -1035,7 +1036,7 @@ public class ViewsTest {
         Assert.assertEquals(noMatch.next(), "bal discover ballerinax/googleapis.sheets type");
 
         String text = TextRenderer.render(answer, new TextRenderer.Context("ballerinax/googleapis.sheets", null,
-                List.of("type"), "server", null));
+                List.of("type"), "server", null, null));
         Assert.assertFalse(text.contains("No types."), text);
         Assert.assertTrue(text.contains("Nothing matches 'server'.\n"), text);
         Assert.assertTrue(text.contains("\nMatched by documentation only\n  ClientHttp1Settings\n"), text);
@@ -1054,7 +1055,7 @@ public class ViewsTest {
         Assert.assertEquals(last.paging().page(), last.paging().pages());
         Assert.assertNull(last.next(), "a paged answer's next only ever turns the page");
         String text = TextRenderer.render(last, new TextRenderer.Context("ballerinax/twilio", null, List.of("type"),
-                "which", null));
+                "which", null, null));
         Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/twilio type <name>"), text);
         JsonObject json = JsonParser.parseString(JsonRenderer.render(last)).getAsJsonObject();
         Assert.assertFalse(json.has("next"), json.toString());
@@ -1069,7 +1070,7 @@ public class ViewsTest {
         DiscoverResult answer = result(Containers.render(twilio, Surface.Scope.CLASS,
                 new Containers.Options(List.of("client"))), "class client");
         String text = TextRenderer.render(answer, new TextRenderer.Context("ballerinax/twilio", null,
-                List.of("class", "client"), null, null));
+                List.of("class", "client"), null, null, null));
         Assert.assertTrue(text.contains("Canonical: bal discover ballerinax/twilio client Client\n"), text);
         Assert.assertTrue(text.contains("\nNext: bal discover ballerinax/twilio client Client --page 2\n"), text);
         Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/twilio client Client --filter <keyword>"),
@@ -1096,7 +1097,7 @@ public class ViewsTest {
         Assert.assertEquals(entry.getAsJsonObject("commands").get("post").getAsString(),
                 "bal discover ballerina/http client Client :...path post");
         String text = TextRenderer.render(rest, new TextRenderer.Context("ballerina/http", null,
-                List.of("client", "Client"), "entity", null));
+                List.of("client", "Client"), "entity", null, null));
         Assert.assertTrue(text.contains("\nMatched by documentation only\n  :...path  get, post"), text);
         Assert.assertTrue(text.endsWith("\nNext: bal discover ballerina/http client Client <path> <accessor>\n"
                 + "Next: bal discover ballerina/http client Client <name>\n"
@@ -1148,14 +1149,14 @@ public class ViewsTest {
         DiscoverResult method = result(Containers.render(twilio, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("client", "createaccount"))), "client client createaccount");
         Assert.assertTrue(TextRenderer.render(method, new TextRenderer.Context("ballerinax/twilio", null,
-                List.of("client", "client", "createaccount"), null, null))
+                List.of("client", "client", "createaccount"), null, null, null))
                 .startsWith("ballerinax/twilio · client · Client · createAccount\n"));
 
         LoadedPackage log = FixtureCorpus.loadedFixture("ballerina__log");
         DiscoverResult function = result(Containers.render(log, Surface.Scope.MODULE,
                 new Containers.Options(List.of("printinfo"))), "funcs printinfo");
         Assert.assertTrue(TextRenderer.render(function, new TextRenderer.Context("ballerina/log", null,
-                List.of("funcs", "printinfo"), null, null)).startsWith("ballerina/log · funcs · printInfo\n"));
+                List.of("funcs", "printinfo"), null, null, null)).startsWith("ballerina/log · funcs · printInfo\n"));
     }
 
     @Test

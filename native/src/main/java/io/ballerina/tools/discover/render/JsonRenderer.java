@@ -41,6 +41,14 @@ public final class JsonRenderer {
         return toJson(result).toString();
     }
 
+    /** {@code result} led by the {@code version} it was read at, as every answer the CLI prints is. */
+    public static String render(DiscoverResult result, String version) {
+        JsonObject answer = new JsonObject();
+        answer.addProperty("version", version);
+        toJson(result).entrySet().forEach(field -> answer.add(field.getKey(), field.getValue()));
+        return answer.toString();
+    }
+
     private static JsonObject toJson(DiscoverResult result) {
         return switch (result) {
             case DiscoverResult.BucketList bucketList -> bucketList(bucketList);

@@ -190,9 +190,11 @@ public final class Cli {
         if (root.page != 1 && answer.value().paging() == null) {
             return fail(notPaged(root, coordinate.value(), filter), streams, json);
         }
+        String read = loaded.value().version().text();
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
-                filter, version == null ? null : version.text());
-        emit(answer.value(), where, streams, json);
+                filter, version == null ? null : version.text(), read);
+        streams.out().accept((json ? JsonRenderer.render(answer.value(), read)
+                : TextRenderer.render(answer.value(), where)) + "\n");
         return 0;
     }
 
@@ -241,10 +243,6 @@ public final class Cli {
         return new Failure.Validation(
                 "Page " + root.page + " is out of range: this answer is not paged.",
                 "Drop --page: `" + command + "`.");
-    }
-
-    private static void emit(DiscoverResult result, TextRenderer.Context where, Streams streams, boolean json) {
-        streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result, where)) + "\n");
     }
 
     private static Failure unknownBucket(String token) {
