@@ -65,6 +65,7 @@ final class Usage {
                                               bal discover ballerinax/github client Client
               3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
               4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
+              5. One specific version:        bal discover ballerina/http:2.15.7 client Client
             """;
 
     private static final String BUCKETS =

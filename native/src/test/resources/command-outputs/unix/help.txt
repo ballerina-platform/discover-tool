@@ -1,6 +1,6 @@
-Usage: bal discover [<org/name>] [bucket] [args...] [--refresh]
+Usage: bal discover [<org/name>[:<version>]] [bucket] [args...] [--refresh]
                     [--output <json|text>] [--filter <keyword>] [--page <n>]
-                    [-m <name>] [--version <version>]
+                    [-m <name>]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
@@ -12,6 +12,7 @@ Typical session:
                                   bal discover ballerinax/github client Client
   3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
   4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
+  5. One specific version:        bal discover ballerina/http:2.15.7 client Client
 
 Buckets, addressed as the second positional: client, service, class, funcs, type,
 readme. No bucket lists which of them this package has.
@@ -33,6 +34,3 @@ readme. No bucket lists which of them this package has.
                          module, the same everywhere including readme. The bare
                          submodule name only — <org/name> is always resolved as one
                          literal, complete package coordinate.
-  --version <version>    Read this exact version of the package instead of the one
-                         the project locks or Central's latest. Carried into every
-                         command the answer prints.

@@ -152,8 +152,10 @@ public class ClientTest {
         Assert.assertFalse(result.isOk());
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
         Assert.assertEquals(failure.qualified(), "ballerinax/github:9.9.9");
-        Assert.assertTrue(failure.suggestion().contains("named by --version or locked by your project"),
+        Assert.assertTrue(failure.suggestion().contains("the version your project's Dependencies.toml locks"),
                 failure.suggestion());
+        Assert.assertTrue(failure.suggestion().endsWith("write a published version after the package: "
+                + "ballerinax/github:<version>"), failure.suggestion());
         Assert.assertTrue(failure.suggestion().contains("published versions are 6.0.0, 5.1.0"),
                 failure.suggestion());
         Assert.assertFalse(failure.suggestion().contains("omit the version"),
@@ -195,7 +197,7 @@ public class ClientTest {
 
         Failure.PackageNotFound withPin = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
                 graphql, "nosuch", pinned, fast(transport).build()).failure();
-        Assert.assertTrue(withPin.suggestion().contains("Run `bal discover ballerina/graphql --version 1.17.0` "),
+        Assert.assertTrue(withPin.suggestion().contains("Run `bal discover ballerina/graphql:1.17.0` "),
                 withPin.suggestion());
 
         for (CentralClient.ResolvedVersion unpinned : List.of(locked, resolved("1.17.0"))) {
@@ -203,7 +205,7 @@ public class ClientTest {
                     graphql, "nosuch", unpinned, fast(transport).build()).failure();
             Assert.assertTrue(without.suggestion().contains("Run `bal discover ballerina/graphql` to list"),
                     without.suggestion());
-            Assert.assertFalse(without.suggestion().contains("--version"), without.suggestion());
+            Assert.assertFalse(without.suggestion().contains("1.17.0"), without.suggestion());
         }
     }
 

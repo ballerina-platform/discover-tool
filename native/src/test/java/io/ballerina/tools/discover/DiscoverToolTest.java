@@ -128,8 +128,9 @@ public class DiscoverToolTest {
     public void theOneLineUsageNamesEveryFlag() {
         StringBuilder sb = new StringBuilder();
         new DiscoverTool(System.out, System.err).printUsage(sb);
-        Assert.assertTrue(sb.toString().startsWith("  bal discover [<org/name>] [bucket] [args...]"), sb.toString());
-        for (String flag : List.of("--refresh", "--output", "--filter", "--page", "-m", "--version", "--help")) {
+        Assert.assertTrue(sb.toString().startsWith("  bal discover [<org/name>[:<version>]] [bucket] [args...]"),
+                sb.toString());
+        for (String flag : List.of("--refresh", "--output", "--filter", "--page", "-m", "--help")) {
             Assert.assertTrue(sb.toString().contains(flag), flag + " missing from: " + sb);
         }
     }

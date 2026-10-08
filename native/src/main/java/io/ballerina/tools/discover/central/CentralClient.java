@@ -79,9 +79,9 @@ public final class CentralClient {
      *
      * @param version the resolved version
      * @param stale the registry was unreachable and this came off disk unverified
-     * @param supplied the CALLER chose this version — {@code --version} or {@code Dependencies.toml} — so a
+     * @param supplied the CALLER chose this version — in the coordinate or {@code Dependencies.toml} — so a
      *     later 404 from the docs endpoint is theirs to correct, not the reader's
-     * @param pinned the version came from {@code --version} itself, so a command printed for the caller must
+     * @param pinned the version was written in the coordinate itself, so a command printed for the caller must
      *     repeat it
      */
     public record ResolvedVersion(Version version, boolean stale, boolean supplied, boolean pinned) {
@@ -280,8 +280,8 @@ public final class CentralClient {
     private static Failure moduleOf(
             QualifiedName qualified, QualifiedName parent, Version version, String pin, HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
-        String command = "`bal discover " + Texts.shellWord(parent.qualified()) + " --module "
-                + Texts.shellWord(submodule) + pinArgument(pin) + "`";
+        String command = "`bal discover " + Texts.shellWord(pinned(parent, pin)) + " --module "
+                + Texts.shellWord(submodule) + "`";
         String url = REGISTRY_PACKAGES_URL + encode(parent.org()) + "/" + encode(parent.name())
                 + "/" + encode(version.text());
         Result<JsonElement> response = fetchJson(url, options);
@@ -424,7 +424,7 @@ public final class CentralClient {
             if (response.failure() instanceof Failure.Upstream upstream
                     && upstream.status() != null && upstream.status() == 404) {
                 return Result.err(new Failure.PackageNotFound(label, missingVersion(
-                        qualified, version, resolved.supplied(), options)));
+                        qualified, resolved, options)));
             }
             return response.cast();
         }
@@ -503,29 +503,35 @@ public final class CentralClient {
         return resolved.pinned() ? resolved.version().text() : null;
     }
 
-    private static String pinArgument(String pin) {
-        return pin == null ? "" : " --version " + Texts.shellWord(pin);
+    private static String pinned(QualifiedName qualified, String pin) {
+        return qualified.qualified() + (pin == null ? "" : ":" + pin);
     }
 
     private static Failure noSuchModulePage(String label, QualifiedName qualified, String pin, String submodule) {
         return new Failure.PackageNotFound(label, qualified.qualified() + " publishes no '" + submodule
-                + "' module at this version. Run `bal discover " + Texts.shellWord(qualified.qualified())
-                + pinArgument(pin) + "` to list the submodules it does publish.");
+                + "' module at this version. Run `bal discover " + Texts.shellWord(pinned(qualified, pin))
+                + "` to list the submodules it does publish.");
     }
 
     private static String missingVersion(
-            QualifiedName qualified, Version version, boolean supplied, HttpOptions options) {
-        if (!supplied) {
+            QualifiedName qualified, ResolvedVersion resolved, HttpOptions options) {
+        Version version = resolved.version();
+        if (!resolved.supplied()) {
             return "Central published no '" + qualified.qualified() + "' at " + version.text()
                     + ", the version resolved for it. Check the name — `bal search <keyword>` lists what Central "
                     + "publishes.";
         }
         String published = publishedVersions(qualified, options);
+        String listed = published == null ? "" : "; published versions are " + published;
+        String coordinate = qualified.qualified() + ":<version>";
+        if (resolved.pinned()) {
+            return "Central does not publish '" + qualified.qualified() + "' at " + version.text() + listed
+                    + ". Write one of them after the package: " + coordinate;
+        }
         return "Central does not publish '" + qualified.qualified() + "' at " + version.text()
-                + ", the version named by --version or locked by your project's Dependencies.toml"
-                + (published == null ? "" : "; published versions are " + published)
-                + ". Pass one of them with --version, or reconcile Dependencies.toml with the registry so a "
-                + "lookup and a build see the same one.";
+                + ", the version your project's Dependencies.toml locks" + listed
+                + ". Reconcile Dependencies.toml with the registry so a lookup and a build see the same one, or "
+                + "write a published version after the package: " + coordinate;
     }
 
     private static final int LISTED_VERSIONS = 10;

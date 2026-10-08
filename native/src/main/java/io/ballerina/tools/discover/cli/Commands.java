@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * The argument grammar, declared once: {@code bal discover <org/name> [bucket] [args...] [flags]}.
+ * The argument grammar, declared once: {@code bal discover <org/name>[:<version>] [bucket] [args...] [flags]}.
  *
  * <p>{@code --module}/{@code -m} applies uniformly across every bucket including {@code readme}: {@link Cli} reads
  * it once before any bucket is dispatched, since which module a coordinate resolves to is a fact about the package
@@ -95,12 +95,7 @@ final class Commands {
                         + "resolved as one literal, complete package coordinate.")
         String module;
 
-        @CommandLine.Option(names = "--version", paramLabel = "<version>",
-                description = "Read this exact version of the package instead of the one the project locks or "
-                        + "Central's latest. Carried into every command the answer prints.")
-        String version;
-
-        @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org/name>")
+        @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org/name>[:<version>]")
         String pkg;
 
         /**

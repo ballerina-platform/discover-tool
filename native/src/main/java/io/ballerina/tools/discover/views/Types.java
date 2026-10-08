@@ -421,7 +421,7 @@ public final class Types {
 
     private static String pinnedTo(LoadedPackage loaded, ModuleRef module, String target) {
         return target.equals(module.coordinate()) && !module.coordinate().equals(loaded.qualified().qualified())
-                ? target + module.pinnedVersion().map(version -> " --version " + version).orElse("")
+                ? target + module.pinnedVersion().map(version -> ":" + version).orElse("")
                 : target;
     }
 }

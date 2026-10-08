@@ -64,11 +64,11 @@ public class QualifiedNameTest {
     }
 
     @Test
-    public void aVersionSuffixInThePackageNameIsRejectedWithTheAdviceToDropIt() {
+    public void aVersionSuffixNeverReachesTheParsedName() {
         Result<QualifiedName> parsed = QualifiedName.parse("ballerinax/github:6.0.0");
         Assert.assertFalse(parsed.isOk());
         Failure.Validation failure = (Failure.Validation) parsed.failure();
-        Assert.assertTrue(failure.suggestion().contains("Drop any ':version' suffix"));
+        Assert.assertTrue(failure.suggestion().contains("'<org>/<name>:<version>'"), failure.suggestion());
     }
 
     @Test

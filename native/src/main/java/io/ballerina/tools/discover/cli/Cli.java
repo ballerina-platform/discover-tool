@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.cli;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Loader;
@@ -39,7 +40,6 @@ import picocli.CommandLine;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 
 /**
  * {@code bal discover} — argv in, exit code out.
@@ -55,8 +55,9 @@ import java.util.regex.Pattern;
  *       the JSON, never the code
  * </ul>
  *
- * <p>{@code bal discover <org/name> [bucket] [args...]} is one picocli command, and {@code bucket} a plain positional
- * value rather than a subcommand: package, then bucket, then member is one drill-down, not a mode switch.
+ * <p>{@code bal discover <org/name>[:<version>] [bucket] [args...]} is one picocli command, and {@code bucket} a
+ * plain positional value rather than a subcommand: package, then bucket, then member is one drill-down, not a mode
+ * switch.
  *
  * <p>No {@link System#exit} here, and no environment read: the cache, the transport and the project directory
  * arrive as arguments, so a test drives the real command against a recorded payload and a temporary directory.
@@ -108,7 +109,7 @@ public final class Cli {
         } catch (CommandLine.ParameterException cause) {
             // picocli's own error printing is deliberately never used: stderr has to hold exactly one `Failure`
             // object, and picocli would write a usage block beside it.
-            return fail(describeParseError(cause), streams);
+            return fail(describeParseError(cause, argv), streams);
         }
 
         // A usage request is answered, not failed: it goes to stdout at exit 0, because "exit 0 means stdout is
@@ -122,7 +123,7 @@ public final class Cli {
         if (root.pkg == null) {
             return fail(new Failure.Validation(
                     "A package is required.",
-                    "Pass 'org/name', e.g. bal discover ballerinax/github."), streams);
+                    "Pass '<org>/<name>', e.g. bal discover ballerinax/github."), streams);
         }
 
         Failure argumentError = validate(root);
@@ -130,10 +131,12 @@ public final class Cli {
             return fail(argumentError, streams);
         }
 
-        Result<QualifiedName> qualified = QualifiedName.parse(root.pkg);
-        if (!qualified.isOk()) {
-            return fail(qualified.failure(), streams);
+        Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
+        if (!coordinate.isOk()) {
+            return fail(coordinate.failure(), streams);
         }
+        QualifiedName qualified = coordinate.value().qualified();
+        String version = coordinate.value().versionText();
 
         // Checked before the package is ever fetched: a mistyped bucket is a fact about the argument list, not
         // about the package, and costs a round trip to Central if left until after the load.
@@ -146,8 +149,8 @@ public final class Cli {
         // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
         HttpOptions resolved = http.withRefresh(root.refresh);
         Loader.LoadOptions options = new Loader.LoadOptions(
-                resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, root.version);
-        Result<LoadedPackage> loaded = Loader.loadPackage(qualified.value(), options);
+                resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, version);
+        Result<LoadedPackage> loaded = Loader.loadPackage(qualified, options);
         if (!loaded.isOk()) {
             return fail(loaded.failure(), streams);
         }
@@ -162,8 +165,8 @@ public final class Cli {
         if (root.page != 1 && answer.value().paging() == null) {
             return fail(notPaged(root, filter), streams);
         }
-        TextRenderer.Context where = new TextRenderer.Context(qualified.value().qualified(), root.module, rest,
-                filter, root.version);
+        TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
+                filter, version);
         emit(answer.value(), where, streams, root.output, interactive);
         return 0;
     }
@@ -190,9 +193,6 @@ public final class Cli {
         StringBuilder command = new StringBuilder("bal discover ").append(root.pkg);
         if (root.module != null) {
             command.append(" --module ").append(Texts.shellWord(root.module));
-        }
-        if (root.version != null) {
-            command.append(" --version ").append(Texts.shellWord(root.version));
         }
         if (root.rest != null) {
             root.rest.forEach(word -> command.append(' ').append(Texts.shellWord(word)));
@@ -254,18 +254,7 @@ public final class Cli {
                     "--page " + root.page + " is out of range: pages are numbered from 1.",
                     "Pass --page 1 or later, or drop it for the first page.");
         }
-        Failure badVersion = rejectInvalidVersion(root);
-        return badVersion != null ? badVersion : rejectVersionArguments(root);
-    }
-
-    private static Failure rejectInvalidVersion(Commands.Root root) {
-        if (root.version == null
-                || VERSION_SHAPED.matcher(root.version).matches() && Version.parse(root.version).isOk()) {
-            return null;
-        }
-        return new Failure.Validation(
-                "'" + root.version + "' is not a version.",
-                "Pass a version as Central publishes it, e.g. --version 2.15.0.");
+        return rejectVersionArguments(root);
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
@@ -278,33 +267,36 @@ public final class Cli {
                 "Pass --output " + Commands.JSON_OUTPUT + " or --output " + Commands.TEXT_OUTPUT + ".");
     }
 
-    /** A version, as Central publishes them. No bucket name, selector or path can look like one. */
-    private static final Pattern VERSION_SHAPED =
-            Pattern.compile("^\\d+\\.\\d+\\.\\d+([-+.].*)?$");
-
     private static Failure rejectVersionArguments(Commands.Root root) {
         List<String> tokens = root.rest;
         if (tokens == null) {
             return null;
         }
         String misplaced = tokens.stream()
-                .filter(token -> VERSION_SHAPED.matcher(token).matches())
+                .filter(Version::isComplete)
                 .findFirst()
                 .orElse(null);
         if (misplaced == null) {
             return null;
         }
         return new Failure.Validation(
-                "'" + misplaced + "' looks like a version, and a version is a flag, not an argument.",
-                "Pass it as --version " + misplaced + ". Without it the version is resolved from your project: "
-                        + "the one its Dependencies.toml locks, so a lookup matches what `bal build` compiles "
-                        + "against, or outside a project Central's latest.");
+                "'" + misplaced + "' looks like a version.",
+                "Write it after the package: " + packageOf(root.pkg) + ":" + misplaced);
     }
 
-    private static Failure describeParseError(CommandLine.ParameterException cause) {
+    /** The {@code <org>/<name>} part of a coordinate as typed, whatever follows it. */
+    private static String packageOf(String coordinate) {
+        int colon = coordinate.indexOf(':');
+        return colon < 0 ? coordinate : coordinate.substring(0, colon);
+    }
+
+    private static Failure describeParseError(CommandLine.ParameterException cause, List<String> argv) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();
             String token = tokens.isEmpty() ? "" : tokens.get(0);
+            if (VERSION_FLAG.equals(token) || token.startsWith(VERSION_FLAG + "=")) {
+                return versionFlag(argv);
+            }
             if (token.startsWith("-")) {
                 return new Failure.Validation(
                         "Unknown option '" + token + "'.",
@@ -315,13 +307,51 @@ public final class Cli {
                     "Run `bal discover --help` for usage.");
         }
         if (cause instanceof CommandLine.MissingParameterException missing) {
-            return new Failure.Validation(
-                    firstLine(missing.getMessage()),
-                    "Pass the value after the flag, or as --flag=value.");
+            return missing.getMissing().stream()
+                    .filter(CommandLine.Model.OptionSpec.class::isInstance)
+                    .map(CommandLine.Model.OptionSpec.class::cast)
+                    .findFirst()
+                    .map(Cli::missingValue)
+                    .orElseGet(() -> new Failure.Validation(firstLine(missing.getMessage()),
+                            "Run with --help for usage."));
         }
         return new Failure.Validation(
                 firstLine(cause.getMessage()),
                 "Run with --help for usage.");
+    }
+
+    private static final String VERSION_FLAG = "--version";
+
+    /**
+     * {@code --version} is not a flag of this command: by convention it asks for a program's own version, so the
+     * package version goes in the coordinate instead — what the caller is told to type, built from their own
+     * package and value where argv carries them.
+     */
+    private static Failure versionFlag(List<String> argv) {
+        String pkg = "<org>/<name>";
+        String version = "<version>";
+        for (int i = 0; i < argv.size(); i++) {
+            String token = argv.get(i);
+            String attached = token.startsWith(VERSION_FLAG + "=") ? token.substring(VERSION_FLAG.length() + 1) : "";
+            if (Version.isComplete(attached)) {
+                version = attached;
+            } else if (token.equals(VERSION_FLAG) && i + 1 < argv.size() && Version.isComplete(argv.get(i + 1))) {
+                version = argv.get(i + 1);
+            } else if (pkg.startsWith("<") && !token.startsWith("-") && token.contains("/")) {
+                pkg = packageOf(token);
+            }
+        }
+        return new Failure.Validation(
+                "Unknown option '" + VERSION_FLAG + "'.",
+                "To read a specific version, write " + pkg + ":" + version);
+    }
+
+    private static Failure missingValue(CommandLine.Model.OptionSpec option) {
+        String name = option.longestName();
+        String label = option.paramLabel();
+        return new Failure.Validation(
+                name + " needs a value.",
+                "Write " + name + " " + label + " or " + name + "=" + label + ".");
     }
 
     private static String firstLine(String message) {

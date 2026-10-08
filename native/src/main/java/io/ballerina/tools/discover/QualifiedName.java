@@ -24,11 +24,10 @@ import java.util.regex.Pattern;
 /**
  * Package coordinates, obtainable only through the parser.
  *
- * <p>The error this prevents is the reader's single most common caller mistake: passing
- * {@code org/name:version} where {@code org/name} belongs. Both are strings, so a plain
- * {@code String} parameter cannot tell them apart and the mistake surfaces as a confusing "package
- * not found" from Central. A private constructor moves it to the type checker — a raw
- * {@code String} cannot reach a request builder at all.
+ * <p>The error this prevents is passing {@code org/name:version} where {@code org/name} belongs. Both are
+ * strings, so a plain {@code String} parameter cannot tell them apart and the mistake surfaces as a confusing
+ * "package not found" from Central. A private constructor moves it to the type checker — a raw {@code String}
+ * cannot reach a request builder at all. The caller's {@code :version} is split off first, by {@link Coordinate}.
  *
  * @since 0.1.0
  */
@@ -75,9 +74,9 @@ public final class QualifiedName {
         Matcher match = PATTERN.matcher(input.trim());
         if (!match.matches() || Version.isTraversal(match.group(1)) || Version.isTraversal(match.group(2))) {
             return Result.err(new Failure.Validation(
-                    "Invalid package name '" + input + "'. Expected 'org/name' (no version suffix).",
-                    "Drop any ':version' suffix and pass strictly 'org/name', e.g. 'ballerinax/github'. "
-                            + "To read one version, add --version <version>."));
+                    "Invalid package name '" + input + "'. Expected '<org>/<name>'.",
+                    "Pass the package as '<org>/<name>', e.g. ballerinax/github, or '<org>/<name>:<version>' to read "
+                            + "one version, e.g. ballerinax/github:6.0.0"));
         }
         return Result.ok(new QualifiedName(match.group(1), match.group(2)));
     }
