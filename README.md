@@ -611,14 +611,15 @@ $ bal discover ballerina/http:2.15
 error: '2.15' in 'ballerina/http:2.15' is not a complete version.
   Write it in full, ballerina/http:<major>.<minor>.<patch>, or drop it to read the version your project locks or Central's latest: ballerina/http
 Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...] [--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
-Run 'bal discover --help' for details.
+Run `bal discover --help` for details.
 ```
 
 A usage error is a `validation` failure found before anything is looked up: an unknown option, an option with
-a missing or invalid value (`--output xml`, `--page x`, `--page 0`), no package, a malformed package name or
-incomplete version, `--version`, a version typed as a positional, or an unknown bucket. A `validation` failure
-that depends on what the package holds — an extra selector the container does not read, a page past the end
-of the listing, a module with no readme — is exit 1.
+a missing or invalid value (`--output xml`, `--page x`, `--page 0`, `--refresh=yes`) or given twice, no package,
+a malformed package name or incomplete version, `--version`, a version typed as a positional, an unknown bucket,
+more than one name after `funcs` or `type`, or a `type` name with `--filter`. A `validation` failure that
+depends on what the package holds — an extra selector a container does not read, a page past the end of the
+listing, a module with no readme — is exit 1.
 
 `upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
 `package-not-found` and `symbol-not-found` need a different command; `schema-drift` means Central's payload

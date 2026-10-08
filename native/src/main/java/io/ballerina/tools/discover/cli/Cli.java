@@ -40,8 +40,11 @@ import picocli.CommandLine;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -76,6 +79,10 @@ public final class Cli {
     private static final String VERSION_FLAG = "--version";
 
     private static final String OUTPUT_FLAG = "--output";
+
+    private static final String HELP = "bal discover --help";
+
+    private static final Pattern OVERWRITTEN = Pattern.compile("option '([^']+)'");
 
     private Cli() {
     }
@@ -157,6 +164,14 @@ public final class Cli {
             return usageError(unknownBucket(bucket), streams, json);
         }
 
+        // A blank keyword filters nothing, so it is no filter at all — normalised once, here, so no header or
+        // printed command downstream ever spells an empty `--filter`.
+        String filter = root.filter == null || root.filter.isBlank() ? null : root.filter;
+        Failure extra = extraNames(bucket, rest, filter, root, qualified, version);
+        if (extra != null) {
+            return usageError(extra, streams, json);
+        }
+
         // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
         HttpOptions resolved = http.withRefresh(root.refresh);
         Loader.LoadOptions options = new Loader.LoadOptions(
@@ -166,9 +181,6 @@ public final class Cli {
             return fail(loaded.failure(), streams, json);
         }
 
-        // A blank keyword filters nothing, so it is no filter at all — normalised once, here, so no header or
-        // printed command downstream ever spells an empty `--filter`.
-        String filter = root.filter == null || root.filter.isBlank() ? null : root.filter;
         Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
         if (!answer.isOk()) {
             return fail(answer.failure(), streams, json);
@@ -198,6 +210,24 @@ public final class Cli {
         Surface.Scope scope = Surface.Scope.ofVerb(bucket)
                 .orElseThrow(() -> new IllegalStateException("unreachable: validated above"));
         return Containers.render(loaded, scope, new Containers.Options(selectors, filter, page));
+    }
+
+    private static Failure extraNames(String bucket, List<String> rest, String filter, Commands.Root root,
+            QualifiedName qualified, String version) {
+        if (bucket == null) {
+            return null;
+        }
+        List<String> selectors = rest.subList(1, rest.size());
+        String pkg = qualified.qualified() + (version == null ? "" : ":" + version);
+        String command = "bal discover " + Texts.shellWord(pkg)
+                + (root.module == null ? "" : " --module " + Texts.shellWord(root.module)) + " " + bucket;
+        if (Types.BUCKET.equals(bucket)) {
+            return Types.misuse(command, new Types.Options(selectors, filter, root.page));
+        }
+        if (Surface.Scope.MODULE.verb().equals(bucket)) {
+            return Containers.extraFunctionNames(command, new Containers.Options(selectors, filter, root.page));
+        }
+        return null;
     }
 
     private static Failure notPaged(Commands.Root root, String filter) {
@@ -322,14 +352,17 @@ public final class Cli {
             if (VERSION_FLAG.equals(token) || token.startsWith(VERSION_FLAG + "=")) {
                 return versionFlag(argv);
             }
-            if (token.startsWith("-")) {
-                return new Failure.Validation(
-                        "Unknown option '" + token + "'.",
-                        UsageRenderer.knownFlags(Commands.Grammar.create()));
-            }
+            // Every positional fits `[bucket] [name ...]`, so only an option is ever left unmatched.
             return new Failure.Validation(
-                    "Unexpected argument '" + token + "'.",
-                    "Drop it, or run `bal discover --help` for usage.");
+                    "Unknown option '" + token + "'.",
+                    UsageRenderer.knownFlags(Commands.Grammar.create()));
+        }
+        Optional<String> repeated = cause instanceof CommandLine.OverwrittenOptionException
+                ? overwritten(cause.getMessage())
+                : Optional.empty();
+        if (repeated.isPresent()) {
+            return new Failure.Validation(
+                    repeated.get() + " is given more than once.", "Pass " + repeated.get() + " once.");
         }
         if (cause instanceof CommandLine.MissingParameterException missing) {
             return missing.getMissing().stream()
@@ -338,16 +371,30 @@ public final class Cli {
                     .findFirst()
                     .map(Cli::missingValue)
                     .orElseGet(() -> new Failure.Validation(firstLine(missing.getMessage()),
-                            "Run `bal discover --help` for usage."));
+                            "Run `" + HELP + "` for usage."));
         }
         if (cause.getArgSpec() instanceof CommandLine.Model.OptionSpec option && cause.getValue() != null) {
+            if (option.type() == boolean.class) {
+                return new Failure.Validation(
+                        option.longestName() + " takes no value.",
+                        "Write " + option.longestName() + ".");
+            }
             return new Failure.Validation(
                     "'" + cause.getValue() + "' is not a valid " + option.longestName() + " value.",
                     "Write " + option.longestName() + " " + option.paramLabel() + ".");
         }
         return new Failure.Validation(
                 firstLine(cause.getMessage()),
-                "Run `bal discover --help` for usage.");
+                "Run `" + HELP + "` for usage.");
+    }
+
+    // picocli 4.0.1 names the option only in its message: "option '--page' (<n>) should be specified only once".
+    private static Optional<String> overwritten(String message) {
+        Matcher named = OVERWRITTEN.matcher(message == null ? "" : message);
+        return named.find()
+                ? Optional.ofNullable(Commands.Grammar.create().line().getCommandSpec().findOption(named.group(1)))
+                        .map(CommandLine.Model.OptionSpec::longestName)
+                : Optional.empty();
     }
 
     // `--version` conventionally asks for a program's own version, so the package's goes in the coordinate.
@@ -391,7 +438,7 @@ public final class Cli {
 
     private static int usageError(Failure failure, Streams streams, boolean json) {
         String usage = json ? "" : "\n" + UsageRenderer.usageLine(Commands.Grammar.create())
-                + "\nRun 'bal discover --help' for details.";
+                + (failure.suggestion().contains(HELP) ? "" : "\nRun `" + HELP + "` for details.");
         streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + usage + "\n");
         return 2;
     }

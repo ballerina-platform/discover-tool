@@ -115,22 +115,36 @@ public final class Types {
     }
 
     public static Result<DiscoverResult> render(LoadedPackage loaded, Options options) {
-        if (options.selectors().size() > 1) {
-            return Result.err(new Failure.Validation(
-                    "The type bucket takes one declaration name; got " + options.selectors().size() + ".",
-                    "Name one declaration, or list them all: `" + baseCommand(loaded) + "`."));
+        Failure misuse = misuse(baseCommand(loaded), options);
+        if (misuse != null) {
+            return Result.err(misuse);
         }
         if (options.selectors().isEmpty()) {
             return roster(loaded, options);
         }
-        if (options.filtered()) {
-            return Result.err(new Failure.Validation(
+        return leaf(loaded, options.selectors().get(0), options.note());
+    }
+
+    /**
+     * The failure for more than one name, or a name with {@code --filter}, which no package can read, or
+     * {@code null}: a fact about the command line, so the CLI finds it before the package is fetched.
+     *
+     * @param command the command the bucket is listed with, e.g. {@code bal discover ballerina/io type}
+     */
+    public static Failure misuse(String command, Options options) {
+        if (options.selectors().size() > 1) {
+            return new Failure.Validation(
+                    "The type bucket takes one declaration name; got " + options.selectors().size() + ".",
+                    "Name one declaration, or list them all: `" + command + "`.");
+        }
+        if (options.selectors().size() == 1 && options.filtered()) {
+            return new Failure.Validation(
                     "The --filter option narrows a listing, and '" + options.selectors().get(0)
                             + "' names one declaration.",
-                    "Drop --filter, or drop the name: `" + baseCommand(loaded) + " "
-                            + "--filter " + Texts.shellWord(options.filter()) + "`."));
+                    "Drop --filter, or drop the name: `" + command + " --filter "
+                            + Texts.shellWord(options.filter()) + "`.");
         }
-        return leaf(loaded, options.selectors().get(0), options.note());
+        return null;
     }
 
     private static List<Entry> entries(Library library) {
