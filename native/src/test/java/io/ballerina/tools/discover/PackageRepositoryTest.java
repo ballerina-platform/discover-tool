@@ -356,8 +356,9 @@ public class PackageRepositoryTest {
         FakeRepository second = graphqlRepository("second", noModulePage());
         Result<LoadedPackage> loaded = loadSubgraph(first, second);
         Assert.assertFalse(loaded.isOk());
-        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) loaded.failure();
-        Assert.assertEquals(failure.candidates(), List.of("dataloader", "subgraph"));
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) loaded.failure();
+        Assert.assertEquals(failure.module(), "subgraph");
+        Assert.assertTrue(failure.suggestion().contains("dataloader, subgraph"), failure.suggestion());
         Assert.assertEquals(first.fetchCalls, 1);
         Assert.assertEquals(second.fetchCalls, 0);
     }

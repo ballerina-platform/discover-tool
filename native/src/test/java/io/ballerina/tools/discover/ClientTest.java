@@ -31,6 +31,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -244,6 +245,51 @@ public class ClientTest {
         Assert.assertEquals(failure.version(), "9.9.9");
         Assert.assertEquals(failure.suggestion(), "'ballerinax/aws.auth' is not a package: it is the 'auth' module "
                 + "of the ballerinax/aws package. Read it with `bal discover ballerinax/aws:9.9.9 --module auth`.");
+    }
+
+    @Test
+    public void aWrittenVersionOfAPackageCentralDoesNotPublishAtAllIsASpellingMiss() {
+        for (int registryStatus : new int[] {400, 404}) {
+            FakeTransport routed = FakeTransport.routing(url -> url.contains("/docs/")
+                    ? FakeTransport.status(404)
+                    : FakeTransport.status(registryStatus));
+            Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
+                    QualifiedName.parse("ballerinax/kafak").value(),
+                    CentralClient.ResolvedVersion.written(Version.parse("4.6.5").value()),
+                    fast(routed).build()).failure();
+            Assert.assertEquals(failure.version(), "4.6.5");
+            Assert.assertEquals(failure.suggestion(),
+                    "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
+        }
+    }
+
+    @Test
+    public void aMissingVersionIsAnsweredWithThePublishedVersionsNearestIt() {
+        StringBuilder listing = new StringBuilder("[");
+        for (int minor = 17; minor >= 8; minor--) {
+            for (int patch = 3; patch >= 0; patch--) {
+                listing.append(listing.length() > 1 ? "," : "").append("\"2.").append(minor).append('.')
+                        .append(patch).append('"');
+            }
+        }
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.status(404)
+                : FakeTransport.ok(listing.append(']').toString()));
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(GITHUB,
+                CentralClient.ResolvedVersion.written(Version.parse("2.9.99").value()),
+                fast(transport).build()).failure();
+        Assert.assertEquals(failure.suggestion(), "Central does not publish 'ballerinax/github' at 2.9.99; the "
+                + "published versions nearest it are 2.11.0, 2.10.3, 2.10.2, 2.10.1, 2.10.0, 2.9.3, 2.9.2, 2.9.1, "
+                + "2.9.0, 2.8.3 and 30 others. Write one of them after the package: ballerinax/github:<version>");
+    }
+
+    @Test
+    public void versionsAreOrderedBySemVerPrecedence() {
+        List<String> versions = new ArrayList<>(List.of("2.10.0", "2.9.1", "2.10.0-beta.11",
+                "2.10.0-beta.2", "2.10.0-alpha", "10.0.0", "not-semver"));
+        versions.sort(Version.PRECEDENCE);
+        Assert.assertEquals(versions, List.of("2.9.1", "2.10.0-alpha", "2.10.0-beta.2", "2.10.0-beta.11", "2.10.0",
+                "10.0.0", "not-semver"));
     }
 
     private static CentralClient.ResolvedVersion supplied(String version) {

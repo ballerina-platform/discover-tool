@@ -30,7 +30,6 @@ import org.testng.annotations.Test;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Which module of a payload gets rendered.
@@ -147,9 +146,10 @@ public class FromCentralTest {
         Result<CentralDocs.Module> selected =
                 FromCentral.selectModule(docs, qualified("ballerina/graphql"), "nosuch", null);
         Assert.assertFalse(selected.isOk());
-        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) selected.failure();
-        Assert.assertEquals(failure.requested(), List.of("nosuch"));
-        Assert.assertEquals(Set.copyOf(failure.candidates()), Set.of("dataloader", "subgraph"));
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) selected.failure();
+        Assert.assertEquals(failure.module(), "nosuch");
+        Assert.assertEquals(failure.suggestion(), "ballerina/graphql publishes these submodules: dataloader, "
+                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
     }
 
     @Test
