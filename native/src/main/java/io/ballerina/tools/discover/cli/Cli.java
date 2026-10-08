@@ -40,8 +40,11 @@ import picocli.CommandLine;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -76,6 +79,10 @@ public final class Cli {
     private static final String VERSION_FLAG = "--version";
 
     private static final String OUTPUT_FLAG = "--output";
+
+    private static final String HELP = "bal discover --help";
+
+    private static final Pattern OVERWRITTEN = Pattern.compile("option '([^']+)'");
 
     private Cli() {
     }
@@ -345,14 +352,17 @@ public final class Cli {
             if (VERSION_FLAG.equals(token) || token.startsWith(VERSION_FLAG + "=")) {
                 return versionFlag(argv);
             }
-            if (token.startsWith("-")) {
-                return new Failure.Validation(
-                        "Unknown option '" + token + "'.",
-                        UsageRenderer.knownFlags(Commands.Grammar.create()));
-            }
+            // Every positional fits `[bucket] [name ...]`, so only an option is ever left unmatched.
             return new Failure.Validation(
-                    "Unexpected argument '" + token + "'.",
-                    "Drop it, or run `bal discover --help` for usage.");
+                    "Unknown option '" + token + "'.",
+                    UsageRenderer.knownFlags(Commands.Grammar.create()));
+        }
+        Optional<String> repeated = cause instanceof CommandLine.OverwrittenOptionException
+                ? overwritten(cause.getMessage())
+                : Optional.empty();
+        if (repeated.isPresent()) {
+            return new Failure.Validation(
+                    repeated.get() + " is given more than once.", "Pass " + repeated.get() + " once.");
         }
         if (cause instanceof CommandLine.MissingParameterException missing) {
             return missing.getMissing().stream()
@@ -361,16 +371,30 @@ public final class Cli {
                     .findFirst()
                     .map(Cli::missingValue)
                     .orElseGet(() -> new Failure.Validation(firstLine(missing.getMessage()),
-                            "Run `bal discover --help` for usage."));
+                            "Run `" + HELP + "` for usage."));
         }
         if (cause.getArgSpec() instanceof CommandLine.Model.OptionSpec option && cause.getValue() != null) {
+            if (option.type() == boolean.class) {
+                return new Failure.Validation(
+                        option.longestName() + " takes no value.",
+                        "Write " + option.longestName() + ".");
+            }
             return new Failure.Validation(
                     "'" + cause.getValue() + "' is not a valid " + option.longestName() + " value.",
                     "Write " + option.longestName() + " " + option.paramLabel() + ".");
         }
         return new Failure.Validation(
                 firstLine(cause.getMessage()),
-                "Run `bal discover --help` for usage.");
+                "Run `" + HELP + "` for usage.");
+    }
+
+    // picocli 4.0.1 names the option only in its message: "option '--page' (<n>) should be specified only once".
+    private static Optional<String> overwritten(String message) {
+        Matcher named = OVERWRITTEN.matcher(message == null ? "" : message);
+        return named.find()
+                ? Optional.ofNullable(Commands.Grammar.create().line().getCommandSpec().findOption(named.group(1)))
+                        .map(CommandLine.Model.OptionSpec::longestName)
+                : Optional.empty();
     }
 
     // `--version` conventionally asks for a program's own version, so the package's goes in the coordinate.
@@ -414,7 +438,7 @@ public final class Cli {
 
     private static int usageError(Failure failure, Streams streams, boolean json) {
         String usage = json ? "" : "\n" + UsageRenderer.usageLine(Commands.Grammar.create())
-                + "\nRun 'bal discover --help' for details.";
+                + (failure.suggestion().contains(HELP) ? "" : "\nRun `" + HELP + "` for details.");
         streams.errorOut().accept((json ? failure.describe() : failure.describeText()) + usage + "\n");
         return 2;
     }

@@ -1625,9 +1625,34 @@ public class CliTest {
                 Assert.assertEquals(lines[2], "Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...] "
                         + "[--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]",
                         capture.stderr());
-                Assert.assertEquals(lines[3], "Run 'bal discover --help' for details.", capture.stderr());
+                Assert.assertEquals(lines[3], "Run `bal discover --help` for details.", capture.stderr());
                 Assert.assertEquals(lines[4], "", capture.stderr());
             }
+        }
+    }
+
+    @Test
+    public void anOptionGivenTwiceOrAFlagGivenAValueIsAUsageErrorInTheToolsOwnWords() {
+        record Case(List<String> argv, String message, String suggestion) { }
+        for (Case each : List.of(
+                new Case(List.of("ballerina/io", "--output", "MODE", "--output", "MODE"),
+                        "--output is given more than once.", "Pass --output once."),
+                new Case(List.of("ballerina/io", "--page", "1", "--page", "2"),
+                        "--page is given more than once.", "Pass --page once."),
+                new Case(List.of("ballerina/io", "--refresh=yes"), "--refresh takes no value.", "Write --refresh."))) {
+            Capture json = new Capture();
+            List<String> jsonArgv = each.argv().stream().map(word -> word.replace("MODE", "json")).toList();
+            Assert.assertEquals(Cli.run(jsonArgv, json.streams(), never()), 2, jsonArgv.toString());
+            Assert.assertEquals(json.field("message"), each.message(), json.stderr());
+            Assert.assertEquals(json.field("suggestion"), each.suggestion(), json.stderr());
+
+            Capture text = new Capture();
+            List<String> textArgv = each.argv().stream().map(word -> word.replace("MODE", "text")).toList();
+            Assert.assertEquals(Cli.run(textArgv, text.streams(), never(), null, true), 2, textArgv.toString());
+            Assert.assertEquals(text.stderr(), "error: " + each.message() + "\n  " + each.suggestion() + "\n"
+                    + "Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...] [--output json|text] "
+                    + "[--filter <keyword>] [--page <n>] [-m <module>] [--refresh]\n"
+                    + "Run `bal discover --help` for details.\n");
         }
     }
 
