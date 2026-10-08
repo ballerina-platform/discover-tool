@@ -365,7 +365,7 @@ public class PackageRepositoryTest {
     @Test
     public void aTransportFailureOnASubmodulePageIsReportedRatherThanAMissingModule() {
         FakeRepository first = graphqlRepository("first", Result.err(new Failure.Upstream(
-                "https://example.test/docs", 3, "HTTP 503", Failure.UPSTREAM_SUGGESTION, 503)));
+                "https://example.test/docs", 3, "HTTP 503", Failure.UPSTREAM_SUGGESTION, 503, true)));
         FakeRepository second = graphqlRepository("second", noModulePage());
         Result<LoadedPackage> loaded = loadSubgraph(first, second);
         Assert.assertFalse(loaded.isOk());
@@ -374,7 +374,7 @@ public class PackageRepositoryTest {
     }
 
     private static Failure.Upstream unreachable() {
-        return new Failure.Upstream("https://example.test/x", 3, "HTTP 503", Failure.UPSTREAM_SUGGESTION, 503);
+        return new Failure.Upstream("https://example.test/x", 3, "HTTP 503", Failure.UPSTREAM_SUGGESTION, 503, true);
     }
 
     @Test

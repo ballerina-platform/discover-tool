@@ -19,12 +19,16 @@
 package io.ballerina.tools.discover.cli;
 
 import io.ballerina.cli.BLauncherCmd;
+import io.ballerina.projects.util.ProjectConstants;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.cache.CacheLocation;
 import io.ballerina.tools.discover.cache.DiskCache;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
+import io.ballerina.tools.discover.central.JdkHttpTransport;
+import io.ballerina.tools.discover.central.ProxySettings;
+import org.wso2.ballerinalang.util.RepoUtils;
 import picocli.CommandLine;
 
 import java.io.PrintStream;
@@ -98,7 +102,14 @@ public class DiscoverTool implements BLauncherCmd {
         if (helpFlag) {
             argv.add("--help");
         }
-        HttpOptions http = HttpOptions.builder().cache(buildCache()).build();
+        Path home = ballerinaHome();
+        HttpOptions.Builder builder = HttpOptions.builder().cache(buildCache());
+        if (home != null) {
+            builder.settingsFile(ProxySettings.displayPath(home.resolve(ProjectConstants.SETTINGS_FILE_NAME),
+                    property("user.home")));
+            ProxySettings.read(home).ifPresent(proxy -> builder.transport(new JdkHttpTransport(proxy)).proxy(proxy));
+        }
+        HttpOptions http = builder.build();
         Cli.Streams streams = new Cli.Streams(outStream::print, errStream::print);
 
         // Pre-JDK 22, System.console() is null if EITHER stream is redirected, so a terminal with redirected
@@ -130,6 +141,14 @@ public class DiscoverTool implements BLauncherCmd {
         return cause.getMessage() == null || cause.getMessage().isEmpty()
                 ? cause.getClass().getName()
                 : cause.getMessage();
+    }
+
+    private static Path ballerinaHome() {
+        try {
+            return RepoUtils.createAndGetHomeReposPath();
+        } catch (RuntimeException | LinkageError unavailable) {
+            return null;
+        }
     }
 
     private static DocsCache buildCache() {
