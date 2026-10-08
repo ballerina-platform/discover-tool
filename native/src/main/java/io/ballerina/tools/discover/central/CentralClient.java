@@ -95,6 +95,15 @@ public final class CentralClient {
         return status == 429 || status == 502 || status == 503 || status == 504;
     }
 
+    // A name that does not resolve, a certificate that does not verify or a password the proxy rejected is the
+    // same on the next attempt, and retrying a rejected password counts against the account.
+    private static boolean passes(HttpTransport.Reply.Problem problem) {
+        return switch (problem) {
+            case UNCONNECTED, TUNNEL, OTHER -> true;
+            case UNRESOLVED, TLS, PROXY_REJECTED, BAD_URL -> false;
+        };
+    }
+
     /** {@code Retry-After} in either of its legal forms, as milliseconds, or {@code -1}. */
     public static long parseRetryAfter(String header, long nowMs) {
         if (header == null) {
@@ -151,7 +160,7 @@ public final class CentralClient {
         return switch (reply) {
             case HttpTransport.Reply.TimedOut ignored -> new Outcome.Spent(null, null, true, true, -1, false);
             case HttpTransport.Reply.Failed failed ->
-                    new Outcome.Spent(failed.message(), null, false, true, -1, true);
+                    new Outcome.Spent(failed.message(), null, false, passes(failed.problem()), -1, true);
             case HttpTransport.Reply.Answered answered -> {
                 if (!answered.isOk()) {
                     boolean retryable = isRetryableStatus(answered.status());

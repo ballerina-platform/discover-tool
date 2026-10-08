@@ -52,8 +52,6 @@ import java.util.Optional;
 @CommandLine.Command(name = "discover")
 public class DiscoverTool implements BLauncherCmd {
 
-    private static final String TUNNELING_DISABLED_SCHEMES = "jdk.http.auth.tunneling.disabledSchemes";
-
     @CommandLine.Parameters(arity = "0..*")
     private List<String> argList;
 
@@ -140,21 +138,12 @@ public class DiscoverTool implements BLauncherCmd {
                 : cause.getMessage();
     }
 
-    /** The proxy {@code bal pull} would use, from the Ballerina home it would read it from. */
     private static Optional<ProxySettings> proxy() {
-        Optional<ProxySettings> proxy;
         try {
-            proxy = ProxySettings.read(RepoUtils.createAndGetHomeReposPath());
+            return ProxySettings.read(RepoUtils.createAndGetHomeReposPath());
         } catch (RuntimeException | LinkageError unavailable) {
             return Optional.empty();
         }
-        // Central is HTTPS, so the proxy is reached through a CONNECT tunnel, where the JDK refuses Basic
-        // credentials unless told otherwise; `bal pull` sends them.
-        if (proxy.isPresent() && proxy.get().authenticates()
-                && System.getProperty(TUNNELING_DISABLED_SCHEMES) == null) {
-            System.setProperty(TUNNELING_DISABLED_SCHEMES, "");
-        }
-        return proxy;
     }
 
     private static DocsCache buildCache() {

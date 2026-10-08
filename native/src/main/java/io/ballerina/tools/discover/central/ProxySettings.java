@@ -36,7 +36,8 @@ import java.util.Optional;
  * <p>Read with {@code bal}'s own {@link SettingsBuilder}, and held to the rule {@code bal pull} applies before
  * using one: a proxy needs a non-empty host and a positive port, and authenticates only when both a username and
  * a password are set. Everything short of that — no file, no table, a value of the wrong type — is no proxy,
- * silently, as it is for {@code bal pull}.
+ * silently, as it is for {@code bal pull}; a malformed file counts for what the parser salvages from it, since
+ * {@code bal pull} ignores its diagnostics too.
  *
  * @param host the proxy's host name or address
  * @param port the proxy's port

@@ -18,8 +18,10 @@
 
 package io.ballerina.tools.discover.central;
 
+import io.ballerina.projects.internal.model.Proxy;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import org.wso2.ballerinalang.util.RepoUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -86,10 +88,50 @@ public class ProxySettingsTest {
                 "[proxy]\nhost = \"proxy.example.com\"\nport = -1\n",
                 "[proxy]\nhost = \"proxy.example.com\"\nport = \"3128\"\n",
                 "[proxy]\nhost = 42\nport = 3128\n",
-                "proxy = \"proxy.example.com:3128\"\n",
-                "[proxy\nhost = \"proxy.example.com\"\n"}) {
+                "proxy = \"proxy.example.com:3128\"\n"}) {
             Assert.assertEquals(ProxySettings.parse(settings), Optional.empty(), settings);
         }
+    }
+
+    // bal pull reads the file with RepoUtils.readSettings() and ignores its diagnostics, so a malformed file
+    // proxies through whatever the parser salvages from it; this tool must take the same route, not a stricter one.
+    @Test
+    public void everyFileIsReadAsBalPullReadsItMalformedOnesIncluded() throws IOException {
+        Path home = Files.createDirectories(RepoUtils.createAndGetHomeReposPath());
+        Path settings = home.resolve("Settings.toml");
+        Assert.assertFalse(Files.exists(settings), "the test Ballerina home must not carry a Settings.toml");
+        try {
+            for (String content : new String[] {
+                    "[proxy]\nhost = \"proxy.example.com\"\nport = 3128\nusername = \"alice\"\npassword = \"s\"\n",
+                    "[proxy]\nhost = \"proxy.example.com\"\nport = 3128\nusername = \n",
+                    "[proxy\nhost = \"proxy.example.com\"\nport = 3128\n",
+                    "[proxy]\nhost = \"proxy.example.com\"\nport = \"3128\"\n",
+                    "[proxy]\nhost = \"proxy.example.com\"\nport = 3128\n[proxy]\nhost = \"other.example.com\"\n",
+                    "proxy = \"proxy.example.com:3128\"\n"}) {
+                Files.writeString(settings, content, StandardCharsets.UTF_8);
+                Assert.assertEquals(ProxySettings.read(home), balPull(), content);
+            }
+        } finally {
+            Files.deleteIfExists(settings);
+        }
+        Assert.assertEquals(ProxySettings.parse("[proxy\nhost = \"proxy.example.com\"\nport = 3128\n"),
+                Optional.of(new ProxySettings("proxy.example.com", 3128, "", "")), "salvaged, as bal pull does");
+    }
+
+    // What bal pull's own reader makes of the file, held to the rule bal pull applies before using a proxy. A
+    // file its reader throws on is no proxy.
+    private static Optional<ProxySettings> balPull() {
+        Proxy balPull;
+        try {
+            balPull = RepoUtils.readSettings().getProxy();
+        } catch (RuntimeException unreadable) {
+            return Optional.empty();
+        }
+        return balPull == null || balPull.host() == null || balPull.host().isEmpty() || balPull.port() <= 0
+                ? Optional.empty()
+                : Optional.of(new ProxySettings(balPull.host(), balPull.port(),
+                        balPull.username() == null ? "" : balPull.username(),
+                        balPull.password() == null ? "" : balPull.password()));
     }
 
     @Test

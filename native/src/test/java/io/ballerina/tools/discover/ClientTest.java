@@ -525,7 +525,8 @@ public class ClientTest {
     @Test
     public void noAnswerAtAllPointsAtTheNetworkAndAnErrorStatusAtCentral() {
         Result<JsonElement> unreached = CentralClient.fetchJson("https://example.invalid/x",
-                fast(FakeTransport.always(new HttpTransport.Reply.Failed("network error: Connection refused")))
+                fast(FakeTransport.always(new HttpTransport.Reply.Failed(
+                        HttpTransport.Reply.Problem.UNCONNECTED, "connection refused")))
                         .maxAttempts(1).build());
         Failure.Upstream network = (Failure.Upstream) unreached.failure();
         Assert.assertNull(network.status());
@@ -541,7 +542,8 @@ public class ClientTest {
     @Test
     public void aNetworkErrorIsRetriedAndThenReportedAsUpstream() {
         FakeTransport transport =
-                FakeTransport.always(new HttpTransport.Reply.Failed("network error: connection refused"));
+                FakeTransport.always(new HttpTransport.Reply.Failed(
+                        HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"));
         Result<JsonElement> result =
                 CentralClient.fetchJson("https://example.invalid/x", fast(transport).build());
         Assert.assertFalse(result.isOk());

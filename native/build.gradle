@@ -82,6 +82,9 @@ test {
     useTestNG()
     maxHeapSize = '2048m'
     systemProperty 'project.version', "${project.version}"
+    // The JDK reads this once, when a JVM builds its first HTTP client. JdkHttpTransport sets it before the only
+    // client the tool builds; a test JVM builds others first, so the tunnel tests need it from the start.
+    systemProperty 'jdk.http.auth.tunneling.disabledSchemes', ''
     // bal's own override of the user's Ballerina home, so no test ever reads the real ~/.ballerina.
     environment 'BALLERINA_HOME_DIR', layout.buildDirectory.dir('test-ballerina-home').get().asFile.path
     testLogging {
