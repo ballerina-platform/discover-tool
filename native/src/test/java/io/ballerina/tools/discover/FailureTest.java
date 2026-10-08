@@ -38,19 +38,19 @@ public class FailureTest {
 
     @Test
     public void aMissingPackageNamesTheCoordinateItLookedFor() {
-        Assert.assertEquals(new Failure.PackageNotFound("ballerina/http", "9.9.9", "Write one.").describeText(),
+        Assert.assertEquals(new Failure.PackageNotFound("ballerina/http", "9.9.9", null, "Write one.").describeText(),
                 "error: not found: ballerina/http:9.9.9\n  Write one.");
-        Assert.assertEquals(new Failure.PackageNotFound("ballerina/htp", null, "Check it.").describeText(),
+        Assert.assertEquals(new Failure.PackageNotFound("ballerina/htp", null, null, "Check it.").describeText(),
                 "error: not found: ballerina/htp\n  Check it.");
     }
 
     @Test
     public void candidatesAndIssuesGetLinesOfTheirOwn() {
-        Assert.assertEquals(new Failure.SymbolNotFound("ballerinax/kafka", "4.6.5", List.of("Prod"),
+        Assert.assertEquals(new Failure.SymbolNotFound("ballerinax/kafka", "4.6.5", null, List.of("Prod"),
                         List.of("Producer", "Consumer"), "Pick one.").describeText(),
                 "error: no match for 'Prod' in ballerinax/kafka:4.6.5\n  Pick one.\n  candidates:\n    Producer\n"
                         + "    Consumer");
-        Assert.assertEquals(new Failure.SchemaDrift("ballerinax/kafka", "4.6.5",
+        Assert.assertEquals(new Failure.SchemaDrift("ballerinax/kafka", "4.6.5", null,
                         List.of(new Failure.SchemaIssue("docsData.modules", "expected an array")), "Report it.")
                         .describeText(),
                 "error: Central's payload for ballerinax/kafka:4.6.5 does not match this reader\n  Report it.\n"

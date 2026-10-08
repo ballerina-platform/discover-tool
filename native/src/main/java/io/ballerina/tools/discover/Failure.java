@@ -55,13 +55,14 @@ public sealed interface Failure {
     record Validation(String message, String suggestion) implements Failure { }
 
     /**
-     * Central has no such package, or no such version of it.
+     * Central has no such package, no such version of it, or no such module at that version.
      *
-     * @param qualified the {@code org/name} that was not found
+     * @param qualified the {@code org/name} that was not found, or whose module was not
      * @param version the version that was looked for, or {@code null} when none was reached
+     * @param module the {@code --module} that was looked for, or {@code null} for the package's default module
      * @param suggestion what to try instead
      */
-    record PackageNotFound(String qualified, String version, String suggestion) implements Failure { }
+    record PackageNotFound(String qualified, String version, String module, String suggestion) implements Failure { }
 
     /**
      * Central answered, but not usefully — a 4xx/5xx, a network error, a bad body. {@code status} is
@@ -90,11 +91,12 @@ public sealed interface Failure {
      *
      * @param qualified the {@code org/name} whose payload drifted
      * @param version the version that payload was read at, or {@code null} when unknown
+     * @param module the {@code --module} whose page drifted, or {@code null} for the package's default module
      * @param issues every place the payload stopped matching the schema
      * @param suggestion what to try next
      */
-    record SchemaDrift(String qualified, String version, List<SchemaIssue> issues, String suggestion)
-            implements Failure { }
+    record SchemaDrift(String qualified, String version, String module, List<SchemaIssue> issues,
+            String suggestion) implements Failure { }
 
     /**
      * The package parsed, but no declaration matched the name the caller asked for. {@code
@@ -103,12 +105,13 @@ public sealed interface Failure {
      *
      * @param qualified the {@code org/name} that was searched
      * @param version the version that was searched, or {@code null} when unknown
+     * @param module the {@code --module} that was searched, or {@code null} for the package's default module
      * @param requested the name (or names) the caller asked for
      * @param candidates the near-misses, or the whole roster when there were none
      * @param suggestion what to try next
      */
-    record SymbolNotFound(String qualified, String version, List<String> requested, List<String> candidates,
-            String suggestion) implements Failure { }
+    record SymbolNotFound(String qualified, String version, String module, List<String> requested,
+            List<String> candidates, String suggestion) implements Failure { }
 
     /**
      * The route left when Central itself is the problem: a resolved version's {@code .bala} carries the same
@@ -162,15 +165,15 @@ public sealed interface Failure {
         List<String> lines = new ArrayList<>();
         lines.add("error: " + switch (this) {
             case Validation f -> f.message();
-            case PackageNotFound f -> "not found: " + coordinate(f.qualified(), f.version());
+            case PackageNotFound f -> "not found: " + coordinate(f.qualified(), f.version(), f.module());
             case Upstream f -> (f.message() == null ? "request failed" : f.message()) + " from " + f.url()
                     + " after " + f.attempts() + (f.attempts() == 1 ? " attempt" : " attempts");
             case Timeout f -> "no answer from " + f.url() + " within " + f.budgetMs() + " ms";
-            case SchemaDrift f -> "Central's payload for " + coordinate(f.qualified(), f.version())
+            case SchemaDrift f -> "Central's payload for " + coordinate(f.qualified(), f.version(), f.module())
                     + " does not match this reader";
             case SymbolNotFound f -> "no match for " + f.requested().stream()
                     .map(name -> "'" + name + "'").collect(Collectors.joining(" ")) + " in "
-                    + coordinate(f.qualified(), f.version());
+                    + coordinate(f.qualified(), f.version(), f.module());
         });
         lines.add("  " + suggestion());
         if (this instanceof SchemaDrift f) {
@@ -184,8 +187,8 @@ public sealed interface Failure {
         return String.join("\n", lines);
     }
 
-    private static String coordinate(String qualified, String version) {
-        return version == null ? qualified : qualified + ":" + version;
+    private static String coordinate(String qualified, String version, String module) {
+        return (version == null ? qualified : qualified + ":" + version) + (module == null ? "" : ", module " + module);
     }
 
     /** The one line a failing run writes to stderr in JSON mode: a single JSON object. */
@@ -198,7 +201,7 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
             }
             case PackageNotFound f -> {
-                coordinates(json, f.qualified(), f.version());
+                coordinates(json, f.qualified(), f.version(), f.module());
                 json.addProperty("suggestion", f.suggestion());
             }
             case Upstream f -> {
@@ -216,7 +219,7 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
             }
             case SchemaDrift f -> {
-                coordinates(json, f.qualified(), f.version());
+                coordinates(json, f.qualified(), f.version(), f.module());
                 JsonArray issues = new JsonArray();
                 for (SchemaIssue issue : f.issues()) {
                     JsonObject entry = new JsonObject();
@@ -228,7 +231,7 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
             }
             case SymbolNotFound f -> {
-                coordinates(json, f.qualified(), f.version());
+                coordinates(json, f.qualified(), f.version(), f.module());
                 json.add("requested", strings(f.requested()));
                 json.add("candidates", strings(f.candidates()));
                 json.addProperty("suggestion", f.suggestion());
@@ -237,10 +240,13 @@ public sealed interface Failure {
         return json.toString();
     }
 
-    private static void coordinates(JsonObject json, String qualified, String version) {
+    private static void coordinates(JsonObject json, String qualified, String version, String module) {
         json.addProperty("qualified", qualified);
         if (version != null) {
             json.addProperty("version", version);
+        }
+        if (module != null) {
+            json.addProperty("module", module);
         }
     }
 

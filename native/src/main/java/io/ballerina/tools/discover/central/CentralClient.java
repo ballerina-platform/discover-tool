@@ -271,7 +271,7 @@ public final class CentralClient {
             tried.append(tried.isEmpty() ? "" : ", ").append(parent.qualified());
         }
         return new Failure.PackageNotFound(
-                qualified.qualified(), null,
+                qualified.qualified(), pin, null,
                 "Central publishes no package under this name, and none of the packages it could be a module "
                         + "of exists either (tried " + tried + "). Check the org/name spelling; "
                         + "`bal search <keyword>` lists what Central publishes.");
@@ -300,7 +300,7 @@ public final class CentralClient {
                     + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
                     + "). Check the name; `bal search <keyword>` lists what Central publishes.";
         }
-        return new Failure.PackageNotFound(qualified.qualified(), null, suggestion);
+        return new Failure.PackageNotFound(qualified.qualified(), pin, null, suggestion);
     }
 
     // Asks for this package's row: listing the whole org (ballerinax) and filtering costs about 45 seconds.
@@ -375,7 +375,7 @@ public final class CentralClient {
 
     private static Failure notFound(QualifiedName qualified) {
         return new Failure.PackageNotFound(
-                qualified.qualified(), null,
+                qualified.qualified(), null, null,
                 "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
     }
 
@@ -422,7 +422,10 @@ public final class CentralClient {
             // One the reader resolved is not: telling them to "omit the version" names what they already did.
             if (response.failure() instanceof Failure.Upstream upstream
                     && upstream.status() != null && upstream.status() == 404) {
-                return Result.err(new Failure.PackageNotFound(qualified.qualified(), version.text(),
+                if (resolved.supplied() && isUnpublishedDottedName(qualified, options)) {
+                    return Result.err(notAPackage(qualified, pinOf(resolved), options));
+                }
+                return Result.err(new Failure.PackageNotFound(qualified.qualified(), version.text(), null,
                         missingVersion(qualified, resolved, options)));
             }
             return response.cast();
@@ -462,13 +465,12 @@ public final class CentralClient {
         DocsCache.ModuleKey key = new DocsCache.ModuleKey(
                 REPOSITORY_ID, qualified.org(), qualified.name(), submodule, version.text());
         String moduleName = qualified.name() + "." + submodule;
-        String label = qualified.org() + "/" + moduleName;
 
         if (!options.refresh()) {
             JsonElement cached = cache.readModuleDocs(key);
             if (cached != null) {
                 Result<CentralDocs> parsed = Coordinates.isModulePage(cached, qualified, submodule, version)
-                        ? Schema.parse(cached, label, version.text())
+                        ? Schema.parse(cached, qualified.qualified(), version.text())
                         : null;
                 if (parsed != null && parsed.isOk()) {
                     return parsed;
@@ -483,16 +485,19 @@ public final class CentralClient {
         if (!response.isOk()) {
             if (response.failure() instanceof Failure.Upstream upstream
                     && upstream.status() != null && upstream.status() == 404) {
-                return Result.err(noSuchModulePage(label, version, qualified, pinOf(resolved), submodule));
+                return Result.err(noSuchModulePage(version, qualified, pinOf(resolved), submodule));
             }
             return response.cast();
         }
         if (!Coordinates.isModulePage(response.value(), qualified, submodule, version)) {
-            return Result.err(noSuchModulePage(label, version, qualified, pinOf(resolved), submodule));
+            return Result.err(noSuchModulePage(version, qualified, pinOf(resolved), submodule));
         }
-        Result<CentralDocs> parsed = Schema.parse(response.value(), label, version.text());
+        Result<CentralDocs> parsed = Schema.parse(response.value(), qualified.qualified(), version.text());
         if (!parsed.isOk()) {
-            return parsed.cast();
+            return parsed.failure() instanceof Failure.SchemaDrift drift
+                    ? Result.err(new Failure.SchemaDrift(
+                            drift.qualified(), drift.version(), submodule, drift.issues(), drift.suggestion()))
+                    : parsed.cast();
         }
         cache.writeModuleDocs(key, response.value());
         return parsed;
@@ -506,11 +511,19 @@ public final class CentralClient {
         return qualified.qualified() + (pin == null ? "" : ":" + pin);
     }
 
-    private static Failure noSuchModulePage(
-            String label, Version version, QualifiedName qualified, String pin, String submodule) {
-        return new Failure.PackageNotFound(label, version.text(), qualified.qualified() + " publishes no '" + submodule
-                + "' module at this version. Run `bal discover " + Texts.shellWord(pinned(qualified, pin))
-                + "` to list the submodules it does publish.");
+    private static Failure noSuchModulePage(Version version, QualifiedName qualified, String pin, String submodule) {
+        return new Failure.PackageNotFound(qualified.qualified(), version.text(), submodule, qualified.qualified()
+                + " publishes no '" + submodule + "' module at this version. Run `bal discover "
+                + Texts.shellWord(pinned(qualified, pin)) + "` to list the submodules it does publish.");
+    }
+
+    // A name Central has no row for, with a package it could be a module of.
+    private static boolean isUnpublishedDottedName(QualifiedName qualified, HttpOptions options) {
+        if (containingPackages(qualified).isEmpty()) {
+            return false;
+        }
+        Result<ResolvedVersion> published = resolvePublishedVersion(qualified, options);
+        return !published.isOk() && published.failure() instanceof Failure.PackageNotFound;
     }
 
     private static String missingVersion(
@@ -526,7 +539,8 @@ public final class CentralClient {
         String coordinate = qualified.qualified() + ":<version>";
         if (resolved.pinned()) {
             return "Central does not publish '" + qualified.qualified() + "' at " + version.text() + listed
-                    + ". Write one of them after the package: " + coordinate;
+                    + (published == null ? ". Write a published version" : ". Write one of them")
+                    + " after the package: " + coordinate;
         }
         return "Central does not publish '" + qualified.qualified() + "' at " + version.text()
                 + ", the version your project's Dependencies.toml locks" + listed

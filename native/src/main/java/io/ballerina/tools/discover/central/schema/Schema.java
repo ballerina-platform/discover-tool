@@ -78,7 +78,7 @@ public final class Schema {
         }
         if (!cursor.issues.isEmpty()) {
             return Result.err(new Failure.SchemaDrift(
-                    qualified, version, List.copyOf(cursor.issues), Failure.SCHEMA_DRIFT_SUGGESTION));
+                    qualified, version, null, List.copyOf(cursor.issues), Failure.SCHEMA_DRIFT_SUGGESTION));
         }
         return Result.ok(new CentralDocs(modules));
     }

@@ -594,7 +594,8 @@ answer whose `next` is the joined command, and three or more are that failure, s
 
 A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
 forced with `--output` (honoured even when the rest of the arguments fail to parse). In JSON it is one object,
-whose `qualified` is always `org/name` and whose `version`, when one was reached, is a key of its own:
+whose `qualified` is always `org/name`, and whose `version` (when one was reached) and `module` (when
+`--module` was passed) are keys of their own:
 
 ```
 $ bal discover ballerinax/kafka client NoSuchContainer | cat

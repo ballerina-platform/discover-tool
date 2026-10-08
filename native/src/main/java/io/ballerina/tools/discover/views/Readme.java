@@ -165,7 +165,7 @@ public final class Readme {
         Optional<Chunk> found = byNumber(chunks, requested).or(() -> byTitle(chunks, requested));
         if (found.isEmpty()) {
             return Result.err(new Failure.SymbolNotFound(
-                    loaded.qualified().qualified(), loaded.version().text(),
+                    loaded.qualified().qualified(), loaded.version().text(), loaded.module(),
                     List.of(requested),
                     chunks.stream().map(chunk -> chunk.number() + ". " + chunk.title()).toList(),
                     "No chunk answers to that. The candidates are every chunk this readme publishes; pass one "

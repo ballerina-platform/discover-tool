@@ -200,8 +200,8 @@ public class PackageRepositoryTest {
     @Test
     public void aVersionFailureFromTheRepositoryPropagatesWithoutEverFetchingDocs() {
         FakeRepository repository = new FakeRepository(
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, "not on this repository")),
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, "must not be reached")));
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "not on this repository")),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "must not be reached")));
         Loader.LoadOptions options =
                 new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null);
 
@@ -217,7 +217,8 @@ public class PackageRepositoryTest {
     public void aDocsFailureFromTheRepositoryPropagatesUnchanged() {
         FakeRepository repository = new FakeRepository(
                 Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "4.6.5", "gone from this repository")));
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "4.6.5", null,
+                        "gone from this repository")));
         Loader.LoadOptions options =
                 new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null);
 
@@ -234,8 +235,8 @@ public class PackageRepositoryTest {
         // for this package is a routine outcome, not a failure worth stopping on.
         Version version = Version.parse("4.6.5").value();
         FakeRepository first = new FakeRepository(
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, "not on this repository")),
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, "must not be reached")));
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "not on this repository")),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "must not be reached")));
         FakeRepository second = new FakeRepository(
                 Result.ok(new CentralClient.ResolvedVersion(version, false)),
                 Result.ok(FixtureCorpus.loadFixture(SLUG)));
@@ -260,10 +261,12 @@ public class PackageRepositoryTest {
         // itself is what `resolvesButFailsToFetch.fetchCalls` below actually pins down.
         FakeRepository resolvesButFailsToFetch = new FakeRepository(
                 Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "4.6.5", "gone from this repository")));
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", "4.6.5", null,
+                        "gone from this repository")));
         FakeRepository second = new FakeRepository(
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, "second repository has no answer")),
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, "must not be reached")));
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null,
+                        "second repository has no answer")),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "must not be reached")));
         Loader.LoadOptions options = new Loader.LoadOptions(
                 httpThatMustNotReachTheNetwork(), null, List.of(resolvesButFailsToFetch, second), null, null);
 
@@ -289,8 +292,8 @@ public class PackageRepositoryTest {
                 Result.ok(new CentralClient.ResolvedVersion(Version.parse("4.6.5").value(), false)),
                 Result.ok(FixtureCorpus.loadFixture(SLUG)));
         FakeRepository second = new FakeRepository(
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, "must not be reached")),
-                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, "must not be reached")));
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "must not be reached")),
+                Result.err(new Failure.PackageNotFound("ballerinax/kafka", null, null, "must not be reached")));
         Loader.LoadOptions options = new Loader.LoadOptions(
                 httpThatMustNotReachTheNetwork(), null, List.of(answersButWrongModule, second), null, null);
 
@@ -318,7 +321,8 @@ public class PackageRepositoryTest {
     }
 
     private static Result<CentralDocs> noModulePage() {
-        return Result.err(new Failure.PackageNotFound("ballerina/graphql.subgraph", "1.17.0", "no such page here"));
+        return Result.err(new Failure.PackageNotFound("ballerina/graphql", "1.17.0", "subgraph",
+                "no such page here"));
     }
 
     private static Result<LoadedPackage> loadSubgraph(FakeRepository... repositories) {
@@ -376,7 +380,7 @@ public class PackageRepositoryTest {
     @Test
     public void aRepositoryThatCouldNotResolveThePackageIsNotTakenForOneWithoutTheSubmodule() {
         FakeRepository unreachable = new FakeRepository("unreachable", Result.err(unreachable()),
-                Result.err(new Failure.PackageNotFound("ballerina/graphql", null, "must not be reached")));
+                Result.err(new Failure.PackageNotFound("ballerina/graphql", null, null, "must not be reached")));
         FakeRepository second = graphqlRepository("second", noModulePage());
         Result<LoadedPackage> loaded = loadSubgraph(unreachable, second);
         Assert.assertFalse(loaded.isOk());
@@ -391,7 +395,7 @@ public class PackageRepositoryTest {
         FakeRepository first = new FakeRepository("first", Result.ok(version), Result.err(unreachable()));
         first.modulePage = noModulePage();
         FakeRepository second = new FakeRepository("second", Result.ok(version),
-                Result.err(new Failure.PackageNotFound("ballerina/graphql", "1.17.0", "not here")));
+                Result.err(new Failure.PackageNotFound("ballerina/graphql", "1.17.0", null, "not here")));
         second.modulePage = noModulePage();
         Result<LoadedPackage> loaded = loadSubgraph(first, second);
         Assert.assertFalse(loaded.isOk());

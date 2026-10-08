@@ -183,8 +183,8 @@ public class CliTest {
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertTrue(transport.urls().get(0).endsWith("/docs/ballerinax/github/6.0.0"),
                 transport.urls().toString());
-        Assert.assertTrue(capture.field("suggestion").endsWith("Write one of them after the package: "
-                + "ballerinax/github:<version>"), capture.stderr());
+        Assert.assertEquals(capture.field("suggestion"), "Central does not publish 'ballerinax/github' at 6.0.0. "
+                + "Write a published version after the package: ballerinax/github:<version>", capture.stderr());
     }
 
     @Test
@@ -624,6 +624,28 @@ public class CliTest {
         Assert.assertEquals(unknown.field("kind"), "package-not-found");
         Assert.assertEquals(unknown.field("qualified"), "ballerina/htp");
         Assert.assertFalse(unknown.failure().has("version"), unknown.stderr());
+    }
+
+    @Test
+    public void aFailureUnderAModuleNamesThePackageAndTheModuleApart() {
+        Capture json = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Nope"),
+                json.streams(), options(graphqlCentral())), 1);
+        Assert.assertEquals(json.field("kind"), "symbol-not-found");
+        Assert.assertEquals(json.field("qualified"), "ballerina/graphql");
+        Assert.assertEquals(json.field("version"), GRAPHQL_VERSION);
+        Assert.assertEquals(json.field("module"), "subgraph");
+
+        Capture text = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Nope", "--output",
+                "text"), text.streams(), options(graphqlCentral())), 1);
+        Assert.assertTrue(text.stderr().startsWith("error: no match for 'Nope' in ballerina/graphql:"
+                + GRAPHQL_VERSION + ", module subgraph\n"), text.stderr());
+
+        Capture plain = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "type", "Nope"), plain.streams(),
+                options(graphqlCentral())), 1);
+        Assert.assertFalse(plain.failure().has("module"), plain.stderr());
     }
 
     @Test

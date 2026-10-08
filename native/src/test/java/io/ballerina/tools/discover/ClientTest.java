@@ -198,6 +198,9 @@ public class ClientTest {
 
         Failure.PackageNotFound withPin = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
                 graphql, "nosuch", pinned, fast(transport).build()).failure();
+        Assert.assertEquals(withPin.qualified(), "ballerina/graphql");
+        Assert.assertEquals(withPin.version(), "1.17.0");
+        Assert.assertEquals(withPin.module(), "nosuch");
         Assert.assertTrue(withPin.suggestion().contains("Run `bal discover ballerina/graphql:1.17.0` "),
                 withPin.suggestion());
 
@@ -208,6 +211,35 @@ public class ClientTest {
                     without.suggestion());
             Assert.assertFalse(without.suggestion().contains("1.17.0"), without.suggestion());
         }
+    }
+
+    @Test
+    public void aWrittenVersionCentralDoesNotPublishNamesTheOnesItDoes() {
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.status(404)
+                : FakeTransport.ok("[\"6.0.0\", \"5.1.0\"]"));
+        CentralClient.ResolvedVersion written =
+                new CentralClient.ResolvedVersion(Version.parse("9.9.9").value(), false, true, true);
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
+                GITHUB, written, fast(transport).build()).failure();
+        Assert.assertEquals(failure.suggestion(), "Central does not publish 'ballerinax/github' at 9.9.9; published "
+                + "versions are 6.0.0, 5.1.0. Write one of them after the package: ballerinax/github:<version>");
+    }
+
+    @Test
+    public void aWrittenVersionOfANameCentralDoesNotPublishIsReportedAsAModuleOfItsPackage() {
+        QualifiedName auth = QualifiedName.parse("ballerinax/aws.auth").value();
+        FakeTransport transport = registry(Map.of(
+                "ballerinax/aws", "[\"1.0.2\"]",
+                "ballerinax/aws/1.0.2", modules("aws", "aws.auth")));
+        CentralClient.ResolvedVersion written =
+                new CentralClient.ResolvedVersion(Version.parse("9.9.9").value(), false, true, true);
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
+                auth, written, fast(transport).build()).failure();
+        Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
+        Assert.assertEquals(failure.version(), "9.9.9");
+        Assert.assertEquals(failure.suggestion(), "'ballerinax/aws.auth' is not a package: it is the 'auth' module "
+                + "of the ballerinax/aws package. Read it with `bal discover ballerinax/aws:9.9.9 --module auth`.");
     }
 
     private static CentralClient.ResolvedVersion supplied(String version) {

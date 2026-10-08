@@ -261,15 +261,16 @@ public final class Types {
             }
             if (owners.size() > 1) {
                 return Result.err(new Failure.SymbolNotFound(
-                        loaded.qualified().qualified(), loaded.version().text(), List.of(requested),
+                        loaded.qualified().qualified(), loaded.version().text(), loaded.module(),
+                        List.of(requested),
                         owners.stream().map(TypeDef.Enumeration::name).toList(),
                         "'" + memberName(requested) + "' is a member of several enums, so this reader will not "
                                 + "choose between them. Re-run with the enum whose member you mean, exactly as "
                                 + "spelled."));
             }
             return Result.err(new Failure.SymbolNotFound(
-                    loaded.qualified().qualified(), loaded.version().text(), List.of(requested),
-                    Names.candidatesOf(match),
+                    loaded.qualified().qualified(), loaded.version().text(), loaded.module(),
+                    List.of(requested), Names.candidatesOf(match),
                     missSuggestion(loaded, match instanceof Names.Match.Ambiguous)));
         }
         String name = found.name();
@@ -352,7 +353,8 @@ public final class Types {
             return answer;
         }
         return Result.err(new Failure.SymbolNotFound(
-                loaded.qualified().qualified(), loaded.version().text(), List.of(object.name()), List.of(),
+                loaded.qualified().qualified(), loaded.version().text(), loaded.module(),
+                List.of(object.name()), List.of(),
                 "'" + object.name() + "' is " + (listener ? "a listener" : "an object") + " this package declares, "
                         + "but `" + scope.verb() + "` has nothing to show for it, and `type` holds only what is not "
                         + "callable. List the buckets with `bal discover " + loaded.pkgArgument() + "`, or search "

@@ -645,7 +645,7 @@ public final class FromCentral {
                 .map(module -> module.orgName() + "/" + module.id())
                 .collect(Collectors.joining(", "));
         return Result.err(new Failure.SchemaDrift(
-                qualified.qualified(), version == null ? null : version.text(),
+                qualified.qualified(), version == null ? null : version.text(), null,
                 List.of(new Failure.SchemaIssue(
                         "docsData.modules", "no module matches; Central returned " + returned)),
                 Failure.SCHEMA_DRIFT_SUGGESTION));
@@ -669,7 +669,7 @@ public final class FromCentral {
                     + "publishes; pass one of them, or drop --module for the default one.";
         }
         return new Failure.SymbolNotFound(qualified.qualified(), version == null ? null : version.text(),
-                List.of(submodule), candidates, suggestion);
+                submodule, List.of(submodule), candidates, suggestion);
     }
 
     /**
