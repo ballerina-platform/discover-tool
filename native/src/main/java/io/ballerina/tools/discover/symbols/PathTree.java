@@ -21,14 +21,14 @@ package io.ballerina.tools.discover.symbols;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.ClientClass;
 import io.ballerina.tools.discover.model.Fn;
+import io.ballerina.tools.discover.model.ModuleRef;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Optional;
 
 /**
  * Operations by path.
@@ -54,49 +54,27 @@ public record PathTree(
      */
     public record Operation(Fn.Resource fn, List<String> segments) { }
 
+    private static final String SEPARATOR = "/";
+
+    private static final String KEYWORD_ESCAPE = "'";
+
     /** How a requested path resolved against the tree. */
     public sealed interface Resolution {
 
         /**
-         * The path resolved. {@code alsoMatched} is the branches a wildcard token matched and did NOT take:
-         * {@code *} takes the first child, and children are ordered busiest-first, so without naming the rest
-         * {@code *} would silently mean "the busiest branch" rather than "this level".
+         * The path resolved.
          *
          * @param node the tree node the path resolved to
-         * @param path the resolved path, in display spelling
-         * @param alsoMatched the branches a wildcard token matched and did not take
+         * @param path the resolved path, as printed
          */
-        record Found(PathTree node, List<String> path, List<Descent.Sibling> alsoMatched)
-                implements Resolution { }
+        record Found(PathTree node, List<String> path) implements Resolution { }
 
         /**
-         * The prefix matched, then a token matched nothing. {@code children} is what was there.
+         * A segment matched nothing.
          *
-         * <p>Carries the child NODES rather than their names, because recovery advice has to know whether a
-         * child is a path parameter to offer an example from the tree the caller is actually navigating.
-         *
-         * @param matched the prefix that did resolve, in display spelling
-         * @param token the token that matched nothing
-         * @param children what was there instead
+         * @param matched the segments before it, which did resolve
          */
-        record Missing(List<String> matched, String token, List<PathTree> children) implements Resolution {
-
-            public List<String> available() {
-                return children.stream().map(PathTree::segment).toList();
-            }
-        }
-    }
-
-    /**
-     * Levels stepped through, the node landed on, and the sibling branches not taken at each.
-     *
-     * @param node the tree node descended to
-     * @param path the path descended, in display spelling
-     * @param skipped the sibling branches not taken at each level
-     */
-    public record Descent(PathTree node, List<String> path, List<Sibling> skipped) {
-
-        public record Sibling(List<String> path, int total) { }
+        record Missing(List<String> matched) implements Resolution { }
     }
 
     /**
@@ -125,8 +103,8 @@ public record PathTree(
     }
 
     /**
-     * How a path segment reads in prose and as a shell argument: {@code repos}, or {@code :owner} for a
-     * parameter.
+     * How a path segment is printed and typed: {@code repos}, {@code 'public} for a segment that is a keyword, or
+     * {@code :owner} for a parameter.
      *
      * <p>Deliberately NOT the {@code [string owner]} declaration spelling, which belongs inside a fenced block
      * where it is a quotation of source. Colon-prefixed rather than brace-wrapped ({@code {owner}}) — the RFC's
@@ -136,7 +114,7 @@ public record PathTree(
      */
     public static String displaySegment(Fn.PathSegment segment) {
         return switch (segment) {
-            case Fn.PathSegment.Literal literal -> readableSegment(literal.text());
+            case Fn.PathSegment.Literal literal -> escaped(readableSegment(literal.text()));
             case Fn.PathSegment.Parameter parameter -> parameter.type().endsWith("...")
                     ? ":..." + parameter.name()
                     : ":" + parameter.name();
@@ -178,12 +156,18 @@ public record PathTree(
         return List.copyOf(collected);
     }
 
+    /** A path as typed, one token per segment. */
     public static List<String> splitPath(String path) {
-        return java.util.Arrays.stream(path.split("/", -1)).filter(token -> !token.isEmpty()).toList();
+        return List.of(path.split(SEPARATOR, -1));
+    }
+
+    /** A path as printed. */
+    public static String join(List<String> segments) {
+        return String.join(SEPARATOR, segments);
     }
 
     /**
-     * Walk a path from the FIRST segment, one token per level.
+     * Walk a path from the FIRST segment, one token per level, each matching a segment exactly as printed.
      *
      * <p>Anchoring is the whole contract. A suffix match for {@code repos/:owner/:repo} on github returns NINE
      * operations rather than three, because {@code orgs/:org/teams/:slug/repos/:owner/:repo} and
@@ -193,176 +177,21 @@ public record PathTree(
     public static Resolution resolve(PathTree root, List<String> tokens) {
         PathTree node = root;
         List<String> matched = new ArrayList<>();
-        List<Descent.Sibling> alsoMatched = new ArrayList<>();
         for (String token : tokens) {
-            List<PathTree> candidates = node.children().stream()
-                    .filter(child -> tokenMatches(token, child))
-                    .toList();
-            if (candidates.isEmpty()) {
-                return new Resolution.Missing(List.copyOf(matched), token, node.children());
+            Optional<PathTree> next = node.children().stream()
+                    .filter(child -> child.segment().equals(token))
+                    .findFirst();
+            if (next.isEmpty()) {
+                return new Resolution.Missing(List.copyOf(matched));
             }
-            PathTree next = candidates.get(0);
-            // Every branch the token ALSO matched, named with where it goes rather than where it forks, for
-            // the reason `fullSiblingPath` gives: a branch named at its fork is harder to reach than one
-            // never mentioned.
-            for (PathTree other : candidates.subList(1, candidates.size())) {
-                List<String> otherPath = new ArrayList<>(matched);
-                otherPath.add(other.segment());
-                alsoMatched.add(new Descent.Sibling(fullSiblingPath(other, otherPath), other.total()));
-            }
-            node = next;
-            matched.add(node.segment());
+            node = next.get();
+            matched.add(token);
         }
-        return new Resolution.Found(node, List.copyOf(matched), List.copyOf(alsoMatched));
+        return new Resolution.Found(node, List.copyOf(matched));
     }
 
-    /**
-     * A resolution, plus where the request was RELOCATED to when it addressed a real segment at the wrong depth.
-     *
-     * @param resolution what the tree answered, after relocation if any
-     * @param alternatives full paths the trailing segment was found at, when there was more than one
-     * @param relocated whether the answer is at a deeper path than the one requested
-     */
-    public record Located(Resolution resolution, List<List<String>> alternatives, boolean relocated) { }
-
-    /**
-     * Resolve a path, and — when it misses — look for the REST of it deeper, under the prefix that did match.
-     *
-     * <p>{@code repos/owner/repo/caches} is a real request against github: {@code caches} exists, at
-     * {@code repos/&#123;owner&#125;/&#123;repo&#125;/actions/caches}. So is {@code repos/actions/runs}, which
-     * leaves out the parameters between the segments it names. Anchored resolution answers honestly that
-     * there is no such path — correct, and it costs a round trip. So the tokens that missed are located, in
-     * order, under the prefix that DID match:
-     *
-     * <ol>
-     *   <li>exactly one occurrence → answer it, and say where it was found;
-     *   <li>more than one → list them and stop. Picking one is the failure anchoring exists to prevent;
-     *   <li>none → the anchored answer, which already names the failing segment and the deepest working prefix.
-     * </ol>
-     *
-     * <p>This is not suffix matching, which {@link #resolve} explains is unsafe: the first token must match
-     * directly, and a request that missed on its first token is only searched for when it is that one token.
-     */
-    public static Located locate(PathTree root, List<String> tokens) {
-        Resolution direct = resolve(root, tokens);
-        if (!(direct instanceof Resolution.Missing missing)
-                || missing.matched().isEmpty() && tokens.size() != 1) {
-            return new Located(direct, List.of(), false);
-        }
-        if (!(resolve(root, missing.matched()) instanceof Resolution.Found prefix)) {
-            return new Located(direct, List.of(), false);
-        }
-
-        List<List<String>> found = new ArrayList<>();
-        findSegments(prefix.node(), tokens.subList(missing.matched().size(), tokens.size()),
-                new ArrayList<>(), true, found);
-        List<List<String>> full = found.stream()
-                .map(relative -> {
-                    List<String> path = new ArrayList<>(missing.matched());
-                    path.addAll(relative);
-                    return List.copyOf(path);
-                })
-                .toList();
-
-        if (full.size() == 1 && resolve(root, full.get(0)) instanceof Resolution.Found relocated) {
-            return new Located(relocated, List.copyOf(full), true);
-        }
-        return new Located(direct, List.copyOf(full), false);
-    }
-
-    private static void findSegments(
-            PathTree node, List<String> tokens, List<String> prefix, boolean anyDepth, List<List<String>> into) {
-        for (PathTree child : node.children()) {
-            List<String> path = new ArrayList<>(prefix);
-            path.add(child.segment());
-            if (!tokenMatches(tokens.get(0), child)) {
-                if (anyDepth || child.isParam()) {
-                    findSegments(child, tokens, path, anyDepth, into);
-                }
-            } else if (tokens.size() == 1) {
-                into.add(List.copyOf(path));
-            } else {
-                findSegments(child, tokens.subList(1, tokens.size()), path, false, into);
-            }
-        }
-    }
-
-    private static boolean tokenMatches(String token, PathTree node) {
-        if ("*".equals(token)) {
-            return true;
-        }
-        if (token.equals(node.segment()) || readableSegment(token).equals(node.segment())) {
-            return true;
-        }
-        if (!node.isParam()) {
-            return false;
-        }
-        String bare = node.segment().replaceFirst("^:\\.{0,3}", "");
-        boolean rest = node.segment().startsWith(":...");
-        // Four spellings: `:owner` (what the tree prints), `{owner}` (the legacy spelling; a rest parameter's
-        // is `{...path}`), `owner` (typed from memory) and `[string owner]` (the declaration form inside every
-        // fenced signature this tool emits, so the likeliest thing a caller copies).
-        return token.equals(bare) || token.equals(":" + bare)
-                || token.equals("{" + bare + "}") || (rest && token.equals("{..." + bare + "}"))
-                || declaredName(token).equals(bare);
-    }
-
-    private static String declaredName(String token) {
-        Matcher declared = DECLARED_PARAM.matcher(token);
-        if (!declared.matches()) {
-            return "";
-        }
-        String[] words = declared.group(1).trim().split("\\s+");
-        String last = words[words.length - 1].replaceFirst("^\\.{1,3}", "");
-        return IDENTIFIER.matcher(last).matches() ? last : "";
-    }
-
-    /** Anything inside square brackets; what it contains is picked apart by {@link #declaredName}. */
-    private static final Pattern DECLARED_PARAM = Pattern.compile("\\[\\s*(.+?)\\s*]");
-
-    private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-
-    /**
-     * Step down through levels that add no routing choice, and NAME what was skipped.
-     *
-     * <p>Drilling into {@code repos} should land on the operations, not on a level whose only content is "there
-     * is a parameter here". But the skipping cannot be silent: {@code repos} genuinely has two parameter
-     * children with different spellings — {@code :owner} with 420 operations and {@code :templateOwner}
-     * with 1 — and collapsing to the dominant one without saying so hides an operation permanently, since
-     * nothing downstream would ever mention it again.
-     *
-     * <p>Only parameter-only levels are stepped through. A level with a literal child is a real choice about
-     * which resource to address, and choosing for the caller there would be guessing.
-     */
-    public static Descent autoDescend(PathTree node, List<String> path) {
-        List<String> walked = new ArrayList<>(path);
-        List<Descent.Sibling> skipped = new ArrayList<>();
-        PathTree current = node;
-
-        while (current.operations().isEmpty()
-                && !current.children().isEmpty()
-                && current.children().stream().allMatch(PathTree::isParam)) {
-            PathTree dominant = current.children().get(0);
-            for (PathTree sibling : current.children().subList(1, current.children().size())) {
-                List<String> siblingPath = new ArrayList<>(walked);
-                siblingPath.add(sibling.segment());
-                skipped.add(new Descent.Sibling(fullSiblingPath(sibling, siblingPath), sibling.total()));
-            }
-            walked.add(dominant.segment());
-            current = dominant;
-        }
-
-        return new Descent(current, List.copyOf(walked), List.copyOf(skipped));
-    }
-
-    private static List<String> fullSiblingPath(PathTree node, List<String> path) {
-        List<String> walked = new ArrayList<>(path);
-        PathTree current = node;
-        while (current.operations().isEmpty() && current.children().size() == 1) {
-            current = current.children().get(0);
-            walked.add(current.segment());
-        }
-        return List.copyOf(walked);
+    private static String escaped(String segment) {
+        return ModuleRef.isKeyword(segment) ? KEYWORD_ESCAPE + segment : segment;
     }
 
     /** The tree under construction. Frozen in one pass so the public shape can stay immutable. */

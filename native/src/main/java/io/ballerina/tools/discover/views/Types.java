@@ -31,7 +31,6 @@ import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.TypeDefs;
 import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.Filter;
-import io.ballerina.tools.discover.symbols.Names;
 import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
@@ -87,15 +86,18 @@ public final class Types {
         return entries(loaded.library()).size();
     }
 
-    /** Every name this bucket holds, in listing order. */
-    public static List<String> names(LoadedPackage loaded) {
-        return entries(loaded.library()).stream().map(Entry::name).toList();
+    /** What {@code name} is, when this bucket holds a type by that name: {@code record}, {@code listener}. */
+    public static Optional<String> kindOf(LoadedPackage loaded, String name) {
+        return entries(loaded.library()).stream()
+                .filter(entry -> entry.name().equals(name))
+                .map(entry -> entry.kind().noun())
+                .findFirst();
     }
 
-    /** Whether {@code name} is a declaration this bucket holds, for another bucket deciding to route here. */
-    public static boolean declares(LoadedPackage loaded, String name) {
-        Library library = loaded.library();
-        return entries(library).stream().anyMatch(entry -> entry.name().equals(name));
+    /** The one enum declaring a member named {@code member}, when exactly one does. */
+    public static Optional<String> enumOf(LoadedPackage loaded, String member) {
+        List<TypeDef.Enumeration> owners = enumsWithMember(loaded, member);
+        return owners.size() == 1 ? Optional.of(owners.get(0).name()) : Optional.empty();
     }
 
     public static Result<DiscoverResult> render(LoadedPackage loaded, Options options) {
@@ -197,9 +199,6 @@ public final class Types {
                     .<DiscoverResult.Documented.Entry>map(name ->
                             new DiscoverResult.Method(name, base + " " + Texts.shellWord(name)))
                     .toList();
-            if (surface.isEmpty()) {
-                return noMatch(loaded, options, all, documented, base, command);
-            }
         }
 
         Map<DiscoverResult.TypeRoster.Kind, List<DiscoverResult.Method>> byKind = new LinkedHashMap<>();
@@ -238,21 +237,6 @@ public final class Types {
                 window.paging(), window.next(command), documentedHere, loaded.warning()));
     }
 
-    private static Result<DiscoverResult> noMatch(
-            LoadedPackage loaded, Options options, List<Entry> all, List<DiscoverResult.Documented.Entry> documented,
-            String base, String command) {
-        Result<Containers.Page> page = Containers.documentedPage(documented, options.page(), command);
-        if (!page.isOk()) {
-            return page.cast();
-        }
-        Containers.Page window = page.value();
-        return Result.ok(new DiscoverResult.NoMatch(options.filter(), null,
-                Names.nearMisses(options.filter(), all.stream().map(Entry::name).toList()), List.of(), null,
-                window.paging() == null ? base : window.next(command),
-                Containers.documentedOn(window, documented, 0),
-                window.paging(), loaded.warning(), null));
-    }
-
     private static Result<DiscoverResult> leaf(LoadedPackage loaded, String requested, int page) {
         Library library = loaded.library();
         Declarations index = Declarations.index(library.addressable());
@@ -260,25 +244,10 @@ public final class Types {
         library.annotations().stream().map(Library.AnnotationDef::name).filter(name -> !names.contains(name))
                 .forEach(names::add);
 
-        Names.Match match = Names.match(requested, names);
-        if (!(match instanceof Names.Match.Found found)) {
-            List<TypeDef.Enumeration> owners = enumsWithMember(loaded, requested);
-            if (owners.size() == 1) {
-                String enumName = owners.get(0).name();
-                return declaration(loaded, index, enumName,
-                        "'" + memberName(requested) + "' is a member of the enum " + enumName + ".");
-            }
-            if (owners.size() > 1) {
-                return Result.err(loaded.symbolNotFound(List.of(requested),
-                        owners.stream().map(TypeDef.Enumeration::name).toList(),
-                        "'" + memberName(requested) + "' is a member of several enums, so this tool will not "
-                                + "choose between them. Re-run with the enum whose member you mean, exactly as "
-                                + "spelled."));
-            }
-            return Result.err(loaded.symbolNotFound(List.of(requested), Names.candidatesOf(match),
-                    missSuggestion(loaded, match instanceof Names.Match.Ambiguous)));
+        if (!names.contains(requested)) {
+            return member(loaded, index, requested);
         }
-        String name = found.name();
+        String name = requested;
         TypeDef typeDef = index.get(name);
         if (typeDef == null) {
             return Result.ok(annotationLeaf(loaded, index, name));
@@ -288,6 +257,26 @@ public final class Types {
                     new Containers.Options(List.of(name), null, page));
         }
         return declaration(loaded, index, name, null);
+    }
+
+    private static Result<DiscoverResult> member(LoadedPackage loaded, Declarations index, String requested) {
+        List<TypeDef.Enumeration> owners = enumsWithMember(loaded, requested);
+        if (owners.size() == 1) {
+            String enumName = owners.get(0).name();
+            return declaration(loaded, index, enumName,
+                    "'" + requested + "' is a member of the enum " + enumName + ".");
+        }
+        String listing = baseCommand(loaded);
+        if (owners.isEmpty()) {
+            return Result.err(loaded.symbolNotFound(List.of(requested),
+                    "'" + requested + "' is not a type in " + loaded.place() + ".",
+                    "List the types: " + Failure.quoted(listing) + ".", listing));
+        }
+        List<String> enums = owners.stream().map(TypeDef.Enumeration::name).toList();
+        return Result.err(loaded.symbolNotFound(List.of(requested),
+                "'" + requested + "' is a member of the enums " + Texts.and(enums) + " in " + loaded.place() + ".",
+                "Open the enum you mean, e.g. " + Failure.quoted(listing + " " + Texts.shellWord(enums.get(0))) + ".",
+                null));
     }
 
     private static Result<DiscoverResult> declaration(
@@ -303,22 +292,12 @@ public final class Types {
                 note));
     }
 
-    private static List<TypeDef.Enumeration> enumsWithMember(LoadedPackage loaded, String requested) {
-        int colon = requested.lastIndexOf(':');
-        if (colon >= 0 && !requested.substring(0, colon).equals(loaded.qualified().moduleAlias())) {
-            return List.of();
-        }
-        String member = memberName(requested);
+    private static List<TypeDef.Enumeration> enumsWithMember(LoadedPackage loaded, String member) {
         return loaded.library().addressable().stream()
                 .filter(TypeDef.Enumeration.class::isInstance)
                 .map(TypeDef.Enumeration.class::cast)
                 .filter(each -> each.memberNames().contains(member))
                 .toList();
-    }
-
-    private static String memberName(String requested) {
-        String bare = requested.substring(requested.lastIndexOf(':') + 1);
-        return bare.startsWith("'") ? bare.substring(1) : bare;
     }
 
     private static DiscoverResult annotationLeaf(LoadedPackage loaded, Declarations index, String name) {
@@ -334,16 +313,6 @@ public final class Types {
 
     private static Optional<Library.AnnotationDef> annotationNamed(Library library, String name) {
         return library.annotations().stream().filter(candidate -> candidate.name().equals(name)).findFirst();
-    }
-
-    private static String missSuggestion(LoadedPackage loaded, boolean ambiguous) {
-        String search = "`" + baseCommand(loaded) + " --filter <keyword>`";
-        return (ambiguous
-                ? "Several declarations normalise to the same name, so this tool will not choose between them. "
-                        + "Re-run with one of the candidates exactly as spelled"
-                : "No declaration matched. Re-run with one of the candidates if it is what you meant, or search "
-                        + "by keyword with " + search)
-                + ". Add --refresh if you believe the name exists and is newer than the cached copy.";
     }
 
     /** What a closure's budget left out, each with the command that opens it, up to the listing ceiling. */

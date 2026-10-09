@@ -60,8 +60,6 @@ public final class JsonRenderer {
             case DiscoverResult.ReadmeChunks chunks -> readmeChunks(chunks);
             case DiscoverResult.Signature signature -> signature(signature);
             case DiscoverResult.MixedListing mixed -> mixedListing(mixed);
-            case DiscoverResult.NoMatch noMatch -> noMatch(noMatch);
-            case DiscoverResult.Owners owners -> owners(owners);
             case DiscoverResult.EmptyBucket empty -> emptyBucket(empty);
             case DiscoverResult.TypeRoster roster -> typeRoster(roster);
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(declaration);
@@ -348,51 +346,6 @@ public final class JsonRenderer {
         addIfPresent(json, "next", mixed.next());
         addDocumented(json, mixed.documented());
         addNotices(json, mixed.warning(), mixed.note());
-        return json;
-    }
-
-    private static JsonObject noMatch(DiscoverResult.NoMatch noMatch) {
-        JsonObject json = new JsonObject();
-        json.addProperty("requested", noMatch.requested());
-        addIfPresent(json, "container", noMatch.container());
-        json.add("candidates", strings(noMatch.candidates()));
-        if (!noMatch.paths().isEmpty()) {
-            JsonArray paths = new JsonArray();
-            for (DiscoverResult.NoMatch.Alternative alternative : noMatch.paths()) {
-                JsonObject entry = new JsonObject();
-                entry.addProperty("path", alternative.path());
-                entry.addProperty("command", alternative.command());
-                paths.add(entry);
-            }
-            json.add("paths", paths);
-        }
-        if (noMatch.available() != null) {
-            json.add("available", toJson(noMatch.available()));
-        }
-        addIfPresent(json, "next", noMatch.next());
-        addDocumented(json, noMatch.documented());
-        addPaging(json, noMatch.paging());
-        addNotices(json, noMatch.warning(), noMatch.note());
-        return json;
-    }
-
-    private static JsonObject owners(DiscoverResult.Owners owners) {
-        JsonObject json = new JsonObject();
-        json.addProperty("requested", owners.requested());
-        JsonArray array = new JsonArray();
-        for (DiscoverResult.Owners.Owner owner : owners.owners()) {
-            JsonObject entry = new JsonObject();
-            entry.addProperty("name", owner.name());
-            entry.addProperty("matches", owner.matches());
-            entry.addProperty("command", owner.command());
-            array.add(entry);
-        }
-        json.add("owners", array);
-        json.addProperty("shown", owners.owners().size());
-        json.addProperty("total", owners.total());
-        addPaging(json, owners.paging());
-        addIfPresent(json, "next", owners.next());
-        addNotices(json, owners.warning(), owners.note());
         return json;
     }
 

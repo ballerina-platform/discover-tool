@@ -22,7 +22,6 @@ import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.TypeDefs;
 import io.ballerina.tools.discover.symbols.Declarations;
-import io.ballerina.tools.discover.symbols.Names;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Closure;
@@ -203,39 +202,22 @@ public class ViewsAgreeTest {
     }
 
     @Test
-    public void aNameThatNormalisesOntoSeveralDeclarationsIsAFailureNeverASilentPick() {
-        // Real, not theoretical: `ballerina/http` has constant-versus-class collisions of the
-        // STATUS_ACCEPTED / StatusAccepted shape.
-        Declarations index = Declarations.index(FixtureCorpus.libraryFor("ballerina__http").typeDefs());
-        List<String> collisions = index.names().stream()
-                .filter(name -> Names.match(name.toLowerCase(java.util.Locale.ROOT), index.names())
-                        instanceof Names.Match.Ambiguous)
-                .toList();
-        Assert.assertFalse(collisions.isEmpty(),
-                "the corpus should contain at least one normalisation collision");
-
-        Result<DiscoverResult> view = Types.render(
-                FixtureCorpus.loadedFixture("ballerina__http"),
-                new Types.Options(List.of(collisions.get(0).toLowerCase(java.util.Locale.ROOT)), null, 1));
-        Assert.assertFalse(view.isOk());
-        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
-        Assert.assertTrue(failure.candidates().size() > 1, "every colliding name has to be listed");
-        // A COLLISION and a MISS both arrive with several candidates, and they need different advice: telling the
-        // caller "several declarations match" when none did sends them to re-run with a name they never asked for.
-        Assert.assertTrue(failure.suggestion().contains("normalise to the same name"), failure.suggestion());
-    }
-
-    @Test
-    public void aMissIsNotDescribedAsACollisionEvenThoughBothCarryCandidates() {
-        Result<DiscoverResult> view = Types.render(
-                FixtureCorpus.loadedFixture("ballerina__http"),
-                new Types.Options(List.of("NoSuchType"), null, 1));
-        Assert.assertFalse(view.isOk());
-        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
-        Assert.assertFalse(failure.candidates().isEmpty(), "near misses are still offered");
-        Assert.assertTrue(failure.suggestion().startsWith("No declaration matched."), failure.suggestion());
-        Assert.assertTrue(failure.suggestion().contains("type --filter <keyword>"), failure.suggestion());
-        Assert.assertFalse(failure.suggestion().contains("normalise to the same name"));
+    public void aTypeNameIsMatchedExactlyAsDeclaredAndAMissSuggestsTheListing() {
+        // Real, not theoretical: `ballerina/http` declares both STATUS_ACCEPTED and StatusAccepted, so a name
+        // matched in any other spelling would answer a different question than the one asked.
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        for (String declared : new String[] {"STATUS_ACCEPTED", "StatusAccepted"}) {
+            Assert.assertTrue(Types.render(http, new Types.Options(List.of(declared), null, 1)).isOk(), declared);
+        }
+        for (String typed : new String[] {"statusaccepted", "Status_Accepted", "NoSuchType"}) {
+            Result<DiscoverResult> view = Types.render(http, new Types.Options(List.of(typed), null, 1));
+            Assert.assertFalse(view.isOk(), typed);
+            Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
+            Assert.assertEquals(failure.message(), "'" + typed + "' is not a type in " + http.label() + ".");
+            Assert.assertEquals(failure.command(), "bal discover ballerina/http type");
+            Assert.assertEquals(failure.suggestion(), "List the types: `bal discover ballerina/http type`.");
+            Assert.assertTrue(failure.candidates().isEmpty(), failure.candidates().toString());
+        }
     }
 
     @Test(dataProvider = "fixtures")
@@ -252,8 +234,8 @@ public class ViewsAgreeTest {
                 Assert.assertTrue(PathTree.resolve(tree, path) instanceof PathTree.Resolution.Found,
                         container.name() + ": " + String.join("/", path) + " is offered but unreachable");
                 expectAnswer(Containers.render(context, Surface.Scope.CLIENT, new Containers.Options(
-                                List.of(container.name(), String.join("/", path)))),
-                        container.name() + " " + String.join("/", path));
+                                List.of(container.name(), PathTree.join(path)))),
+                        container.name() + " " + PathTree.join(path));
             }
         }
     }
@@ -277,33 +259,6 @@ public class ViewsAgreeTest {
                 Assert.assertTrue(resolution instanceof PathTree.Resolution.Found);
                 String landed = String.join("/", ((PathTree.Resolution.Found) resolution).path());
                 Assert.assertTrue(offered.contains(landed), "resolved to an unoffered path: " + landed);
-            }
-
-            // A wildcard cannot reach anything the tree does not hold either.
-            for (List<String> path : paths) {
-                List<String> wildcarded = path.stream()
-                        .map(segment -> segment.startsWith(":") ? "*" : segment)
-                        .toList();
-                PathTree.Resolution resolution = PathTree.resolve(tree, wildcarded);
-                if (!(resolution instanceof PathTree.Resolution.Found found)) {
-                    continue;
-                }
-                Assert.assertTrue(offered.contains(String.join("/", found.path())),
-                        "a wildcard reached an unoffered path: " + String.join("/", found.path()));
-            }
-
-            // And neither can segment LOCATION, which is the one relaxation of anchoring in the design. It may
-            // land deeper than the request; it may never land somewhere the tree does not offer.
-            for (List<String> path : paths) {
-                PathTree.Located located = PathTree.locate(tree, path);
-                if (located.resolution() instanceof PathTree.Resolution.Found found) {
-                    Assert.assertTrue(offered.contains(String.join("/", found.path())),
-                            "location reached an unoffered path: " + String.join("/", found.path()));
-                }
-                for (List<String> alternative : located.alternatives()) {
-                    Assert.assertTrue(offered.contains(String.join("/", alternative)),
-                            "location offered an unoffered path: " + String.join("/", alternative));
-                }
             }
         }
     }
@@ -373,7 +328,7 @@ public class ViewsAgreeTest {
         // carry the record.
         LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__github");
         DiscoverResult view = expectAnswer(Containers.render(context, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client", "delete", "repos/{owner}/{repo}/actions/caches"))),
+                new Containers.Options(List.of("Client", "delete", "repos/:owner/:repo/actions/caches"))),
                 "caches delete");
         Assert.assertTrue(view instanceof DiscoverResult.Signature, view.toString());
         DiscoverResult.Signature signature = (DiscoverResult.Signature) view;

@@ -23,7 +23,6 @@ import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.symbols.Declarations;
-import io.ballerina.tools.discover.symbols.Names;
 import io.ballerina.tools.discover.symbols.PathTree;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -47,10 +46,10 @@ public class SymbolsTest {
     public Object[][] recordedLookups() {
         return new Object[][] {
                 {"ballerinax__github", "repos", 421},
-                {"ballerinax__github", "repos/*/*", 420},
-                {"ballerinax__github", "repos/*/*/issues", 30},
-                {"ballerinax__github", "repos/*/*/pulls", 31},
-                {"ballerinax__github", "repos/*/*/stargazers", 1},
+                {"ballerinax__github", "repos/:owner/:repo", 420},
+                {"ballerinax__github", "repos/:owner/:repo/issues", 30},
+                {"ballerinax__github", "repos/:owner/:repo/pulls", 31},
+                {"ballerinax__github", "repos/:owner/:repo/stargazers", 1},
                 {"ballerinax__github", "user", 93},
                 {"ballerinax__github", "orgs", 200},
                 {"ballerinax__github", "search", 7},
@@ -90,12 +89,18 @@ public class SymbolsTest {
     }
 
     @Test
-    public void bothSpellingsAddressTheSameNode() {
-        // Because an agent may copy either.
+    public void aPathIsMatchedOnlyAsTheToolPrintsIt() {
         PathTree tree = github();
-        for (String spelling : new String[] {"repos/*/*/code-scanning", "repos/*/*/code\\-scanning"}) {
-            PathTree.Resolution resolution = PathTree.resolve(tree, PathTree.splitPath(spelling));
-            Assert.assertTrue(resolution instanceof PathTree.Resolution.Found, spelling);
+        Assert.assertTrue(PathTree.resolve(tree, PathTree.splitPath("repos/:owner/:repo/code-scanning"))
+                instanceof PathTree.Resolution.Found);
+        Assert.assertTrue(PathTree.resolve(tree, PathTree.splitPath("gists/'public"))
+                instanceof PathTree.Resolution.Found, "a keyword segment keeps its escape");
+        for (String spelling : new String[] {
+                "repos/:owner/:repo/code\\-scanning", "gists/public", "repos/*/*", "repos/{owner}/{repo}",
+                "repos/owner/repo", "repos/[owner]/[repo]", "repos/[string owner]/[string repo]", "Repos",
+                "/repos", "repos/"}) {
+            Assert.assertTrue(PathTree.resolve(tree, PathTree.splitPath(spelling))
+                    instanceof PathTree.Resolution.Missing, spelling);
         }
     }
 
@@ -157,7 +162,7 @@ public class SymbolsTest {
     public void aPathIsMatchedFromTheFirstSegmentNeverAsASuffix() {
         PathTree tree = github();
         PathTree.Resolution.Found anchored =
-                (PathTree.Resolution.Found) PathTree.resolve(tree, PathTree.splitPath("repos/*/*"));
+                (PathTree.Resolution.Found) PathTree.resolve(tree, PathTree.splitPath("repos/:owner/:repo"));
         Assert.assertEquals(anchored.node().operations().size(), 3);
 
         // The counter-measurements, which are why this walks the tree instead of filtering strings. Two
@@ -188,14 +193,13 @@ public class SymbolsTest {
     }
 
     @Test
-    public void aPathThatRunsOutNamesWhatWasThere() {
-        // Instead of failing blankly.
+    public void aPathThatRunsOutNamesTheSegmentsThatMatchedBeforeIt() {
         PathTree.Resolution resolution =
-                PathTree.resolve(github(), PathTree.splitPath("repos/*/*/nonesuch"));
-        PathTree.Resolution.Missing missing = (PathTree.Resolution.Missing) resolution;
-        Assert.assertEquals(missing.matched(), List.of("repos", ":owner", ":repo"));
-        Assert.assertEquals(missing.token(), "nonesuch");
-        Assert.assertEquals(missing.available().size(), 63);
+                PathTree.resolve(github(), PathTree.splitPath("repos/:owner/:repo/nonesuch"));
+        Assert.assertEquals(((PathTree.Resolution.Missing) resolution).matched(), List.of("repos", ":owner", ":repo"));
+        Assert.assertEquals(((PathTree.Resolution.Missing) PathTree.resolve(github(),
+                PathTree.splitPath("repos/actions/runs"))).matched(), List.of("repos"),
+                "a path that leaves out its parameter segments stops where they were left out");
     }
 
     @Test
@@ -203,136 +207,15 @@ public class SymbolsTest {
         // Not a partial path.
         PathTree.Resolution resolution = PathTree.resolve(github(), PathTree.splitPath("nonesuch/repos"));
         Assert.assertEquals(((PathTree.Resolution.Missing) resolution).matched(), List.of());
+        Assert.assertEquals(((PathTree.Resolution.Missing) PathTree.resolve(github(), PathTree.splitPath("caches")))
+                .matched(), List.of(), "a segment deep inside a path is not found from the top");
     }
 
     @Test
-    public void anEmptyPathIsTheRootWhichIsEveryOperation() {
-        PathTree.Resolution resolution = PathTree.resolve(github(), PathTree.splitPath(""));
-        Assert.assertEquals(((PathTree.Resolution.Found) resolution).node().total(), 903);
-    }
-
-    @Test
-    public void aWildcardAddressesAParameterLevelAndTheAnchoredMatchIsNotASuffixMatch() {
-        PathTree tree = github();
-        PathTree.Resolution.Found anchored =
-                (PathTree.Resolution.Found) PathTree.resolve(tree, PathTree.splitPath("repos/*/*"));
-        Assert.assertEquals(anchored.node().operations().size(), 3);
-        Assert.assertEquals(anchored.path(), List.of("repos", ":owner", ":repo"));
-
-        // The same three are reachable by naming the parameters, with or without braces.
-        for (String spelling : new String[] {"repos/{owner}/{repo}", "repos/owner/repo", "repos/*/repo"}) {
-            PathTree.Resolution resolution = PathTree.resolve(tree, PathTree.splitPath(spelling));
-            Assert.assertTrue(resolution instanceof PathTree.Resolution.Found, spelling);
-            Assert.assertEquals(
-                    ((PathTree.Resolution.Found) resolution).node().operations().size(), 3, spelling);
-        }
-    }
-
-    /**
-     * Locating a trailing segment deeper than it was asked for, which is the ONE relaxation of anchoring.
-     *
-     * <p>`repos/owner/repo/caches` is a real request against github: `caches` exists, at
-     * `repos/{owner}/{repo}/actions/caches`. The anchored answer is honest and costs a round trip, so the trailing
-     * segment is located under the prefix that DID match — and only when it is unambiguous, because picking one of
-     * several is exactly the failure anchoring exists to prevent.
-     */
-    @Test
-    public void aTrailingSegmentIsLocatedUnderTheMatchedPrefixWhenThereIsExactlyOne() {
-        PathTree tree = github();
-        PathTree.Located located =
-                PathTree.locate(tree, PathTree.splitPath("repos/owner/repo/caches"));
-        Assert.assertTrue(located.relocated(), "one occurrence, so it is answered");
-        Assert.assertTrue(located.resolution() instanceof PathTree.Resolution.Found);
-        Assert.assertEquals(located.alternatives().size(), 1);
-        Assert.assertEquals(String.join("/", located.alternatives().get(0)),
-                "repos/:owner/:repo/actions/caches");
-    }
-
-    @Test
-    public void aTrailingSegmentFoundInSeveralPlacesIsListedAndNotChosen() {
-        PathTree tree = github();
-        // `secrets` exists under `actions`, `codespaces` AND `dependabot`, and they are three different APIs.
-        PathTree.Located located =
-                PathTree.locate(tree, PathTree.splitPath("repos/owner/repo/secrets"));
-        Assert.assertFalse(located.relocated(), "several occurrences, so none is chosen");
-        Assert.assertTrue(located.resolution() instanceof PathTree.Resolution.Missing);
-        Assert.assertTrue(located.alternatives().size() > 1, located.alternatives().toString());
-        for (List<String> path : located.alternatives()) {
-            Assert.assertTrue(PathTree.resolve(tree, path) instanceof PathTree.Resolution.Found,
-                    "every path offered has to be one the tree holds: " + String.join("/", path));
-        }
-    }
-
-    @Test
-    public void severalMissedSegmentsAreLocatedInOrderUnderTheMatchedPrefix() {
-        PathTree tree = github();
-        PathTree.Located located = PathTree.locate(tree, PathTree.splitPath("repos/actions/runs"));
-        Assert.assertTrue(located.relocated());
-        Assert.assertEquals(String.join("/", located.alternatives().get(0)), "repos/:owner/:repo/actions/runs");
-        PathTree.Located ambiguous = PathTree.locate(tree, PathTree.splitPath("repos/secrets/public-key"));
-        Assert.assertFalse(ambiguous.relocated());
-        Assert.assertTrue(ambiguous.alternatives().size() > 1, ambiguous.alternatives().toString());
-    }
-
-    @Test
-    public void locationNeverRelaxesAnchoringItself() {
-        PathTree tree = github();
-        // A segment that never matches anywhere under the prefix leaves nothing to locate.
-        PathTree.Located middle = PathTree.locate(tree, PathTree.splitPath("repos/nonesuch/actions/caches"));
-        Assert.assertFalse(middle.relocated());
-        Assert.assertTrue(middle.resolution() instanceof PathTree.Resolution.Missing);
-        Assert.assertTrue(middle.alternatives().isEmpty(), middle.alternatives().toString());
-
-        // A first segment that misses is never searched for when more tokens follow it.
-        PathTree.Located unanchored = PathTree.locate(tree, PathTree.splitPath("actions/runs"));
-        Assert.assertFalse(unanchored.relocated());
-        Assert.assertTrue(unanchored.alternatives().isEmpty(), unanchored.alternatives().toString());
-
-        // And a path that resolves anchored is untouched — no search runs at all.
-        PathTree.Located exact = PathTree.locate(tree, PathTree.splitPath("repos/owner/repo"));
-        Assert.assertFalse(exact.relocated());
-        Assert.assertTrue(exact.resolution() instanceof PathTree.Resolution.Found);
-        Assert.assertTrue(exact.alternatives().isEmpty());
-    }
-
-    @Test
-    public void descentStepsThroughParameterOnlyLevelsAndNamesTheBranchItDidNotTake() {
-        PathTree tree = github();
-        PathTree.Resolution.Found repos =
-                (PathTree.Resolution.Found) PathTree.resolve(tree, List.of("repos"));
-
-        PathTree.Descent descent = PathTree.autoDescend(repos.node(), repos.path());
-        Assert.assertEquals(descent.path(), List.of("repos", ":owner", ":repo"));
-        Assert.assertEquals(descent.node().operations().size(), 3);
-
-        // Naming the sibling is not cosmetic: `repos` really has two parameter children with different
-        // spellings, and collapsing silently to the dominant one hides an operation permanently, because
-        // nothing downstream would mention it again.
-        Assert.assertEquals(descent.skipped().size(), 1);
-        Assert.assertEquals(descent.skipped().get(0).path(),
-                List.of("repos", ":templateOwner", ":templateRepo", "generate"));
-        Assert.assertEquals(descent.skipped().get(0).total(), 1);
-    }
-
-    @Test
-    public void descentStopsAtALevelWithALiteralChild() {
-        // Because that is a real choice.
-        PathTree tree = github();
-        PathTree.Resolution.Found user = (PathTree.Resolution.Found) PathTree.resolve(tree, List.of("user"));
-        PathTree.Descent descent = PathTree.autoDescend(user.node(), user.path());
-        // `user` has operations of its own AND literal children; choosing for the caller there would be guessing
-        // which resource they meant.
-        Assert.assertEquals(descent.path(), List.of("user"));
-        Assert.assertEquals(descent.skipped().size(), 0);
-    }
-
-    @Test
-    public void descentTerminatesOnALeaf() {
-        PathTree tree = github();
-        PathTree.Resolution.Found zen = (PathTree.Resolution.Found) PathTree.resolve(tree, List.of("zen"));
-        PathTree.Descent descent = PathTree.autoDescend(zen.node(), zen.path());
-        Assert.assertEquals(descent.path(), List.of("zen"));
-        Assert.assertEquals(descent.node().operations().size(), 1);
+    public void theRootResourceIsTheSegmentADot() {
+        PathTree.Resolution resolution = PathTree.resolve(github(), PathTree.splitPath("."));
+        Assert.assertEquals(((PathTree.Resolution.Found) resolution).node().operations().size(), 1);
+        Assert.assertEquals(PathTree.join(List.of("repos", ":owner")), "repos/:owner");
     }
 
     @Test
@@ -353,62 +236,6 @@ public class SymbolsTest {
         // Operations are addressed by path, not by name, which is why the oracle's bijection is scoped to
         // declarations.
         Assert.assertNull(index.get("repos"));
-    }
-
-    @Test
-    public void normalisationIsWhatStatusAcceptedSpellingsHaveInCommon() {
-        Assert.assertEquals(Names.normalise("STATUS_ACCEPTED"), "statusaccepted");
-        Assert.assertEquals(Names.normalise("StatusAccepted"), "statusaccepted");
-        Assert.assertEquals(Names.normalise("client_id"), "clientid");
-        Assert.assertEquals(Names.normalise("clientId"), "clientid");
-        Assert.assertEquals(Names.normalise("'import"), "import");
-    }
-
-    @Test
-    public void anExactMatchWinsBeforeNormalisationIsEvenTried() {
-        // github's ManifestConversions declares BOTH clientId and client_id, so the exact spelling has to be
-        // honoured or one of them is unreachable.
-        List<String> names = List.of("clientId", "client_id");
-        Assert.assertEquals(Names.match("clientId", names), new Names.Match.Found("clientId"));
-        Assert.assertEquals(Names.match("client_id", names), new Names.Match.Found("client_id"));
-    }
-
-    @Test
-    public void aNormalisedCollisionIsReportedWithEveryMatch() {
-        // Never resolved silently.
-        Names.Match match = Names.match("CLIENTID", List.of("clientId", "client_id"));
-        Assert.assertTrue(match instanceof Names.Match.Ambiguous);
-        Assert.assertEquals(
-                ((Names.Match.Ambiguous) match).candidates().stream().sorted().toList(),
-                List.of("clientId", "client_id"));
-    }
-
-    @Test
-    public void aMissSuggestsNamesByTheLongestRunOfCharactersTheyShare() {
-        List<String> names = List.of(
-                "FullRepository", "MinimalRepository", "NullableRepository", "Repository", "SimpleUser",
-                "Issue");
-        List<String> candidates = Names.nearMisses("FullRepo", names);
-        Assert.assertEquals(candidates.get(0), "FullRepository", "the closest first");
-        for (String expected : new String[] {"MinimalRepository", "NullableRepository", "Repository"}) {
-            Assert.assertTrue(candidates.contains(expected), expected + " shares 'Repo'");
-        }
-        Assert.assertFalse(candidates.contains("Issue"),
-                "four characters of overlap is the floor, and 'Issue' shares none");
-    }
-
-    @Test
-    public void candidatesAreCapped() {
-        // Because the alternative is github's whole roster of names on stderr.
-        Declarations index = Declarations.index(FixtureCorpus.libraryFor("ballerinax__github").typeDefs());
-        Assert.assertTrue(Names.nearMisses("Repository", index.names()).size() <= Names.MAX_CANDIDATES);
-    }
-
-    @Test
-    public void aRequestThatResemblesNothingGetsNoCandidatesRatherThanNoise() {
-        Names.Match match = Names.match("zzzzzz", List.of("FullRepository", "SimpleUser"));
-        Assert.assertTrue(match instanceof Names.Match.Missing);
-        Assert.assertEquals(((Names.Match.Missing) match).candidates(), List.of());
     }
 
     @Test(dataProvider = "recordedLookups")

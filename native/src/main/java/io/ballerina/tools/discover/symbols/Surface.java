@@ -69,28 +69,42 @@ public final class Surface {
     public enum Scope {
 
         /** Objects reached with {@code ->}: every derived-CLIENT declaration, from either Central bucket. */
-        CLIENT("client"),
+        CLIENT("client", "client", "clients"),
 
         /**
          * A service type, paired with the listener it binds to in one leaf — a service cannot run without
          * attaching to a listener, and a listener with no service attached does nothing, so neither half is
          * independently addressable.
          */
-        SERVICE("service"),
+        SERVICE("service", "service type", "service types"),
 
         /** Objects reached with {@code .}: classes and object types that are neither clients nor services. */
-        CLASS("class"),
+        CLASS("class", "class", "classes"),
 
         /** Functions at module scope, which belong to no object. */
-        MODULE("funcs");
+        MODULE("funcs", "function", "functions");
 
         private final String verb;
+        private final String noun;
+        private final String plural;
 
-        Scope(String verb) {
+        Scope(String verb, String noun, String plural) {
             this.verb = verb;
+            this.noun = noun;
+            this.plural = plural;
         }
 
-        /** The verb that addresses this scope, for the note that routes a caller to it. */
+        /** What one thing this scope lists is called: {@code client}, {@code service type}. */
+        public String noun() {
+            return noun;
+        }
+
+        /** {@link #noun()} for several. */
+        public String plural() {
+            return plural;
+        }
+
+        /** The verb that addresses this scope. */
         public String verb() {
             return verb;
         }
@@ -284,34 +298,8 @@ public final class Surface {
         };
     }
 
-    /**
-     * Resolve a container by the name a caller typed.
-     *
-     * <p>Exact first, then {@link Names}' normalisation, so {@code schemaclient} reaches {@code SchemaClient}
-     * without any casing heuristic in the dispatcher. A normalised name that reaches SEVERAL containers resolves
-     * to none of them — the caller has to choose, and picking one would answer a different question silently.
-     */
+    /** The container named exactly {@code requested}, as the roster prints it. */
     public static Optional<Container> byName(List<Container> containers, String requested) {
-        for (Container container : containers) {
-            if (container.name().equals(requested)) {
-                return Optional.of(container);
-            }
-        }
-        String wanted = Names.normalise(requested);
-        if (wanted.isEmpty()) {
-            return Optional.empty();
-        }
-        List<Container> normalised = containers.stream()
-                .filter(container -> Names.normalise(container.name()).equals(wanted))
-                .toList();
-        if (normalised.size() == 1) {
-            return Optional.of(normalised.get(0));
-        }
-        // Another module's service type is listed under the name a caller writes it by, `cdc:Service`; its bare
-        // name reaches it too, when nothing else answers to it.
-        List<Container> qualified = containers.stream()
-                .filter(container -> container.name().endsWith(":" + requested))
-                .toList();
-        return normalised.isEmpty() && qualified.size() == 1 ? Optional.of(qualified.get(0)) : Optional.empty();
+        return containers.stream().filter(container -> container.name().equals(requested)).findFirst();
     }
 }

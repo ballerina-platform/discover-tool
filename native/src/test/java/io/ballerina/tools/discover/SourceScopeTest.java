@@ -91,8 +91,8 @@ public class SourceScopeTest {
         return new Object[][] {
                 {List.of("ballerina/http", "service")},
                 {List.of("ballerina/http", "service", "Service")},
-                {List.of("ballerina/http", "class", "InterceptableService")},
-                {List.of("ballerina/http", "client", "RequestInterceptor")},
+                {List.of("ballerina/http", "type", "InterceptableService")},
+                {List.of("ballerina/http", "type", "RequestInterceptor")},
         };
     }
 

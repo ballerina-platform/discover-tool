@@ -80,7 +80,7 @@ public class PointersTest {
     private static List<DiscoverResult> answersOf(LoadedPackage context) {
         List<DiscoverResult> answers = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
-            answers.add(expect(Containers.render(context, scope, Containers.Options.bare())));
+            answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of()))));
             answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of(), "config", 1))));
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 if (container.isModule()) {
@@ -89,9 +89,9 @@ public class PointersTest {
                 answers.add(expect(Containers.render(context, scope,
                         new Containers.Options(List.of(container.name())))));
                 answers.add(expect(Containers.render(context, scope,
-                        new Containers.Options(List.of(container.name(), "zzznosuchmember")))));
-                for (List<String> selector : narrowingSelectors(container)) {
-                    answers.add(expect(Containers.render(context, scope, new Containers.Options(selector))));
+                        new Containers.Options(List.of(container.name()), "zzznosuchmember", 1))));
+                for (Containers.Options narrowed : narrowings(container)) {
+                    answers.add(expect(Containers.render(context, scope, narrowed)));
                 }
             }
         }
@@ -139,20 +139,23 @@ public class PointersTest {
         return commands;
     }
 
-    private static List<List<String>> narrowingSelectors(Surface.Container container) {
-        List<List<String>> selectors = new ArrayList<>();
+    private static List<Containers.Options> narrowings(Surface.Container container) {
+        List<Containers.Options> narrowings = new ArrayList<>();
         container.memberNames().stream().findFirst().filter(name -> name.length() > 3)
-                .ifPresent(name -> selectors.add(List.of(container.name(), name.substring(1, name.length() - 1))));
-        container.operations().stream().findFirst().ifPresent(operation -> selectors.add(
-                List.of(container.name(), operation.segments().get(0), operation.fn().accessor())));
-        return selectors;
+                .ifPresent(name -> narrowings.add(new Containers.Options(List.of(container.name()),
+                        name.substring(1, name.length() - 1), 1)));
+        container.operations().stream().findFirst().ifPresent(operation -> narrowings.add(new Containers.Options(
+                List.of(container.name(), operation.segments().get(0), operation.fn().accessor()))));
+        return narrowings;
     }
 
     private static List<String> commandsOf(DiscoverResult result) {
         List<String> commands = new ArrayList<>();
         switch (result) {
-            case DiscoverResult.BucketList bucketList ->
-                    bucketList.submodules().forEach(submodule -> commands.add(submodule.command()));
+            case DiscoverResult.BucketList bucketList -> {
+                bucketList.buckets().forEach(bucket -> commands.add(bucket.command()));
+                bucketList.submodules().forEach(submodule -> commands.add(submodule.command()));
+            }
             case DiscoverResult.ContainerRoster roster -> {
                 roster.containers().forEach(entry -> commands.add(entry.command()));
                 addIfPresent(commands, roster.next());
@@ -187,17 +190,6 @@ public class PointersTest {
                 mixed.remote().forEach(method -> commands.add(method.command()));
                 mixed.normal().forEach(method -> commands.add(method.command()));
                 addIfPresent(commands, mixed.next());
-            }
-            case DiscoverResult.NoMatch noMatch -> {
-                noMatch.paths().forEach(alternative -> commands.add(alternative.command()));
-                if (noMatch.available() != null) {
-                    commands.addAll(commandsOf(noMatch.available()));
-                }
-                commands.add(noMatch.next());
-            }
-            case DiscoverResult.Owners owners -> {
-                owners.owners().forEach(owner -> commands.add(owner.command()));
-                addIfPresent(commands, owners.next());
             }
             case DiscoverResult.EmptyBucket empty ->
                     empty.elsewhere().forEach(other -> commands.add(other.command()));
@@ -349,11 +341,6 @@ public class PointersTest {
                 mixed.remote().forEach(method -> rows.add(new Row(method, mixed.container(), "->")));
                 mixed.normal().forEach(method -> rows.add(new Row(method, mixed.container(), ".")));
             }
-            case DiscoverResult.NoMatch noMatch -> {
-                if (noMatch.available() != null) {
-                    rows.addAll(methodRowsOf(noMatch.available()));
-                }
-            }
             default -> { }
         }
         return rows;
@@ -364,8 +351,6 @@ public class PointersTest {
             case DiscoverResult.PathGroups groups -> groups.resources();
             case DiscoverResult.ResourceList resources -> resources.resources();
             case DiscoverResult.MixedListing mixed -> mixed.resources();
-            case DiscoverResult.NoMatch noMatch -> noMatch.available() == null ? List.of()
-                    : resourcesOf(noMatch.available());
             default -> List.of();
         };
     }

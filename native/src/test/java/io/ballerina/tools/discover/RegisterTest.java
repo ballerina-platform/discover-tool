@@ -60,7 +60,7 @@ public class RegisterTest {
         List<Answer> answers = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
             String verb = scope.verb();
-            add(answers, verb, Containers.render(context, scope, Containers.Options.bare()));
+            add(answers, verb, Containers.render(context, scope, new Containers.Options(List.of())));
             add(answers, verb + " --filter config",
                     Containers.render(context, scope, new Containers.Options(List.of(), "config", 1)));
             for (Surface.Container container : Surface.of(context.library(), scope)) {
@@ -69,31 +69,11 @@ public class RegisterTest {
                     add(answers, verb + " " + container.name(),
                             Containers.render(context, scope, new Containers.Options(selector)));
                 }
-                List<String> missing = new ArrayList<>(selector);
-                missing.add("zzzznosuchmember");
-                add(answers, verb + " " + String.join(" ", missing),
-                        Containers.render(context, scope, new Containers.Options(missing)));
                 for (String member : container.memberNames().stream().limit(3).toList()) {
                     List<String> one = new ArrayList<>(selector);
                     one.add(member);
                     add(answers, verb + " " + String.join(" ", one),
                             Containers.render(context, scope, new Containers.Options(one)));
-                }
-                // The three answers that carry a note: a member named without its owner, a wildcard path that
-                // skips sibling branches, and a container asked of a bucket that does not hold it.
-                container.memberNames().stream().findFirst().ifPresent(member -> addIfOk(answers, verb + " " + member,
-                        Containers.render(context, scope, new Containers.Options(List.of(member)))));
-                if (container.hasPaths()) {
-                    List<String> wildcard = new ArrayList<>(selector);
-                    wildcard.add("*/*");
-                    add(answers, verb + " " + String.join(" ", wildcard),
-                            Containers.render(context, scope, new Containers.Options(wildcard)));
-                }
-                for (Surface.Scope other : Surface.Scope.values()) {
-                    if (other != scope && !container.isModule()) {
-                        add(answers, other.verb() + " " + container.name(),
-                                Containers.render(context, other, new Containers.Options(selector)));
-                    }
                 }
             }
         }
@@ -106,13 +86,6 @@ public class RegisterTest {
             }
         }
         return answers;
-    }
-
-    // A member named bare can be ambiguous across buckets in ways this walk does not control.
-    private static void addIfOk(List<Answer> answers, String label, Result<DiscoverResult> view) {
-        if (view.isOk()) {
-            answers.add(new Answer(label, view.value()));
-        }
     }
 
     private static void add(List<Answer> answers, String label, Result<DiscoverResult> view) {
@@ -182,7 +155,6 @@ public class RegisterTest {
                 case DiscoverResult.MethodList methods -> methods.note();
                 case DiscoverResult.MixedListing mixed -> mixed.note();
                 case DiscoverResult.Signature signature -> signature.note();
-                case DiscoverResult.NoMatch noMatch -> noMatch.note();
                 default -> null;
             };
             if (note != null) {
@@ -190,7 +162,7 @@ public class RegisterTest {
                 notes++;
             }
         }
-        if (slug.equals("ballerina__http") || slug.equals("ballerinax__github")) {
+        if (slug.equals("ballerina__http")) {
             Assert.assertTrue(notes > 0, slug + ": no answer carried a note, so this checked nothing");
         }
     }
@@ -321,11 +293,6 @@ public class RegisterTest {
                 mixed.normal().forEach(method -> entries.add(method.name()));
                 entries.addAll(mixed.documented().names());
             }
-            case DiscoverResult.NoMatch noMatch -> {
-                entries.addAll(noMatch.candidates());
-                noMatch.paths().forEach(alternative -> entries.add(alternative.path()));
-            }
-            case DiscoverResult.Owners owners -> owners.owners().forEach(owner -> entries.add(owner.name()));
             case DiscoverResult.EmptyBucket empty -> empty.elsewhere().forEach(other -> entries.add(other.bucket()));
             default -> { }
         }
@@ -350,10 +317,6 @@ public class RegisterTest {
                 mixed.remote().forEach(method -> commands.add(new String[] {method.name(), method.command()}));
                 mixed.normal().forEach(method -> commands.add(new String[] {method.name(), method.command()}));
             }
-            case DiscoverResult.NoMatch noMatch -> noMatch.paths()
-                    .forEach(alternative -> commands.add(new String[] {alternative.path(), alternative.command()}));
-            case DiscoverResult.Owners owners -> owners.owners()
-                    .forEach(owner -> commands.add(new String[] {owner.name(), owner.command()}));
             case DiscoverResult.EmptyBucket empty -> empty.elsewhere()
                     .forEach(other -> commands.add(new String[] {other.bucket(), other.command()}));
             default -> { }
@@ -373,8 +336,6 @@ public class RegisterTest {
             case DiscoverResult.ResourceList resources -> resources.next();
             case DiscoverResult.MethodList methods -> methods.next();
             case DiscoverResult.MixedListing mixed -> mixed.next();
-            case DiscoverResult.NoMatch noMatch -> noMatch.available() == null ? noMatch.next() : null;
-            case DiscoverResult.Owners owners -> owners.next();
             default -> null;
         };
     }
