@@ -82,6 +82,11 @@ public record LoadedPackage(
         return pkgArgument(module);
     }
 
+    /** {@code bal discover} and {@link #pkgArgument()}: the command every next command this lookup prints extends. */
+    public String command() {
+        return new Coordinate(qualified, pinned).command(module);
+    }
+
     /** {@link #pkgArgument()} for another module of this package, or its default one when {@code other} is null. */
     public String pkgArgument(String other) {
         return new Coordinate(qualified, pinned).argument(other);

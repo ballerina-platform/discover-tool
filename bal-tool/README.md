@@ -81,7 +81,7 @@ ballerinax/kafka:4.6.5
 Next: bal discover ballerinax/kafka <bucket>
 
 $ bal discover ballerinax/kafka | cat
-{"version":"4.6.5","buckets":["client","service","class","type","readme"]}
+{"version":"4.6.5","buckets":[{"name":"client","command":"bal discover ballerinax/kafka client"},{"name":"service","command":"bal discover ballerinax/kafka service"},{"name":"class","command":"bal discover ballerinax/kafka class"},{"name":"type","command":"bal discover ballerinax/kafka type"},{"name":"readme","command":"bal discover ballerinax/kafka readme"}]}
 ```
 
 Every JSON answer is exactly one line, however long, so cutting the output with `head` or `tail` never
@@ -503,7 +503,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| bare package                         | `buckets`, `submodules` (`name`, `summary`, `command`)                                                              |
+| bare package                         | `buckets` (`name`, `command`), `submodules` (`name`, `summary`, `command`)                                          |
 | several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `confirmed`, `unconfirmedReason`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |

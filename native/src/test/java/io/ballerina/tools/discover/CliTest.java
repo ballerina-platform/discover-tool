@@ -1077,7 +1077,10 @@ public class CliTest {
         Assert.assertEquals(transport.urls(), List.of(
                 CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
                 CentralClient.CENTRAL_BASE_URL + "docs/ballerina/graphql.dataloader/" + GRAPHQL_VERSION));
-        Assert.assertTrue(capture.stdout().contains("\"buckets\":[\"class\",\"type\"]"), capture.stdout());
+        Assert.assertTrue(capture.stdout().contains("\"buckets\":["
+                + "{\"name\":\"class\",\"command\":\"bal discover ballerina/graphql --module dataloader class\"},"
+                + "{\"name\":\"type\",\"command\":\"bal discover ballerina/graphql --module dataloader type\"}]"),
+                capture.stdout());
     }
 
     @Test

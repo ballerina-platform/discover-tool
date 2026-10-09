@@ -42,7 +42,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aBucketListRendersOneBucketPerLineInText() {
         DiscoverResult result = new DiscoverResult.BucketList(
-                List.of("client", "service", "funcs", "readme"), List.of(), null);
+                buckets("client", "service", "funcs", "readme"), List.of(), null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "4 buckets",
                 "",
@@ -54,7 +54,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void aBucketListAtATerminalNamesThePackageAndTheCommandThatOpensABucket() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"), List.of(), null);
+        DiscoverResult result = new DiscoverResult.BucketList(buckets("client", "readme"), List.of(), null);
         TextRenderer.Context where =
                 new TextRenderer.Context("ballerina/graphql", "subgraph", List.of(), null, null, null);
         Assert.assertEquals(TextRenderer.render(result, where), lines(
@@ -68,17 +68,18 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
-    public void aBucketListRendersAsAJsonArrayField() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"), List.of(), null);
+    public void aBucketListRendersEachBucketAsARowWithItsCommandInJson() {
+        DiscoverResult result = new DiscoverResult.BucketList(buckets("client", "readme"), List.of(), null);
         String json = JsonRenderer.render(result);
         Assert.assertEquals(
                 JsonParser.parseString(json).getAsJsonObject().getAsJsonArray("buckets").toString(),
-                "[\"client\",\"readme\"]");
+                "[{\"name\":\"client\",\"command\":\"bal discover ballerina/graphql client\"},"
+                        + "{\"name\":\"readme\",\"command\":\"bal discover ballerina/graphql readme\"}]");
     }
 
     @Test
     public void anEmptyBucketListRendersAsNoneInTextAndAnEmptyArrayInJson() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of(), List.of(), null);
+        DiscoverResult result = new DiscoverResult.BucketList(buckets(), List.of(), null);
         Assert.assertEquals(TextRenderer.render(result), "No buckets.");
         Assert.assertEquals(JsonRenderer.render(result), "{\"buckets\":[]}");
     }
@@ -86,7 +87,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void submodulesAppearAfterTheBucketListInTextAndAsTheirOwnArrayInJson() {
         DiscoverResult result = new DiscoverResult.BucketList(
-                List.of("client", "service", "funcs", "readme"),
+                buckets("client", "service", "funcs", "readme"),
                 List.of(
                         new DiscoverResult.BucketList.Submodule("dataloader",
                                 "load data from a source with batching and caching",
@@ -119,7 +120,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void noSubmodulesOmitsTheFieldEntirelyInJson() {
-        DiscoverResult result = new DiscoverResult.BucketList(List.of("client", "readme"), List.of(), null);
+        DiscoverResult result = new DiscoverResult.BucketList(buckets("client", "readme"), List.of(), null);
         Assert.assertFalse(JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject().has("submodules"),
                 "a package with no submodules carries no submodules key at all");
     }
@@ -127,7 +128,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void anUnverifiedVersionsWarningAppearsInBothRenderings() {
         DiscoverResult result = new DiscoverResult.BucketList(
-                List.of("client"), List.of(), "the registry was unreachable, so this version came off disk unchecked");
+                buckets("client"), List.of(), "the registry was unreachable, so this version came off disk unchecked");
         Assert.assertTrue(TextRenderer.render(result).endsWith(
                 "\n\nWarning: the registry was unreachable, so this version came off disk unchecked"));
         String json = JsonRenderer.render(result);
@@ -850,5 +851,11 @@ public class DiscoverResultRenderingTest {
 
     private static String lines(String... lines) {
         return String.join("\n", lines);
+    }
+
+    private static List<DiscoverResult.BucketList.Bucket> buckets(String... names) {
+        return Arrays.stream(names)
+                .map(name -> new DiscoverResult.BucketList.Bucket(name, "bal discover ballerina/graphql " + name))
+                .toList();
     }
 }

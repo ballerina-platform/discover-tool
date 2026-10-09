@@ -71,7 +71,12 @@ public final class JsonRenderer {
     private static JsonObject bucketList(DiscoverResult.BucketList bucketList) {
         JsonObject json = new JsonObject();
         JsonArray buckets = new JsonArray();
-        bucketList.buckets().forEach(buckets::add);
+        for (DiscoverResult.BucketList.Bucket bucket : bucketList.buckets()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("name", bucket.name());
+            entry.addProperty("command", bucket.command());
+            buckets.add(entry);
+        }
         json.add("buckets", buckets);
         if (!bucketList.submodules().isEmpty()) {
             JsonArray submodules = new JsonArray();
