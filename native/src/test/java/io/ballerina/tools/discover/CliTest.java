@@ -523,6 +523,7 @@ public class CliTest {
         Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
                 + "subgraph. Pass one of them to --module, or drop --module for the default module: "
                 + "`bal discover ballerina/graphql type --filter x`.");
+        Assert.assertEquals(capture.failure().get("candidates").toString(), "[\"dataloader\",\"subgraph\"]");
     }
 
     @Test
