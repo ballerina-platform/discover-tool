@@ -628,7 +628,7 @@ listing, a module with no readme — is exit 1.
 
 `upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
 `package-not-found` and `symbol-not-found` need a different command (a `--module` the package does not publish
-is `package-not-found` with `module`, and lists the submodules it does); `schema-drift` means Central's payload
+is `package-not-found` with `module`, and lists the submodules it does in `candidates`); `schema-drift` means Central's payload
 changed shape and is for a maintainer; `internal` is a defect in `bal discover` itself, to report with the
 command that produced it. An `upstream` failure's `message` names what failed: the host, or the
 proxy and the `Settings.toml` that sets it. Its `reached` is `true` when Central answered, with an error status

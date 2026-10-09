@@ -673,7 +673,7 @@ public final class FromCentral {
                     + ". Pass one of them to --module, or " + dropped;
         }
         return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version),
-                submodule, suggestion, command);
+                submodule, suggestion, command, candidates);
     }
 
     /**
