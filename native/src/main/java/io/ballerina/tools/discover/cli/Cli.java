@@ -278,26 +278,29 @@ public final class Cli {
     }
 
     private static DiscoverResult.BucketList bucketList(LoadedPackage loaded) {
-        List<String> buckets = new ArrayList<>();
+        List<String> names = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
             if (!Surface.of(loaded.library(), scope).isEmpty()) {
-                buckets.add(scope.verb());
+                names.add(scope.verb());
             }
         }
         // Neither is a Surface.Scope — they are not part of the callable surface — so they are appended here
         // rather than found by the loop above: `type`, then `readme` last, matching the RFC's worked examples.
         if (Types.count(loaded) > 0) {
-            buckets.add(Types.BUCKET);
+            names.add(Types.BUCKET);
         }
         if (loaded.readme().isPresent()) {
-            buckets.add(Readme.BUCKET);
+            names.add(Readme.BUCKET);
         }
+        List<DiscoverResult.BucketList.Bucket> buckets = names.stream()
+                .map(name -> new DiscoverResult.BucketList.Bucket(name, loaded.command() + " " + name))
+                .toList();
         List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.BucketList.Submodule(
                         submodule.name(), submodule.summary(),
                         COMMAND + loaded.pkgArgument(submodule.name())))
                 .toList();
-        return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
+        return new DiscoverResult.BucketList(buckets, submodules, loaded.warning());
     }
 
     /**

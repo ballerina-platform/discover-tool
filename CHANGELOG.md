@@ -37,8 +37,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Cap every listing at 40 entries, with `--page` to page through any longer one; a text listing that continues also
   ends with the `--filter <keyword>` command that narrows it
 - List containers, service types, methods, resource paths and declarations alphabetically
-- Add a ready-to-run next command to every listing entry: `command`, or `commands` keyed by accessor on resource rows,
-  plus a `next` command when a listing continues
+- Add a ready-to-run next command to every listing entry, the bare package's buckets included: `command`, or
+  `commands` keyed by accessor on resource rows, plus a `next` command when a listing continues
 - Add JSON output (one line per answer) and aligned human-readable text output, selected by `--output json|text` and
   defaulting to text on a terminal and JSON otherwise
 - Report failures on stderr in the run's output mode: a single-line JSON object, or `error: <message>` with the

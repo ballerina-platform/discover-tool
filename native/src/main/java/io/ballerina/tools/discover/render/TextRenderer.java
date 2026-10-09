@@ -140,7 +140,7 @@ public final class TextRenderer {
     private static void bucketList(Layout layout, DiscoverResult.BucketList bucketList, Context where) {
         layout.top(counted(bucketList.buckets().size(), "bucket", "buckets"));
         TextTable buckets = new TextTable(TextTable.Column.LEFT);
-        bucketList.buckets().forEach(buckets::row);
+        bucketList.buckets().forEach(bucket -> buckets.row(bucket.name()));
         layout.block(buckets.lines(INDENT));
         if (!bucketList.submodules().isEmpty()) {
             TextTable submodules = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
