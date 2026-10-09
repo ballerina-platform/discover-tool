@@ -43,13 +43,13 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * {@code type} — the declarations that are not callable: records, enums, errors, type aliases, constants, module
- * variables and annotations.
+ * {@code type} — every type the package declares: records, enums, errors, type aliases, constants, module variables,
+ * annotations, listeners, and the classes, clients and service types the callable buckets also list.
  *
  * <p>Not derived from call-site grammar, so it shares no {@link Surface.Scope} with the four container buckets:
  * every loop over {@code Scope.values()} assumes a container with methods. Bare, it is a roster grouped by kind
- * and paged as one sequence; one name is a leaf, the declaration whole with the types it names. A name that is
- * really a class, client or service type is answered by the bucket that holds it, and says so.
+ * and paged as one sequence; one name is a leaf, the declaration whole with the types it names. A class, client or
+ * service type gets the answer its own bucket gives.
  *
  * @since 0.1.0
  */
@@ -57,32 +57,15 @@ public final class Types {
 
     public static final String BUCKET = "type";
 
-    private static final String RECORDS = "records";
-    private static final String ENUMS = "enums";
-    private static final String ERRORS = "errors";
-    private static final String ALIASES = "aliases";
-    private static final String CONSTANTS = "constants";
-    private static final String VARIABLES = "variables";
-    private static final String ANNOTATIONS = "annotations";
-
-    /** The roster's sections, in the order it lists them. */
-    private static final List<String> KINDS =
-            List.of(RECORDS, ENUMS, ERRORS, ALIASES, CONSTANTS, VARIABLES, ANNOTATIONS);
-
     private Types() {
     }
 
     /**
      * @param selectors everything after {@code type}: at most one declaration name
      * @param filter the {@code --filter} keyword, or {@code null}
-     * @param page {@code --page}, 1-indexed, for a roster over the ceiling
-     * @param note the routing advisory when another bucket sent the caller here, or {@code null}
+     * @param page {@code --page}, 1-indexed, for a roster over the ceiling, or the answer a class gets
      */
-    public record Options(List<String> selectors, String filter, int page, String note) {
-
-        public Options(List<String> selectors, String filter, int page) {
-            this(selectors, filter, page, null);
-        }
+    public record Options(List<String> selectors, String filter, int page) {
 
         public boolean filtered() {
             return filter != null && !filter.isBlank();
@@ -97,7 +80,7 @@ public final class Types {
      * @param surface what its name and shape say
      * @param docs what its documentation says
      */
-    private record Entry(String kind, String name, String surface, String docs) { }
+    private record Entry(DiscoverResult.TypeRoster.Kind kind, String name, String surface, String docs) { }
 
     /** How many declarations the bucket holds — what the bare package listing and an empty bucket report. */
     public static int count(LoadedPackage loaded) {
@@ -123,7 +106,7 @@ public final class Types {
         if (options.selectors().isEmpty()) {
             return roster(loaded, options);
         }
-        return leaf(loaded, options.selectors().get(0), options.note());
+        return leaf(loaded, options.selectors().get(0), options.page());
     }
 
     /**
@@ -153,14 +136,14 @@ public final class Types {
         Set<String> seen = new LinkedHashSet<>();
         Set<String> seenAnnotations = new LinkedHashSet<>();
         for (TypeDef typeDef : library.addressable()) {
-            String kind = kindOf(typeDef);
-            if (kind != null && seen.add(typeDef.name())) {
-                entries.add(new Entry(kind, typeDef.name(), Filter.surfaceOf(typeDef), Filter.docsOf(typeDef)));
+            if (seen.add(typeDef.name())) {
+                entries.add(new Entry(kindOf(library, typeDef), typeDef.name(), Filter.surfaceOf(typeDef),
+                        Filter.docsOf(typeDef)));
             }
         }
         for (Library.AnnotationDef annotation : library.annotations()) {
             if (seenAnnotations.add(annotation.name())) {
-                entries.add(new Entry(ANNOTATIONS, annotation.name(),
+                entries.add(new Entry(DiscoverResult.TypeRoster.Kind.ANNOTATIONS, annotation.name(),
                         annotation.name() + " " + annotation.type().map(TypeRef::name).orElse("") + " "
                                 + annotation.attachmentPoints(),
                         annotation.description()));
@@ -169,16 +152,28 @@ public final class Types {
         return List.copyOf(entries);
     }
 
-    private static String kindOf(TypeDef typeDef) {
+    private static DiscoverResult.TypeRoster.Kind kindOf(Library library, TypeDef typeDef) {
         return switch (typeDef) {
-            case TypeDef.Rec ignored -> RECORDS;
-            case TypeDef.Enumeration ignored -> ENUMS;
-            case TypeDef.ErrorDef ignored -> ERRORS;
-            case TypeDef.Alias alias -> alias.type().name().startsWith("distinct ") ? ERRORS : ALIASES;
-            case TypeDef.Constant ignored -> CONSTANTS;
-            case TypeDef.Variable ignored -> VARIABLES;
-            case TypeDef.ObjectDef ignored -> null;
+            case TypeDef.Rec ignored -> DiscoverResult.TypeRoster.Kind.RECORDS;
+            case TypeDef.Enumeration ignored -> DiscoverResult.TypeRoster.Kind.ENUMS;
+            case TypeDef.ErrorDef ignored -> DiscoverResult.TypeRoster.Kind.ERRORS;
+            case TypeDef.Alias alias -> alias.type().name().startsWith("distinct ")
+                    ? DiscoverResult.TypeRoster.Kind.ERRORS
+                    : DiscoverResult.TypeRoster.Kind.ALIASES;
+            case TypeDef.Constant ignored -> DiscoverResult.TypeRoster.Kind.CONSTANTS;
+            case TypeDef.Variable ignored -> DiscoverResult.TypeRoster.Kind.VARIABLES;
+            case TypeDef.ObjectDef object -> isListener(library, object.name())
+                    ? DiscoverResult.TypeRoster.Kind.LISTENERS
+                    : switch (Surface.scopeOf(object)) {
+                        case CLIENT -> DiscoverResult.TypeRoster.Kind.CLIENTS;
+                        case SERVICE -> DiscoverResult.TypeRoster.Kind.SERVICE_TYPES;
+                        case CLASS, MODULE -> DiscoverResult.TypeRoster.Kind.CLASSES;
+                    };
         };
+    }
+
+    private static boolean isListener(Library library, String name) {
+        return library.listeners().stream().anyMatch(listener -> listener.name().equals(name));
     }
 
     private static String baseCommand(LoadedPackage loaded) {
@@ -207,9 +202,9 @@ public final class Types {
             }
         }
 
-        Map<String, List<DiscoverResult.Method>> byKind = new LinkedHashMap<>();
-        Map<String, Integer> counts = new LinkedHashMap<>();
-        for (String kind : KINDS) {
+        Map<DiscoverResult.TypeRoster.Kind, List<DiscoverResult.Method>> byKind = new LinkedHashMap<>();
+        Map<DiscoverResult.TypeRoster.Kind, Integer> counts = new LinkedHashMap<>();
+        for (DiscoverResult.TypeRoster.Kind kind : DiscoverResult.TypeRoster.Kind.values()) {
             List<DiscoverResult.Method> methods = surface.stream()
                     .filter(entry -> entry.kind().equals(kind))
                     .map(Entry::name)
@@ -228,7 +223,7 @@ public final class Types {
         Containers.Page window = page.value();
         List<DiscoverResult.TypeRoster.Section> sections = new ArrayList<>();
         int offset = 0;
-        for (String kind : KINDS) {
+        for (DiscoverResult.TypeRoster.Kind kind : DiscoverResult.TypeRoster.Kind.values()) {
             List<DiscoverResult.Method> shown = window.slice(byKind.get(kind), offset);
             offset += byKind.get(kind).size();
             if (!shown.isEmpty()) {
@@ -240,7 +235,7 @@ public final class Types {
                 ? DiscoverResult.Documented.NONE
                 : new DiscoverResult.Documented(window.slice(documented, total), documented.size());
         return Result.ok(new DiscoverResult.TypeRoster(List.copyOf(sections), counts, shown, total,
-                window.paging(), window.next(command), documentedHere, loaded.warning(), options.note()));
+                window.paging(), window.next(command), documentedHere, loaded.warning()));
     }
 
     private static Result<DiscoverResult> noMatch(
@@ -255,10 +250,10 @@ public final class Types {
                 Names.nearMisses(options.filter(), all.stream().map(Entry::name).toList()), List.of(), null,
                 window.paging() == null ? base : window.next(command),
                 Containers.documentedOn(window, documented, 0),
-                window.paging(), loaded.warning(), options.note()));
+                window.paging(), loaded.warning(), null));
     }
 
-    private static Result<DiscoverResult> leaf(LoadedPackage loaded, String requested, String note) {
+    private static Result<DiscoverResult> leaf(LoadedPackage loaded, String requested, int page) {
         Library library = loaded.library();
         Declarations index = Declarations.index(library.addressable());
         List<String> names = new ArrayList<>(index.names());
@@ -270,10 +265,8 @@ public final class Types {
             List<TypeDef.Enumeration> owners = enumsWithMember(loaded, requested);
             if (owners.size() == 1) {
                 String enumName = owners.get(0).name();
-                String routing = "'" + memberName(requested) + "' is a member of the enum " + enumName
-                        + " — showing it. Canonical: " + baseCommand(loaded) + " "
-                        + Texts.shellWord(enumName);
-                return leaf(loaded, enumName, note == null ? routing : routing + " " + note);
+                return declaration(loaded, index, enumName,
+                        "'" + memberName(requested) + "' is a member of the enum " + enumName + ".");
             }
             if (owners.size() > 1) {
                 return Result.err(loaded.symbolNotFound(List.of(requested),
@@ -287,18 +280,24 @@ public final class Types {
         }
         String name = found.name();
         TypeDef typeDef = index.get(name);
-        if (typeDef instanceof TypeDef.ObjectDef object) {
-            return routed(loaded, object);
-        }
         if (typeDef == null) {
-            return Result.ok(annotationLeaf(loaded, index, name, note));
+            return Result.ok(annotationLeaf(loaded, index, name));
         }
+        if (typeDef instanceof TypeDef.ObjectDef object && !isListener(library, name)) {
+            return Containers.render(loaded, Surface.scopeOf(object),
+                    new Containers.Options(List.of(name), null, page));
+        }
+        return declaration(loaded, index, name, null);
+    }
 
+    private static Result<DiscoverResult> declaration(
+            LoadedPackage loaded, Declarations index, String name, String note) {
+        TypeDef typeDef = index.get(name);
         Closure.Result closure = Closure.leaf(List.of(name), index);
         List<DiscoverResult.Signature.Type> types = closure.types(index).stream()
                 .filter(type -> !type.name().equals(name))
                 .toList();
-        return Result.ok(new DiscoverResult.TypeDeclaration(name, singular(typeDef),
+        return Result.ok(new DiscoverResult.TypeDeclaration(name, kindOf(loaded.library(), typeDef).noun(),
                 TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure), closure.omitted().size(),
                 omittedNext(loaded, closure), foreignOf(loaded, closure, index, List.of()), loaded.warning(),
                 note));
@@ -322,53 +321,19 @@ public final class Types {
         return bare.startsWith("'") ? bare.substring(1) : bare;
     }
 
-    private static DiscoverResult annotationLeaf(LoadedPackage loaded, Declarations index, String name, String note) {
+    private static DiscoverResult annotationLeaf(LoadedPackage loaded, Declarations index, String name) {
         Library.AnnotationDef annotation = annotationNamed(loaded.library(), name).orElseThrow();
         List<String> roots = annotation.type().map(type -> Closure.rootsOf(type, index)).orElse(List.of());
         Closure.Result closure = Closure.leaf(roots, index);
-        return new DiscoverResult.TypeDeclaration(name, "annotation", Documents.renderAnnotation(annotation),
-                closure.types(index), omittedOf(loaded, closure), closure.omitted().size(),
-                omittedNext(loaded, closure),
+        return new DiscoverResult.TypeDeclaration(name, DiscoverResult.TypeRoster.Kind.ANNOTATIONS.noun(),
+                Documents.renderAnnotation(annotation), closure.types(index), omittedOf(loaded, closure),
+                closure.omitted().size(), omittedNext(loaded, closure),
                 foreignOf(loaded, closure, index, annotation.type().map(List::of).orElse(List.of())),
-                loaded.warning(), note);
+                loaded.warning(), null);
     }
 
     private static Optional<Library.AnnotationDef> annotationNamed(Library library, String name) {
         return library.annotations().stream().filter(candidate -> candidate.name().equals(name)).findFirst();
-    }
-
-    private static String singular(TypeDef typeDef) {
-        return switch (kindOf(typeDef)) {
-            case RECORDS -> "record";
-            case ENUMS -> "enum";
-            case ERRORS -> "error";
-            case ALIASES -> "alias";
-            case CONSTANTS -> "constant";
-            case VARIABLES -> "variable";
-            default -> throw new IllegalStateException("not a type-bucket declaration: " + typeDef.name());
-        };
-    }
-
-    private static Result<DiscoverResult> routed(LoadedPackage loaded, TypeDef.ObjectDef object) {
-        boolean listener = loaded.library().listeners().stream().anyMatch(each -> each.name().equals(object.name()));
-        Surface.Scope scope = listener ? Surface.Scope.SERVICE : Surface.scopeOf(object);
-        String routing = "'" + object.name() + "' is "
-                + (listener ? "a listener, shown with the service types it serves" : "addressed by " + scope.verb())
-                + " — showing it. Canonical: bal discover " + loaded.pkgArgument() + " " + scope.verb()
-                + (listener ? "" : " " + Texts.shellWord(object.name()));
-        Result<DiscoverResult> answer = Containers.render(loaded, scope,
-                new Containers.Options(listener ? List.of() : List.of(object.name())), routing);
-        boolean nothingToShow = answer.isOk()
-                ? answer.value() instanceof DiscoverResult.EmptyBucket
-                : answer.failure() instanceof Failure.SymbolNotFound;
-        if (!nothingToShow) {
-            return answer;
-        }
-        return Result.err(loaded.symbolNotFound(List.of(object.name()), List.of(),
-                "'" + object.name() + "' is " + (listener ? "a listener" : "an object") + " this package declares, "
-                        + "but `" + scope.verb() + "` has nothing to show for it, and `type` holds only what is not "
-                        + "callable. List the buckets with `bal discover " + loaded.pkgArgument() + "`, or search "
-                        + "declarations with `" + baseCommand(loaded) + " --filter <keyword>`."));
     }
 
     private static String missSuggestion(LoadedPackage loaded, boolean ambiguous) {

@@ -94,7 +94,7 @@ ballerina/http · funcs
 Next: bal discover ballerina/http funcs <name>
 == type ==
 ballerina/http · type
-135 records, 5 enums, 65 errors, 32 aliases, 144 constants, 61 variables, 7 annotations
+135 records, 5 enums, 65 errors, 32 aliases, 144 constants, 61 variables, 7 annotations, 1 listener, 83 classes, 10 clients, 7 service types
 
 Records
   Accepted
@@ -138,7 +138,7 @@ Records
   Found
   GatewayTimeout
 
-... 409 more (page 1 of 12)
+... 510 more (page 1 of 14)
 Next: bal discover ballerina/http type <name>
 Next: bal discover ballerina/http type --page 2
 Next: bal discover ballerina/http type --filter <keyword>

@@ -35,7 +35,7 @@ ballerina/graphql · funcs
 Next: bal discover ballerina/graphql funcs <name>
 == type ==
 ballerina/graphql · type
-47 records, 1 enum, 9 errors, 6 aliases, 5 constants, 3 variables, 4 annotations
+47 records, 1 enum, 9 errors, 6 aliases, 5 constants, 3 variables, 4 annotations, 1 listener, 2 classes, 1 client, 2 service types
 
 Records
   __EnumValue
@@ -79,7 +79,7 @@ Records
   OAuth2RefreshTokenGrantConfig
   PoolConfiguration
 
-... 35 more (page 1 of 2)
+... 41 more (page 1 of 3)
 Next: bal discover ballerina/graphql type <name>
 Next: bal discover ballerina/graphql type --page 2
 Next: bal discover ballerina/graphql type --filter <keyword>

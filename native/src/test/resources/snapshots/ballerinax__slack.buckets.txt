@@ -54,24 +54,24 @@ This package declares nothing in service.
 
 Elsewhere
   client    1  bal discover ballerinax/slack client
-  type    506  bal discover ballerinax/slack type
+  type    507  bal discover ballerinax/slack type
 == class ==
 ballerinax/slack · class
 This package declares nothing in class.
 
 Elsewhere
   client    1  bal discover ballerinax/slack client
-  type    506  bal discover ballerinax/slack type
+  type    507  bal discover ballerinax/slack type
 == funcs ==
 ballerinax/slack · funcs
 This package declares nothing in funcs.
 
 Elsewhere
   client    1  bal discover ballerinax/slack client
-  type    506  bal discover ballerinax/slack type
+  type    507  bal discover ballerinax/slack type
 == type ==
 ballerinax/slack · type
-436 records, 70 aliases
+436 records, 70 aliases, 1 client
 
 Records
   '200200200200AnyOf12234                                        bal discover ballerinax/slack type "'200200200200AnyOf12234"
@@ -115,7 +115,7 @@ Records
   AdminConversationsGetTeamsResponse
   AdminConversationsGetTeamsResponseResponseMetadata
 
-... 466 more (page 1 of 13)
+... 467 more (page 1 of 13)
 Next: bal discover ballerinax/slack type <name>
 Next: bal discover ballerinax/slack type --page 2
 Next: bal discover ballerinax/slack type --filter <keyword>

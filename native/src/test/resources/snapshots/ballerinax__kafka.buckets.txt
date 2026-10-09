@@ -30,10 +30,10 @@ Elsewhere
   client    3  bal discover ballerinax/kafka client
   service   1  bal discover ballerinax/kafka service
   class     4  bal discover ballerinax/kafka class
-  type     58  bal discover ballerinax/kafka type
+  type     67  bal discover ballerinax/kafka type
 == type ==
 ballerinax/kafka · type
-14 records, 3 enums, 3 errors, 8 aliases, 29 constants, 1 annotation
+14 records, 3 enums, 3 errors, 8 aliases, 29 constants, 1 annotation, 1 listener, 4 classes, 3 clients, 1 service type
 
 Records
   AnydataConsumerRecord
@@ -85,7 +85,7 @@ Constants
   COMPRESSION_ZSTD
   DEFAULT_URL
 
-... 18 more (page 1 of 2)
+... 27 more (page 1 of 2)
 Next: bal discover ballerinax/kafka type <name>
 Next: bal discover ballerinax/kafka type --page 2
 Next: bal discover ballerinax/kafka type --filter <keyword>

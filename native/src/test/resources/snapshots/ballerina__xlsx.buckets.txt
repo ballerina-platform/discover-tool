@@ -5,7 +5,7 @@ This package declares nothing in client.
 Elsewhere
   class   3  bal discover ballerina/xlsx class
   funcs   6  bal discover ballerina/xlsx funcs
-  type   38  bal discover ballerina/xlsx type
+  type   41  bal discover ballerina/xlsx type
 == service ==
 ballerina/xlsx · service
 This package declares nothing in service.
@@ -13,7 +13,7 @@ This package declares nothing in service.
 Elsewhere
   class   3  bal discover ballerina/xlsx class
   funcs   6  bal discover ballerina/xlsx funcs
-  type   38  bal discover ballerina/xlsx type
+  type   41  bal discover ballerina/xlsx type
 == class ==
 ballerina/xlsx · class
 3 classes
@@ -37,7 +37,7 @@ ballerina/xlsx · funcs
 Next: bal discover ballerina/xlsx funcs <name>
 == type ==
 ballerina/xlsx · type
-19 records, 5 enums, 11 errors, 2 aliases, 1 annotation
+19 records, 5 enums, 11 errors, 2 aliases, 1 annotation, 3 classes
 
 Records
   CellRange
@@ -87,4 +87,11 @@ Aliases
 Annotations
   Name
 
+Classes
+  Sheet
+  Table
+
+... 1 more (page 1 of 2)
 Next: bal discover ballerina/xlsx type <name>
+Next: bal discover ballerina/xlsx type --page 2
+Next: bal discover ballerina/xlsx type --filter <keyword>

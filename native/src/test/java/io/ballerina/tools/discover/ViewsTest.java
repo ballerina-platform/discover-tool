@@ -38,6 +38,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -328,9 +329,6 @@ public class ViewsTest {
         DiscoverResult.TypeDeclaration asType = as(DiscoverResult.TypeDeclaration.class,
                 render(http, Surface.Scope.CLIENT, List.of("ClientConfiguration")));
         Assert.assertEquals(asType.kind(), "record");
-        Assert.assertTrue(asType.note().contains("'ClientConfiguration' is addressed by type"), asType.note());
-        Assert.assertTrue(asType.note().contains("bal discover ballerina/http type ClientConfiguration"),
-                asType.note());
     }
 
     @Test
@@ -988,19 +986,49 @@ public class ViewsTest {
     }
 
     @Test
-    public void anObjectNamedToTypeIsAnsweredByTheBucketThatHoldsItWithANoteSayingWhich() {
-        // The name index must hold a client: it is one of the four things sap publishes.
-        Assert.assertEquals(routedTo(type("ballerinax__sap", "Client")), new Routed("Client",
-                "'Client' is addressed by client — showing it. Canonical: bal discover ballerinax/sap client Client"));
-        Assert.assertEquals(routedTo(type("ballerina__http", "Response")), new Routed("Response",
-                "'Response' is addressed by class — showing it. Canonical: bal discover ballerina/http class "
-                        + "Response"));
-        Assert.assertEquals(routedTo(type("ballerinax__kafka", "Service")), new Routed("Service",
-                "'Service' is addressed by service — showing it. Canonical: bal discover ballerinax/kafka service "
-                        + "Service; binds to kafka:Listener"));
-        Assert.assertEquals(routedTo(type("ballerinax__kafka", "Listener")), new Routed("Service",
-                "'Listener' is a listener, shown with the service types it serves — showing it. Canonical: "
-                        + "bal discover ballerinax/kafka service; binds to kafka:Listener"));
+    public void anObjectNamedToTypeGetsTheAnswerItsOwnBucketGives() {
+        LoadedPackage sap = FixtureCorpus.loadedFixture("ballerinax__sap");
+        Assert.assertEquals(type("ballerinax__sap", "Client"),
+                render(sap, Surface.Scope.CLIENT, List.of("Client")));
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        Assert.assertEquals(routedTo(type("ballerina__http", "Response")), new Routed("Response", null));
+        Assert.assertEquals(type("ballerina__http", "Response"), render(http, Surface.Scope.CLASS,
+                List.of("Response")));
+        Assert.assertEquals(routedTo(type("ballerinax__kafka", "Service")),
+                new Routed("Service", "binds to kafka:Listener"));
+    }
+
+    @Test
+    public void aListenerNamedToTypePrintsItsOwnDeclarationWithTheTypesItUses() {
+        DiscoverResult.TypeDeclaration listener = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerinax__kafka", "Listener"));
+        Assert.assertEquals(listener.kind(), "listener");
+        Assert.assertTrue(listener.declaration().contains("class Listener {"), listener.declaration());
+        Assert.assertTrue(listener.declaration().contains("function init("), listener.declaration());
+        Assert.assertTrue(listener.declaration().contains("function attach("), listener.declaration());
+        Assert.assertTrue(listener.types().stream().anyMatch(each -> each.name().equals("Service")),
+                listener.types().toString());
+        Assert.assertTrue(listener.omitted().stream().anyMatch(each -> each.name().equals("ConsumerConfiguration")),
+                listener.omitted().toString());
+        Assert.assertNull(listener.note());
+    }
+
+    @Test
+    public void theTypeRosterListsEveryTypeThePackageDeclaresClassesAndListenersIncluded() {
+        DiscoverResult.TypeRoster roster = as(DiscoverResult.TypeRoster.class,
+                result(Types.render(FixtureCorpus.loadedFixture("ballerina__http"),
+                        new Types.Options(List.of(), "Listener", 1)), "type --filter Listener"));
+        Map<DiscoverResult.TypeRoster.Kind, List<String>> names = new LinkedHashMap<>();
+        roster.sections().forEach(section -> names.put(section.kind(),
+                section.entries().stream().map(DiscoverResult.Method::name).toList()));
+        Assert.assertEquals(names.get(DiscoverResult.TypeRoster.Kind.LISTENERS), List.of("Listener"),
+                names.toString());
+        Assert.assertTrue(roster.counts().get(DiscoverResult.TypeRoster.Kind.CLASSES) > 0, roster.counts().toString());
+
+        DiscoverResult.TypeRoster all = as(DiscoverResult.TypeRoster.class, type("ballerina__http"));
+        Assert.assertEquals(all.counts().get(DiscoverResult.TypeRoster.Kind.CLIENTS),
+                Surface.of(FixtureCorpus.loadedFixture("ballerina__http").library(), Surface.Scope.CLIENT).size());
+        Assert.assertEquals(all.counts().get(DiscoverResult.TypeRoster.Kind.SERVICE_TYPES), 7);
     }
 
     @Test
@@ -1021,7 +1049,7 @@ public class ViewsTest {
                 new Types.Options(List.of(), null, 9));
         Assert.assertFalse(page.isOk());
         Assert.assertEquals(page.failure(), new Failure.Validation(
-                "Page 9 is out of range: this listing has 58 entries on 2 pages.",
+                "Page 9 is out of range: this listing has 67 entries on 2 pages.",
                 "Pass a page from 1 to 2, e.g. `bal discover ballerinax/kafka type --page 2`."));
     }
 

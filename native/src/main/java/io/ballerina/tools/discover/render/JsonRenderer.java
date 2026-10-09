@@ -416,17 +416,17 @@ public final class JsonRenderer {
     private static JsonObject typeRoster(DiscoverResult.TypeRoster roster) {
         JsonObject json = new JsonObject();
         JsonObject sections = new JsonObject();
-        roster.sections().forEach(section -> sections.add(section.kind(), methods(section.entries())));
+        roster.sections().forEach(section -> sections.add(section.kind().key(), methods(section.entries())));
         json.add("sections", sections);
         JsonObject counts = new JsonObject();
-        roster.counts().forEach((kind, count) -> addIfPositive(counts, kind, count));
+        roster.counts().forEach((kind, count) -> addIfPositive(counts, kind.key(), count));
         json.add("counts", counts);
         json.addProperty("shown", roster.shown());
         json.addProperty("total", roster.total());
         addPaging(json, roster.paging());
         addIfPresent(json, "next", roster.next());
         addDocumented(json, roster.documented());
-        addNotices(json, roster.warning(), roster.note());
+        addIfPresent(json, "warning", roster.warning());
         return json;
     }
 

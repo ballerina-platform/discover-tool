@@ -13,11 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   Ballerina Central without a web search
 - Add the `client`, `service`, `class`, `funcs` and `readme` buckets, classified by call-site grammar rather than
   Ballerina Central's metadata
-- Add the `type` bucket for what is not callable — records, enums, errors, type aliases, constants, module variables
-  and annotations — listed by kind, with `type <Name>` reading one whole together with the declarations it names, the
-  ones its size budget left out and the ones another package owns, each with the command that opens it; a class,
-  client, service type or listener named to `type`, and a record named to a container bucket, is answered by the
-  bucket that holds it, and an enum member to the enum that declares it
+- Add the `type` bucket, listing every type the package declares by kind — records, enums, errors, type aliases,
+  constants, module variables, annotations, listeners, classes, clients and service types — with `type <Name>`
+  opening any of them: a declaration whole together with the declarations it names, the ones its size budget left
+  out and the ones another package owns, each with the command that opens it; a listener's own declaration, `init`
+  and its other methods included; the answer a class, client or service type gets in its own bucket; and, for an
+  enum member, the enum that declares it
 - Pair each service type with the listener it binds to in the `service` bucket — the listener's `attach` target,
   or a type that includes it, read from the package's source when Central's docs cannot say — and list the
   service types no listener accepts apart
