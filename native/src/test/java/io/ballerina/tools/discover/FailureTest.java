@@ -49,10 +49,11 @@ public class FailureTest {
 
     @Test
     public void candidatesAndIssuesGetLinesOfTheirOwn() {
-        Assert.assertEquals(new Failure.SymbolNotFound("ballerinax/kafka", "4.6.5", null, List.of("Prod"),
-                        List.of("Producer", "Consumer"), "Pick one.").describeText(),
-                "error: No match for 'Prod' in ballerinax/kafka:4.6.5.\n  Pick one.\n  candidates:\n    Producer\n"
-                        + "    Consumer");
+        Assert.assertEquals(new Failure.SymbolNotFound("ballerinax/kafka", "4.6.5", null, List.of("9"),
+                        "No readme chunk of ballerinax/kafka:4.6.5 is numbered or titled '9'.", "Pick one.", null,
+                        List.of("1. Producer", "2. Consumer")).describeText(),
+                "error: No readme chunk of ballerinax/kafka:4.6.5 is numbered or titled '9'.\n  Pick one.\n"
+                        + "  candidates:\n    1. Producer\n    2. Consumer");
         Assert.assertEquals(new Failure.SchemaDrift("ballerinax/kafka", "4.6.5", null,
                         List.of(new Failure.SchemaIssue("docsData.modules", "expected an array")), "Report it.")
                         .describeText(),
@@ -62,15 +63,18 @@ public class FailureTest {
     }
 
     @Test
-    public void aMissWithinAModuleNamesTheModule() {
+    public void aMissCarriesTheCommandItsSuggestionQuotesAndNoCandidates() {
         Failure miss = new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "subgraph", List.of("Nope"),
-                List.of(), "Pick one.");
-        Assert.assertEquals(miss.describeText(),
-                "error: No match for 'Nope' in ballerina/graphql:1.17.0, module subgraph.\n  Pick one.");
-        Assert.assertEquals(miss.describe(), "{\"kind\":\"symbol-not-found\",\"message\":\"No match for 'Nope' in "
-                + "ballerina/graphql:1.17.0, module subgraph.\",\"qualified\":\"ballerina/graphql\",\"version\":"
-                + "\"1.17.0\",\"module\":\"subgraph\",\"requested\":[\"Nope\"],\"candidates\":[],\"suggestion\":"
-                + "\"Pick one.\"}");
+                "'Nope' is not a class in ballerina/graphql:1.17.0, module subgraph.",
+                "List the classes: `bal discover ballerina/graphql --module subgraph class`.",
+                "bal discover ballerina/graphql --module subgraph class", List.of());
+        Assert.assertEquals(miss.describeText(), "error: 'Nope' is not a class in ballerina/graphql:1.17.0, "
+                + "module subgraph.\n  List the classes: `bal discover ballerina/graphql --module subgraph class`.");
+        Assert.assertEquals(miss.describe(), "{\"kind\":\"symbol-not-found\",\"message\":\"'Nope' is not a class "
+                + "in ballerina/graphql:1.17.0, module subgraph.\",\"qualified\":\"ballerina/graphql\","
+                + "\"version\":\"1.17.0\",\"module\":\"subgraph\",\"requested\":[\"Nope\"],"
+                + "\"suggestion\":\"List the classes: `bal discover ballerina/graphql --module subgraph class`.\","
+                + "\"command\":\"bal discover ballerina/graphql --module subgraph class\"}");
     }
 
     @Test

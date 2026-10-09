@@ -69,9 +69,25 @@ public record LoadedPackage(
         return qualified.versioned(version);
     }
 
-    public Failure symbolNotFound(List<String> requested, List<String> candidates, String suggestion) {
-        return new Failure.SymbolNotFound(qualified.qualified(), version.text(), module, requested, candidates,
-                suggestion);
+    /** Where a lookup looked, as a failure names it: {@link #label()}, and the module under {@code --module}. */
+    public String place() {
+        return module == null ? label() : label() + ", module " + module;
+    }
+
+    /**
+     * @param message what was not found, naming {@link #place()}
+     * @param command the command {@code suggestion} quotes, or {@code null}
+     */
+    public Failure symbolNotFound(List<String> requested, String message, String suggestion, String command) {
+        return new Failure.SymbolNotFound(qualified.qualified(), version.text(), module, requested, message,
+                suggestion, command, List.of());
+    }
+
+    /** A miss in a listing no command prints, so the failure itself carries every entry of it. */
+    public Failure symbolNotFoundAmong(List<String> requested, String message, String suggestion,
+            List<String> candidates) {
+        return new Failure.SymbolNotFound(qualified.qualified(), version.text(), module, requested, message,
+                suggestion, null, candidates);
     }
 
     /**

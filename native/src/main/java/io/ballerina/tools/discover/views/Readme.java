@@ -23,7 +23,6 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.render.DiscoverResult;
-import io.ballerina.tools.discover.symbols.Names;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -164,10 +163,11 @@ public final class Readme {
         }
         Optional<Chunk> found = byNumber(chunks, requested).or(() -> byTitle(chunks, requested));
         if (found.isEmpty()) {
-            return Result.err(loaded.symbolNotFound(List.of(requested),
-                    chunks.stream().map(chunk -> chunk.number() + ". " + chunk.title()).toList(),
-                    "No chunk answers to that. The candidates are every chunk this readme publishes; pass one "
-                            + "of the numbers, or read the readme whole: `" + command(loaded.pkgArgument()) + "`."));
+            return Result.err(loaded.symbolNotFoundAmong(List.of(requested),
+                    "No readme chunk of " + loaded.place() + " is numbered or titled '" + requested + "'.",
+                    "The candidates are every chunk this readme publishes; pass one of the numbers, or read the "
+                            + "readme whole: `" + command(loaded.pkgArgument()) + "`.",
+                    chunks.stream().map(chunk -> chunk.number() + ". " + chunk.title()).toList()));
         }
         Chunk chunk = found.get();
         if (filter != null && !matches(chunk, filter)) {
@@ -190,18 +190,23 @@ public final class Readme {
     }
 
     private static Optional<Chunk> byTitle(List<Chunk> chunks, String requested) {
-        String wanted = Names.normalise(requested);
+        String wanted = normalised(requested);
         if (wanted.isEmpty()) {
             return Optional.empty();
         }
-        List<Chunk> exact = chunks.stream().filter(chunk -> Names.normalise(chunk.title()).equals(wanted)).toList();
+        List<Chunk> exact = chunks.stream().filter(chunk -> normalised(chunk.title()).equals(wanted)).toList();
         if (exact.size() == 1) {
             return Optional.of(exact.get(0));
         }
         List<Chunk> partial = chunks.stream()
-                .filter(chunk -> Names.normalise(chunk.title()).contains(wanted))
+                .filter(chunk -> normalised(chunk.title()).contains(wanted))
                 .toList();
         return partial.size() == 1 ? Optional.of(partial.get(0)) : Optional.empty();
+    }
+
+    // A title is typed from prose, so it is matched on its letters and digits alone, in any case.
+    private static String normalised(String title) {
+        return title.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
     }
 
     private static boolean matches(Chunk chunk, String filter) {
@@ -219,12 +224,6 @@ public final class Readme {
         List<Chunk> matched = chunks.stream().filter(chunk -> matches(chunk, options.filter())).toList();
         String pkg = loaded.pkgArgument();
 
-        if (matched.isEmpty()) {
-            return Result.ok(new DiscoverResult.NoMatch(options.filter(), null,
-                    Names.nearMisses(options.filter(), chunks.stream().map(Chunk::title).toList()), List.of(), null,
-                    command(pkg), DiscoverResult.Documented.NONE, null, loaded.warning(),
-                    null));
-        }
         if (matched.size() == 1) {
             return Result.ok(toResult(matched.get(0), chunks.size(), loaded));
         }

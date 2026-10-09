@@ -136,11 +136,11 @@ public class ServiceAnswersTest {
     }
 
     @Test
-    public void aServiceTypeReachedThroughAnotherBucketSaysWhatTheServiceBucketSays() {
+    public void aServiceTypeReachedThroughTypeSaysWhatTheServiceBucketSays() {
         HttpOptions http = central("ballerina__http", true);
-        String through = json(http, "ballerina/http", "class", "RequestInterceptor").get("note").getAsString();
+        String through = json(http, "ballerina/http", "type", "RequestInterceptor").get("note").getAsString();
         Assert.assertTrue(through.contains("not attachable to any listener this package declares"), through);
-        String bound = json(http, "ballerina/http", "class", "InterceptableService").get("note").getAsString();
+        String bound = json(http, "ballerina/http", "type", "InterceptableService").get("note").getAsString();
         Assert.assertTrue(bound.contains("binds to http:Listener"), bound);
         Assert.assertFalse(bound.contains("not confirmed"), bound);
     }
@@ -155,7 +155,7 @@ public class ServiceAnswersTest {
     @Test
     public void anotherPackagesDefaultModuleIsOpenedInThatPackage() {
         HttpOptions http = central("ballerinax__postgresql", false);
-        JsonObject answer = json(http, "ballerinax/postgresql", "service", "Service");
+        JsonObject answer = json(http, "ballerinax/postgresql", "service", "cdc:Service");
         Assert.assertEquals(answer.get("container").getAsString(), "cdc:Service");
         Assert.assertTrue(answer.get("note").getAsString()
                 .contains("declared in ballerinax/cdc — bal discover ballerinax/cdc service Service"));

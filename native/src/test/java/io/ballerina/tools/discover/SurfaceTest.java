@@ -227,13 +227,13 @@ public class SurfaceTest {
     }
 
     @Test
-    public void aNameResolvesExactlyOrThroughNormalisationAndNeverAmbiguously() {
+    public void aNameResolvesOnlyExactlyAsDeclared() {
         List<Surface.Container> clients =
                 Surface.of(FixtureCorpus.libraryFor("ballerina__http"), Surface.Scope.CLIENT);
         Assert.assertEquals(Surface.byName(clients, "Client").orElseThrow().name(), "Client");
-        // No casing heuristic anywhere: the normalisation `type` already uses is what makes this work.
-        Assert.assertEquals(Surface.byName(clients, "failoverclient").orElseThrow().name(), "FailoverClient");
-        Assert.assertTrue(Surface.byName(clients, "NoSuchClient").isEmpty());
+        for (String typed : new String[] {"failoverclient", "FAILOVERCLIENT", "Failover_Client", "NoSuchClient"}) {
+            Assert.assertTrue(Surface.byName(clients, typed).isEmpty(), typed);
+        }
     }
 
     @Test

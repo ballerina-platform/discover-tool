@@ -65,7 +65,7 @@ final class Usage {
               1. What can I ask?              bal discover ballerinax/github
               2. A bucket, listed or one:     bal discover ballerinax/github client
                                               bal discover ballerinax/github client Client
-              3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
+              3. One call, fully addressed:   bal discover ballerinax/github client Client "gists/'public" get
               4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
               5. One specific version:        bal discover ballerina/http:2.15.7 client Client
             """;

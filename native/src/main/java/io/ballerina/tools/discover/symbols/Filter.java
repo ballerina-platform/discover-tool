@@ -71,10 +71,10 @@ public final class Filter {
     /**
      * Partition a list against a keyword.
      *
-     * <p>A single case-insensitive substring match of the whole argument — no tokenising, no AND. Normalised
-     * through {@link PathTree#readableSelector} for the same reason the selector is: the escaped spelling
-     * ({@code chat\.postMessage}, {@code code\-scanning}, {@code 'import}) is what the documents print, so it is
-     * what a caller copies back.
+     * <p>A single case-insensitive substring match of the whole argument — no tokenising, no AND. A search, unlike a
+     * selector, so the keyword and the surface are both read through {@link PathTree#readableSelector}: the escaped
+     * spelling ({@code chat\.postMessage}, {@code code\-scanning}, {@code 'import}) and the plain one find the same
+     * entries.
      */
     public static <T> Split<T> apply(
             String query, List<T> items, Function<T, String> surfaceText, Function<T, String> docText) {
@@ -85,7 +85,7 @@ public final class Filter {
         List<T> surface = new ArrayList<>();
         List<T> documented = new ArrayList<>();
         for (T item : items) {
-            if (surfaceText.apply(item).toLowerCase(Locale.ROOT).contains(keyword)) {
+            if (normalise(surfaceText.apply(item)).contains(keyword)) {
                 surface.add(item);
             } else if (docText.apply(item).toLowerCase(Locale.ROOT).contains(keyword)) {
                 documented.add(item);
@@ -97,14 +97,14 @@ public final class Filter {
     /** Whether {@code text} matches the keyword the same way {@link #apply} matches an entry's surface. */
     public static boolean matches(String query, String text) {
         String keyword = normalise(query);
-        return keyword.isEmpty() || text.toLowerCase(Locale.ROOT).contains(keyword);
+        return keyword.isEmpty() || normalise(text).contains(keyword);
     }
 
-    private static String normalise(String query) {
-        if (query == null || query.isBlank()) {
+    private static String normalise(String text) {
+        if (text == null || text.isBlank()) {
             return "";
         }
-        return PathTree.readableSelector(query).trim().toLowerCase(Locale.ROOT);
+        return PathTree.readableSelector(text).trim().toLowerCase(Locale.ROOT);
     }
 
     /**

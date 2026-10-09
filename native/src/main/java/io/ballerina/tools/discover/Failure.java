@@ -24,7 +24,6 @@ import com.google.gson.JsonObject;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Failures are values, not thrown classes.
@@ -146,19 +145,20 @@ public sealed interface Failure {
             String suggestion) implements Failure { }
 
     /**
-     * The package parsed, but no declaration matched the name the caller asked for. {@code
-     * candidates} is what the index does hold — either near-misses of the requested name, or the
-     * whole roster when there were none.
+     * The package parsed, but nothing in it is named exactly as the caller typed, or it is not what the bucket asked
+     * for holds.
      *
      * @param qualified the {@code org/name} that was searched
      * @param version the version that was searched, or {@code null} when unknown
      * @param module the {@code --module} that was searched, or {@code null} for the package's default module
      * @param requested the name (or names) the caller asked for
-     * @param candidates the near-misses, or the whole roster when there were none
+     * @param message what was not found, as one sentence
      * @param suggestion what to try next
+     * @param command the command the suggestion quotes, ready to run, or {@code null} when it quotes none
+     * @param candidates every entry of a listing no command prints — a readme's chunks — or empty
      */
-    record SymbolNotFound(String qualified, String version, String module, List<String> requested,
-            List<String> candidates, String suggestion) implements Failure { }
+    record SymbolNotFound(String qualified, String version, String module, List<String> requested, String message,
+            String suggestion, String command, List<String> candidates) implements Failure { }
 
     /**
      * A defect in this tool: something in the pipeline threw.
@@ -216,9 +216,7 @@ public sealed interface Failure {
             case Timeout f -> "Central did not answer " + f.url() + " within " + seconds(f.budgetMs()) + ".";
             case SchemaDrift f -> "Central's answer for " + coordinate(f.qualified(), f.version(), f.module())
                     + " has a shape this tool does not understand; Central's docs format may have changed.";
-            case SymbolNotFound f -> "No match for " + f.requested().stream().map(name -> "'" + name + "'")
-                    .collect(Collectors.joining(" ")) + " in " + coordinate(f.qualified(), f.version(), f.module())
-                    + ".";
+            case SymbolNotFound f -> f.message();
             case Internal f -> "Unexpected internal failure: " + f.message() + (f.message().endsWith(".") ? "" : ".");
         };
     }
@@ -305,8 +303,11 @@ public sealed interface Failure {
             case SymbolNotFound f -> {
                 coordinates(json, f.qualified(), f.version(), f.module());
                 json.add("requested", strings(f.requested()));
-                json.add("candidates", strings(f.candidates()));
                 json.addProperty("suggestion", f.suggestion());
+                command(json, f.command());
+                if (!f.candidates().isEmpty()) {
+                    json.add("candidates", strings(f.candidates()));
+                }
             }
             case Internal f -> json.addProperty("suggestion", f.suggestion());
         }

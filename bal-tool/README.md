@@ -49,8 +49,9 @@ its other methods included, with the types it uses, and an enum member (`HTTP_1_
 declares it (`HttpVersion`) and a note naming it.
 
 Selectors after the bucket name a container, then a member: a method name, or a resource path followed by
-its accessor (`client "gists/'public" get`). With one container in the bucket, the container name can be
-left out.
+its accessor (`client Client "gists/'public" get`). The container is always named, even when the bucket holds
+only one, and every name is typed exactly as the listings print it: a miss fails, with the listing to choose
+from (see Paths and The contract, below).
 
 | Flag                   | Meaning                                                                                                |
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
@@ -228,7 +229,7 @@ Next: bal discover ballerinax/github client Client <group>
 A group small enough to list shows one entry per path, with every accessor it answers to:
 
 ```
-$ bal discover ballerinax/github client gists
+$ bal discover ballerinax/github client Client gists
 ballerinax/github:6.0.0 · client · Client · gists
 10 resource paths
 
@@ -250,7 +251,7 @@ Operations that end exactly at a grouped prefix are listed beside its groups rat
 own, and a group deeper than the top is named by its full path:
 
 ```
-$ bal discover ballerinax/github client repos
+$ bal discover ballerinax/github client Client repos
 ballerinax/github:6.0.0 · client · Client · repos
 1 resource path here, 64 path groups
 
@@ -268,12 +269,12 @@ Groups (operations under each)
 Next: bal discover ballerinax/github client Client <path> <accessor>
 Next: bal discover ballerinax/github client Client <group>
 Next: bal discover ballerinax/github client Client repos --page 2
-Next: bal discover ballerinax/github client repos --filter <keyword>
+Next: bal discover ballerinax/github client Client repos --filter <keyword>
 ```
 
-A path may leave out its parameter segments: `repos/actions/runs` opens `repos/:owner/:repo/actions/runs`, with
-a `note` saying where it was relocated to. When several real paths fit the shorthand, none is picked: the answer
-lists each full path with the command that opens it.
+A path is typed whole, from its first segment, exactly as listed. One that leaves out its parameter segments
+(`repos/actions/runs`) fails, suggesting the deepest level it did reach,
+`bal discover ballerinax/github client Client repos`.
 
 In JSON, every resource entry carries a `commands` object keyed by accessor, in `accessors` order: for each
 accessor, the ready-to-run command that opens that signature. A path with one accessor has the same shape with
@@ -281,7 +282,7 @@ one key, so a caller reads every resource row the same way, and a path with seve
 rather than a guess at one:
 
 ```
-$ bal discover ballerinax/github client gists --filter star | cat
+$ bal discover ballerinax/github client Client gists --filter star | cat
 {"version":"6.0.0","container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover ballerinax/github client Client gists/starred get"}}],"shown":2,"total":2}
 ```
 
@@ -420,38 +421,27 @@ Next: bal discover ballerinax/twilio client Client <name>
 The entries a `--filter` matched only in their documentation are named after the ones it matched by name,
 path, parameter or type, and paged after them under the same `--page` — each is one more call away by name.
 
-A selector that matches nothing is still an answer (exit 0), naming the closest names and what is there:
+A selector that matches nothing fails (exit 1, see The contract, below), suggesting the listing to choose from
+rather than a guess at what was meant:
 
 ```
 $ bal discover ballerinax/kafka client Producer sendd
-ballerinax/kafka:4.6.5 · client · Producer · sendd
-Nothing on Producer matches 'sendd'.
-
-Did you mean
-  send
-  sendWithMetadata
-
-Available
-  5 methods
-
-    'flush              bal discover ballerinax/kafka client Producer "'flush"
-    close
-    getTopicPartitions
-    send
-    sendWithMetadata
-
-  Next: bal discover ballerinax/kafka client Producer <name>
+error: 'sendd' is not a member of Producer in ballerinax/kafka:4.6.5.
+  List its members: `bal discover ballerinax/kafka client Producer`.
 ```
 
-A member declared on several containers is never picked silently:
+So does a name asked in a bucket that does not hold it — the suggestion is the command in the bucket that does,
+`type` for a record, enum, listener or other type — and a member name typed where its container goes, with its
+owner's command, or, when several containers declare it, the bucket's listing:
 
 ```
-$ bal discover ballerinax/kafka client commit
-ballerinax/kafka:4.6.5 · client · commit
-'commit' is declared on 2 containers; pick one.
+$ bal discover ballerinax/kafka client Listener
+error: 'Listener' is not a client in ballerinax/kafka:4.6.5.
+  It is a listener: `bal discover ballerinax/kafka type Listener`.
 
-  Caller    2 matches  bal discover ballerinax/kafka client Caller commit
-  Consumer  3 matches  bal discover ballerinax/kafka client Consumer commit
+$ bal discover ballerinax/kafka client send
+error: 'send' is not a client in ballerinax/kafka:4.6.5.
+  It is a remote method of Producer: `bal discover ballerinax/kafka client Producer send`.
 ```
 
 A declaration that is not callable, read whole with the declarations it names:
@@ -512,23 +502,21 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
 | type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`) |
-| nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining` |
-| member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`                    |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
 | readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
 | readme sections                      | `chunks` (`number`, `title`, `lines`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`                       |
 
-Any answer can also carry `warning` (the version could not be confirmed against the registry) and most can
-carry `note` (the symbol was found in a different bucket than the one asked, the path selector was relocated
-or a wildcard skipped a branch, or the service's listener). `documented` lists entries a `--filter` matched
+Any answer can also carry `warning` (the version could not be confirmed against the registry), and a service
+type's answers `note` (the listener it binds to, or that it attaches to none), as can an enum member's (the enum
+it shows). `documented` lists entries a `--filter` matched
 only in their documentation, alphabetically and shaped as their listing rows are — a method, function or type
 with its `command`, a resource path once with every matching accessor's `commands` — held to the same ceiling
 and paged with the same `--page`, with `documentedTotal` giving how many there are (in text, a `Matched by
 documentation only (40 of 102)` heading and a `Next:` line with the command's shape). Beside a listing they are
 its last section, after every entry the filter matched by name; beside one signature, or as all a filter found,
-they page on their own, and `next` turns that page — absent on the last page, as on every paged answer. A miss
-that has them lists them in place of `available`, and when they fit on one page its `next` opens the whole
-container.
+they page on their own, and `next` turns that page — absent on the last page, as on every paged answer. A
+`--filter` that matches nothing by name is still an answer (exit 0): the listing with no entries, and its
+documentation-only matches if it has any.
 
 ### Order
 
@@ -546,8 +534,8 @@ No listing shows more than **40 entries**. Over that:
   accessor the listing was narrowed by into its `command`;
 - everything else **pages** with `--page <n>`: a roster of containers, a level of groups (the paths ending
   there first, then the groups, with `counts` giving both across every page), methods of one call form
-  (alphabetically), resource paths that cannot be grouped — selected by a name substring or `--filter`, or
-  already four literal levels deep — and readme sections narrowed by `--filter`. Every page keeps the selector,
+  (alphabetically), resource paths that cannot be grouped — selected by `--filter`, or already four literal
+  levels deep — and readme sections narrowed by `--filter`. Every page keeps the selector,
   the `--filter` and the `--module`;
 - a container mixing call forms (resources with methods, or remote methods with normal ones) pages the same
   way, as one sequence — resource paths, then remote methods, then normal ones — so a page can end partway
@@ -562,27 +550,24 @@ No listing shows more than **40 entries**. Over that:
 A cut listing always says so: `shown`/`total`, `page`/`pages`, `remaining` (everything after this page,
 documentation-only matches included) and `next` (the `--page` command that continues it) in JSON, or a
 `... N more (page P of Q)` line followed by `Next: <command>` in text, where `N` counts what comes after this page
-(`... N more matched by documentation only (page P of Q)` when only those are paged, beside one signature or a
-miss). In text, a listing that continues also ends with the command that narrows it by keyword,
+(`... N more matched by documentation only (page P of Q)` when only those are paged, beside one signature or in
+a listing with no entries of its own). In text, a listing that continues also ends with the command that narrows it by keyword,
 `Next: bal discover <package> <bucket> --filter <keyword>`, which is usually shorter than paging.
 
 ### Paths
 
 Path parameters print as `:name` (`repos/:owner/:repo`), which is safe unquoted in bash, zsh, fish and
 PowerShell. A segment that is a Ballerina keyword keeps its escape (`gists/'public`), and every command the
-tool prints pre-quotes such a path for the shell. A selector also accepts `[string owner]`, `[owner]`,
-`{owner}` and plain `owner` for a parameter, and either spelling of an escaped segment (`code\-scanning` or
-`code-scanning`). Paths match from the first segment; the one relaxation is a trailing segment, which is
-looked for beneath the prefix that matched and listed rather than chosen when it occurs in several places.
-`new` addresses the constructor Ballerina spells `init` — except on a container with resource paths, where a
-path selector is tried first, so a path segment called `new` (github's `codespaces/'new`) wins over it.
-A member name is one selector. On a container with resource paths, two selectors that resolve as a path and
-its accessor, in either order, are read together and win over a member of the same name; otherwise a first
-selector naming a method, function or `new` is read alone, and any other pair is a no-match answer listing
-the path's accessors.
+tool prints pre-quotes such a path for the shell. A selector is matched exactly as it is printed: case-sensitive,
+a parameter only as `:owner` (not `[owner]`, `{owner}` or `owner`), an escaped segment only as listed
+(`code-scanning`, `gists/'public`), and a path whole, from its first segment, in one argument joined by `/`.
+A path that matches nothing fails, suggesting the listing under the deepest prefix it did match.
+`new` addresses the constructor Ballerina spells `init`. A member name is one selector. On a container with
+resource paths, two selectors that resolve as a path and its accessor, in either order, are read together and
+win over a member of the same name; otherwise a first selector naming a method, function or `new` is read
+alone, and any other pair is read as a path and an accessor that match nothing, which fails.
 A selector beyond what the container reads is a `validation` failure naming the command without it, never
-silently dropped; a path's segments go in one argument joined by `/`. Typed apart, two segments are a no-match
-answer whose `next` is the joined command, and three or more are that failure, suggesting the joined command.
+silently dropped.
 
 ## The contract
 
@@ -605,11 +590,11 @@ that command, ready to run (`bal discover ballerinax/kafka client --version 4.6.
 
 ```
 $ bal discover ballerinax/kafka client NoSuchContainer | cat
-{"kind":"symbol-not-found","message":"No match for 'NoSuchContainer' in ballerinax/kafka:4.6.5.","qualified":"ballerinax/kafka","version":"4.6.5","requested":["NoSuchContainer"],"candidates":[],"suggestion":"Nothing in ballerinax/kafka:4.6.5 is named anything like that. List what is there: `bal discover ballerinax/kafka client`."}
+{"kind":"symbol-not-found","message":"'NoSuchContainer' is not a client in ballerinax/kafka:4.6.5.","qualified":"ballerinax/kafka","version":"4.6.5","requested":["NoSuchContainer"],"suggestion":"List the clients: `bal discover ballerinax/kafka client`.","command":"bal discover ballerinax/kafka client"}
 ```
 
-In text it is `error: <message>`, then the suggestion and anything else the failure carries (candidates, schema
-issues) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
+In text it is `error: <message>`, then the suggestion and anything else the failure carries (schema issues, a
+readme's chunks) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
 
 ```
 $ bal discover ballerina/http:2.15
@@ -627,7 +612,8 @@ depends on what the package holds — an extra selector a container does not rea
 listing, a module with no readme — is exit 1.
 
 `upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
-`package-not-found` and `symbol-not-found` need a different command (a `--module` the package does not publish
+`package-not-found` and `symbol-not-found` need a different command — `symbol-not-found` is a container, member,
+path or type not named exactly as listed, or asked in a bucket that does not hold it (a `--module` the package does not publish
 is `package-not-found` with `module`, and lists the submodules it does in `candidates`); `schema-drift` means Central's payload
 changed shape and is for a maintainer; `internal` is a defect in `bal discover` itself, to report with the
 command that produced it. An `upstream` failure's `message` names what failed: the host, or the

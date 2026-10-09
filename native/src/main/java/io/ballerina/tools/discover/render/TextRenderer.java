@@ -20,7 +20,6 @@ package io.ballerina.tools.discover.render;
 
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Texts;
-import io.ballerina.tools.discover.symbols.Names;
 import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
@@ -95,7 +94,7 @@ public final class TextRenderer {
             return verbatimReadme(readme);
         }
         Layout layout = new Layout();
-        layout.top(header(where, containerOf(result), memberOf(result)));
+        layout.top(header(where, containerOf(result)));
         fill(layout, result, where);
         if (layout.hasLaterPages && where.filter() == null && where.pkg() != null) {
             layout.next(filterCommand(result));
@@ -111,7 +110,6 @@ public final class TextRenderer {
             case DiscoverResult.MethodList methods -> methods.next();
             case DiscoverResult.MixedListing mixed -> mixed.next();
             case DiscoverResult.TypeRoster roster -> roster.next();
-            case DiscoverResult.Owners owners -> owners.next();
             default -> null;
         };
         Matcher page = next == null ? null : PAGE_ARGUMENT.matcher(next);
@@ -129,8 +127,6 @@ public final class TextRenderer {
             case DiscoverResult.ReadmeChunks chunks -> readmeChunks(layout, chunks);
             case DiscoverResult.Signature signature -> signature(layout, signature);
             case DiscoverResult.MixedListing mixed -> mixedListing(layout, mixed);
-            case DiscoverResult.NoMatch noMatch -> noMatch(layout, noMatch, where);
-            case DiscoverResult.Owners owners -> owners(layout, owners);
             case DiscoverResult.EmptyBucket empty -> emptyBucket(layout, empty);
             case DiscoverResult.TypeRoster roster -> typeRoster(layout, roster);
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(layout, declaration);
@@ -265,7 +261,8 @@ public final class TextRenderer {
         layout.block(resourceTable(resources.resources(), drill).lines(INDENT));
         List<String> documentedDrill = documented(layout, resources.documented());
         layout.notices(resources.note(), resources.warning());
-        layout.more(remaining(resources.shown(), resources.total(), resources.paging()), resources.paging());
+        layout.more(remaining(resources.shown(), resources.total(), resources.paging()), resources.paging(),
+                onlyDocumented(resources.total()));
         layout.next(drill.pattern());
         documentedDrill.forEach(layout::next);
         layout.next(resources.next());
@@ -279,7 +276,8 @@ public final class TextRenderer {
         layout.block(methodTable(methods.methods(), drill).lines(INDENT));
         List<String> documentedDrill = documented(layout, methods.documented());
         layout.notices(methods.note(), methods.warning());
-        layout.more(remaining(methods.shown(), methods.total(), methods.paging()), methods.paging());
+        layout.more(remaining(methods.shown(), methods.total(), methods.paging()), methods.paging(),
+                onlyDocumented(methods.total()));
         layout.next(drill.pattern());
         documentedDrill.forEach(layout::next);
         layout.next(methods.next());
@@ -364,43 +362,6 @@ public final class TextRenderer {
         layout.next(mixed.next());
     }
 
-    private static void noMatch(Layout layout, DiscoverResult.NoMatch noMatch, Context where) {
-        layout.top("Nothing" + (noMatch.container() == null ? "" : " on " + noMatch.container())
-                + " matches '" + noMatch.requested() + "'.");
-        layout.section("Did you mean", names(noMatch.candidates()));
-        TextTable paths = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
-        noMatch.paths().forEach(alternative -> paths.row(alternative.path(), alternative.command()));
-        layout.section(noMatch.paths().size() + " paths carry that segment; pick one", paths);
-        List<String> documentedDrill = documented(layout, noMatch.documented());
-        if (noMatch.available() != null) {
-            Layout available = new Layout();
-            fill(available, noMatch.available(), where);
-            List<String> block = new ArrayList<>();
-            block.add("Available");
-            block.addAll(indented(available.render().lines().toList()));
-            layout.block(block);
-        }
-        layout.notices(noMatch.note(), noMatch.warning());
-        documentedDrill.forEach(layout::next);
-        if (noMatch.paging() != null) {
-            layout.more(noMatch.paging().remaining(), noMatch.paging(), DOCUMENTED);
-            layout.next(noMatch.next());
-        } else if (noMatch.available() == null) {
-            layout.next(noMatch.next());
-        }
-    }
-
-    private static void owners(Layout layout, DiscoverResult.Owners owners) {
-        layout.top("'" + owners.requested() + "' is declared on " + owners.total() + " containers; pick one.");
-        TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.count("match", "matches"),
-                TextTable.Column.LEFT);
-        owners.owners().forEach(owner -> table.row(owner.name(), String.valueOf(owner.matches()), owner.command()));
-        layout.block(table.lines(INDENT));
-        layout.notices(owners.note(), owners.warning());
-        layout.more(remaining(owners.owners().size(), owners.total(), owners.paging()), owners.paging());
-        layout.next(owners.next());
-    }
-
     private static void emptyBucket(Layout layout, DiscoverResult.EmptyBucket empty) {
         layout.top("This package declares nothing in " + empty.bucket() + ".");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
@@ -430,7 +391,8 @@ public final class TextRenderer {
         }
         List<String> documentedDrill = documented(layout, roster.documented());
         layout.warning(roster.warning());
-        layout.more(remaining(roster.shown(), roster.total(), roster.paging()), roster.paging());
+        layout.more(remaining(roster.shown(), roster.total(), roster.paging()), roster.paging(),
+                onlyDocumented(roster.total()));
         layout.next(drill.pattern());
         documentedDrill.forEach(layout::next);
         layout.next(roster.next());
@@ -469,7 +431,7 @@ public final class TextRenderer {
         layout.section("From other packages (" + foreign.size() + ")", table);
     }
 
-    private static String header(Context where, String container, String member) {
+    private static String header(Context where, String container) {
         List<String> parts = new ArrayList<>();
         if (where.pkg() != null) {
             parts.add(where.version() == null ? where.pkg() : where.pkg() + ":" + where.version());
@@ -477,7 +439,7 @@ public final class TextRenderer {
         if (where.module() != null) {
             parts.add("module " + where.module());
         }
-        List<String> trail = resolvedTrail(where, container, member);
+        List<String> trail = new ArrayList<>(where.trail());
         if (container != null && !trail.contains(container)) {
             trail.add(Math.min(1, trail.size()), container);
         }
@@ -488,28 +450,6 @@ public final class TextRenderer {
         return parts.isEmpty() ? null : String.join(SEPARATOR, parts);
     }
 
-    private static List<String> resolvedTrail(Context where, String container, String member) {
-        List<String> trail = new ArrayList<>(where.trail());
-        int containerAt = -1;
-        if (container != null && trail.size() > 1 && sameName(trail.get(1), container)) {
-            trail.set(1, container);
-            containerAt = 1;
-        }
-        int last = trail.size() - 1;
-        if (member != null && last >= 1 && last != containerAt && sameName(trail.get(last), member)) {
-            trail.set(last, member);
-        }
-        return trail;
-    }
-
-    private static boolean sameName(String typed, String declared) {
-        return Names.normalise(typed).equals(Names.normalise(declared));
-    }
-
-    private static String memberOf(DiscoverResult result) {
-        return result instanceof DiscoverResult.Signature signature ? signature.name() : null;
-    }
-
     private static String containerOf(DiscoverResult result) {
         return switch (result) {
             case DiscoverResult.PathGroups groups -> groups.container();
@@ -517,7 +457,6 @@ public final class TextRenderer {
             case DiscoverResult.MethodList methods -> methods.container();
             case DiscoverResult.MixedListing mixed -> mixed.container();
             case DiscoverResult.Signature signature -> signature.container();
-            case DiscoverResult.NoMatch noMatch -> noMatch.container();
             default -> null;
         };
     }
@@ -573,12 +512,6 @@ public final class TextRenderer {
         return table;
     }
 
-    private static TextTable names(List<String> names) {
-        TextTable table = new TextTable(TextTable.Column.LEFT);
-        names.forEach(table::row);
-        return table;
-    }
-
     private static List<String> documented(Layout layout, DiscoverResult.Documented documented) {
         List<DiscoverResult.Documented.Entry> entries = documented.entries();
         if (entries.isEmpty() && documented.total() > 0) {
@@ -620,6 +553,10 @@ public final class TextRenderer {
             return "No " + plural + ".";
         }
         return count + " " + (count == 1 ? singular : plural);
+    }
+
+    private static String onlyDocumented(int total) {
+        return total == 0 ? DOCUMENTED : null;
     }
 
     private static int remaining(int shown, int total, DiscoverResult.Paging paging) {

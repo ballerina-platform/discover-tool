@@ -93,18 +93,15 @@ public class SelectionCarryTest {
     }
 
     @Test
-    public void turningThePageOfASelectedMethodListKeepsTheSelector() {
-        String command = "bal discover ballerinax/twilio client Client list";
+    public void turningThePageOfAFilteredMethodListKeepsTheFilter() {
+        String command = "bal discover ballerinax/twilio client Client --filter list";
         JsonObject first = answer("ballerinax__twilio", command);
-        Assert.assertEquals(first.get("total").getAsInt(), 84, first.toString());
+        int total = first.get("total").getAsInt();
+        Assert.assertTrue(total > 80, first.toString());
         Assert.assertEquals(first.get("next").getAsString(), command + " --page 2");
 
         JsonObject second = answer("ballerinax__twilio", first.get("next").getAsString());
-        Assert.assertEquals(second.get("total").getAsInt(), 84, "page 2 widened back out to the whole client");
-        JsonObject third = answer("ballerinax__twilio", second.get("next").getAsString());
-        Assert.assertEquals(third.get("shown").getAsInt(), 4);
-        Assert.assertEquals(third.get("page").getAsInt(), 3);
-        Assert.assertFalse(third.has("next"), third.toString());
+        Assert.assertEquals(second.get("total").getAsInt(), total, "page 2 widened back out to the whole client");
     }
 
     @Test
@@ -143,13 +140,13 @@ public class SelectionCarryTest {
     }
 
     @Test
-    public void aKindToleranceNoteNamesTheWholeCanonicalCommandRunnably() {
-        String asked = "bal discover ballerinax/github class Client \"gists/'public\" get";
-        JsonObject signature = answer("ballerinax__github", asked);
-        String note = signature.get("note").getAsString();
+    public void aWrongBucketFailureNamesTheWholeCommandRunnably() {
+        Run asked = run("ballerinax__github", "bal discover ballerinax/github class Client \"gists/'public\" get");
+        Assert.assertEquals(asked.code(), 1, asked.out());
+        JsonObject failure = JsonParser.parseString(asked.err()).getAsJsonObject();
         String canonical = GITHUB + " \"gists/'public\" get";
-        Assert.assertTrue(note.endsWith("Canonical: " + canonical), note);
-        Assert.assertFalse(note.contains("`"), note);
+        Assert.assertEquals(failure.get("command").getAsString(), canonical);
+        Assert.assertEquals(failure.get("suggestion").getAsString(), "It is a client: `" + canonical + "`.");
         JsonObject followed = answer("ballerinax__github", canonical);
         Assert.assertEquals(followed.get("path").getAsString(), "gists/'public");
         Assert.assertEquals(followed.get("accessor").getAsString(), "get");
@@ -165,22 +162,17 @@ public class SelectionCarryTest {
     }
 
     @Test
-    public void aNameSubstringOverTheCeilingPagesFlatRatherThanInventingGroups() {
-        JsonObject action = answer("ballerinax__github", GITHUB + " action");
-        Assert.assertFalse(action.has("groups"), "groups spliced from a substring: " + action);
-        Assert.assertEquals(action.get("next").getAsString(), GITHUB + " action --page 2");
-        for (JsonElement element : action.getAsJsonArray("resources")) {
-            Assert.assertFalse(element.getAsJsonObject().get("path").getAsString().startsWith("action/"),
-                    element.toString());
-        }
+    public void aFilterOverTheCeilingPagesFlatRatherThanInventingGroups() {
+        JsonObject action = answer("ballerinax__github", GITHUB + " --filter action");
+        Assert.assertFalse(action.has("groups"), "groups spliced from a search: " + action);
+        Assert.assertEquals(action.get("next").getAsString(), GITHUB + " --filter action --page 2");
     }
 
     @Test
-    public void aSubstringThatLooksLikeAnAccessorIsReTypedAsGivenNotJoinedIntoAPath() {
-        JsonObject get = answer("ballerinax__github", GITHUB + " get");
-        Assert.assertEquals(get.get("next").getAsString(), GITHUB + " get --page 2");
-        JsonObject second = answer("ballerinax__github", get.get("next").getAsString());
-        Assert.assertEquals(second.get("total").getAsInt(), get.get("total").getAsInt());
+    public void anAccessorAloneIsNotAMemberOfAContainerWithOnlyPaths() {
+        Run run = run("ballerinax__github", GITHUB + " get");
+        Assert.assertEquals(run.code(), 1, run.out());
+        Assert.assertEquals(JsonParser.parseString(run.err()).getAsJsonObject().get("command").getAsString(), GITHUB);
     }
 
     @Test

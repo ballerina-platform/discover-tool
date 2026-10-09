@@ -569,27 +569,19 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
-    public void onlyTheContainerAndTheFinalMemberAreRespelledInTheHeader() {
-        DiscoverResult result = new DiscoverResult.Signature("Client", "resource", null, "get", "client", "->",
-                "resource isolated function get client() returns error?;", List.of(), "error?", false, List.of(),
-                List.of(), 0, null, List.of(), DiscoverResult.Documented.NONE, null, null, null, null);
-        String text = TextRenderer.render(result, new TextRenderer.Context("pkg", null,
-                List.of("client", "client", "client", "get"), null, null, null));
-        Assert.assertTrue(text.startsWith("pkg · client · Client · client · get\n"), text);
-    }
-
-    @Test
-    public void aContainerTypedInAnotherCaseIsNamedOnceAsItResolved() {
+    public void theHeaderEchoesTheTrailAndNamesTheContainerABareBucketOpened() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
                 List.of(new DiscoverResult.Method("createCall", "bal discover ballerinax/twilio client Client "
                         + "createCall")),
                 1, 199, new DiscoverResult.Paging(1, 5, 159), "bal discover ballerinax/twilio client Client --page 2",
                 DiscoverResult.Documented.NONE, null, null);
         String text = TextRenderer.render(result, new TextRenderer.Context("ballerinax/twilio", null,
-                List.of("client", "client"), null, null, null));
+                List.of("client"), null, null, null));
         Assert.assertTrue(text.startsWith("ballerinax/twilio · client · Client\n"), text);
         Assert.assertTrue(text.contains("\nNext: bal discover ballerinax/twilio client Client --filter <keyword>"),
                 text);
+        Assert.assertTrue(TextRenderer.render(result, new TextRenderer.Context("ballerinax/twilio", null,
+                List.of("client", "Client"), null, null, null)).startsWith("ballerinax/twilio · client · Client\n"));
     }
 
     @Test
@@ -724,89 +716,6 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(json.getAsJsonObject("counts").toString(), "{\"remote\":2,\"normal\":2}",
                 "the whole listing's split, a form with none omitted");
         Assert.assertFalse(json.has("container"));
-    }
-
-    @Test
-    public void aMissNamesTheClosestNamesAndWhatIsThereInBothRenderings() {
-        DiscoverResult result = new DiscoverResult.NoMatch("sendd", "Producer", List.of("send"), List.of(),
-                new DiscoverResult.MethodList(null,
-                        methods("bal discover ballerinax/kafka client Producer", "close", "send"),
-                        2, 2, null, null, DiscoverResult.Documented.NONE, null, null),
-                "bal discover ballerinax/kafka client Producer", DiscoverResult.Documented.NONE, null, null, null);
-        Assert.assertEquals(TextRenderer.render(result), lines(
-                "Producer",
-                "Nothing on Producer matches 'sendd'.",
-                "",
-                "Did you mean",
-                "  send",
-                "",
-                "Available",
-                "  2 functions",
-                "",
-                "    close",
-                "    send",
-                "",
-                "  Next: bal discover ballerinax/kafka client Producer <name>"));
-
-        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
-        Assert.assertEquals(json.get("requested").getAsString(), "sendd");
-        Assert.assertEquals(json.get("container").getAsString(), "Producer");
-        Assert.assertEquals(json.getAsJsonArray("candidates").toString(), "[\"send\"]");
-        Assert.assertEquals(json.getAsJsonObject("available").getAsJsonArray("methods").size(), 2);
-        Assert.assertEquals(json.get("next").getAsString(), "bal discover ballerinax/kafka client Producer");
-        Assert.assertFalse(json.has("paths"), "no ambiguous segment, so no paths key");
-    }
-
-    @Test
-    public void anAmbiguousSegmentListsEveryPathWithTheCommandThatOpensIt() {
-        DiscoverResult result = new DiscoverResult.NoMatch("repos/owner/repo/secrets", "Client", List.of(),
-                List.of(new DiscoverResult.NoMatch.Alternative("repos/:owner/:repo/actions/secrets",
-                                "bal discover ballerinax/github client Client repos/:owner/:repo/actions/secrets"),
-                        new DiscoverResult.NoMatch.Alternative("repos/:owner/:repo/dependabot/secrets",
-                                "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets")),
-                null, "bal discover ballerinax/github client Client", DiscoverResult.Documented.NONE, null, null,
-                null);
-        Assert.assertEquals(TextRenderer.render(result), lines(
-                "Client",
-                "Nothing on Client matches 'repos/owner/repo/secrets'.",
-                "",
-                "2 paths carry that segment; pick one",
-                "  repos/:owner/:repo/actions/secrets     "
-                        + "bal discover ballerinax/github client Client repos/:owner/:repo/actions/secrets",
-                "  repos/:owner/:repo/dependabot/secrets  "
-                        + "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets",
-                "",
-                "Next: bal discover ballerinax/github client Client"));
-
-        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
-        JsonArray paths = json.getAsJsonArray("paths");
-        Assert.assertEquals(paths.get(1).getAsJsonObject().get("command").getAsString(),
-                "bal discover ballerinax/github client Client repos/:owner/:repo/dependabot/secrets");
-        Assert.assertFalse(json.has("available"));
-    }
-
-    @Test
-    public void aMemberOnSeveralContainersListsTheOwnersInBothRenderings() {
-        DiscoverResult result = new DiscoverResult.Owners("commit",
-                List.of(new DiscoverResult.Owners.Owner(
-                                "Caller", 1, "bal discover ballerinax/kafka client Caller commit"),
-                        new DiscoverResult.Owners.Owner(
-                                "Consumer", 3, "bal discover ballerinax/kafka client Consumer commit")),
-                2, null, null, null, null);
-        Assert.assertEquals(TextRenderer.render(result), lines(
-                "'commit' is declared on 2 containers; pick one.",
-                "",
-                "  Caller    1 match    bal discover ballerinax/kafka client Caller commit",
-                "  Consumer  3 matches  bal discover ballerinax/kafka client Consumer commit"));
-
-        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
-        Assert.assertEquals(json.get("requested").getAsString(), "commit");
-        JsonObject consumer = json.getAsJsonArray("owners").get(1).getAsJsonObject();
-        Assert.assertEquals(consumer.get("matches").getAsInt(), 3);
-        Assert.assertEquals(consumer.get("command").getAsString(),
-                "bal discover ballerinax/kafka client Consumer commit");
-        Assert.assertEquals(json.get("shown").getAsInt(), 2);
-        Assert.assertEquals(json.get("total").getAsInt(), 2);
     }
 
     @Test

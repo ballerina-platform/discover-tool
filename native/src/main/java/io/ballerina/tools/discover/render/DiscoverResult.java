@@ -176,10 +176,8 @@ public sealed interface DiscoverResult {
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
-     * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
-     *     tolerance (the selector named something in a different bucket, and this is that bucket's own answer
-     *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
-     *     {@code null} when neither applies
+     * @param note the listener a service type binds to, or that it is attachable to none — {@code null} outside the
+     *     {@code service} bucket
      */
     record PathGroups(
             String container, List<ResourceList.Resource> resources, List<Group> groups, Counts counts, int total,
@@ -213,10 +211,8 @@ public sealed interface DiscoverResult {
      * @param documented entries a {@code --filter} matched only in their documentation, paged after the paths
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
-     * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
-     *     tolerance (the selector named something in a different bucket, and this is that bucket's own answer
-     *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
-     *     {@code null} when neither applies
+     * @param note the listener a service type binds to, or that it is attachable to none — {@code null} outside the
+     *     {@code service} bucket
      */
     record ResourceList(
             String container, List<Resource> resources, int shown, int total, Paging paging, String next,
@@ -260,10 +256,8 @@ public sealed interface DiscoverResult {
      * @param documented entries a {@code --filter} matched only in their documentation, paged after the methods
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
-     * @param note one or two facts the ceiling has no room to give its own field: this answer was reached by kind
-     *     tolerance (the selector named something in a different bucket, and this is that bucket's own answer
-     *     instead), the {@code service} bucket's own container names the listener it binds to, or both, joined —
-     *     {@code null} when neither applies
+     * @param note the listener a service type binds to, or that it is attachable to none — {@code null} outside the
+     *     {@code service} bucket
      */
     record MethodList(
             String container, List<Method> methods, int shown, int total, Paging paging, String next,
@@ -339,7 +333,7 @@ public sealed interface DiscoverResult {
      * @param paging which page of {@code documented} this is, or {@code null} when it fit on one
      * @param next the ready-to-run command that turns {@code documented}'s page, or {@code null} on the last
      * @param warning why the loaded version cannot be trusted, or {@code null}
-     * @param note kind tolerance, a path advisory or a service's listener, joined — or {@code null}
+     * @param note the listener a service type's method binds through, or {@code null}
      */
     record Signature(
             String container, String kind, String name, String accessor, String path, String form,
@@ -396,56 +390,6 @@ public sealed interface DiscoverResult {
          * @param normal normal methods in the whole listing
          */
         public record Counts(int resources, int remote, int normal) { }
-    }
-
-    /**
-     * A selector or {@code --filter} that matched nothing — exit 0, with what IS there.
-     *
-     * @param requested the selector or filter keyword, as typed
-     * @param container the container it was looked for in, or {@code null} for a whole bucket
-     * @param candidates the closest names that do exist
-     * @param paths where a trailing path segment occurs, when it occurs in several places and none was picked
-     * @param available the listing the same command gives without the selector, or {@code null} when
-     *     {@code paths} or {@code documented} already names the way forward
-     * @param next the command that lists everything there — or, once {@code documented} pages, the command that
-     *     turns its page, {@code null} on the last
-     * @param documented entries a {@code --filter} matched only in their documentation
-     * @param paging which page of {@code documented} this is, or {@code null} when it fit on one
-     * @param warning why the loaded version cannot be trusted, or {@code null}
-     * @param note the same joined advisory every other container answer carries, or {@code null}
-     */
-    record NoMatch(
-            String requested, String container, List<String> candidates, List<Alternative> paths,
-            DiscoverResult available, String next, Documented documented, Paging paging, String warning,
-            String note) implements DiscoverResult {
-
-        /**
-         * @param path one full path carrying the requested segment
-         * @param command the command that opens it
-         */
-        public record Alternative(String path, String command) { }
-    }
-
-    /**
-     * One member name declared on several containers in a bucket — which one is the caller's choice, not a guess.
-     *
-     * @param requested the member name, as typed
-     * @param owners the containers on this page, up to the ceiling
-     * @param total how many containers declare it
-     * @param paging which page this is, or {@code null} when every owner fit on one
-     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
-     * @param warning why the loaded version cannot be trusted, or {@code null}
-     * @param note the kind-tolerance advisory when the member was found in a different bucket, or {@code null}
-     */
-    record Owners(String requested, List<Owner> owners, int total, Paging paging, String next, String warning,
-            String note) implements DiscoverResult {
-
-        /**
-         * @param name the container's name
-         * @param matches how many of its entries the selector matched
-         * @param command the command that opens the member on that container
-         */
-        public record Owner(String name, int matches, String command) { }
     }
 
     /**
