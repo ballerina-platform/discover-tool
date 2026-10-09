@@ -29,7 +29,7 @@ coordinate, the form `bal pull` takes: `bal discover ballerina/http:2.15.7` (see
 | `service` | Service object types, under the listener(s) that accept them; the rest are listed apart.                 |
 | `class`   | Plain objects reached with `.`.                                                                          |
 | `funcs`   | Module-level functions.                                                                                  |
-| `type`    | Everything else the module declares: records, enums, errors, type aliases, constants, module variables and annotations. `type <Name>` reads one whole. |
+| `type`    | Every type the module declares: records, enums, errors, type aliases, constants, module variables, annotations, listeners, and the classes, clients and service types the buckets above also list. `type <Name>` opens any of them. |
 | `readme`  | The module's README, verbatim. `readme <n>` or `readme "<title>"` opens one code-carrying section.       |
 
 The first four are derived from how a symbol is called, not from Central's `isClient`-style flags:
@@ -37,16 +37,16 @@ The first four are derived from how a symbol is called, not from Central's `isCl
 are not callable, so they have no containers or members.
 
 `type` lists its declarations grouped by kind (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`,
-`annotations`) and pages them like any listing; `--filter` is how a large one — `ballerinax/github` declares
+`annotations`, `listeners`, `classes`, `clients`, `serviceTypes`) and pages them like any listing; `--filter` is how a large one — `ballerinax/github` declares
 over a thousand records — is narrowed. `type <Name>` prints the declaration whole, then the declarations it
 names one level deep, within a size budget: what the budget left out is listed with the command that opens each
 one (up to 40; `omittedTotal` or an `... N more` line says how many there were in all, and `omittedNext` or the
 `Next:` line is the command that lists them: the whole `type` roster), and so are the declarations another
 package owns (`bal discover ballerina/http type BearerTokenConfig`).
-It takes one name and no `--filter`. A name that is really a class, client, service type or listener is
-answered by the bucket that holds it, and a record asked of `client` is answered by `type`; either way a note
-says which. The name of an enum member (`HTTP_1_1`) is answered by the enum that declares it (`HttpVersion`), with a
-note.
+It takes one name and no `--filter`. A class, client or service type answers as its own bucket does
+(`type Response` as `class Response`), a listener — opened nowhere else — prints its own declaration, `init` and
+its other methods included, with the types it uses, and an enum member (`HTTP_1_1`) answers with the enum that
+declares it (`HttpVersion`) and a note naming it.
 
 Selectors after the bucket name a container, then a member: a method name, or a resource path followed by
 its accessor (`client "gists/'public" get`). With one container in the bucket, the container name can be
@@ -510,7 +510,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`)                 |
 | more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
-| type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
+| type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`) |
 | nothing matched                      | `requested`, `container`, `candidates`, `paths` (`path`, `command`), `available`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining` |
 | member on several containers         | `requested`, `owners` (`name`, `matches`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`                    |

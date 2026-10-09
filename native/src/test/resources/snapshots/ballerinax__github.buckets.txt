@@ -47,24 +47,24 @@ This package declares nothing in service.
 
 Elsewhere
   client     1  bal discover ballerinax/github client
-  type    1227  bal discover ballerinax/github type
+  type    1228  bal discover ballerinax/github type
 == class ==
 ballerinax/github · class
 This package declares nothing in class.
 
 Elsewhere
   client     1  bal discover ballerinax/github client
-  type    1227  bal discover ballerinax/github type
+  type    1228  bal discover ballerinax/github type
 == funcs ==
 ballerinax/github · funcs
 This package declares nothing in funcs.
 
 Elsewhere
   client     1  bal discover ballerinax/github client
-  type    1227  bal discover ballerinax/github type
+  type    1228  bal discover ballerinax/github type
 == type ==
 ballerinax/github · type
-1101 records, 126 aliases
+1101 records, 126 aliases, 1 client
 
 Records
   AccessSelectedUsersBody
@@ -108,7 +108,7 @@ Records
   ActionsPermissionsBody1
   ActionsPublicKey
 
-... 1187 more (page 1 of 31)
+... 1188 more (page 1 of 31)
 Next: bal discover ballerinax/github type <name>
 Next: bal discover ballerinax/github type --page 2
 Next: bal discover ballerinax/github type --filter <keyword>

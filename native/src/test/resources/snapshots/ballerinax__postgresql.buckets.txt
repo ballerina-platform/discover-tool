@@ -76,10 +76,10 @@ Elsewhere
   client     1  bal discover ballerinax/postgresql client
   service    1  bal discover ballerinax/postgresql service
   class    125  bal discover ballerinax/postgresql class
-  type      36  bal discover ballerinax/postgresql type
+  type     163  bal discover ballerinax/postgresql type
 == type ==
 ballerinax/postgresql · type
-32 records, 4 enums
+32 records, 4 enums, 1 listener, 125 classes, 1 client
 
 Records
   Box
@@ -121,4 +121,15 @@ Enums
   PublicationAutocreateMode
   SSLMode
 
+Listeners
+  CdcListener
+
+Classes
+  BitStringArrayValue
+  BitStringValue
+  BoxArrayValue
+
+... 123 more (page 1 of 5)
 Next: bal discover ballerinax/postgresql type <name>
+Next: bal discover ballerinax/postgresql type --page 2
+Next: bal discover ballerinax/postgresql type --filter <keyword>

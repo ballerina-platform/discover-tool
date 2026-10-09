@@ -53,24 +53,24 @@ This package declares nothing in service.
 
 Elsewhere
   client   1  bal discover ballerinax/googleapis.sheets client
-  type    31  bal discover ballerinax/googleapis.sheets type
+  type    32  bal discover ballerinax/googleapis.sheets type
 == class ==
 ballerinax/googleapis.sheets · class
 This package declares nothing in class.
 
 Elsewhere
   client   1  bal discover ballerinax/googleapis.sheets client
-  type    31  bal discover ballerinax/googleapis.sheets type
+  type    32  bal discover ballerinax/googleapis.sheets type
 == funcs ==
 ballerinax/googleapis.sheets · funcs
 This package declares nothing in funcs.
 
 Elsewhere
   client   1  bal discover ballerinax/googleapis.sheets client
-  type    31  bal discover ballerinax/googleapis.sheets type
+  type    32  bal discover ballerinax/googleapis.sheets type
 == type ==
 ballerinax/googleapis.sheets · type
-20 records, 6 enums, 3 errors, 1 alias, 1 constant
+20 records, 6 enums, 3 errors, 1 alias, 1 constant, 1 client
 
 Records
   A1Range
@@ -112,5 +112,8 @@ Aliases
 
 Constants
   REFRESH_URL
+
+Clients
+  Client
 
 Next: bal discover ballerinax/googleapis.sheets type <name>

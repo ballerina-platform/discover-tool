@@ -413,7 +413,7 @@ public final class TextRenderer {
         List<String> parts = new ArrayList<>();
         roster.counts().forEach((kind, count) -> {
             if (count > 0) {
-                parts.add(count + " " + kindNoun(kind, count));
+                parts.add(count + " " + (count == 1 ? kind.noun() : kind.plural()));
             }
         });
         layout.top(parts.isEmpty() ? "No types." : String.join(", ", parts));
@@ -423,26 +423,17 @@ public final class TextRenderer {
         Drill drill = methodDrill(all);
         int offset = 0;
         for (DiscoverResult.TypeRoster.Section section : roster.sections()) {
-            String heading = Character.toUpperCase(section.kind().charAt(0)) + section.kind().substring(1);
-            layout.section(heading, methodTable(section.entries(), drill, offset));
+            String plural = section.kind().plural();
+            layout.section(Character.toUpperCase(plural.charAt(0)) + plural.substring(1),
+                    methodTable(section.entries(), drill, offset));
             offset += section.entries().size();
         }
         List<String> documentedDrill = documented(layout, roster.documented());
-        layout.notices(roster.note(), roster.warning());
+        layout.warning(roster.warning());
         layout.more(remaining(roster.shown(), roster.total(), roster.paging()), roster.paging());
         layout.next(drill.pattern());
         documentedDrill.forEach(layout::next);
         layout.next(roster.next());
-    }
-
-    private static String kindNoun(String kind, int count) {
-        if (count == 1) {
-            return switch (kind) {
-                case "aliases" -> "alias";
-                default -> kind.substring(0, kind.length() - 1);
-            };
-        }
-        return kind;
     }
 
     private static void typeDeclaration(Layout layout, DiscoverResult.TypeDeclaration declaration) {

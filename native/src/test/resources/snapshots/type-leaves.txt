@@ -399,7 +399,6 @@ Normal (.)
   getCircuitBreakerCurrentState
   getCookieStore
 
-Note: 'Client' is addressed by client — showing it. Canonical: bal discover ballerina/http client Client
 Next: bal discover ballerina/http client Client <path> <accessor>
 Next: bal discover ballerina/http client Client <name>
 == ballerina__graphql type ID ==
