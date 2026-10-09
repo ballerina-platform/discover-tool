@@ -71,9 +71,14 @@ public sealed interface Failure {
      * @param suggestion what to try instead
      * @param command the caller's command with the fix applied, ready to run, or {@code null} when there is no one
      *     fix; the suggestion quotes it
+     * @param candidates the submodules the package does publish, when a {@code --module} was not found
      */
-    record PackageNotFound(String qualified, String version, String module, String suggestion, String command)
-            implements Failure {
+    record PackageNotFound(String qualified, String version, String module, String suggestion, String command,
+            List<String> candidates) implements Failure {
+
+        public PackageNotFound(String qualified, String version, String module, String suggestion, String command) {
+            this(qualified, version, module, suggestion, command, List.of());
+        }
 
         public PackageNotFound(String qualified, String version, String module, String suggestion) {
             this(qualified, version, module, suggestion, null);
@@ -261,6 +266,9 @@ public sealed interface Failure {
                 coordinates(json, f.qualified(), f.version(), f.module());
                 json.addProperty("suggestion", f.suggestion());
                 command(json, f.command());
+                if (!f.candidates().isEmpty()) {
+                    json.add("candidates", strings(f.candidates()));
+                }
             }
             case Upstream f -> {
                 if (f.qualified() != null) {
@@ -320,7 +328,8 @@ public sealed interface Failure {
             case Validation f when f.command() != null && !tail.isEmpty() -> new Validation(f.message(),
                     lengthened(f.suggestion(), f.command(), tail), f.command() + tail);
             case PackageNotFound f when f.command() != null && !tail.isEmpty() -> new PackageNotFound(f.qualified(),
-                    f.version(), f.module(), lengthened(f.suggestion(), f.command(), tail), f.command() + tail);
+                    f.version(), f.module(), lengthened(f.suggestion(), f.command(), tail), f.command() + tail,
+                    f.candidates());
             default -> this;
         };
     }
