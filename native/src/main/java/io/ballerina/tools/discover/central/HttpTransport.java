@@ -67,10 +67,32 @@ public interface HttpTransport {
         record TimedOut() implements Reply { }
 
         /**
-         * The request never produced a response — DNS, TLS, a refused connection.
+         * The request never produced a response from Central.
          *
+         * @param problem what went wrong
          * @param message what the transport said
+         * @param status the proxy's answer to the {@code CONNECT} for {@link Problem#TUNNEL}, else {@code null}
          */
-        record Failed(String message) implements Reply { }
+        record Failed(Problem problem, String message, Integer status) implements Reply {
+
+            public Failed(Problem problem, String message) {
+                this(problem, message, null);
+            }
+        }
+
+        /** Why a request produced no response from Central. */
+        enum Problem {
+            /** The connection to the proxy, or to Central when there is none, could not be made. */
+            UNCONNECTED,
+            /** The proxy's host name, or Central's when there is no proxy, did not resolve. */
+            UNRESOLVED,
+            TLS,
+            /** The proxy answered the {@code CONNECT} with an error status of its own, other than 407. */
+            TUNNEL,
+            PROXY_REJECTED,
+            /** The URL could not be made into a request: a defect, not the network. */
+            BAD_URL,
+            OTHER
+        }
     }
 }

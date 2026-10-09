@@ -61,8 +61,12 @@ public final class Schema {
     private Schema() {
     }
 
-    /** Validate a raw payload, reporting every mismatch at once. */
-    public static Result<CentralDocs> parse(JsonElement raw, String qualified) {
+    /**
+     * Validate a raw payload, reporting every mismatch at once.
+     *
+     * @param version the version the payload was read at, or {@code null} when unknown
+     */
+    public static Result<CentralDocs> parse(JsonElement raw, String qualified, String version) {
         Cursor cursor = new Cursor();
         JsonObject root = cursor.object(raw, "");
         JsonObject docsData = cursor.object(root.get(DOCS_DATA), DOCS_DATA);
@@ -73,7 +77,7 @@ public final class Schema {
         }
         if (!cursor.issues.isEmpty()) {
             return Result.err(new Failure.SchemaDrift(
-                    qualified, List.copyOf(cursor.issues), Failure.SCHEMA_DRIFT_SUGGESTION));
+                    qualified, version, null, List.copyOf(cursor.issues), Failure.SCHEMA_DRIFT_SUGGESTION));
         }
         return Result.ok(new CentralDocs(modules));
     }

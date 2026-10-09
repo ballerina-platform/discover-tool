@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.model;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
@@ -616,7 +617,7 @@ public final class FromCentral {
      * verifies nothing.
      */
     public static Result<CentralDocs.Module> selectModule(CentralDocs docs, QualifiedName qualified) {
-        return selectModule(docs, qualified, null, null);
+        return selectModule(docs, qualified, null, null, null);
     }
 
     /**
@@ -629,9 +630,10 @@ public final class FromCentral {
      *
      * @param submodule the {@code --module} value, or {@code null} to select the package's own default module
      * @param version the version {@code docs} was read at, or {@code null} when the caller has none to name
+     * @param pin the version the caller wrote, repeated in the command a failure offers, or {@code null}
      */
     public static Result<CentralDocs.Module> selectModule(
-            CentralDocs docs, QualifiedName qualified, String submodule, Version version) {
+            CentralDocs docs, QualifiedName qualified, String submodule, Version version, Version pin) {
         String wanted = submodule == null ? qualified.name() : qualified.name() + "." + submodule;
         for (CentralDocs.Module module : docs.modules()) {
             if (module.orgName().equals(qualified.org()) && module.id().equals(wanted)) {
@@ -639,36 +641,39 @@ public final class FromCentral {
             }
         }
         if (submodule != null) {
-            return Result.err(noSuchSubmodule(docs, qualified, submodule, version));
+            return Result.err(noSuchSubmodule(docs, qualified, submodule, version, pin));
         }
         String returned = docs.modules().stream()
                 .map(module -> module.orgName() + "/" + module.id())
                 .collect(Collectors.joining(", "));
         return Result.err(new Failure.SchemaDrift(
-                qualified.qualified(),
+                qualified.qualified(), Version.textOf(version), null,
                 List.of(new Failure.SchemaIssue(
                         "docsData.modules", "no module matches; Central returned " + returned)),
                 Failure.SCHEMA_DRIFT_SUGGESTION));
     }
 
     private static Failure noSuchSubmodule(
-            CentralDocs docs, QualifiedName qualified, String submodule, Version version) {
+            CentralDocs docs, QualifiedName qualified, String submodule, Version version, Version pin) {
         String prefix = qualified.name() + ".";
         List<String> candidates = submodulesOf(docs, qualified).stream()
                 .map(module -> module.id().substring(prefix.length()))
                 .toList();
+        String command = new Coordinate(qualified, pin).command(null);
+        String dropped = "drop --module for the default module: " + Failure.quoted(command) + ".";
         String suggestion;
         if (candidates.isEmpty()) {
-            suggestion = "This package publishes no submodules at all. Drop --module.";
+            suggestion = qualified.qualified() + " publishes no submodules, so " + dropped;
         } else if (candidates.contains(submodule)) {
             suggestion = "Central's page for '" + submodule + "'" + (version == null ? "" : " at " + version.text())
-                    + " cannot be confirmed as a submodule of this package. Drop --module for the default module, "
-                    + "or pass another of the candidates.";
+                    + " cannot be confirmed as a submodule of this package. Pass another of its submodules ("
+                    + String.join(", ", candidates) + "), or " + dropped;
         } else {
-            suggestion = "No submodule answers to that. The candidates are every submodule this package "
-                    + "publishes; pass one of them, or drop --module for the default one.";
+            suggestion = qualified.qualified() + " publishes these submodules: " + String.join(", ", candidates)
+                    + ". Pass one of them to --module, or " + dropped;
         }
-        return new Failure.SymbolNotFound(qualified.qualified(), List.of(submodule), candidates, suggestion);
+        return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version),
+                submodule, suggestion, command, candidates);
     }
 
     /**

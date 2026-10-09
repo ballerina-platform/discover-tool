@@ -1,0 +1,6 @@
+error: No match for 'NoSuchType' in ballerinax/kafka:4.6.5.
+  No declaration matched. Re-run with one of the candidates if it is what you meant, or search by keyword with `bal discover ballerinax/kafka type --filter <keyword>`. Add --refresh if you believe the name exists and is newer than the cached copy.
+  candidates:
+    CompressionType
+    DeserializerType
+    SerializerType

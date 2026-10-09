@@ -39,7 +39,9 @@ final class Usage {
                 .append(UsageRenderer.synopsis(grammar))
                 .append("\n").append(UsageRenderer.prose(INTRO, 0))
                 .append("\n").append(SESSION)
-                .append("\n").append(UsageRenderer.prose(BUCKETS, 0));
+                .append("\n").append(UsageRenderer.prose(BUCKETS, 0))
+                .append("\n").append(UsageRenderer.prose(VERSION, 0))
+                .append(UsageRenderer.prose(EXIT_CODES, 0));
         String flags = UsageRenderer.flagList(grammar);
         if (!flags.isEmpty()) {
             text.append("\n").append(flags);
@@ -65,7 +67,14 @@ final class Usage {
                                               bal discover ballerinax/github client Client
               3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
               4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
+              5. One specific version:        bal discover ballerina/http:2.15.7 client Client
             """;
+
+    private static final String VERSION =
+            "With no version after the package, the one your project's Dependencies.toml locks is read (found "
+                    + "from the current directory up), else Central's latest.";
+
+    private static final String EXIT_CODES = "Exit codes: 0 an answer, 1 a failure, 2 a usage error.";
 
     private static final String BUCKETS =
             "Buckets, addressed as the second positional: " + String.join(", ", Commands.BUCKETS)

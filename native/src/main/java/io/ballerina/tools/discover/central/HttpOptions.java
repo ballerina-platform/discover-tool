@@ -35,6 +35,9 @@ import java.util.function.LongSupplier;
  */
 public final class HttpOptions {
 
+    /** The system property naming the authentication schemes the JDK refuses inside a {@code CONNECT} tunnel. */
+    public static final String TUNNELING_DISABLED_SCHEMES = "jdk.http.auth.tunneling.disabledSchemes";
+
     /** Per-attempt ceiling. Central is slow for large packages; this is not a p99. */
     private static final long DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -44,6 +47,8 @@ public final class HttpOptions {
     private static final long DEFAULT_BUDGET_MS = 300_000;
 
     private static final long DEFAULT_BASE_DELAY_MS = 200;
+
+    private static final String DEFAULT_SETTINGS_FILE = "~/.ballerina/Settings.toml";
 
     private final HttpTransport transport;
     private final long timeoutMs;
@@ -55,6 +60,9 @@ public final class HttpOptions {
     private final LongSupplier clock;
     private final DoubleSupplier jitter;
     private final Sleeper sleeper;
+    private final ProxySettings proxy;
+    private final String settingsFile;
+    private final boolean basicProxyAuthDisabled;
 
     /**
      * The real transport, created on first use.
@@ -71,7 +79,9 @@ public final class HttpOptions {
     }
 
     private HttpOptions(Builder builder) {
-        this.transport = builder.transport == null ? RealTransport.INSTANCE : builder.transport;
+        this.transport = builder.transport != null ? builder.transport
+                : builder.proxy != null ? new JdkHttpTransport(builder.proxy)
+                : RealTransport.INSTANCE;
         this.timeoutMs = builder.timeoutMs;
         this.maxAttempts = builder.maxAttempts;
         this.budgetMs = builder.budgetMs;
@@ -81,6 +91,9 @@ public final class HttpOptions {
         this.clock = builder.clock;
         this.jitter = builder.jitter;
         this.sleeper = builder.sleeper;
+        this.proxy = builder.proxy;
+        this.settingsFile = builder.settingsFile;
+        this.basicProxyAuthDisabled = builder.basicProxyAuthDisabled;
     }
 
     /** How the retry loop waits. Injectable so a test never actually sleeps. */
@@ -126,6 +139,20 @@ public final class HttpOptions {
         return refresh;
     }
 
+    /** The proxy every request goes through, or {@code null}; the default transport is built from it. */
+    public ProxySettings proxy() {
+        return proxy;
+    }
+
+    public String settingsFile() {
+        return settingsFile;
+    }
+
+    /** Whether the JDK refuses Basic credentials in a {@code CONNECT} tunnel, so proxy credentials are never sent. */
+    public boolean basicProxyAuthDisabled() {
+        return basicProxyAuthDisabled;
+    }
+
     /**
      * The same options with {@code --refresh} applied.
      *
@@ -133,9 +160,15 @@ public final class HttpOptions {
      * is not known until the arguments are parsed.
      */
     public HttpOptions withRefresh(boolean value) {
-        if (value == refresh) {
-            return this;
-        }
+        return value == refresh ? this : toBuilder().refresh(value).build();
+    }
+
+    /** The same options, allowing at most {@code value} attempts per request. */
+    public HttpOptions withMaxAttempts(int value) {
+        return toBuilder().maxAttempts(value).build();
+    }
+
+    private Builder toBuilder() {
         return builder()
                 .transport(transport)
                 .timeoutMs(timeoutMs)
@@ -143,27 +176,13 @@ public final class HttpOptions {
                 .budgetMs(budgetMs)
                 .baseDelayMs(baseDelayMs)
                 .cache(cache)
-                .refresh(value)
-                .clock(clock)
-                .jitter(jitter)
-                .sleeper(sleeper)
-                .build();
-    }
-
-    /** The same options, allowing at most {@code value} attempts per request. */
-    public HttpOptions withMaxAttempts(int value) {
-        return builder()
-                .transport(transport)
-                .timeoutMs(timeoutMs)
-                .maxAttempts(value)
-                .budgetMs(budgetMs)
-                .baseDelayMs(baseDelayMs)
-                .cache(cache)
                 .refresh(refresh)
                 .clock(clock)
                 .jitter(jitter)
                 .sleeper(sleeper)
-                .build();
+                .proxy(proxy)
+                .settingsFile(settingsFile)
+                .basicProxyAuthDisabled(basicProxyAuthDisabled);
     }
 
     public long now() {
@@ -191,6 +210,9 @@ public final class HttpOptions {
         private LongSupplier clock = System::currentTimeMillis;
         private DoubleSupplier jitter = () -> ThreadLocalRandom.current().nextDouble();
         private Sleeper sleeper = Builder::sleepQuietly;
+        private ProxySettings proxy;
+        private String settingsFile = DEFAULT_SETTINGS_FILE;
+        private boolean basicProxyAuthDisabled;
 
         private Builder() {
         }
@@ -250,6 +272,21 @@ public final class HttpOptions {
 
         public Builder sleeper(Sleeper value) {
             this.sleeper = value;
+            return this;
+        }
+
+        public Builder proxy(ProxySettings value) {
+            this.proxy = value;
+            return this;
+        }
+
+        public Builder settingsFile(String value) {
+            this.settingsFile = value;
+            return this;
+        }
+
+        public Builder basicProxyAuthDisabled(boolean value) {
+            this.basicProxyAuthDisabled = value;
             return this;
         }
 

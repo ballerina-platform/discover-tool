@@ -21,21 +21,24 @@ package io.ballerina.tools.discover.central;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonParser;
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
-import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.central.schema.Schema;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,6 +65,22 @@ public final class CentralClient {
     private static final String REGISTRY_PACKAGES_URL = CENTRAL_BASE_URL + "registry/packages/";
     private static final String DOCS_URL = CENTRAL_BASE_URL + "docs/";
 
+    private static final int BAD_REQUEST = 400;
+    private static final int NOT_FOUND = 404;
+    private static final int PROXY_AUTHENTICATION_REQUIRED = 407;
+    private static final int TOO_MANY_REQUESTS = 429;
+    private static final int BAD_GATEWAY = 502;
+    private static final int SERVICE_UNAVAILABLE = 503;
+    private static final int GATEWAY_TIMEOUT = 504;
+
+    private static final long NO_RETRY_AFTER = -1;
+
+    private static final int LISTED_VERSIONS = 10;
+
+    private static final String RUN_AGAIN = "then run the same command again.";
+
+    private static final String SEARCH_HINT = "`bal search <keyword>` lists what Central publishes.";
+
     /**
      * How long Central's answer to "what is the latest version" is believed.
      *
@@ -75,24 +94,55 @@ public final class CentralClient {
     }
 
     /**
-     * A version, and what a caller may need to know about where it came from.
+     * A version, and where it came from.
      *
      * @param version the resolved version
+     * @param source who chose it
      * @param stale the registry was unreachable and this came off disk unverified
-     * @param supplied the CALLER chose this version — {@code --version} or {@code Dependencies.toml} — so a
-     *     later 404 from the docs endpoint is theirs to correct, not the reader's
-     * @param pinned the version came from {@code --version} itself, so a command printed for the caller must
-     *     repeat it
+     * @param lock the {@code Dependencies.toml} that locks it, for {@link Source#LOCKED}, else {@code null}
      */
-    public record ResolvedVersion(Version version, boolean stale, boolean supplied, boolean pinned) {
+    public record ResolvedVersion(Version version, Source source, boolean stale, Path lock) {
 
-        public ResolvedVersion(Version version, boolean stale) {
-            this(version, stale, false, false);
+        public enum Source {
+            /** The caller wrote it in the coordinate, so a command printed for them repeats it. */
+            WRITTEN,
+            LOCKED,
+            LATEST
+        }
+
+        public static ResolvedVersion latest(Version version, boolean stale) {
+            return new ResolvedVersion(version, Source.LATEST, stale, null);
+        }
+
+        public static ResolvedVersion written(Version version) {
+            return new ResolvedVersion(version, Source.WRITTEN, false, null);
+        }
+
+        public static ResolvedVersion locked(Version version, Path lock) {
+            return new ResolvedVersion(version, Source.LOCKED, false, lock);
+        }
+
+        /** Whether the caller chose it, so a later 404 from the docs endpoint is theirs to correct. */
+        public boolean supplied() {
+            return source != Source.LATEST;
         }
     }
 
     private static boolean isRetryableStatus(int status) {
-        return status == 429 || status == 502 || status == 503 || status == 504;
+        return status == TOO_MANY_REQUESTS || isGatewayStatus(status);
+    }
+
+    private static boolean isGatewayStatus(int status) {
+        return status == BAD_GATEWAY || status == SERVICE_UNAVAILABLE || status == GATEWAY_TIMEOUT;
+    }
+
+    // These fail the same way again, and a rejected password retried counts against the proxy account.
+    private static boolean isRetryable(HttpTransport.Reply.Failed failed) {
+        return switch (failed.problem()) {
+            case UNCONNECTED, OTHER -> true;
+            case TUNNEL -> failed.status() != null && isGatewayStatus(failed.status());
+            case UNRESOLVED, TLS, PROXY_REJECTED, BAD_URL -> false;
+        };
     }
 
     /** {@code Retry-After} in either of its legal forms, as milliseconds, or {@code -1}. */
@@ -122,53 +172,140 @@ public final class CentralClient {
         return (long) Math.floor(baseDelayMs * Math.pow(2, attempt) * (1 + jitter * 0.25));
     }
 
-    /**
-     * What one attempt produced, before the URL and the attempt count are known.
-     *
-     * <p>Separate from {@link Failure} on purpose: the retry loop branches on {@code retryable} and
-     * {@code retryAfterMs}, which a finished {@code Failure} has no field for and no caller should see.
-     */
+    // Not a Failure: the retry loop branches on retryable and retryAfterMs, which no caller should see.
     private sealed interface Outcome {
 
         record Body(JsonElement value) implements Outcome { }
 
-        /**
-         * A failed attempt.
-         *
-         * @param message what upstream, or the transport, said
-         * @param status the HTTP status the attempt failed with, or {@code null}
-         * @param timedOut whether the attempt failed by timing out
-         * @param retryable whether another attempt is worth making
-         * @param retryAfterMs how long to wait before retrying, or negative when upstream did not say
-         */
-        record Spent(String message, Integer status, boolean timedOut, boolean retryable, long retryAfterMs)
-                implements Outcome { }
+        record Broken(Failure failure) implements Outcome { }
+
+        record TimedOut() implements Outcome { }
+
+        record Spent(Report report, boolean retryable, long retryAfterMs) implements Outcome {
+
+            static Spent of(Report report, boolean retryable) {
+                return new Spent(report, retryable, NO_RETRY_AFTER);
+            }
+        }
+    }
+
+    // The message has no full stop: Failure.headline adds it.
+    private record Report(String message, Integer status, boolean reached, String suggestion) {
+
+        static Report unanswered(String message, String suggestion) {
+            return new Report(message, null, false, suggestion);
+        }
     }
 
     private static Outcome attemptFetch(String url, HttpOptions options) {
         HttpTransport.Reply reply = options.transport().get(url, options.timeoutMs());
         return switch (reply) {
-            case HttpTransport.Reply.TimedOut ignored -> new Outcome.Spent(null, null, true, true, -1);
-            case HttpTransport.Reply.Failed failed ->
-                    new Outcome.Spent(failed.message(), null, false, true, -1);
-            case HttpTransport.Reply.Answered answered -> {
-                if (!answered.isOk()) {
-                    boolean retryable = isRetryableStatus(answered.status());
-                    long retryAfterMs =
-                            retryable ? parseRetryAfter(answered.retryAfter(), options.now()) : -1;
-                    yield new Outcome.Spent(
-                            "HTTP " + answered.status(), answered.status(), false, retryable, retryAfterMs);
-                }
-                try {
-                    JsonElement parsed = JsonParser.parseString(answered.body());
-                    yield new Outcome.Body(parsed == null ? JsonNull.INSTANCE : parsed);
-                } catch (RuntimeException malformed) {
-                    // Upstream serving something that is not JSON is not a transient condition.
-                    yield new Outcome.Spent(
-                            "malformed JSON: " + malformed.getMessage(), null, false, false, -1);
-                }
-            }
+            case HttpTransport.Reply.TimedOut ignored -> new Outcome.TimedOut();
+            case HttpTransport.Reply.Failed failed -> failed.problem() == HttpTransport.Reply.Problem.BAD_URL
+                    ? new Outcome.Broken(new Failure.Internal(
+                            "Could not make a request to " + url + ": " + failed.message(),
+                            Failure.INTERNAL_SUGGESTION))
+                    : Outcome.Spent.of(noAnswer(failed, url, options), isRetryable(failed));
+            case HttpTransport.Reply.Answered answered -> answer(answered, url, options);
         };
+    }
+
+    private static Outcome answer(HttpTransport.Reply.Answered answered, String url, HttpOptions options) {
+        if (answered.status() == PROXY_AUTHENTICATION_REQUIRED) {
+            return Outcome.Spent.of(proxyAuthentication(options), false);
+        }
+        if (!answered.isOk()) {
+            boolean retryable = isRetryableStatus(answered.status());
+            long retryAfterMs = retryable ? parseRetryAfter(answered.retryAfter(), options.now()) : NO_RETRY_AFTER;
+            return new Outcome.Spent(new Report("Central answered " + url + " with HTTP " + answered.status(),
+                    answered.status(), true, Failure.UPSTREAM_SUGGESTION), retryable, retryAfterMs);
+        }
+        try {
+            JsonElement parsed = JsonParser.parseString(answered.body());
+            return new Outcome.Body(parsed == null ? JsonNull.INSTANCE : parsed);
+        } catch (RuntimeException malformed) {
+            // Upstream serving something that is not JSON is not a transient condition.
+            return Outcome.Spent.of(new Report("Central answered " + url + " with a body that is not JSON: "
+                    + malformed.getMessage(), null, true, Failure.UPSTREAM_SUGGESTION), false);
+        }
+    }
+
+    // Through a proxy, only the CONNECT's answer is the proxy's; a status inside the tunnel is Central's.
+    private static Report noAnswer(HttpTransport.Reply.Failed failed, String url, HttpOptions options) {
+        String host = host(url);
+        String file = options.settingsFile();
+        ProxySettings proxy = options.proxy();
+        String through = proxy == null ? "" : " through the proxy " + address(proxy);
+        return switch (failed.problem()) {
+            case UNCONNECTED -> proxy == null
+                    ? Report.unanswered("Could not reach " + host + ": " + failed.message(), network(file))
+                    : Report.unanswered("Could not connect to the proxy " + address(proxy) + " set in " + file + ": "
+                            + failed.message(), "Check that the proxy is running and that host and port under "
+                            + "[proxy] in " + file + " are right, " + RUN_AGAIN);
+            case UNRESOLVED -> proxy == null
+                    ? Report.unanswered("Could not resolve the host " + host, network(file))
+                    : Report.unanswered("Could not resolve the proxy host " + proxy.host(),
+                            "Check host under [proxy] in " + file + ", " + RUN_AGAIN);
+            case TLS -> Report.unanswered("Could not open a secure connection to " + host + through + ": "
+                    + failed.message(), "Check the system clock, and any proxy or firewall that intercepts HTTPS, "
+                    + RUN_AGAIN);
+            case TUNNEL -> new Report(theProxy(proxy) + (proxy == null ? "" : " set in " + file)
+                    + " could not connect to " + host + ": HTTP " + failed.status(), failed.status(), false,
+                    "The proxy answered but could not reach " + host + "; run the same command again later, or "
+                            + "check that the proxy allows it.");
+            case PROXY_REJECTED -> rejected(options);
+            case OTHER -> Report.unanswered("Could not reach " + host + through + ": " + failed.message(),
+                    network(file));
+            case BAD_URL -> throw new IllegalStateException("a malformed URL is not a network failure");
+        };
+    }
+
+    private static Report proxyAuthentication(HttpOptions options) {
+        ProxySettings proxy = options.proxy();
+        if (proxy != null && proxy.authenticates() && options.basicProxyAuthDisabled()) {
+            String property = HttpOptions.TUNNELING_DISABLED_SCHEMES;
+            return new Report("The proxy " + address(proxy) + " requires authentication, and the username and "
+                    + "password in the [proxy] table of " + options.settingsFile() + " were not sent: the "
+                    + property + " system property disables Basic", PROXY_AUTHENTICATION_REQUIRED, false,
+                    "Remove Basic from the " + property + " system property, " + RUN_AGAIN);
+        }
+        if (proxy != null && proxy.authenticates()) {
+            return rejected(options);
+        }
+        return new Report((proxy == null ? "A proxy" : "The proxy " + address(proxy))
+                + " requires authentication", PROXY_AUTHENTICATION_REQUIRED, false,
+                "Set both username and password under [proxy] in " + options.settingsFile()
+                        + ", " + RUN_AGAIN);
+    }
+
+    private static Report rejected(HttpOptions options) {
+        ProxySettings proxy = options.proxy();
+        String file = options.settingsFile();
+        return new Report(theProxy(proxy) + " rejected the username and password in the [proxy] table of " + file,
+                PROXY_AUTHENTICATION_REQUIRED, false,
+                "Correct username and password under [proxy] in " + file + ", " + RUN_AGAIN);
+    }
+
+    private static String network(String settingsFile) {
+        return "Check your network connection, and the [proxy] table in " + settingsFile
+                + " if your network needs a proxy, " + RUN_AGAIN;
+    }
+
+    private static String theProxy(ProxySettings proxy) {
+        return proxy == null ? "The proxy" : "The proxy " + address(proxy);
+    }
+
+    private static String address(ProxySettings proxy) {
+        return proxy.host() + ":" + proxy.port();
+    }
+
+    private static String host(String url) {
+        try {
+            String host = URI.create(url).getHost();
+            return host == null ? url : host;
+        } catch (IllegalArgumentException malformed) {
+            return url;
+        }
     }
 
     /**
@@ -179,7 +316,8 @@ public final class CentralClient {
      */
     public static Result<JsonElement> fetchJson(String url, HttpOptions options) {
         long deadline = options.now() + options.budgetMs();
-        Outcome.Spent last = null;
+        Outcome last = null;
+        int made = 0;
 
         for (int attempt = 0; attempt < options.maxAttempts(); attempt++) {
             if (attempt > 0) {
@@ -187,37 +325,45 @@ public final class CentralClient {
                 if (remaining <= 0) {
                     break;
                 }
-                long wait = last != null && last.retryAfterMs() >= 0
-                        ? last.retryAfterMs()
+                long wait = last instanceof Outcome.Spent spent && spent.retryAfterMs() >= 0
+                        ? spent.retryAfterMs()
                         : backoffMs(attempt - 1, options.baseDelayMs(), options.jitter());
                 options.sleep(Math.min(remaining, wait));
             }
-            switch (attemptFetch(url, options)) {
+            made++;
+            last = attemptFetch(url, options);
+            switch (last) {
                 case Outcome.Body body -> {
                     return Result.ok(body.value());
                 }
-                case Outcome.Spent spent -> {
-                    if (!spent.retryable()) {
-                        return Result.err(toFailure(spent, url, attempt + 1, options.budgetMs()));
-                    }
-                    last = spent;
+                case Outcome.Broken broken -> {
+                    return Result.err(broken.failure());
+                }
+                case Outcome.Spent spent when !spent.retryable() -> {
+                    return Result.err(toFailure(spent, url, made, options));
+                }
+                case Outcome.Spent ignored -> {
+                }
+                case Outcome.TimedOut ignored -> {
                 }
             }
         }
 
         if (last == null) {
-            return Result.err(new Failure.Upstream(
-                    url, options.maxAttempts(), "no attempt was made", Failure.UPSTREAM_SUGGESTION, null));
+            return Result.err(new Failure.Internal("No request was made to " + url, Failure.INTERNAL_SUGGESTION));
         }
-        return Result.err(toFailure(last, url, options.maxAttempts(), options.budgetMs()));
+        return Result.err(toFailure(last, url, made, options));
     }
 
-    private static Failure toFailure(Outcome.Spent spent, String url, int attempts, long budgetMs) {
-        if (spent.timedOut()) {
-            return new Failure.Timeout(url, budgetMs, Failure.TIMEOUT_SUGGESTION);
+    private static Failure toFailure(Outcome last, String url, int attempts, HttpOptions options) {
+        if (last instanceof Outcome.Spent spent) {
+            Report report = spent.report();
+            return new Failure.Upstream(url, attempts, report.message(), report.suggestion(), report.status(),
+                    report.reached());
         }
-        return new Failure.Upstream(
-                url, attempts, spent.message(), Failure.UPSTREAM_SUGGESTION, spent.status());
+        return new Failure.Timeout(url, options.budgetMs(), "A large package is slow on a cold fetch, so run the "
+                + "same command again; if it keeps timing out, check your network connection and the [proxy] "
+                + "table in " + options.settingsFile() + ".");
     }
 
     /**
@@ -240,7 +386,7 @@ public final class CentralClient {
                 || containingPackages(qualified).isEmpty()) {
             return direct;
         }
-        return Result.err(notAPackage(qualified, null, options));
+        return Result.err(notAPackage(qualified, null, null, options));
     }
 
     private static List<QualifiedName> containingPackages(QualifiedName qualified) {
@@ -255,12 +401,12 @@ public final class CentralClient {
         return parents;
     }
 
-    private static Failure notAPackage(QualifiedName qualified, String pin, HttpOptions options) {
+    private static Failure notAPackage(QualifiedName qualified, Version version, Version pin, HttpOptions options) {
         List<QualifiedName> parents = containingPackages(qualified);
         for (QualifiedName parent : parents) {
             Result<ResolvedVersion> probed = resolvePublishedVersion(parent, options);
             if (probed.isOk()) {
-                return moduleOf(qualified, parent, probed.value().version(), pin, options);
+                return moduleOf(qualified, parent, probed.value().version(), version, pin, options);
             }
             if (!(probed.failure() instanceof Failure.PackageNotFound)) {
                 return notFound(qualified);
@@ -271,36 +417,36 @@ public final class CentralClient {
             tried.append(tried.isEmpty() ? "" : ", ").append(parent.qualified());
         }
         return new Failure.PackageNotFound(
-                qualified.qualified(),
+                qualified.qualified(), Version.textOf(version), null,
                 "Central publishes no package under this name, and none of the packages it could be a module "
                         + "of exists either (tried " + tried + "). Check the org/name spelling; "
-                        + "`bal search <keyword>` lists what Central publishes.");
+                        + SEARCH_HINT);
     }
 
     private static Failure moduleOf(
-            QualifiedName qualified, QualifiedName parent, Version version, String pin, HttpOptions options) {
+            QualifiedName qualified, QualifiedName parent, Version parentVersion, Version version, Version pin,
+            HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
-        String command = "`bal discover " + Texts.shellWord(parent.qualified()) + " --module "
-                + Texts.shellWord(submodule) + pinArgument(pin) + "`";
+        String command = new Coordinate(parent, pin).command(submodule);
         String url = REGISTRY_PACKAGES_URL + encode(parent.org()) + "/" + encode(parent.name())
-                + "/" + encode(version.text());
+                + "/" + encode(parentVersion.text());
         Result<JsonElement> response = fetchJson(url, options);
         Optional<List<String>> listed = response.isOk() ? Coordinates.moduleNames(response.value()) : Optional.empty();
-        String suggestion;
         if (listed.isEmpty()) {
-            suggestion = "'" + qualified.qualified() + "' is not a package, but " + parent.qualified()
-                    + " is, and Central could not say which modules it publishes. If '" + submodule
-                    + "' is one of them, read it with " + command + ".";
-        } else if (listed.get().contains(qualified.name())) {
-            suggestion = "'" + qualified.qualified() + "' is not a package: it is the '" + submodule
-                    + "' module of the " + parent.qualified() + " package. Read it with " + command + ".";
-        } else {
-            List<String> modules = listed.get();
-            suggestion = "'" + qualified.qualified() + "' is not a package, and " + parent.qualified()
-                    + " publishes no '" + submodule + "' module (its modules are " + String.join(", ", modules)
-                    + "). Check the name; `bal search <keyword>` lists what Central publishes.";
+            return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
+                    + qualified.qualified() + "' is not a package, but " + parent.qualified() + " is, and Central "
+                    + "could not say which modules it publishes. If '" + submodule + "' is one of them, read it with "
+                    + Failure.quoted(command) + ".", command);
         }
-        return new Failure.PackageNotFound(qualified.qualified(), suggestion);
+        if (listed.get().contains(qualified.name())) {
+            return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
+                    + qualified.qualified() + "' is not a package: it is the '" + submodule + "' module of the "
+                    + parent.qualified() + " package. Read it with " + Failure.quoted(command) + ".", command);
+        }
+        return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
+                + qualified.qualified() + "' is not a package, and " + parent.qualified() + " publishes no '"
+                + submodule + "' module (its modules are " + String.join(", ", listed.get()) + "). Check the name; "
+                + SEARCH_HINT);
     }
 
     // Asks for this package's row: listing the whole org (ballerinax) and filtering costs about 45 seconds.
@@ -318,27 +464,24 @@ public final class CentralClient {
                     && options.now() - entry.atMs() < LATEST_TTL_MS) {
                 Result<Version> cached = Version.parse(entry.version());
                 if (cached.isOk()) {
-                    return Result.ok(new ResolvedVersion(cached.value(), false));
+                    return Result.ok(ResolvedVersion.latest(cached.value(), false));
                 }
             }
         }
 
-        String url = REGISTRY_PACKAGES_URL + encode(qualified.org())
-                + "/" + encode(qualified.name());
-        Result<JsonElement> response = fetchJson(url, options);
+        Result<JsonElement> response = fetchJson(registryUrl(qualified), options);
         if (!response.isOk()) {
             // Central answers an unpublished org/name with a 400, not a 404. Either way the fact is "no such
             // package", and reporting it as a transport error would send the caller looking at the network for
             // a typo.
-            Integer status = response.failure() instanceof Failure.Upstream upstream ? upstream.status() : null;
-            if (status != null && (status == 400 || status == 404)) {
+            if (isNoSuchPackage(response)) {
                 return Result.err(notFound(qualified));
             }
             Version offline = offlineVersion(cache, key, options);
             if (offline != null) {
-                return Result.ok(new ResolvedVersion(offline, true));
+                return Result.ok(ResolvedVersion.latest(offline, true));
             }
-            return response.cast();
+            return about(response, qualified, null);
         }
 
         String latest = Coordinates.newestVersion(response.value());
@@ -352,7 +495,7 @@ public final class CentralClient {
             return parsed.cast();
         }
         cache.writeLatest(key, new DocsCache.LatestEntry(parsed.value().text(), options.now()));
-        return Result.ok(new ResolvedVersion(parsed.value(), false));
+        return Result.ok(ResolvedVersion.latest(parsed.value(), false));
     }
 
     private static Version offlineVersion(DocsCache cache, DocsCache.PackageKey key, HttpOptions options) {
@@ -374,9 +517,13 @@ public final class CentralClient {
     }
 
     private static Failure notFound(QualifiedName qualified) {
+        return notFound(qualified, null);
+    }
+
+    private static Failure notFound(QualifiedName qualified, Version version) {
         return new Failure.PackageNotFound(
-                qualified.qualified(),
-                "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
+                qualified.qualified(), Version.textOf(version), null,
+                "Check the org/name spelling; " + SEARCH_HINT);
     }
 
     /**
@@ -399,13 +546,12 @@ public final class CentralClient {
         DocsCache cache = options.cache();
         DocsCache.DocsKey key =
                 new DocsCache.DocsKey(REPOSITORY_ID, qualified.org(), qualified.name(), version.text());
-        String label = qualified.versioned(version);
 
         if (!options.refresh()) {
             JsonElement cached = cache.readDocs(key);
             if (cached != null) {
                 Result<CentralDocs> parsed = Coordinates.match(cached, qualified, version)
-                        ? Schema.parse(cached, label)
+                        ? Schema.parse(cached, qualified.qualified(), version.text())
                         : null;
                 if (parsed != null && parsed.isOk()) {
                     return parsed;
@@ -421,19 +567,17 @@ public final class CentralClient {
             // 404 here is specific: the org/name may well exist, this VERSION does not — and which half the
             // caller can act on depends on who chose the version. A version they passed is theirs to correct.
             // One the reader resolved is not: telling them to "omit the version" names what they already did.
-            if (response.failure() instanceof Failure.Upstream upstream
-                    && upstream.status() != null && upstream.status() == 404) {
-                return Result.err(new Failure.PackageNotFound(label, missingVersion(
-                        qualified, version, resolved.supplied(), options)));
+            if (isNotFound(response)) {
+                return Result.err(missingVersion(qualified, resolved, options));
             }
-            return response.cast();
+            return about(response, qualified, version);
         }
         // A version for a module path can still arrive from a `latest` entry an older build of this reader wrote
         // under the module's own key; the page itself says what it is.
         if (Coordinates.describesSubmodule(response.value(), qualified)) {
-            return Result.err(notAPackage(qualified, pinOf(resolved), options));
+            return Result.err(notAPackage(qualified, version, pinOf(resolved), options));
         }
-        Result<CentralDocs> parsed = Schema.parse(response.value(), label);
+        Result<CentralDocs> parsed = Schema.parse(response.value(), qualified.qualified(), version.text());
         if (!parsed.isOk()) {
             return parsed.cast();
         }
@@ -463,13 +607,12 @@ public final class CentralClient {
         DocsCache.ModuleKey key = new DocsCache.ModuleKey(
                 REPOSITORY_ID, qualified.org(), qualified.name(), submodule, version.text());
         String moduleName = qualified.name() + "." + submodule;
-        String label = qualified.org() + "/" + moduleName + ":" + version.text();
 
         if (!options.refresh()) {
             JsonElement cached = cache.readModuleDocs(key);
             if (cached != null) {
                 Result<CentralDocs> parsed = Coordinates.isModulePage(cached, qualified, submodule, version)
-                        ? Schema.parse(cached, label)
+                        ? Schema.parse(cached, qualified.qualified(), version.text())
                         : null;
                 if (parsed != null && parsed.isOk()) {
                     return parsed;
@@ -482,69 +625,104 @@ public final class CentralClient {
                 + "/" + encode(moduleName) + "/" + encode(version.text());
         Result<JsonElement> response = fetchJson(url, options);
         if (!response.isOk()) {
-            if (response.failure() instanceof Failure.Upstream upstream
-                    && upstream.status() != null && upstream.status() == 404) {
-                return Result.err(noSuchModulePage(label, qualified, pinOf(resolved), submodule));
+            if (isNotFound(response)) {
+                return Result.err(noSuchModulePage(version, qualified, pinOf(resolved), submodule));
             }
-            return response.cast();
+            return about(response, qualified, version);
         }
         if (!Coordinates.isModulePage(response.value(), qualified, submodule, version)) {
-            return Result.err(noSuchModulePage(label, qualified, pinOf(resolved), submodule));
+            return Result.err(noSuchModulePage(version, qualified, pinOf(resolved), submodule));
         }
-        Result<CentralDocs> parsed = Schema.parse(response.value(), label);
+        Result<CentralDocs> parsed = Schema.parse(response.value(), qualified.qualified(), version.text());
         if (!parsed.isOk()) {
-            return parsed.cast();
+            return parsed.failure() instanceof Failure.SchemaDrift drift
+                    ? Result.err(new Failure.SchemaDrift(
+                            drift.qualified(), drift.version(), submodule, drift.issues(), drift.suggestion()))
+                    : parsed.cast();
         }
         cache.writeModuleDocs(key, response.value());
         return parsed;
     }
 
-    private static String pinOf(ResolvedVersion resolved) {
-        return resolved.pinned() ? resolved.version().text() : null;
+    private static Version pinOf(ResolvedVersion resolved) {
+        return resolved.source() == ResolvedVersion.Source.WRITTEN ? resolved.version() : null;
     }
 
-    private static String pinArgument(String pin) {
-        return pin == null ? "" : " --version " + Texts.shellWord(pin);
+    private static Failure noSuchModulePage(Version version, QualifiedName qualified, Version pin, String submodule) {
+        String command = new Coordinate(qualified, pin).command(null);
+        return new Failure.PackageNotFound(qualified.qualified(), version.text(), submodule, qualified.qualified()
+                + " publishes no '" + submodule + "' module at this version. Drop --module to read its default "
+                + "module: " + Failure.quoted(command) + ".", command);
     }
 
-    private static Failure noSuchModulePage(String label, QualifiedName qualified, String pin, String submodule) {
-        return new Failure.PackageNotFound(label, qualified.qualified() + " publishes no '" + submodule
-                + "' module at this version. Run `bal discover " + Texts.shellWord(qualified.qualified())
-                + pinArgument(pin) + "` to list the submodules it does publish.");
+    private static boolean isNotFound(Result<?> response) {
+        return statusOf(response) == NOT_FOUND;
     }
 
-    private static String missingVersion(
-            QualifiedName qualified, Version version, boolean supplied, HttpOptions options) {
-        if (!supplied) {
-            return "Central published no '" + qualified.qualified() + "' at " + version.text()
-                    + ", the version resolved for it. Check the name — `bal search <keyword>` lists what Central "
-                    + "publishes.";
+    private static boolean isNoSuchPackage(Result<?> registry) {
+        return statusOf(registry) == BAD_REQUEST || isNotFound(registry);
+    }
+
+    private static int statusOf(Result<?> response) {
+        return !response.isOk() && response.failure() instanceof Failure.Upstream upstream && upstream.status() != null
+                ? upstream.status()
+                : 0;
+    }
+
+    private static <T> Result<T> about(Result<?> failed, QualifiedName qualified, Version version) {
+        return Result.err(switch (failed.failure()) {
+            case Failure.Upstream upstream -> upstream.about(qualified.qualified(), Version.textOf(version));
+            case Failure.Timeout timeout -> timeout.about(qualified.qualified(), Version.textOf(version));
+            default -> failed.failure();
+        });
+    }
+
+    private static Failure missingVersion(QualifiedName qualified, ResolvedVersion resolved, HttpOptions options) {
+        Version version = resolved.version();
+        if (!resolved.supplied()) {
+            return new Failure.PackageNotFound(qualified.qualified(), version.text(), null,
+                    "Central published no '" + qualified.qualified() + "' at " + version.text() + ", the version "
+                            + "resolved for it. Check the name — " + SEARCH_HINT);
         }
-        String published = publishedVersions(qualified, options);
-        return "Central does not publish '" + qualified.qualified() + "' at " + version.text()
-                + ", the version named by --version or locked by your project's Dependencies.toml"
-                + (published == null ? "" : "; published versions are " + published)
-                + ". Pass one of them with --version, or reconcile Dependencies.toml with the registry so a "
-                + "lookup and a build see the same one.";
+        Result<JsonElement> registry = fetchJson(registryUrl(qualified), options);
+        List<String> versions = registry.isOk() ? Coordinates.publishedVersions(registry.value()) : List.of();
+        if (isNoSuchPackage(registry) || registry.isOk() && versions.isEmpty()) {
+            return containingPackages(qualified).isEmpty()
+                    ? notFound(qualified, version)
+                    : notAPackage(qualified, version, pinOf(resolved), options);
+        }
+        String listed = versions.isEmpty() ? "" : "; " + nearest(versions, version);
+        String coordinate = qualified.qualified() + ":<version>";
+        String suggestion = resolved.source() == ResolvedVersion.Source.WRITTEN
+                ? "Central does not publish '" + qualified.qualified() + "' at " + version.text() + listed
+                        + (versions.isEmpty() ? ". Write a published version" : ". Write one of them")
+                        + " after the package: " + coordinate
+                : "Central does not publish '" + qualified.qualified() + "' at " + version.text() + ", the version "
+                        + resolved.lock() + " locks" + listed + ". Fix the " + qualified.qualified() + " entry "
+                        + "there, or delete the file and run `bal build` to regenerate it; or write a published "
+                        + "version after the package: " + coordinate;
+        return new Failure.PackageNotFound(qualified.qualified(), version.text(), null, suggestion);
     }
 
-    private static final int LISTED_VERSIONS = 10;
+    // A window of published versions centred on the requested one, newest first.
+    private static String nearest(List<String> versions, Version requested) {
+        if (versions.size() <= LISTED_VERSIONS) {
+            return "published versions are " + String.join(", ", versions);
+        }
+        List<String> ascending = new ArrayList<>(versions);
+        ascending.sort(Version.PRECEDENCE);
+        int below = (int) ascending.stream()
+                .filter(published -> Version.PRECEDENCE.compare(published, requested.text()) < 0)
+                .count();
+        int from = Math.max(0, Math.min(below - LISTED_VERSIONS / 2, ascending.size() - LISTED_VERSIONS));
+        List<String> window = new ArrayList<>(ascending.subList(from, from + LISTED_VERSIONS));
+        Collections.reverse(window);
+        return "the published versions nearest it are " + String.join(", ", window) + " and "
+                + (versions.size() - LISTED_VERSIONS) + " others";
+    }
 
-    private static String publishedVersions(QualifiedName qualified, HttpOptions options) {
-        String url = REGISTRY_PACKAGES_URL + encode(qualified.org())
-                + "/" + encode(qualified.name());
-        Result<JsonElement> response = fetchJson(url, options);
-        if (!response.isOk()) {
-            return null;
-        }
-        List<String> versions = Coordinates.publishedVersions(response.value());
-        if (versions.isEmpty()) {
-            return null;
-        }
-        return versions.size() <= LISTED_VERSIONS
-                ? String.join(", ", versions)
-                : String.join(", ", versions.subList(0, LISTED_VERSIONS)) + " and "
-                        + (versions.size() - LISTED_VERSIONS) + " older";
+    private static String registryUrl(QualifiedName qualified) {
+        return REGISTRY_PACKAGES_URL + encode(qualified.org()) + "/" + encode(qualified.name());
     }
 
     /**

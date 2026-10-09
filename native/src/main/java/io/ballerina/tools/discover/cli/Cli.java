@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.cli;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Loader;
@@ -37,9 +38,11 @@ import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * {@code bal discover} — argv in, exit code out.
@@ -49,14 +52,18 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>stdout — the requested document, and nothing else: no progress, no banner. A usage request is a request
  *       like any other, so {@code --help} is that document
- *   <li>stderr — on failure, one JSON object matching {@link Failure}, and nothing else
+ *   <li>stderr — on failure, one {@link Failure} and nothing else, in the run's output mode: one JSON object,
+ *       or {@code error: <message>} with the suggestion indented below it
  *   <li>exit 0 — success, and stdout is COMPLETE
- *   <li>exit 1 — every failure, whatever went wrong. What to do next is {@code kind} and {@code suggestion} in
- *       the JSON, never the code
+ *   <li>exit 2 — a usage error: the command line itself is malformed, so nothing was looked up. In text mode
+ *       the failure is followed by the synopsis and a pointer to {@code --help}
+ *   <li>exit 1 — every other failure. What to do next is {@code kind} and {@code suggestion} in the failure,
+ *       never the code
  * </ul>
  *
- * <p>{@code bal discover <org/name> [bucket] [args...]} is one picocli command, and {@code bucket} a plain positional
- * value rather than a subcommand: package, then bucket, then member is one drill-down, not a mode switch.
+ * <p>{@code bal discover <org>/<name>[:<version>] [bucket] [name ...]} is one picocli command, and {@code bucket} a
+ * plain positional value rather than a subcommand: package, then bucket, then member is one drill-down, not a mode
+ * switch.
  *
  * <p>No {@link System#exit} here, and no environment read: the cache, the transport and the project directory
  * arrive as arguments, so a test drives the real command against a recorded payload and a temporary directory.
@@ -65,6 +72,26 @@ import java.util.regex.Pattern;
  * @since 0.1.0
  */
 public final class Cli {
+
+    private static final String OUTPUT_FLAG = "--output";
+
+    private static final String HELP = "bal discover --help";
+
+    private static final String RUN_HELP = "Run `" + HELP + "` for usage.";
+
+    static final int FAILED = 1;
+
+    private static final int USAGE_ERROR = 2;
+
+    private static final int FIRST_PAGE = 1;
+
+    private static final String COMMAND = "bal discover ";
+
+    private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
+
+    private static final String PLACEHOLDER_VERSION = "<version>";
+
+    private static final String WRITE_VERSION = "To read a specific version, write it after the package: ";
 
     private Cli() {
     }
@@ -102,13 +129,18 @@ public final class Cli {
         }
 
         Commands.Grammar grammar = Commands.Grammar.create();
+        boolean json = jsonOutput(argv, interactive, grammar);
+        UsageErrors usage = new UsageErrors(grammar, streams, json);
         CommandLine.ParseResult parsed;
         try {
             parsed = grammar.line().parseArgs(argv.toArray(new String[0]));
         } catch (CommandLine.ParameterException cause) {
             // picocli's own error printing is deliberately never used: stderr has to hold exactly one `Failure`
             // object, and picocli would write a usage block beside it.
-            return fail(describeParseError(cause), streams);
+            Failure specific = describeParseError(cause, grammar);
+            return specific == null
+                    ? usage.helpError(firstLine(cause.getMessage()))
+                    : usage.error(specific);
         }
 
         // A usage request is answered, not failed: it goes to stdout at exit 0, because "exit 0 means stdout is
@@ -119,52 +151,62 @@ public final class Cli {
         }
 
         Commands.Root root = grammar.root();
+        if (root.version != null) {
+            return usage.error(versionFlag(root));
+        }
         if (root.pkg == null) {
-            return fail(new Failure.Validation(
+            return usage.error(new Failure.Validation(
                     "A package is required.",
-                    "Pass 'org/name', e.g. bal discover ballerinax/github."), streams);
+                    "Pass '<org>/<name>', e.g. bal discover ballerinax/github."));
         }
 
-        Failure argumentError = validate(root);
+        Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
+        if (!coordinate.isOk()) {
+            return usage.error(coordinate.failure().lengthened(Coordinate.moduleArgument(root.module) + tail(root)));
+        }
+        QualifiedName qualified = coordinate.value().qualified();
+
+        Failure argumentError = validate(root, coordinate.value());
         if (argumentError != null) {
-            return fail(argumentError, streams);
+            return usage.error(argumentError);
         }
-
-        Result<QualifiedName> qualified = QualifiedName.parse(root.pkg);
-        if (!qualified.isOk()) {
-            return fail(qualified.failure(), streams);
-        }
+        Version version = coordinate.value().version();
 
         // Checked before the package is ever fetched: a mistyped bucket is a fact about the argument list, not
         // about the package, and costs a round trip to Central if left until after the load.
-        List<String> rest = root.rest == null ? List.of() : root.rest;
+        List<String> rest = rest(root);
         String bucket = rest.isEmpty() ? null : rest.get(0);
         if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
-            return fail(unknownBucket(bucket), streams);
+            return usage.error(unknownBucket(bucket));
+        }
+
+        String filter = root.filter;
+        Failure extra = extraNames(bucket, rest, filter, root, qualified, version);
+        if (extra != null) {
+            return usage.error(extra);
         }
 
         // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
         HttpOptions resolved = http.withRefresh(root.refresh);
         Loader.LoadOptions options = new Loader.LoadOptions(
-                resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, root.version);
-        Result<LoadedPackage> loaded = Loader.loadPackage(qualified.value(), options);
+                resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, version);
+        Result<LoadedPackage> loaded = Loader.loadPackage(qualified, options);
         if (!loaded.isOk()) {
-            return fail(loaded.failure(), streams);
+            return fail(loaded.failure().lengthened(tail(root)), streams, json);
         }
 
-        // A blank keyword filters nothing, so it is no filter at all — normalised once, here, so no header or
-        // printed command downstream ever spells an empty `--filter`.
-        String filter = root.filter == null || root.filter.isBlank() ? null : root.filter;
         Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
         if (!answer.isOk()) {
-            return fail(answer.failure(), streams);
+            return fail(answer.failure(), streams, json);
         }
-        if (root.page != 1 && answer.value().paging() == null) {
-            return fail(notPaged(root, filter), streams);
+        if (root.page != FIRST_PAGE && answer.value().paging() == null) {
+            return fail(notPaged(root, coordinate.value(), filter), streams, json);
         }
-        TextRenderer.Context where = new TextRenderer.Context(qualified.value().qualified(), root.module, rest,
-                filter, root.version);
-        emit(answer.value(), where, streams, root.output, interactive);
+        String read = loaded.value().version().text();
+        TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
+                filter, Version.textOf(version), read);
+        streams.out().accept((json ? JsonRenderer.render(answer.value(), read)
+                : TextRenderer.render(answer.value(), where)) + "\n");
         return 0;
     }
 
@@ -186,29 +228,47 @@ public final class Cli {
         return Containers.render(loaded, scope, new Containers.Options(selectors, filter, page));
     }
 
-    private static Failure notPaged(Commands.Root root, String filter) {
-        StringBuilder command = new StringBuilder("bal discover ").append(root.pkg);
-        if (root.module != null) {
-            command.append(" --module ").append(Texts.shellWord(root.module));
+    private static Failure extraNames(String bucket, List<String> rest, String filter, Commands.Root root,
+            QualifiedName qualified, Version version) {
+        if (bucket == null) {
+            return null;
         }
-        if (root.version != null) {
-            command.append(" --version ").append(Texts.shellWord(root.version));
+        List<String> selectors = rest.subList(1, rest.size());
+        String command = new Coordinate(qualified, version).command(root.module) + " " + bucket;
+        if (Types.BUCKET.equals(bucket)) {
+            return Types.misuse(command, new Types.Options(selectors, filter, root.page));
         }
-        if (root.rest != null) {
-            root.rest.forEach(word -> command.append(' ').append(Texts.shellWord(word)));
+        if (Surface.Scope.MODULE.verb().equals(bucket)) {
+            return Containers.extraFunctionNames(command, new Containers.Options(selectors, filter, root.page));
         }
-        if (filter != null) {
-            command.append(" --filter ").append(Texts.shellWord(filter));
-        }
-        return new Failure.Validation(
-                "--page " + root.page + " is out of range: this answer is not paged.",
-                "Drop --page: `" + command + "`.");
+        return null;
     }
 
-    private static void emit(
-            DiscoverResult result, TextRenderer.Context where, Streams streams, String output, boolean interactive) {
-        boolean json = jsonOutput(output, interactive);
-        streams.out().accept((json ? JsonRenderer.render(result) : TextRenderer.render(result, where)) + "\n");
+    private static String tail(List<String> rest, String filter, int page) {
+        StringBuilder words = new StringBuilder();
+        rest.forEach(word -> words.append(' ').append(Texts.shellWord(word)));
+        if (filter != null) {
+            words.append(" --filter ").append(Texts.shellWord(filter));
+        }
+        if (page != FIRST_PAGE) {
+            words.append(" --page ").append(page);
+        }
+        return words.toString();
+    }
+
+    private static String tail(Commands.Root root) {
+        return tail(rest(root), root.filter, root.page);
+    }
+
+    private static List<String> rest(Commands.Root root) {
+        return root.rest == null ? List.of() : root.rest;
+    }
+
+    private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
+        String command = coordinate.command(root.module) + tail(rest(root), filter, FIRST_PAGE);
+        return new Failure.Validation(
+                "Page " + root.page + " is out of range: this answer is not paged.",
+                "Drop --page: " + Failure.quoted(command) + ".", command);
     }
 
     private static Failure unknownBucket(String token) {
@@ -235,37 +295,74 @@ public final class Cli {
         List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.BucketList.Submodule(
                         submodule.name(), submodule.summary(),
-                        "bal discover " + loaded.pkgArgument(submodule.name())))
+                        COMMAND + loaded.pkgArgument(submodule.name())))
                 .toList();
         return new DiscoverResult.BucketList(List.copyOf(buckets), submodules, loaded.warning());
     }
 
-    private static boolean jsonOutput(String output, boolean interactive) {
-        return output != null ? Commands.JSON_OUTPUT.equals(output) : !interactive;
+    /**
+     * The run's output mode: a valid {@code --output} in argv, else JSON unless stdout is a terminal. Read off argv,
+     * not the parsed flag, so a parse failure is still written in the mode the caller asked for.
+     */
+    public static boolean jsonOutput(List<String> argv, boolean interactive) {
+        return jsonOutput(argv, interactive, Commands.Grammar.create());
     }
 
-    private static Failure validate(Commands.Root root) {
+    private static boolean jsonOutput(List<String> argv, boolean interactive, Commands.Grammar grammar) {
+        Set<String> takesValue = grammar.line().getCommandSpec().options().stream()
+                .filter(option -> option.arity().min() > 0)
+                .flatMap(option -> Arrays.stream(option.names()))
+                .collect(Collectors.toSet());
+        for (int i = 0; i < argv.size(); i++) {
+            String token = argv.get(i);
+            String value = null;
+            if (token.startsWith(OUTPUT_FLAG + "=")) {
+                value = token.substring(OUTPUT_FLAG.length() + 1);
+            } else if (takesValue.contains(token) && i + 1 < argv.size()) {
+                i++;
+                value = token.equals(OUTPUT_FLAG) ? argv.get(i) : null;
+            }
+            if (Commands.JSON_OUTPUT.equals(value) || Commands.TEXT_OUTPUT.equals(value)) {
+                return Commands.JSON_OUTPUT.equals(value);
+            }
+        }
+        return !interactive;
+    }
+
+    private static Failure validate(Commands.Root root, Coordinate coordinate) {
         Failure output = rejectInvalidOutput(root);
         if (output != null) {
             return output;
         }
-        if (root.page < 1) {
+        if (root.filter != null && root.filter.isBlank()) {
+            return new Failure.Validation("The --filter option needs a keyword.",
+                    "Write --filter <keyword>, or drop it to list everything.");
+        }
+        if (root.page < FIRST_PAGE) {
             return new Failure.Validation(
-                    "--page " + root.page + " is out of range: pages are numbered from 1.",
+                    "Page " + root.page + " is out of range: pages are numbered from 1.",
                     "Pass --page 1 or later, or drop it for the first page.");
         }
-        Failure badVersion = rejectInvalidVersion(root);
-        return badVersion != null ? badVersion : rejectVersionArguments(root);
+        return rejectVersionArguments(root, coordinate.qualified());
     }
 
-    private static Failure rejectInvalidVersion(Commands.Root root) {
-        if (root.version == null
-                || VERSION_SHAPED.matcher(root.version).matches() && Version.parse(root.version).isOk()) {
-            return null;
+    private static Failure versionFlag(Commands.Root root) {
+        String message = "Unknown option '" + Commands.VERSION_FLAG + "'.";
+        Result<Coordinate> coordinate = root.pkg == null ? null : Coordinate.parse(root.pkg);
+        if (coordinate == null || !coordinate.isOk()) {
+            return new Failure.Validation(message, "To read a specific version, write " + PLACEHOLDER_PACKAGE + ":"
+                    + PLACEHOLDER_VERSION);
         }
-        return new Failure.Validation(
-                "'" + root.version + "' is not a version.",
-                "Pass a version as Central publishes it, e.g. --version 2.15.0.");
+        return writtenVersion(message, root, coordinate.value().qualified(), root.version, tail(root));
+    }
+
+    private static Failure writtenVersion(String message, Commands.Root root, QualifiedName qualified,
+            String version, String tail) {
+        if (!Version.isComplete(version)) {
+            return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
+        }
+        String command = new Coordinate(qualified, Version.parse(version).value()).command(root.module) + tail;
+        return new Failure.Validation(message, WRITE_VERSION + Failure.quoted(command) + ".", command);
     }
 
     private static Failure rejectInvalidOutput(Commands.Root root) {
@@ -278,61 +375,92 @@ public final class Cli {
                 "Pass --output " + Commands.JSON_OUTPUT + " or --output " + Commands.TEXT_OUTPUT + ".");
     }
 
-    /** A version, as Central publishes them. No bucket name, selector or path can look like one. */
-    private static final Pattern VERSION_SHAPED =
-            Pattern.compile("^\\d+\\.\\d+\\.\\d+([-+.].*)?$");
-
-    private static Failure rejectVersionArguments(Commands.Root root) {
+    private static Failure rejectVersionArguments(Commands.Root root, QualifiedName qualified) {
         List<String> tokens = root.rest;
         if (tokens == null) {
             return null;
         }
         String misplaced = tokens.stream()
-                .filter(token -> VERSION_SHAPED.matcher(token).matches())
+                .filter(Version::isComplete)
                 .findFirst()
                 .orElse(null);
         if (misplaced == null) {
             return null;
         }
-        return new Failure.Validation(
-                "'" + misplaced + "' looks like a version, and a version is a flag, not an argument.",
-                "Pass it as --version " + misplaced + ". Without it the version is resolved from your project: "
-                        + "the one its Dependencies.toml locks, so a lookup matches what `bal build` compiles "
-                        + "against, or outside a project Central's latest.");
+        List<String> others = new ArrayList<>(tokens);
+        others.remove(misplaced);
+        return writtenVersion("'" + misplaced + "' looks like a version.", root, qualified, misplaced,
+                tail(others, root.filter, root.page));
     }
 
-    private static Failure describeParseError(CommandLine.ParameterException cause) {
+    // The failure a parse error is, or null when picocli's own first line says it best.
+    private static Failure describeParseError(CommandLine.ParameterException cause, Commands.Grammar grammar) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();
-            String token = tokens.isEmpty() ? "" : tokens.get(0);
-            if (token.startsWith("-")) {
-                return new Failure.Validation(
-                        "Unknown option '" + token + "'.",
-                        UsageRenderer.knownFlags(Commands.Grammar.create()) + " Run with --help for usage.");
-            }
+            // Every positional fits `[bucket] [name ...]`, so only an option is ever left unmatched.
             return new Failure.Validation(
-                    "Unexpected argument '" + token + "'.",
-                    "Run `bal discover --help` for usage.");
+                    "Unknown option '" + (tokens.isEmpty() ? "" : tokens.get(0)) + "'.",
+                    UsageRenderer.knownFlags(grammar));
+        }
+        if (cause instanceof CommandLine.OverwrittenOptionException overwritten
+                && overwritten.getOverwritten() instanceof CommandLine.Model.OptionSpec option) {
+            return new Failure.Validation(
+                    option.longestName() + " is given more than once.", "Pass " + option.longestName() + " once.");
         }
         if (cause instanceof CommandLine.MissingParameterException missing) {
-            return new Failure.Validation(
-                    firstLine(missing.getMessage()),
-                    "Pass the value after the flag, or as --flag=value.");
+            return missing.getMissing().stream()
+                    .filter(CommandLine.Model.OptionSpec.class::isInstance)
+                    .map(CommandLine.Model.OptionSpec.class::cast)
+                    .findFirst()
+                    .map(Cli::missingValue)
+                    .orElse(null);
         }
+        if (cause.getArgSpec() instanceof CommandLine.Model.OptionSpec option && cause.getValue() != null) {
+            if (option.type() == boolean.class) {
+                return new Failure.Validation(
+                        option.longestName() + " takes no value.",
+                        "Write " + option.longestName() + ".");
+            }
+            return new Failure.Validation(
+                    "'" + cause.getValue() + "' is not a valid " + option.longestName() + " value.",
+                    "Write " + option.longestName() + " " + option.paramLabel() + ".");
+        }
+        return null;
+    }
+
+    private static Failure missingValue(CommandLine.Model.OptionSpec option) {
+        String name = option.longestName();
+        String label = option.paramLabel();
         return new Failure.Validation(
-                firstLine(cause.getMessage()),
-                "Run with --help for usage.");
+                "The " + name + " option needs a value.",
+                "Write " + name + " " + label + " or " + name + "=" + label + ".");
     }
 
     private static String firstLine(String message) {
-        if (message == null) {
-            return "invalid arguments";
-        }
-        return message.split("\n", -1)[0];
+        String line = message == null ? "Invalid arguments" : message.split("\n", -1)[0];
+        return line.endsWith(".") ? line : line + ".";
     }
 
-    private static int fail(Failure failure, Streams streams) {
-        streams.errorOut().accept(failure.describe() + "\n");
-        return 1;
+    private static int fail(Failure failure, Streams streams, boolean json) {
+        streams.errorOut().accept(failure.describe(json) + "\n");
+        return FAILED;
+    }
+
+    private record UsageErrors(Commands.Grammar grammar, Streams streams, boolean json) {
+
+        int error(Failure failure) {
+            return write(failure, true);
+        }
+
+        int helpError(String message) {
+            return write(new Failure.Validation(message, RUN_HELP), false);
+        }
+
+        private int write(Failure failure, boolean pointToHelp) {
+            String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar)
+                    + (pointToHelp ? "\nRun `" + HELP + "` for details." : "");
+            streams.errorOut().accept(failure.describe(json) + usage + "\n");
+            return USAGE_ERROR;
+        }
     }
 }

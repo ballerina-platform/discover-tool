@@ -17,6 +17,7 @@
  */
 package io.ballerina.tools.discover.views;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
@@ -115,21 +116,36 @@ public final class Types {
     }
 
     public static Result<DiscoverResult> render(LoadedPackage loaded, Options options) {
-        if (options.selectors().size() > 1) {
-            return Result.err(new Failure.Validation(
-                    "type takes one declaration name; got " + options.selectors().size() + ".",
-                    "Name one declaration, or list them all: `" + baseCommand(loaded) + "`."));
+        Failure misuse = misuse(baseCommand(loaded), options);
+        if (misuse != null) {
+            return Result.err(misuse);
         }
         if (options.selectors().isEmpty()) {
             return roster(loaded, options);
         }
-        if (options.filtered()) {
-            return Result.err(new Failure.Validation(
-                    "--filter narrows a listing, and '" + options.selectors().get(0) + "' names one declaration.",
-                    "Drop --filter, or drop the name: `" + baseCommand(loaded) + " "
-                            + "--filter " + Texts.shellWord(options.filter()) + "`."));
-        }
         return leaf(loaded, options.selectors().get(0), options.note());
+    }
+
+    /**
+     * The failure for more than one name, or a name with {@code --filter}, or {@code null}; checked before the
+     * package is fetched.
+     *
+     * @param command the command the bucket is listed with, e.g. {@code bal discover ballerina/io type}
+     */
+    public static Failure misuse(String command, Options options) {
+        if (options.selectors().size() > 1) {
+            return new Failure.Validation(
+                    "The type bucket takes one declaration name; got " + options.selectors().size() + ".",
+                    "Name one declaration, or list them all: `" + command + "`.");
+        }
+        if (options.selectors().size() == 1 && options.filtered()) {
+            return new Failure.Validation(
+                    "The --filter option narrows a listing, and '" + options.selectors().get(0)
+                            + "' names one declaration.",
+                    "Drop --filter, or drop the name: `" + command + " --filter "
+                            + Texts.shellWord(options.filter()) + "`.");
+        }
+        return null;
     }
 
     private static List<Entry> entries(Library library) {
@@ -260,14 +276,13 @@ public final class Types {
                 return leaf(loaded, enumName, note == null ? routing : routing + " " + note);
             }
             if (owners.size() > 1) {
-                return Result.err(new Failure.SymbolNotFound(
-                        loaded.label(), List.of(requested), owners.stream().map(TypeDef.Enumeration::name).toList(),
-                        "'" + memberName(requested) + "' is a member of several enums, so this reader will not "
+                return Result.err(loaded.symbolNotFound(List.of(requested),
+                        owners.stream().map(TypeDef.Enumeration::name).toList(),
+                        "'" + memberName(requested) + "' is a member of several enums, so this tool will not "
                                 + "choose between them. Re-run with the enum whose member you mean, exactly as "
                                 + "spelled."));
             }
-            return Result.err(new Failure.SymbolNotFound(
-                    loaded.label(), List.of(requested), Names.candidatesOf(match),
+            return Result.err(loaded.symbolNotFound(List.of(requested), Names.candidatesOf(match),
                     missSuggestion(loaded, match instanceof Names.Match.Ambiguous)));
         }
         String name = found.name();
@@ -349,8 +364,7 @@ public final class Types {
         if (!nothingToShow) {
             return answer;
         }
-        return Result.err(new Failure.SymbolNotFound(
-                loaded.label(), List.of(object.name()), List.of(),
+        return Result.err(loaded.symbolNotFound(List.of(object.name()), List.of(),
                 "'" + object.name() + "' is " + (listener ? "a listener" : "an object") + " this package declares, "
                         + "but `" + scope.verb() + "` has nothing to show for it, and `type` holds only what is not "
                         + "callable. List the buckets with `bal discover " + loaded.pkgArgument() + "`, or search "
@@ -360,7 +374,7 @@ public final class Types {
     private static String missSuggestion(LoadedPackage loaded, boolean ambiguous) {
         String search = "`" + baseCommand(loaded) + " --filter <keyword>`";
         return (ambiguous
-                ? "Several declarations normalise to the same name, so this reader will not choose between them. "
+                ? "Several declarations normalise to the same name, so this tool will not choose between them. "
                         + "Re-run with one of the candidates exactly as spelled"
                 : "No declaration matched. Re-run with one of the candidates if it is what you meant, or search "
                         + "by keyword with " + search)
@@ -421,7 +435,7 @@ public final class Types {
 
     private static String pinnedTo(LoadedPackage loaded, ModuleRef module, String target) {
         return target.equals(module.coordinate()) && !module.coordinate().equals(loaded.qualified().qualified())
-                ? target + module.pinnedVersion().map(version -> " --version " + version).orElse("")
+                ? Coordinate.argument(target, module.pinnedVersion().orElse(null), null)
                 : target;
     }
 }

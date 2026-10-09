@@ -18,18 +18,22 @@
 
 package io.ballerina.tools.discover.cli;
 
-import com.google.gson.JsonObject;
 import io.ballerina.cli.BLauncherCmd;
+import io.ballerina.projects.util.ProjectConstants;
+import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.cache.CacheLocation;
 import io.ballerina.tools.discover.cache.DiskCache;
 import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
+import io.ballerina.tools.discover.central.ProxySettings;
+import org.wso2.ballerinalang.util.RepoUtils;
 import picocli.CommandLine;
 
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -47,6 +51,8 @@ import java.util.List;
  */
 @CommandLine.Command(name = "discover")
 public class DiscoverTool implements BLauncherCmd {
+
+    private static final String BASIC_SCHEME = "Basic";
 
     @CommandLine.Parameters(arity = "0..*")
     private List<String> argList;
@@ -94,25 +100,34 @@ public class DiscoverTool implements BLauncherCmd {
 
     @Override
     public void execute() {
+        boolean basicProxyAuthAllowed = allowBasicProxyAuthInTunnels();
         List<String> argv = new ArrayList<>(argList == null ? List.of() : argList);
         if (helpFlag) {
             argv.add("--help");
         }
-        HttpOptions http = HttpOptions.builder().cache(buildCache()).build();
+        HttpOptions.Builder builder = HttpOptions.builder()
+                .cache(buildCache())
+                .basicProxyAuthDisabled(!basicProxyAuthAllowed)
+                .proxy(ProxySettings.configured().orElse(null));
+        Path home = ballerinaHome();
+        if (home != null) {
+            builder.settingsFile(displayPath(home.resolve(ProjectConstants.SETTINGS_FILE_NAME), property("user.home")));
+        }
+        HttpOptions http = builder.build();
         Cli.Streams streams = new Cli.Streams(outStream::print, errStream::print);
 
+        // Pre-JDK 22, System.console() is null if EITHER stream is redirected, so a terminal with redirected
+        // stdin is under-detected. That is the safe direction: a human gets JSON (recoverable with
+        // --output text) rather than an agent's parser getting prose.
+        boolean interactive = System.console() != null;
         int code;
         try {
-            // Pre-JDK 22, System.console() is null if EITHER stream is redirected, so a terminal with redirected
-            // stdin is under-detected. That is the safe direction: a human gets JSON (recoverable with
-            // --output text) rather than an agent's parser getting prose.
-            boolean interactive = System.console() != null;
             code = Cli.run(argv, streams, http, discoverProject(), interactive);
         } catch (RuntimeException cause) {
-            // Nothing in the pipeline throws by design; if something does, it is a defect in this tool and the
-            // caller still needs a machine-readable line rather than a Java stack trace on stdout.
-            errStream.print(internalFailure(cause) + "\n");
-            code = 1;
+            // Nothing throws by design; a defect still reaches the caller as a failure in the run's own mode.
+            Failure failure = new Failure.Internal(messageOf(cause), Failure.INTERNAL_SUGGESTION);
+            errStream.print(failure.describe(Cli.jsonOutput(argv, interactive)) + "\n");
+            code = Cli.FAILED;
         }
 
         outStream.flush();
@@ -125,14 +140,37 @@ public class DiscoverTool implements BLauncherCmd {
         }
     }
 
-    private static String internalFailure(Throwable cause) {
-        String message = cause.getMessage();
-        JsonObject json = new JsonObject();
-        json.addProperty("kind", "internal");
-        json.addProperty("message", message == null || message.isEmpty()
+    // Lets Basic answer a tunnel's proxy challenge, as bal pull does; keeps a value the user set. Must run before
+    // any HttpClient exists: the JDK reads the property once.
+    static boolean allowBasicProxyAuthInTunnels() {
+        Object chosen = System.getProperties().putIfAbsent(HttpOptions.TUNNELING_DISABLED_SCHEMES, "");
+        return chosen == null || Arrays.stream(chosen.toString().split(","))
+                .map(String::trim)
+                .noneMatch(BASIC_SCHEME::equalsIgnoreCase);
+    }
+
+    static String displayPath(Path file, String userHome) {
+        if (userHome != null && !userHome.isEmpty()) {
+            Path home = Path.of(userHome);
+            if (file.startsWith(home) && !file.equals(home)) {
+                return "~" + file.getFileSystem().getSeparator() + home.relativize(file);
+            }
+        }
+        return file.toString();
+    }
+
+    private static String messageOf(Throwable cause) {
+        return cause.getMessage() == null || cause.getMessage().isEmpty()
                 ? cause.getClass().getName()
-                : message);
-        return json.toString();
+                : cause.getMessage();
+    }
+
+    private static Path ballerinaHome() {
+        try {
+            return RepoUtils.createAndGetHomeReposPath();
+        } catch (RuntimeException | LinkageError unavailable) {
+            return null;
+        }
     }
 
     private static DocsCache buildCache() {

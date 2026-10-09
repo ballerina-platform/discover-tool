@@ -142,8 +142,8 @@ Past the closure budget (9)
   ClientSocketConfig    bal discover ballerina/http type ClientSocketConfig
 
 From other packages (2)
-  TrustStore  ballerina/crypto 2.9.3  bal discover ballerina/crypto --version 2.9.3 type TrustStore
-  KeyStore    ballerina/crypto 2.9.3  bal discover ballerina/crypto --version 2.9.3 type KeyStore
+  TrustStore  ballerina/crypto 2.9.3  bal discover ballerina/crypto:2.9.3 type TrustStore
+  KeyStore    ballerina/crypto 2.9.3  bal discover ballerina/crypto:2.9.3 type KeyStore
 == ballerina__http type ClientError ==
 ballerina/http · type · ClientError
 
@@ -454,21 +454,21 @@ public type ConnectionConfig record {|
 |};
 
 From other packages (15)
-  BearerTokenConfig     ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type BearerTokenConfig
-  HttpVersion           ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type HttpVersion
-  ClientHttp1Settings   ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type ClientHttp1Settings
-  ClientHttp2Settings   ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type ClientHttp2Settings
-  FollowRedirects       ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type FollowRedirects
-  PoolConfiguration     ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type PoolConfiguration
-  CacheConfig           ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type CacheConfig
-  Compression           ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type Compression
-  CircuitBreakerConfig  ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type CircuitBreakerConfig
-  RetryConfig           ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type RetryConfig
-  CookieConfig          ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type CookieConfig
-  ResponseLimitConfigs  ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type ResponseLimitConfigs
-  ClientSecureSocket    ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type ClientSecureSocket
-  ProxyConfig           ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type ProxyConfig
-  ClientSocketConfig    ballerina/http 2.15.5  bal discover ballerina/http --version 2.15.5 type ClientSocketConfig
+  BearerTokenConfig     ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type BearerTokenConfig
+  HttpVersion           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type HttpVersion
+  ClientHttp1Settings   ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ClientHttp1Settings
+  ClientHttp2Settings   ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ClientHttp2Settings
+  FollowRedirects       ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type FollowRedirects
+  PoolConfiguration     ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type PoolConfiguration
+  CacheConfig           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type CacheConfig
+  Compression           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type Compression
+  CircuitBreakerConfig  ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type CircuitBreakerConfig
+  RetryConfig           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type RetryConfig
+  CookieConfig          ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type CookieConfig
+  ResponseLimitConfigs  ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ResponseLimitConfigs
+  ClientSecureSocket    ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ClientSecureSocket
+  ProxyConfig           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ProxyConfig
+  ClientSocketConfig    ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ClientSocketConfig
 == ballerinax__googleapis.sheets type ConnectionConfig ==
 ballerinax/googleapis.sheets · type · ConnectionConfig
 
@@ -525,20 +525,20 @@ Types it names (2)
   |};
 
 From other packages (14)
-  BearerTokenConfig              ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type BearerTokenConfig
-  HttpVersion                    ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type HttpVersion
-  ClientHttp2Settings            ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type ClientHttp2Settings
-  PoolConfiguration              ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type PoolConfiguration
-  CacheConfig                    ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type CacheConfig
-  Compression                    ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type Compression
-  CircuitBreakerConfig           ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type CircuitBreakerConfig
-  RetryConfig                    ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type RetryConfig
-  ResponseLimitConfigs           ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type ResponseLimitConfigs
-  ClientSecureSocket             ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type ClientSecureSocket
-  ProxyConfig                    ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type ProxyConfig
-  OAuth2RefreshTokenGrantConfig  ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type OAuth2RefreshTokenGrantConfig
-  KeepAlive                      ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type KeepAlive
-  Chunking                       ballerina/http 2.14.10  bal discover ballerina/http --version 2.14.10 type Chunking
+  BearerTokenConfig              ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type BearerTokenConfig
+  HttpVersion                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type HttpVersion
+  ClientHttp2Settings            ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type ClientHttp2Settings
+  PoolConfiguration              ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type PoolConfiguration
+  CacheConfig                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type CacheConfig
+  Compression                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type Compression
+  CircuitBreakerConfig           ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type CircuitBreakerConfig
+  RetryConfig                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type RetryConfig
+  ResponseLimitConfigs           ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type ResponseLimitConfigs
+  ClientSecureSocket             ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type ClientSecureSocket
+  ProxyConfig                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type ProxyConfig
+  OAuth2RefreshTokenGrantConfig  ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type OAuth2RefreshTokenGrantConfig
+  KeepAlive                      ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type KeepAlive
+  Chunking                       ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type Chunking
 == ballerinax__kafka type TopicPartitionOffset ==
 ballerinax/kafka · type · TopicPartitionOffset
 
@@ -564,4 +564,9 @@ Types it names (2)
       int? leaderEpoch = ();
   |};
 == ballerinax__kafka type NoSuchType ==
-{"kind":"symbol-not-found","qualified":"ballerinax/kafka:0.0.0-fixture","requested":["NoSuchType"],"candidates":["CompressionType","DeserializerType","SerializerType"],"suggestion":"No declaration matched. Re-run with one of the candidates if it is what you meant, or search by keyword with `bal discover ballerinax/kafka type --filter <keyword>`. Add --refresh if you believe the name exists and is newer than the cached copy."}
+error: No match for 'NoSuchType' in ballerinax/kafka:0.0.0-fixture.
+  No declaration matched. Re-run with one of the candidates if it is what you meant, or search by keyword with `bal discover ballerinax/kafka type --filter <keyword>`. Add --refresh if you believe the name exists and is newer than the cached copy.
+  candidates:
+    CompressionType
+    DeserializerType
+    SerializerType

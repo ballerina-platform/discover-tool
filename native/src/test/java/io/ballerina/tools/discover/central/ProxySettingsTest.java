@@ -1,0 +1,122 @@
+/*
+ *  Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com)
+ *
+ *  WSO2 LLC. licenses this file to you under the Apache License,
+ *  Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing,
+ *  software distributed under the License is distributed on an
+ *  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ *  KIND, either express or implied.  See the License for the
+ *  specific language governing permissions and limitations
+ *  under the License.
+ */
+
+package io.ballerina.tools.discover.central;
+
+import io.ballerina.projects.TomlDocument;
+import io.ballerina.projects.internal.SettingsBuilder;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+import org.wso2.ballerinalang.util.RepoUtils;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
+
+/**
+ * The {@code [proxy]} table is read as {@code bal pull} reads it: a host and a positive port make a proxy,
+ * credentials count only in pairs, and anything less is no proxy rather than a failure.
+ *
+ * @since 0.1.0
+ */
+public class ProxySettingsTest {
+
+    private static Optional<ProxySettings> parse(String settingsToml) {
+        try {
+            return ProxySettings.of(SettingsBuilder.from(TomlDocument.from("Settings.toml", settingsToml))
+                    .settings().getProxy());
+        } catch (RuntimeException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    @Test
+    public void aHostAndPortMakeAProxyWithoutCredentials() {
+        Optional<ProxySettings> proxy = parse("""
+                [proxy]
+                host = "proxy.example.com"
+                port = 3128
+                """);
+        Assert.assertEquals(proxy, Optional.of(new ProxySettings("proxy.example.com", 3128, "", "")));
+        Assert.assertFalse(proxy.get().authenticates());
+    }
+
+    @Test
+    public void aUsernameAndPasswordTogetherAuthenticate() {
+        ProxySettings proxy = parse("""
+                [central]
+                accesstoken = "token"
+
+                [proxy]
+                host = "10.0.0.1"
+                port = 8080
+                username = "alice"
+                password = "secret"
+                """).orElseThrow();
+        Assert.assertEquals(proxy, new ProxySettings("10.0.0.1", 8080, "alice", "secret"));
+        Assert.assertTrue(proxy.authenticates());
+        Assert.assertFalse(proxy.toString().contains("secret"), proxy.toString());
+    }
+
+    @Test
+    public void aUsernameWithoutAPasswordDoesNotAuthenticate() {
+        ProxySettings proxy = parse("""
+                [proxy]
+                host = "proxy.example.com"
+                port = 3128
+                username = "alice"
+                """).orElseThrow();
+        Assert.assertFalse(proxy.authenticates());
+    }
+
+    @Test
+    public void anythingShortOfAHostAndAPositivePortIsNoProxy() {
+        for (String settings : new String[] {
+                "",
+                "[central]\naccesstoken = \"token\"\n",
+                "[proxy]\n",
+                "[proxy]\nhost = \"\"\nport = 3128\n",
+                "[proxy]\nhost = \"proxy.example.com\"\n",
+                "[proxy]\nhost = \"proxy.example.com\"\nport = 0\n",
+                "[proxy]\nhost = \"proxy.example.com\"\nport = -1\n",
+                "[proxy]\nhost = \"proxy.example.com\"\nport = \"3128\"\n",
+                "[proxy]\nhost = 42\nport = 3128\n",
+                "proxy = \"proxy.example.com:3128\"\n"}) {
+            Assert.assertEquals(parse(settings), Optional.empty(), settings);
+        }
+    }
+
+    // bal pull's reader salvages the table from a malformed file, so it proxies as it does for bal pull.
+    @Test
+    public void theSettingsFileIsReadFromTheBallerinaHomeAsBalPullReadsItAndAMissingOneIsNoProxy()
+            throws IOException {
+        Path home = Files.createDirectories(RepoUtils.createAndGetHomeReposPath());
+        Path settings = home.resolve("Settings.toml");
+        Assert.assertFalse(Files.exists(settings), "the test Ballerina home must not carry a Settings.toml");
+        Assert.assertEquals(ProxySettings.configured(), Optional.empty());
+        try {
+            Files.writeString(settings, "[proxy\nhost = \"proxy.example.com\"\nport = 3128\n", StandardCharsets.UTF_8);
+            Assert.assertEquals(ProxySettings.configured(),
+                    Optional.of(new ProxySettings("proxy.example.com", 3128, "", "")));
+        } finally {
+            Files.deleteIfExists(settings);
+        }
+    }
+}

@@ -21,14 +21,17 @@ package io.ballerina.tools.discover;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Failures are values, not thrown classes.
  *
  * <p>The question every failure has to answer is "what does the agent reading this do next". The
- * answer is carried by {@link #kind()} and {@link #describe()}, not by the exit code: a failing run
- * is exit 1 whatever went wrong, so the discriminator has to be in the JSON. A sealed
+ * answer is carried by {@link #kind()} and {@link #describe()}, not by the exit code, which only tells a
+ * malformed command line (2) from every other failure (1), so the discriminator has to be in the JSON. A sealed
  * hierarchy makes both switches exhaustive with no {@code default}, so a new failure mode fails the
  * build until someone names it and decides what it tells the caller.
  *
@@ -45,33 +48,69 @@ public sealed interface Failure {
     record SchemaIssue(String path, String message) { }
 
     /**
-     * The caller's arguments are wrong — nothing upstream was contacted.
+     * The caller's arguments are wrong.
      *
      * @param message what was wrong with the arguments
-     * @param suggestion the corrected command to run instead
+     * @param suggestion what to do instead
+     * @param command the caller's command with the fix applied, ready to run, or {@code null} when there is no one
+     *     fix; the suggestion quotes it
      */
-    record Validation(String message, String suggestion) implements Failure { }
+    record Validation(String message, String suggestion, String command) implements Failure {
+
+        public Validation(String message, String suggestion) {
+            this(message, suggestion, null);
+        }
+    }
 
     /**
-     * Central has no such package, or no such version of it.
+     * Central has no such package, no such version of it, or no such module at that version.
      *
-     * @param qualified the coordinate that was not found
+     * @param qualified the {@code org/name} that was not found, or whose module was not
+     * @param version the version that was looked for, or {@code null} when none was reached
+     * @param module the {@code --module} that was looked for, or {@code null} for the package's default module
      * @param suggestion what to try instead
+     * @param command the caller's command with the fix applied, ready to run, or {@code null} when there is no one
+     *     fix; the suggestion quotes it
+     * @param candidates the submodules the package does publish, when a {@code --module} was not found
      */
-    record PackageNotFound(String qualified, String suggestion) implements Failure { }
+    record PackageNotFound(String qualified, String version, String module, String suggestion, String command,
+            List<String> candidates) implements Failure {
+
+        public PackageNotFound(String qualified, String version, String module, String suggestion, String command) {
+            this(qualified, version, module, suggestion, command, List.of());
+        }
+
+        public PackageNotFound(String qualified, String version, String module, String suggestion) {
+            this(qualified, version, module, suggestion, null);
+        }
+    }
 
     /**
-     * Central answered, but not usefully — a 4xx/5xx, a network error, a bad body. {@code status} is
-     * {@code null} when the failure happened before a status line existed.
+     * A request to Central failed: Central answered with an error status or a body that is not JSON, or no answer
+     * from Central came back at all — the connection, DNS, TLS or the proxy failed.
      *
      * @param url the request that failed
-     * @param attempts how many times it was retried before giving up
-     * @param message what Central's answer, or the transport, said
+     * @param attempts how many attempts were made before giving up
+     * @param message what went wrong, as a sentence without its full stop
      * @param suggestion what to try next
-     * @param status the HTTP status Central answered with, or {@code null}
+     * @param status the HTTP status the request failed with — Central's when {@code reached}, else the proxy's —
+     *     or {@code null} when no status line came back
+     * @param reached whether Central answered
+     * @param qualified the {@code org/name} the request was for, or {@code null} when not yet known
+     * @param version the version it was for, or {@code null} when none was reached
      */
-    record Upstream(String url, int attempts, String message, String suggestion, Integer status)
-            implements Failure { }
+    record Upstream(String url, int attempts, String message, String suggestion, Integer status, boolean reached,
+            String qualified, String version) implements Failure {
+
+        public Upstream(String url, int attempts, String message, String suggestion, Integer status,
+                boolean reached) {
+            this(url, attempts, message, suggestion, status, reached, null, null);
+        }
+
+        public Upstream about(String forPackage, String atVersion) {
+            return new Upstream(url, attempts, message, suggestion, status, reached, forPackage, atVersion);
+        }
+    }
 
     /**
      * Central did not answer inside the budget.
@@ -79,58 +118,77 @@ public sealed interface Failure {
      * @param url the request that timed out
      * @param budgetMs the budget it exceeded, in milliseconds
      * @param suggestion what to try next
+     * @param qualified the {@code org/name} the request was for, or {@code null} when not yet known
+     * @param version the version it was for, or {@code null} when none was reached
      */
-    record Timeout(String url, long budgetMs, String suggestion) implements Failure { }
+    record Timeout(String url, long budgetMs, String suggestion, String qualified, String version)
+            implements Failure {
+
+        public Timeout(String url, long budgetMs, String suggestion) {
+            this(url, budgetMs, suggestion, null, null);
+        }
+
+        public Timeout about(String forPackage, String atVersion) {
+            return new Timeout(url, budgetMs, suggestion, forPackage, atVersion);
+        }
+    }
 
     /**
-     * Central answered with a shape this reader does not understand.
+     * Central answered with a shape this tool does not understand.
      *
-     * @param qualified the package coordinate whose payload drifted
+     * @param qualified the {@code org/name} whose payload drifted
+     * @param version the version that payload was read at, or {@code null} when unknown
+     * @param module the {@code --module} whose page drifted, or {@code null} for the package's default module
      * @param issues every place the payload stopped matching the schema
      * @param suggestion what to try next
      */
-    record SchemaDrift(String qualified, List<SchemaIssue> issues, String suggestion) implements Failure { }
+    record SchemaDrift(String qualified, String version, String module, List<SchemaIssue> issues,
+            String suggestion) implements Failure { }
 
     /**
      * The package parsed, but no declaration matched the name the caller asked for. {@code
      * candidates} is what the index does hold — either near-misses of the requested name, or the
      * whole roster when there were none.
      *
-     * @param qualified the package coordinate that was searched
+     * @param qualified the {@code org/name} that was searched
+     * @param version the version that was searched, or {@code null} when unknown
+     * @param module the {@code --module} that was searched, or {@code null} for the package's default module
      * @param requested the name (or names) the caller asked for
      * @param candidates the near-misses, or the whole roster when there were none
      * @param suggestion what to try next
      */
-    record SymbolNotFound(String qualified, List<String> requested, List<String> candidates, String suggestion)
-            implements Failure { }
+    record SymbolNotFound(String qualified, String version, String module, List<String> requested,
+            List<String> candidates, String suggestion) implements Failure { }
 
     /**
-     * The route left when Central itself is the problem: a resolved version's {@code .bala} carries the same
-     * signatures Central serves, but only if some build already pulled it, so it follows a retry. Every
-     * suggestion that admits defeat must forbid writing the call from a remembered API — the failure this tool
-     * exists to prevent, and measurably what a blocked agent does otherwise.
+     * A defect in this tool: something in the pipeline threw.
+     *
+     * @param message what was thrown
+     * @param suggestion what to do about it
+     */
+    record Internal(String message, String suggestion) implements Failure { }
+
+    String INTERNAL_SUGGESTION = "This is a defect in bal discover, not in the arguments. Report it with the "
+            + "command that produced it.";
+
+    /**
+     * The route left when Central's payload itself is unreadable: a resolved version's {@code .bala} carries the
+     * same signatures Central serves, but only if some build already pulled it. It forbids writing the call from a
+     * remembered API — the failure this tool exists to prevent, and measurably what a blocked agent does otherwise.
      */
     String OFFLINE_FALLBACK = "read the resolved version's sources under "
             + "`~/.ballerina/repositories/central.ballerina.io/bala/<org>/<name>/`, which exist if a "
             + "build already pulled the package — those are the signatures Central publishes. Never "
             + "fall back to a remembered signature.";
 
-    /**
-     * Shared rather than written at each construction site: more than one module raises each of these, and one
-     * {@code kind} must never carry two different instructions.
-     */
-    String UPSTREAM_SUGGESTION = "Central answered badly. Run the same command once more; if it "
-            + "persists, " + OFFLINE_FALLBACK;
-
-    String TIMEOUT_SUGGESTION = "Central did not answer in time. Run the same command once more — a "
-            + "large package is slow on a cold fetch. If it persists, " + OFFLINE_FALLBACK;
+    String UPSTREAM_SUGGESTION = "Central returned an error; run the same command again later.";
 
     /**
      * Addressed to a human on purpose: no argument the agent can change will make a payload this
-     * reader cannot parse. The fallback still applies — a package Central mis-serves is intact on
+     * tool cannot parse. The fallback still applies — a package Central mis-serves is intact on
      * disk — so reporting the drift and getting on with the work are not alternatives.
      */
-    String SCHEMA_DRIFT_SUGGESTION = "Central's payload no longer matches this reader, so no change "
+    String SCHEMA_DRIFT_SUGGESTION = "Central's answer no longer matches what this tool reads, so no change "
             + "of arguments will help. Report the `issues` paths, then " + OFFLINE_FALLBACK;
 
     /** The discriminator an agent branches on, and the JSON field of the same name. */
@@ -142,38 +200,98 @@ public sealed interface Failure {
             case Timeout ignored -> "timeout";
             case SchemaDrift ignored -> "schema-drift";
             case SymbolNotFound ignored -> "symbol-not-found";
+            case Internal ignored -> "internal";
         };
     }
 
-    /** The one line a failing run writes to stderr: a single JSON object. */
+    String suggestion();
+
+    /** What went wrong, as one full sentence: the {@code message} of either output mode. */
+    default String headline() {
+        return switch (this) {
+            case Validation f -> f.message();
+            case PackageNotFound f -> (f.module() == null ? "Package" : "Module") + " not found on Central: "
+                    + coordinate(f.qualified(), f.version(), f.module()) + ".";
+            case Upstream f -> f.message() + (f.attempts() > 1 ? " (" + f.attempts() + " attempts)." : ".");
+            case Timeout f -> "Central did not answer " + f.url() + " within " + seconds(f.budgetMs()) + ".";
+            case SchemaDrift f -> "Central's answer for " + coordinate(f.qualified(), f.version(), f.module())
+                    + " has a shape this tool does not understand; Central's docs format may have changed.";
+            case SymbolNotFound f -> "No match for " + f.requested().stream().map(name -> "'" + name + "'")
+                    .collect(Collectors.joining(" ")) + " in " + coordinate(f.qualified(), f.version(), f.module())
+                    + ".";
+            case Internal f -> "Unexpected internal failure: " + f.message() + (f.message().endsWith(".") ? "" : ".");
+        };
+    }
+
+    /** The failure as text-mode stderr: {@code error: <headline>}, then indented detail lines, no final newline. */
+    default String describeText() {
+        List<String> lines = new ArrayList<>();
+        lines.add("error: " + headline());
+        lines.add("  " + suggestion());
+        if (this instanceof SchemaDrift f) {
+            lines.add("  issues:");
+            f.issues().forEach(issue -> lines.add("    " + issue.path() + ": " + issue.message()));
+        }
+        if (this instanceof SymbolNotFound f && !f.candidates().isEmpty()) {
+            lines.add("  candidates:");
+            f.candidates().forEach(candidate -> lines.add("    " + candidate));
+        }
+        return String.join("\n", lines);
+    }
+
+    private static String seconds(long millis) {
+        String amount = BigDecimal.valueOf(millis, 3).stripTrailingZeros().toPlainString();
+        return amount + ("1".equals(amount) ? " second" : " seconds");
+    }
+
+    private static String coordinate(String qualified, String version, String module) {
+        return (version == null ? qualified : qualified + ":" + version) + (module == null ? "" : ", module " + module);
+    }
+
+    default String describe(boolean json) {
+        return json ? describe() : describeText();
+    }
+
+    /** The one line a failing run writes to stderr in JSON mode, with {@link #headline()} as its message. */
     default String describe() {
         JsonObject json = new JsonObject();
         json.addProperty("kind", kind());
+        json.addProperty("message", headline());
         switch (this) {
             case Validation f -> {
-                json.addProperty("message", f.message());
                 json.addProperty("suggestion", f.suggestion());
+                command(json, f.command());
             }
             case PackageNotFound f -> {
-                json.addProperty("qualified", f.qualified());
+                coordinates(json, f.qualified(), f.version(), f.module());
                 json.addProperty("suggestion", f.suggestion());
+                command(json, f.command());
+                if (!f.candidates().isEmpty()) {
+                    json.add("candidates", strings(f.candidates()));
+                }
             }
             case Upstream f -> {
+                if (f.qualified() != null) {
+                    coordinates(json, f.qualified(), f.version(), null);
+                }
                 json.addProperty("url", f.url());
                 json.addProperty("attempts", f.attempts());
-                json.addProperty("message", f.message());
                 json.addProperty("suggestion", f.suggestion());
                 if (f.status() != null) {
                     json.addProperty("status", f.status());
                 }
+                json.addProperty("reached", f.reached());
             }
             case Timeout f -> {
+                if (f.qualified() != null) {
+                    coordinates(json, f.qualified(), f.version(), null);
+                }
                 json.addProperty("url", f.url());
                 json.addProperty("budgetMs", f.budgetMs());
                 json.addProperty("suggestion", f.suggestion());
             }
             case SchemaDrift f -> {
-                json.addProperty("qualified", f.qualified());
+                coordinates(json, f.qualified(), f.version(), f.module());
                 JsonArray issues = new JsonArray();
                 for (SchemaIssue issue : f.issues()) {
                     JsonObject entry = new JsonObject();
@@ -185,13 +303,53 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
             }
             case SymbolNotFound f -> {
-                json.addProperty("qualified", f.qualified());
+                coordinates(json, f.qualified(), f.version(), f.module());
                 json.add("requested", strings(f.requested()));
                 json.add("candidates", strings(f.candidates()));
                 json.addProperty("suggestion", f.suggestion());
             }
+            case Internal f -> json.addProperty("suggestion", f.suggestion());
         }
         return json.toString();
+    }
+
+    private static void command(JsonObject json, String command) {
+        if (command != null) {
+            json.addProperty("command", command);
+        }
+    }
+
+    /**
+     * This failure with {@code tail} appended to its {@code command} and the suggestion's quote of it: a layer below
+     * the CLI knows only the start of the caller's command.
+     */
+    default Failure lengthened(String tail) {
+        return switch (this) {
+            case Validation f when f.command() != null && !tail.isEmpty() -> new Validation(f.message(),
+                    lengthened(f.suggestion(), f.command(), tail), f.command() + tail);
+            case PackageNotFound f when f.command() != null && !tail.isEmpty() -> new PackageNotFound(f.qualified(),
+                    f.version(), f.module(), lengthened(f.suggestion(), f.command(), tail), f.command() + tail,
+                    f.candidates());
+            default -> this;
+        };
+    }
+
+    private static String lengthened(String suggestion, String command, String tail) {
+        return suggestion.replace(quoted(command), quoted(command + tail));
+    }
+
+    static String quoted(String command) {
+        return "`" + command + "`";
+    }
+
+    private static void coordinates(JsonObject json, String qualified, String version, String module) {
+        json.addProperty("qualified", qualified);
+        if (version != null) {
+            json.addProperty("version", version);
+        }
+        if (module != null) {
+            json.addProperty("module", module);
+        }
     }
 
     private static JsonArray strings(List<String> values) {

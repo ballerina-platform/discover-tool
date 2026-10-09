@@ -12,7 +12,7 @@ bal discover --help
 ## Usage
 
 ```
-bal discover <org>/<package> [bucket] [selector ...] [flags]
+bal discover <org>/<package>[:<version>] [bucket] [name ...] [flags]
 ```
 
 The package comes first and every further positional drills one level down. With no bucket, the answer is
@@ -20,7 +20,8 @@ the list of buckets the package has.
 
 `<org>/<package>` always names a package, never a module of one: `bal discover ballerinax/aws.auth` fails with
 the command that reads that module, `bal discover ballerinax/aws --module auth`. To find a package in the first
-place, use `bal search <keyword>`; `bal discover` only drills into one you already know.
+place, use `bal search <keyword>`; `bal discover` only drills into one you already know. A version goes in the
+coordinate, the form `bal pull` takes: `bal discover ballerina/http:2.15.7` (see Which version is read, below).
 
 | Bucket    | What it holds                                                                                            |
 | --------- | -------------------------------------------------------------------------------------------------------- |
@@ -56,8 +57,7 @@ left out.
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
 | `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
 | `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, the `type` declarations, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
-| `-m, --module <name>`  | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
-| `--version <version>`  | Read this exact version of the package, ahead of the one the project locks and Central's latest. Carried into every command the answer prints. |
+| `-m, --module <module>` | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. |
 
 ## Walkthrough
@@ -69,7 +69,7 @@ What a package has:
 
 ```
 $ bal discover ballerinax/kafka
-ballerinax/kafka
+ballerinax/kafka:4.6.5
 5 buckets
 
   client
@@ -81,11 +81,14 @@ ballerinax/kafka
 Next: bal discover ballerinax/kafka <bucket>
 
 $ bal discover ballerinax/kafka | cat
-{"buckets":["client","service","class","type","readme"]}
+{"version":"4.6.5","buckets":["client","service","class","type","readme"]}
 ```
 
 Every JSON answer is exactly one line, however long, so cutting the output with `head` or `tail` never
 leaves half an answer. The JSON samples below are that real output, unwrapped.
+
+Every answer says the version it read: a JSON answer leads with a `version` key, and at a terminal the header
+names the package as `org/name:version`, whether the version was written, locked or Central's latest.
 
 At a terminal every answer opens with a header naming where it is — package, bucket, container, selector — and
 a count, lists one entry per line in aligned columns, and ends with a footer: notes, how much was left out,
@@ -99,7 +102,7 @@ listener they bind to, and the ones no listener accepts are listed apart, still 
 
 ```
 $ bal discover ballerina/http client
-ballerina/http · client
+ballerina/http:2.16.6 · client
 10 clients
 
   Caller                                              5 remote  1 normal
@@ -116,7 +119,7 @@ ballerina/http · client
 Next: bal discover ballerina/http client <name>
 
 $ bal discover ballerina/http service
-ballerina/http · service
+ballerina/http:2.16.6 · service
 7 service types
 
 http:Listener
@@ -146,7 +149,7 @@ in JSON, with the reason in `unconfirmedReason` — and opening one says why. Wi
 
 ```
 $ bal discover ballerina/http service
-ballerina/http · service
+ballerina/http:2.16.6 · service
 7 service types
 
 http:Listener
@@ -167,7 +170,7 @@ A listener whose `attach` takes another package's type points there:
 
 ```
 $ bal discover ballerinax/postgresql service
-ballerinax/postgresql · service
+ballerinax/postgresql:1.19.0 · service
 1 service type
 
 postgresql:CdcListener
@@ -178,7 +181,7 @@ A bucket with too many resource paths to list is grouped by path segment:
 
 ```
 $ bal discover ballerinax/github client
-ballerinax/github · client · Client
+ballerinax/github:6.0.0 · client · Client
 36 path groups
 
 Groups (operations under each)
@@ -226,7 +229,7 @@ A group small enough to list shows one entry per path, with every accessor it an
 
 ```
 $ bal discover ballerinax/github client gists
-ballerinax/github · client · Client · gists
+ballerinax/github:6.0.0 · client · Client · gists
 10 resource paths
 
   gists                              get, post
@@ -248,7 +251,7 @@ own, and a group deeper than the top is named by its full path:
 
 ```
 $ bal discover ballerinax/github client repos
-ballerinax/github · client · Client · repos
+ballerinax/github:6.0.0 · client · Client · repos
 1 resource path here, 64 path groups
 
 Here
@@ -279,7 +282,7 @@ rather than a guess at one:
 
 ```
 $ bal discover ballerinax/github client gists --filter star | cat
-{"container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover ballerinax/github client Client gists/starred get"}}],"shown":2,"total":2}
+{"version":"6.0.0","container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover ballerinax/github client Client gists/starred get"}}],"shown":2,"total":2}
 ```
 
 Everything else that opens exactly one thing — a method, a group, a container, a submodule, a readme section —
@@ -288,7 +291,7 @@ it needs it (`'flush`):
 
 ```
 $ bal discover ballerinax/kafka client Producer
-ballerinax/kafka · client · Producer
+ballerinax/kafka:4.6.5 · client · Producer
 5 methods
 
   'flush              bal discover ballerinax/kafka client Producer "'flush"
@@ -300,7 +303,7 @@ ballerinax/kafka · client · Producer
 Next: bal discover ballerinax/kafka client Producer <name>
 
 $ bal discover ballerinax/kafka client Producer | cat
-{"container":"Producer","methods":[{"name":"'flush","command":"bal discover ballerinax/kafka client Producer \"'flush\""},{"name":"close","command":"bal discover ballerinax/kafka client Producer close"},{"name":"getTopicPartitions","command":"bal discover ballerinax/kafka client Producer getTopicPartitions"},{"name":"send","command":"bal discover ballerinax/kafka client Producer send"},{"name":"sendWithMetadata","command":"bal discover ballerinax/kafka client Producer sendWithMetadata"}],"shown":5,"total":5}
+{"version":"4.6.5","container":"Producer","methods":[{"name":"'flush","command":"bal discover ballerinax/kafka client Producer \"'flush\""},{"name":"close","command":"bal discover ballerinax/kafka client Producer close"},{"name":"getTopicPartitions","command":"bal discover ballerinax/kafka client Producer getTopicPartitions"},{"name":"send","command":"bal discover ballerinax/kafka client Producer send"},{"name":"sendWithMetadata","command":"bal discover ballerinax/kafka client Producer sendWithMetadata"}],"shown":5,"total":5}
 ```
 
 A container whose methods come in more than one call form is split by form, since `->` against `.` is what a
@@ -308,7 +311,7 @@ caller has to get right:
 
 ```
 $ bal discover ballerinax/postgresql client
-ballerinax/postgresql · client · Client
+ballerinax/postgresql:1.19.0 · client · Client
 5 remote methods, 1 normal method
 
 Remote (->)
@@ -324,7 +327,7 @@ Normal (.)
 Next: bal discover ballerinax/postgresql client Client <name>
 
 $ bal discover ballerinax/postgresql client | cat
-{"container":"Client","remote":[{"name":"batchExecute","command":"bal discover ballerinax/postgresql client Client batchExecute"},{"name":"call","command":"bal discover ballerinax/postgresql client Client call"},{"name":"execute","command":"bal discover ballerinax/postgresql client Client execute"},{"name":"query","command":"bal discover ballerinax/postgresql client Client query"},{"name":"queryRow","command":"bal discover ballerinax/postgresql client Client queryRow"}],"normal":[{"name":"close","command":"bal discover ballerinax/postgresql client Client close"}],"counts":{"remote":5,"normal":1},"shown":6,"total":6}
+{"version":"1.19.0","container":"Client","remote":[{"name":"batchExecute","command":"bal discover ballerinax/postgresql client Client batchExecute"},{"name":"call","command":"bal discover ballerinax/postgresql client Client call"},{"name":"execute","command":"bal discover ballerinax/postgresql client Client execute"},{"name":"query","command":"bal discover ballerinax/postgresql client Client query"},{"name":"queryRow","command":"bal discover ballerinax/postgresql client Client queryRow"}],"normal":[{"name":"close","command":"bal discover ballerinax/postgresql client Client close"}],"counts":{"remote":5,"normal":1},"shown":6,"total":6}
 ```
 
 One callable is the end of a drill-down: its declaration with its doc comment, then the declarations its
@@ -332,7 +335,7 @@ signature names, one level deep:
 
 ```
 $ bal discover ballerinax/kafka client Producer send
-ballerinax/kafka · client · Producer · send
+ballerinax/kafka:4.6.5 · client · Producer · send
 
 # Produces records to the Kafka server.
 # ```ballerina
@@ -367,7 +370,7 @@ A listing over the ceiling says so, with the command that continues it:
 
 ```
 $ bal discover ballerinax/twilio client
-ballerinax/twilio · client · Client
+ballerinax/twilio:5.0.2 · client · Client
 199 methods
 
   createAccount
@@ -383,7 +386,7 @@ Next: bal discover ballerinax/twilio client Client --page 2
 Next: bal discover ballerinax/twilio client --filter <keyword>
 
 $ bal discover ballerinax/twilio client --filter message
-ballerinax/twilio · client · Client · --filter message
+ballerinax/twilio:5.0.2 · client · Client · --filter message
 14 methods
 
   createMessage
@@ -421,7 +424,7 @@ A selector that matches nothing is still an answer (exit 0), naming the closest 
 
 ```
 $ bal discover ballerinax/kafka client Producer sendd
-ballerinax/kafka · client · Producer · sendd
+ballerinax/kafka:4.6.5 · client · Producer · sendd
 Nothing on Producer matches 'sendd'.
 
 Did you mean
@@ -444,7 +447,7 @@ A member declared on several containers is never picked silently:
 
 ```
 $ bal discover ballerinax/kafka client commit
-ballerinax/kafka · client · commit
+ballerinax/kafka:4.6.5 · client · commit
 'commit' is declared on 2 containers; pick one.
 
   Caller    2 matches  bal discover ballerinax/kafka client Caller commit
@@ -455,7 +458,7 @@ A declaration that is not callable, read whole with the declarations it names:
 
 ```
 $ bal discover ballerinax/kafka type TopicPartitionOffset
-ballerinax/kafka · type · TopicPartitionOffset
+ballerinax/kafka:4.6.5 · type · TopicPartitionOffset
 
 # Represents a topic partition and an offset with a timestamp.
 public type TopicPartitionOffset [TopicPartition, OffsetAndTimestamp?];
@@ -484,7 +487,7 @@ A large readme can be narrowed to the sections that mention a keyword:
 
 ```
 $ bal discover ballerinax/kafka readme --filter producer
-ballerinax/kafka · readme · --filter producer
+ballerinax/kafka:4.6.5 · readme · --filter producer
 2 matching chunks
 
   1  Kafka producer      18 lines
@@ -583,29 +586,87 @@ answer whose `next` is the joined command, and three or more are that failure, s
 
 ## The contract
 
-|        |                                                                       |
-| ------ | --------------------------------------------------------------------- |
-| stdout | the answer, and nothing else                                          |
-| stderr | on failure, exactly one JSON object, and nothing else                 |
-| exit 0 | success, and stdout is complete                                       |
-| exit 1 | every failure; the JSON's `kind` and `suggestion` say what to do next |
+|        |                                                                                  |
+| ------ | -------------------------------------------------------------------------------- |
+| stdout | the answer, and nothing else                                                     |
+| stderr | on failure, exactly one failure, and nothing else                                |
+| exit 0 | success, and stdout is complete                                                  |
+| exit 2 | a usage error — the command line itself is malformed, so nothing was looked up: stdout is empty |
+| exit 1 | every other failure: stdout is empty, and the failure's `kind` and `suggestion` say what to do next |
+
+A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
+forced with `--output` (honoured even when the rest of the arguments fail to parse). In JSON it is one object
+carrying `kind`, `message` (the one-sentence headline text mode prints after `error:`) and `suggestion`. Its
+`qualified` is always `org/name` (an `upstream` or `timeout` failure carries it once the request was for a
+package), and `version` (when one was reached) and `module` (when `--module` was passed) are keys of their own.
+When the failure has one fix, the suggestion quotes your whole command with it applied, and `command` holds
+that command, ready to run (`bal discover ballerinax/kafka client --version 4.6.5 Producer` is answered with
+`bal discover ballerinax/kafka:4.6.5 client Producer`):
 
 ```
-$ bal discover ballerinax/kafka client NoSuchContainer
-{"kind":"symbol-not-found","qualified":"ballerinax/kafka:4.6.5","requested":["NoSuchContainer"],"candidates":[],"suggestion":"Nothing in ballerinax/kafka:4.6.5 is named anything like that. List what is there: `bal discover ballerinax/kafka client`."}
+$ bal discover ballerinax/kafka client NoSuchContainer | cat
+{"kind":"symbol-not-found","message":"No match for 'NoSuchContainer' in ballerinax/kafka:4.6.5.","qualified":"ballerinax/kafka","version":"4.6.5","requested":["NoSuchContainer"],"candidates":[],"suggestion":"Nothing in ballerinax/kafka:4.6.5 is named anything like that. List what is there: `bal discover ballerinax/kafka client`."}
 ```
 
-`upstream` and `timeout` are worth re-running unchanged; `validation`, `package-not-found` and
-`symbol-not-found` need a different command; `schema-drift` means Central's payload changed shape and is for
-a maintainer.
+In text it is `error: <message>`, then the suggestion and anything else the failure carries (candidates, schema
+issues) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
 
-**Which version is read.** `--version <version>` if given. Otherwise, inside a Ballerina project the tool walks up
-to `Ballerina.toml` and uses the version `Dependencies.toml` locks, so a lookup sees what `bal build` compiles
-against, and outside one it uses Central's latest. A version is a flag, never a positional: `bal discover
-ballerina/http client 2.16.6` and `ballerina/http:2.16.6` are `validation` failures that name `--version`. Under
-`--version` every command the answer prints carries it (`bal discover ballerina/http --version 2.15.0 client
-Client`), so drilling in stays on that version; without it the printed commands are unpinned, except one that opens a
-declaration another package owns, which pins the version that declaration was generated against.
+```
+$ bal discover ballerina/http:2.15
+error: '2.15' in 'ballerina/http:2.15' is not a complete version.
+  Write it in full, ballerina/http:<major>.<minor>.<patch>, or drop it to read the version your project locks or Central's latest: ballerina/http
+Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...] [--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
+Run `bal discover --help` for details.
+```
+
+A usage error is a `validation` failure found before anything is looked up: an unknown option, an option with
+a missing or invalid value (`--output xml`, `--page x`, `--page 0`, `--refresh=yes`) or given twice, no package,
+a malformed package name or incomplete version, `--version`, a version typed as a positional, an unknown bucket,
+more than one name after `funcs` or `type`, or a `type` name with `--filter`. A `validation` failure that
+depends on what the package holds — an extra selector a container does not read, a page past the end of the
+listing, a module with no readme — is exit 1.
+
+`upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
+`package-not-found` and `symbol-not-found` need a different command (a `--module` the package does not publish
+is `package-not-found` with `module`, and lists the submodules it does in `candidates`); `schema-drift` means Central's payload
+changed shape and is for a maintainer; `internal` is a defect in `bal discover` itself, to report with the
+command that produced it. An `upstream` failure's `message` names what failed: the host, or the
+proxy and the `Settings.toml` that sets it. Its `reached` is `true` when Central answered, with an error status
+(in `status`) or a body that is not JSON, and `false` when no answer from Central came back: the connection, DNS,
+TLS or the proxy failed, and `status` is then the proxy's own answer when it gave one (407 when it wants a
+username and password).
+
+**Which version is read.** The one written in the coordinate (`ballerina/http:2.15.7`), even inside a project that
+locks another. Otherwise, inside a Ballerina project the tool walks up to `Ballerina.toml` and uses the version
+`Dependencies.toml` locks, so a lookup sees what `bal build` compiles against, and outside one (or for a package
+the project does not depend on yet) it uses Central's latest. A written version must be complete SemVer, with no
+leading `v` or zero: `ballerina/http:2.15` is a `validation` failure, and so is a version typed as a positional
+(`bal discover ballerina/http 2.15.0`) or as `--version`, each suggesting the coordinate to type. A lock that
+names no complete version, or one Central does not publish, is a failure naming the `Dependencies.toml` it was
+read from; `bal build` regenerates the file when it is deleted. A version Central does not publish is answered
+with the published versions nearest it. `--module` composes unchanged:
+`bal discover ballerina/http:2.15.7 --module httpscerr`. A written version is carried into every command the
+answer prints (`bal discover ballerina/http:2.15.7 client Client`), so drilling in stays on it; without one the
+printed commands are unpinned (a locked version is resolved again), except one that opens a declaration another
+package owns, which pins the version that declaration was generated against
+(`bal discover ballerina/crypto:2.9.3 type TrustStore`).
+
+## Proxy
+
+Requests to Central go through the HTTP proxy `bal pull` uses: the `[proxy]` table of `~/.ballerina/Settings.toml`
+(or of `$BALLERINA_HOME_DIR/Settings.toml` when that is set). A proxy needs `host` and `port`; `username` and
+`password`, when both are set, answer the proxy's own authentication challenge, once per request: a rejected
+password is a failure, never retried. With no such table, an empty `host` or no `port`, requests go direct. If
+the `jdk.http.auth.tunneling.disabledSchemes` system property disables Basic, the credentials are never sent,
+and the failure says so.
+
+```toml
+[proxy]
+host = "proxy.example.com"
+port = 3128
+username = "alice"
+password = "secret"
+```
 
 ## Caching
 

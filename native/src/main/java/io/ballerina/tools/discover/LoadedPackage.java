@@ -40,7 +40,7 @@ import java.util.function.Supplier;
  *     reaching another module of this package is checked against, whichever module is being read
  * @param warning why this version cannot be trusted, or {@code null} when it was confirmed against the
  *     registry — see {@link Loader#unverifiedWarning}
- * @param pinned the {@code --version} the caller supplied, or {@code null} when it was resolved — carried into
+ * @param pinned the version the caller wrote in the coordinate, or {@code null} when it was resolved — carried into
  *     every command this lookup prints, so drilling further stays on the version being read
  * @param bound {@code library} with its service bindings read from the package source — deferred, since only an
  *     answer that shows a service type needs it, and reading it can mean a download
@@ -55,7 +55,7 @@ public record LoadedPackage(
         List<Submodule> submodules,
         List<String> modules,
         String warning,
-        String pinned,
+        Version pinned,
         Supplier<Library> bound) {
 
     /**
@@ -69,6 +69,11 @@ public record LoadedPackage(
         return qualified.versioned(version);
     }
 
+    public Failure symbolNotFound(List<String> requested, List<String> candidates, String suggestion) {
+        return new Failure.SymbolNotFound(qualified.qualified(), version.text(), module, requested, candidates,
+                suggestion);
+    }
+
     /**
      * The argument a caller types to reach this SAME (package, module) pair again — what every "next command"
      * this tool prints builds on, so drilling further never silently falls back to the default module.
@@ -79,11 +84,7 @@ public record LoadedPackage(
 
     /** {@link #pkgArgument()} for another module of this package, or its default one when {@code other} is null. */
     public String pkgArgument(String other) {
-        return qualified.qualified() + (other == null ? "" : " --module " + Texts.shellWord(other)) + pin();
-    }
-
-    private String pin() {
-        return pinned == null ? "" : " --version " + Texts.shellWord(pinned);
+        return new Coordinate(qualified, pinned).argument(other);
     }
 
     /**

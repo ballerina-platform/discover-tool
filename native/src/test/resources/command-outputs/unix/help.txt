@@ -1,6 +1,6 @@
-Usage: bal discover [<org/name>] [bucket] [args...] [--refresh]
-                    [--output <json|text>] [--filter <keyword>] [--page <n>]
-                    [-m <name>] [--version <version>]
+Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...]
+                    [--output json|text] [--filter <keyword>] [--page <n>]
+                    [-m <module>] [--refresh]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
@@ -12,27 +12,29 @@ Typical session:
                                   bal discover ballerinax/github client Client
   3. One call, fully addressed:   bal discover ballerinax/github client "gists/'public" get
   4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
+  5. One specific version:        bal discover ballerina/http:2.15.7 client Client
 
 Buckets, addressed as the second positional: client, service, class, funcs, type,
 readme. No bucket lists which of them this package has.
 
-  --refresh              Ignore any cached copy and rewrite it. Worth passing only
-                         when a name should exist and does not.
-  --output <json|text>   Override the TTY-detected default: human text at an
-                         interactive terminal, JSON otherwise.
-  --filter <keyword>     Narrow an already-selected bucket to entries whose name,
-                         path, parameter or type matches this keyword, client-side.
-                         Never sent to Central as a query.
-  --page <n>             1-indexed. Turns the page of any listing over the entry
-                         ceiling: a roster, a level of path groups, methods,
-                         resource paths, a container listed by call form, the type
-                         declarations, documentation-only matches, and readme
-                         sections narrowed by --filter. A page outside the listing,
-                         or against an answer that does not page, is an error.
-  -m, --module <name>    Target this submodule instead of the package's default
-                         module, the same everywhere including readme. The bare
-                         submodule name only — <org/name> is always resolved as one
-                         literal, complete package coordinate.
-  --version <version>    Read this exact version of the package instead of the one
-                         the project locks or Central's latest. Carried into every
-                         command the answer prints.
+With no version after the package, the one your project's Dependencies.toml locks is
+read (found from the current directory up), else Central's latest.
+Exit codes: 0 an answer, 1 a failure, 2 a usage error.
+
+  --output json|text      Override the TTY-detected default: human text at an
+                          interactive terminal, JSON otherwise.
+  --filter <keyword>      Narrow an already-selected bucket to entries whose name,
+                          path, parameter or type matches this keyword, client-side.
+                          Never sent to Central as a query.
+  --page <n>              1-indexed. Turns the page of any listing over the entry
+                          ceiling: a roster, a level of path groups, methods,
+                          resource paths, a container listed by call form, the type
+                          declarations, documentation-only matches, and readme
+                          sections narrowed by --filter. A page outside the listing,
+                          or against an answer that does not page, is an error.
+  -m, --module <module>   Target this submodule instead of the package's default
+                          module, the same everywhere including readme. The bare
+                          submodule name only — <org>/<name> is always resolved as
+                          one literal, complete package coordinate.
+  --refresh               Ignore any cached copy and rewrite it. Worth passing only
+                          when a name should exist and does not.

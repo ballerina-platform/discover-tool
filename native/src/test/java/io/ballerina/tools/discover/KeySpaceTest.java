@@ -66,7 +66,7 @@ public class KeySpaceTest {
 
     @Test(dataProvider = "fixtures")
     public void theFixtureStillSatisfiesTheSchema(String slug) {
-        Result<CentralDocs> parsed = Schema.parse(FixtureCorpus.loadRawFixture(slug), slug);
+        Result<CentralDocs> parsed = Schema.parse(FixtureCorpus.loadRawFixture(slug), slug, null);
         Assert.assertTrue(parsed.isOk(), parsed.isOk() ? "" : parsed.failure().describe());
     }
 
@@ -74,7 +74,7 @@ public class KeySpaceTest {
     public void everyRecordedModulePageStillSatisfiesTheSchema() {
         Assert.assertFalse(FixtureCorpus.listModulePages().isEmpty());
         for (String slug : FixtureCorpus.listModulePages()) {
-            Result<CentralDocs> parsed = Schema.parse(FixtureCorpus.loadRawModulePage(slug), slug);
+            Result<CentralDocs> parsed = Schema.parse(FixtureCorpus.loadRawModulePage(slug), slug, null);
             Assert.assertTrue(parsed.isOk(), slug + ": " + (parsed.isOk() ? "" : parsed.failure().describe()));
         }
     }
@@ -88,7 +88,7 @@ public class KeySpaceTest {
             JsonObject page = FixtureCorpus.loadRawFixture("ballerina__graphql").getAsJsonObject();
             page.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject()
                     .add("relatedModules", JsonParser.parseString(related));
-            Result<CentralDocs> parsed = Schema.parse(page, "related");
+            Result<CentralDocs> parsed = Schema.parse(page, "related", null);
             Assert.assertTrue(parsed.isOk(), related + ": " + (parsed.isOk() ? "" : parsed.failure().describe()));
             List<CentralDocs.RelatedModule> read = parsed.value().modules().get(0).relatedModules();
             if (related.contains("summary")) {
@@ -114,10 +114,10 @@ public class KeySpaceTest {
         JsonObject restField = firstRestField(withEmptyName);
         Assert.assertEquals(restField.get("name").getAsString(), "",
                 "the corpus is expected to carry the empty-string spelling");
-        Assert.assertTrue(Schema.parse(withEmptyName, "empty-name").isOk());
+        Assert.assertTrue(Schema.parse(withEmptyName, "empty-name", null).isOk());
 
         restField.remove("name");
-        Result<CentralDocs> absent = Schema.parse(withEmptyName, "absent-name");
+        Result<CentralDocs> absent = Schema.parse(withEmptyName, "absent-name", null);
         Assert.assertTrue(absent.isOk(), absent.isOk() ? "" : absent.failure().describe());
     }
 
@@ -127,7 +127,7 @@ public class KeySpaceTest {
         JsonObject payload = FixtureCorpus.loadRawFixture("ballerina__http").getAsJsonObject();
         JsonObject ordinary = firstDeclaredField(payload);
         ordinary.remove("name");
-        Assert.assertFalse(Schema.parse(payload, "no-name").isOk(),
+        Assert.assertFalse(Schema.parse(payload, "no-name", null).isOk(),
                 "a named field losing its name has to keep failing");
     }
 

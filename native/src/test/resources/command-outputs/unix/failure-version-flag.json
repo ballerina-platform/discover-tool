@@ -1,0 +1,1 @@
+{"kind":"validation","message":"Unknown option '--version'.","suggestion":"To read a specific version, write it after the package: `bal discover ballerinax/github:6.0.0`.","command":"bal discover ballerinax/github:6.0.0"}

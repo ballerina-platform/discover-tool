@@ -24,11 +24,14 @@ import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.HttpTransport;
+import io.ballerina.tools.discover.central.ProxySettings;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.central.schema.Schema;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -41,6 +44,8 @@ import java.util.Map;
 public class ClientTest {
 
     private static final QualifiedName GITHUB = QualifiedName.parse("ballerinax/github").value();
+
+    private static final Path LOCK = Path.of("/work/app/Dependencies.toml");
 
     private static HttpOptions.Builder fast(HttpTransport transport) {
         return HttpOptions.builder()
@@ -151,9 +156,12 @@ public class ClientTest {
                 GITHUB, supplied("9.9.9"), fast(transport).build());
         Assert.assertFalse(result.isOk());
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
-        Assert.assertEquals(failure.qualified(), "ballerinax/github:9.9.9");
-        Assert.assertTrue(failure.suggestion().contains("named by --version or locked by your project"),
-                failure.suggestion());
+        Assert.assertEquals(failure.qualified(), "ballerinax/github");
+        Assert.assertEquals(failure.version(), "9.9.9");
+        Assert.assertTrue(failure.suggestion().contains("the version " + LOCK + " locks"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("run `bal build` to regenerate it"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().endsWith("write a published version after the package: "
+                + "ballerinax/github:<version>"), failure.suggestion());
         Assert.assertTrue(failure.suggestion().contains("published versions are 6.0.0, 5.1.0"),
                 failure.suggestion());
         Assert.assertFalse(failure.suggestion().contains("omit the version"),
@@ -190,29 +198,106 @@ public class ClientTest {
         QualifiedName graphql = QualifiedName.parse("ballerina/graphql").value();
         FakeTransport transport = FakeTransport.always(FakeTransport.status(404));
         CentralClient.ResolvedVersion pinned =
-                new CentralClient.ResolvedVersion(Version.parse("1.17.0").value(), false, true, true);
+                CentralClient.ResolvedVersion.written(Version.parse("1.17.0").value());
         CentralClient.ResolvedVersion locked = supplied("1.17.0");
 
         Failure.PackageNotFound withPin = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
                 graphql, "nosuch", pinned, fast(transport).build()).failure();
-        Assert.assertTrue(withPin.suggestion().contains("Run `bal discover ballerina/graphql --version 1.17.0` "),
+        Assert.assertEquals(withPin.qualified(), "ballerina/graphql");
+        Assert.assertEquals(withPin.version(), "1.17.0");
+        Assert.assertEquals(withPin.module(), "nosuch");
+        Assert.assertTrue(withPin.suggestion().endsWith("module: `bal discover ballerina/graphql:1.17.0`."),
                 withPin.suggestion());
 
         for (CentralClient.ResolvedVersion unpinned : List.of(locked, resolved("1.17.0"))) {
             Failure.PackageNotFound without = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
                     graphql, "nosuch", unpinned, fast(transport).build()).failure();
-            Assert.assertTrue(without.suggestion().contains("Run `bal discover ballerina/graphql` to list"),
+            Assert.assertTrue(without.suggestion().endsWith("module: `bal discover ballerina/graphql`."),
                     without.suggestion());
-            Assert.assertFalse(without.suggestion().contains("--version"), without.suggestion());
+            Assert.assertFalse(without.suggestion().contains("1.17.0"), without.suggestion());
         }
     }
 
+    @Test
+    public void aWrittenVersionCentralDoesNotPublishNamesTheOnesItDoes() {
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.status(404)
+                : FakeTransport.ok("[\"6.0.0\", \"5.1.0\"]"));
+        CentralClient.ResolvedVersion written =
+                CentralClient.ResolvedVersion.written(Version.parse("9.9.9").value());
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
+                GITHUB, written, fast(transport).build()).failure();
+        Assert.assertEquals(failure.suggestion(), "Central does not publish 'ballerinax/github' at 9.9.9; published "
+                + "versions are 6.0.0, 5.1.0. Write one of them after the package: ballerinax/github:<version>");
+    }
+
+    @Test
+    public void aWrittenVersionOfANameCentralDoesNotPublishIsReportedAsAModuleOfItsPackage() {
+        QualifiedName auth = QualifiedName.parse("ballerinax/aws.auth").value();
+        FakeTransport transport = registry(Map.of(
+                "ballerinax/aws", "[\"1.0.2\"]",
+                "ballerinax/aws/1.0.2", modules("aws", "aws.auth")));
+        CentralClient.ResolvedVersion written =
+                CentralClient.ResolvedVersion.written(Version.parse("9.9.9").value());
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
+                auth, written, fast(transport).build()).failure();
+        Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
+        Assert.assertEquals(failure.version(), "9.9.9");
+        Assert.assertEquals(failure.suggestion(), "'ballerinax/aws.auth' is not a package: it is the 'auth' module "
+                + "of the ballerinax/aws package. Read it with `bal discover ballerinax/aws:9.9.9 --module auth`.");
+    }
+
+    @Test
+    public void aWrittenVersionOfAPackageCentralDoesNotPublishAtAllIsASpellingMiss() {
+        for (int registryStatus : new int[] {400, 404}) {
+            FakeTransport routed = FakeTransport.routing(url -> url.contains("/docs/")
+                    ? FakeTransport.status(404)
+                    : FakeTransport.status(registryStatus));
+            Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
+                    QualifiedName.parse("ballerinax/kafak").value(),
+                    CentralClient.ResolvedVersion.written(Version.parse("4.6.5").value()),
+                    fast(routed).build()).failure();
+            Assert.assertEquals(failure.version(), "4.6.5");
+            Assert.assertEquals(failure.suggestion(),
+                    "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
+        }
+    }
+
+    @Test
+    public void aMissingVersionIsAnsweredWithThePublishedVersionsNearestIt() {
+        StringBuilder listing = new StringBuilder("[");
+        for (int minor = 17; minor >= 8; minor--) {
+            for (int patch = 3; patch >= 0; patch--) {
+                listing.append(listing.length() > 1 ? "," : "").append("\"2.").append(minor).append('.')
+                        .append(patch).append('"');
+            }
+        }
+        FakeTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
+                ? FakeTransport.status(404)
+                : FakeTransport.ok(listing.append(']').toString()));
+        Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(GITHUB,
+                CentralClient.ResolvedVersion.written(Version.parse("2.9.99").value()),
+                fast(transport).build()).failure();
+        Assert.assertEquals(failure.suggestion(), "Central does not publish 'ballerinax/github' at 2.9.99; the "
+                + "published versions nearest it are 2.11.0, 2.10.3, 2.10.2, 2.10.1, 2.10.0, 2.9.3, 2.9.2, 2.9.1, "
+                + "2.9.0, 2.8.3 and 30 others. Write one of them after the package: ballerinax/github:<version>");
+    }
+
+    @Test
+    public void versionsAreOrderedBySemVerPrecedence() {
+        List<String> versions = new ArrayList<>(List.of("2.10.0", "2.9.1", "2.10.0-beta.11",
+                "2.10.0-beta.2", "2.10.0-alpha", "10.0.0", "not-semver"));
+        versions.sort(Version.PRECEDENCE);
+        Assert.assertEquals(versions, List.of("2.9.1", "2.10.0-alpha", "2.10.0-beta.2", "2.10.0-beta.11", "2.10.0",
+                "10.0.0", "not-semver"));
+    }
+
     private static CentralClient.ResolvedVersion supplied(String version) {
-        return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, true, false);
+        return CentralClient.ResolvedVersion.locked(Version.parse(version).value(), LOCK);
     }
 
     private static CentralClient.ResolvedVersion resolved(String version) {
-        return new CentralClient.ResolvedVersion(Version.parse(version).value(), false, false, false);
+        return CentralClient.ResolvedVersion.latest(Version.parse(version).value(), false);
     }
 
     @Test
@@ -458,7 +543,7 @@ public class ClientTest {
         Assert.assertFalse(((Failure.Upstream) upstream.failure()).suggestion().isEmpty());
 
         Result<CentralDocs> drift = Schema.parse(
-                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y:1.0.0");
+                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y", "1.0.0");
         Assert.assertFalse(drift.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) drift.failure();
         // Addressed to a human on purpose: no argument the agent can change will make a payload this reader
@@ -466,38 +551,141 @@ public class ClientTest {
         Assert.assertTrue(failure.suggestion().contains("Report the"));
     }
 
-    /**
-     * A failure object must not contradict {@code --help}'s "no failure is licence to guess": it is what an agent
-     * reads at the moment it is blocked, so the content is asserted, not merely that a suggestion is present.
-     */
     @Test
-    public void noFailureOffersARememberedSignatureAsTheWayOut() {
-        List<String> whenCentralIsTheProblem = List.of(
-                Failure.UPSTREAM_SUGGESTION, Failure.TIMEOUT_SUGGESTION, Failure.SCHEMA_DRIFT_SUGGESTION);
-        for (String suggestion : whenCentralIsTheProblem) {
-            Assert.assertTrue(suggestion.contains("bala/<org>/<name>/"),
-                    "a lookup Central blocked still has an answer on disk, and has to name it: " + suggestion);
-            Assert.assertTrue(suggestion.contains("Never fall back to a remembered signature"),
-                    "a blocked agent guesses unless something forbids it: " + suggestion);
-        }
-
-        // Retryability is the one thing these three do not share, so it is asserted per kind.
-        Assert.assertTrue(Failure.UPSTREAM_SUGGESTION.contains("once more"));
-        Assert.assertTrue(Failure.TIMEOUT_SUGGESTION.contains("once more"));
-        Assert.assertFalse(Failure.SCHEMA_DRIFT_SUGGESTION.contains("once more"),
+    public void schemaDriftIsAnsweredFromDiskNeverFromMemoryAndIsNotARetry() {
+        Assert.assertTrue(Failure.SCHEMA_DRIFT_SUGGESTION.contains("bala/<org>/<name>/"),
+                Failure.SCHEMA_DRIFT_SUGGESTION);
+        Assert.assertTrue(Failure.SCHEMA_DRIFT_SUGGESTION.contains("Never fall back to a remembered signature"),
+                Failure.SCHEMA_DRIFT_SUGGESTION);
+        Assert.assertFalse(Failure.SCHEMA_DRIFT_SUGGESTION.contains("run the same command"),
                 "schema drift is not a retry: no change of arguments will help");
+    }
+
+    private static final String URL = "https://api.central.ballerina.io/2.0/docs/ballerina/http";
+    private static final String SETTINGS = "~/home/Settings.toml";
+    private static final ProxySettings OPEN_PROXY = new ProxySettings("127.0.0.1", 3128, "", "");
+    private static final ProxySettings AUTHENTICATING_PROXY = new ProxySettings("127.0.0.1", 3128, "alice", "pw");
+
+    private static Failure failing(HttpTransport.Reply reply, ProxySettings proxy) {
+        return CentralClient.fetchJson(URL,
+                fast(FakeTransport.always(reply)).proxy(proxy).settingsFile(SETTINGS).build()).failure();
+    }
+
+    private static HttpTransport.Reply failed(HttpTransport.Reply.Problem problem, String message) {
+        return new HttpTransport.Reply.Failed(problem, message);
+    }
+
+    private static HttpTransport.Reply tunnel(int status) {
+        return new HttpTransport.Reply.Failed(HttpTransport.Reply.Problem.TUNNEL, "Tunnel failed, got: " + status,
+                status);
+    }
+
+    @Test
+    public void aTunnelTheProxyRefusesIsNotRetriedButOneItCouldNotOpenIs() {
+        FakeTransport refused = FakeTransport.always(tunnel(403));
+        Failure.Upstream policy = (Failure.Upstream) CentralClient.fetchJson(URL,
+                fast(refused).proxy(OPEN_PROXY).build()).failure();
+        Assert.assertEquals(refused.calls(), 1);
+        Assert.assertEquals(policy.status(), Integer.valueOf(403));
+
+        FakeTransport gateway = FakeTransport.always(tunnel(502));
+        CentralClient.fetchJson(URL, fast(gateway).proxy(OPEN_PROXY).build());
+        Assert.assertEquals(gateway.calls(), 3);
+    }
+
+    @Test
+    public void noAttemptAtAllIsADefect() {
+        Failure failure = CentralClient.fetchJson(URL,
+                fast(FakeTransport.always(FakeTransport.status(200))).maxAttempts(0).build()).failure();
+        Assert.assertEquals(failure.kind(), "internal");
+    }
+
+    @Test
+    public void aRequestWithNoAnswerNamesTheHostOrTheProxyAndWhatToCheck() {
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"), null)
+                .describeText(), "error: Could not reach api.central.ballerina.io: connection refused (3 attempts).\n"
+                + "  Check your network connection, and the [proxy] table in ~/home/Settings.toml if your network "
+                + "needs a proxy, then run the same command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"), OPEN_PROXY)
+                .describeText(), "error: Could not connect to the proxy 127.0.0.1:3128 set in ~/home/Settings.toml: "
+                + "connection refused (3 attempts).\n  Check that the proxy is running and that host and port under "
+                + "[proxy] in ~/home/Settings.toml are right, then run the same command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNRESOLVED, "x"), null).describeText(),
+                "error: Could not resolve the host api.central.ballerina.io.\n  Check your network connection, and "
+                        + "the [proxy] table in ~/home/Settings.toml if your network needs a proxy, then run the same "
+                        + "command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNRESOLVED, "x"),
+                        new ProxySettings("no-such-proxy.invalid", 3128, "", "")).describeText(),
+                "error: Could not resolve the proxy host no-such-proxy.invalid.\n  Check host under [proxy] in "
+                        + "~/home/Settings.toml, then run the same command again.");
+        Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.TLS, "its certificate has expired"), null)
+                .describeText(), "error: Could not open a secure connection to api.central.ballerina.io: its "
+                + "certificate has expired.\n  Check the system clock, and any proxy or firewall that intercepts "
+                + "HTTPS, then run the same command again.");
+        Assert.assertEquals(failing(tunnel(502), OPEN_PROXY).describeText(),
+                "error: The proxy 127.0.0.1:3128 set in ~/home/Settings.toml could not connect to "
+                        + "api.central.ballerina.io: HTTP 502 (3 attempts).\n  The proxy answered but could not "
+                        + "reach api.central.ballerina.io; run the same command again later, or check that the proxy "
+                        + "allows it.");
+    }
+
+    @Test
+    public void aProxyAskingForCredentialsSaysWhetherTheyWereMissingOrWrongAndIsNotRetried() {
+        Failure.Upstream missing = (Failure.Upstream) failing(FakeTransport.status(407), OPEN_PROXY);
+        Assert.assertEquals(missing.describeText(), "error: The proxy 127.0.0.1:3128 requires authentication.\n"
+                + "  Set both username and password under [proxy] in ~/home/Settings.toml, then run the same command "
+                + "again.");
+        Assert.assertEquals(missing.attempts(), 1);
+        Assert.assertFalse(missing.reached());
+
+        Failure.Upstream wrong = (Failure.Upstream) failing(
+                failed(HttpTransport.Reply.Problem.PROXY_REJECTED, "No credentials provided"), AUTHENTICATING_PROXY);
+        Assert.assertEquals(wrong.describeText(), "error: The proxy 127.0.0.1:3128 rejected the username and "
+                + "password in the [proxy] table of ~/home/Settings.toml.\n  Correct username and password under "
+                + "[proxy] in ~/home/Settings.toml, then run the same command again.");
+        Assert.assertEquals(wrong.attempts(), 1);
+        Assert.assertEquals(failing(FakeTransport.status(407), AUTHENTICATING_PROXY).describeText(),
+                wrong.describeText());
+    }
+
+    @Test
+    public void anAnswerFromCentralIsBlamedOnCentralAndATimeoutNamesTheSettingsFile() {
+        Failure.Upstream status = (Failure.Upstream) failing(FakeTransport.status(503), OPEN_PROXY);
+        Assert.assertEquals(status.describeText(), "error: Central answered " + URL + " with HTTP 503 (3 attempts).\n"
+                + "  Central returned an error; run the same command again later.");
+        Assert.assertTrue(status.reached());
+        Assert.assertEquals(status.status(), Integer.valueOf(503));
+
+        Failure.Upstream malformed = (Failure.Upstream) failing(FakeTransport.ok("{"), null);
+        Assert.assertTrue(malformed.describeText().startsWith("error: Central answered " + URL
+                + " with a body that is not JSON: "), malformed.describeText());
+        Assert.assertTrue(malformed.reached());
+        Assert.assertNull(malformed.status());
+
+        Assert.assertEquals(failing(new HttpTransport.Reply.TimedOut(), null).suggestion(), "A large package is slow "
+                + "on a cold fetch, so run the same command again; if it keeps timing out, check your network "
+                + "connection and the [proxy] table in ~/home/Settings.toml.");
+    }
+
+    @Test
+    public void aRequestThatCannotBeMadeIsADefectNotANetworkProblem() {
+        Failure failure = failing(failed(HttpTransport.Reply.Problem.BAD_URL, "Illegal character in path"), null);
+        Assert.assertEquals(failure.kind(), "internal");
+        Assert.assertEquals(failure.suggestion(), Failure.INTERNAL_SUGGESTION);
     }
 
     @Test
     public void aNetworkErrorIsRetriedAndThenReportedAsUpstream() {
-        FakeTransport transport =
-                FakeTransport.always(new HttpTransport.Reply.Failed("network error: connection refused"));
+        FakeTransport transport = FakeTransport.always(failed(HttpTransport.Reply.Problem.UNCONNECTED,
+                "connection refused"));
         Result<JsonElement> result =
                 CentralClient.fetchJson("https://example.invalid/x", fast(transport).build());
         Assert.assertFalse(result.isOk());
         Failure.Upstream failure = (Failure.Upstream) result.failure();
         Assert.assertEquals(failure.attempts(), 3);
         Assert.assertNull(failure.status(), "a request that never answered has no status line");
+        Assert.assertFalse(failure.reached());
+        Assert.assertTrue(failure.describe().contains("\"reached\":false"), failure.describe());
     }
 
     @Test
@@ -508,7 +696,7 @@ public class ClientTest {
         int configurablesBefore = module.getAsJsonArray("configurables").size();
         module.remove("records");
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertTrue(result.isOk(), "an omitted bucket must not refuse the whole package");
         CentralDocs.Module parsed = result.value().modules().get(0);
         Assert.assertTrue(parsed.records().isEmpty());
@@ -526,7 +714,7 @@ public class ClientTest {
         JsonObject module = onlyModule("ballerinax__sap");
         module.addProperty("records", "no longer an array");
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertFalse(result.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) result.failure();
         Assert.assertEquals(
@@ -552,7 +740,7 @@ public class ClientTest {
     @Test
     public void aPayloadWithNoModulesAtAllIsDriftNotAnEmptyLibrary() {
         Result<CentralDocs> result = Schema.parse(
-                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y:1.0.0");
+                com.google.gson.JsonParser.parseString("{\"docsData\":{\"modules\":[]}}"), "x/y", "1.0.0");
         Assert.assertFalse(result.isOk());
     }
 
@@ -567,7 +755,7 @@ public class ClientTest {
             module.addProperty(bucket, "no longer an array");
         }
 
-        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap:1.3.1");
+        Result<CentralDocs> result = Schema.parse(wrap(module), "ballerinax/sap", "1.3.1");
         Assert.assertFalse(result.isOk());
         Failure.SchemaDrift failure = (Failure.SchemaDrift) result.failure();
         Assert.assertEquals(failure.issues().size(), 6,
@@ -581,7 +769,7 @@ public class ClientTest {
         // The shape Central actually serves for a package with nothing in most buckets.
         String payload = "{\"docsData\":{\"modules\":[{\"id\":\"kafka\",\"orgName\":\"ballerinax\"}]}}";
         Result<CentralDocs> result =
-                Schema.parse(com.google.gson.JsonParser.parseString(payload), "ballerinax/kafka:4.6.5");
+                Schema.parse(com.google.gson.JsonParser.parseString(payload), "ballerinax/kafka", "4.6.5");
         Assert.assertTrue(result.isOk(), "a module with no declarations is empty, not drifted");
         Assert.assertTrue(result.value().modules().get(0).clients().isEmpty());
     }
