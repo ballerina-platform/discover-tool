@@ -1,8 +1,8 @@
 == client ==
 ballerinax/redis · client · Client
-111 remote methods, 1 normal method
+111 remote methods, 1 method
 
-Remote (->)
+Remote methods (->)
   append
   auth
   bitCount
@@ -50,23 +50,23 @@ Next: bal discover ballerinax/redis client Client --page 2
 Next: bal discover ballerinax/redis client Client --filter <keyword>
 == service ==
 ballerinax/redis · service
-This package declares nothing in service.
+ballerinax/redis has no service types.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/redis client
   type    10  bal discover ballerinax/redis type
 == class ==
 ballerinax/redis · class
-This package declares nothing in class.
+ballerinax/redis has no classes.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/redis client
   type    10  bal discover ballerinax/redis type
 == funcs ==
 ballerinax/redis · funcs
-This package declares nothing in funcs.
+ballerinax/redis has no functions.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/redis client
   type    10  bal discover ballerinax/redis type
 == type ==

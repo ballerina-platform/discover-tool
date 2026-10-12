@@ -1,16 +1,16 @@
 == client ==
 ballerina/log · client
-This package declares nothing in client.
+ballerina/log has no clients.
 
-Elsewhere
+Other buckets
   class   3  bal discover ballerina/log class
   funcs  11  bal discover ballerina/log funcs
   type   25  bal discover ballerina/log type
 == service ==
 ballerina/log · service
-This package declares nothing in service.
+ballerina/log has no service types.
 
-Elsewhere
+Other buckets
   class   3  bal discover ballerina/log class
   funcs  11  bal discover ballerina/log funcs
   type   25  bal discover ballerina/log type
@@ -18,8 +18,8 @@ Elsewhere
 ballerina/log · class
 3 classes
 
-  Logger                7 normal
-  LoggerRegistry        2 normal
+  Logger                7 methods
+  LoggerRegistry        2 methods
   PrintableRawTemplate
 
 Next: bal discover ballerina/log class <name>

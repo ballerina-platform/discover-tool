@@ -49,23 +49,23 @@ Next: bal discover ballerinax/googleapis.sheets client Client --page 2
 Next: bal discover ballerinax/googleapis.sheets client Client --filter <keyword>
 == service ==
 ballerinax/googleapis.sheets · service
-This package declares nothing in service.
+ballerinax/googleapis.sheets has no service types.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/googleapis.sheets client
   type    32  bal discover ballerinax/googleapis.sheets type
 == class ==
 ballerinax/googleapis.sheets · class
-This package declares nothing in class.
+ballerinax/googleapis.sheets has no classes.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/googleapis.sheets client
   type    32  bal discover ballerinax/googleapis.sheets type
 == funcs ==
 ballerinax/googleapis.sheets · funcs
-This package declares nothing in funcs.
+ballerinax/googleapis.sheets has no functions.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/googleapis.sheets client
   type    32  bal discover ballerinax/googleapis.sheets type
 == type ==

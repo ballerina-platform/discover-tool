@@ -216,7 +216,7 @@ public type GraphqlServiceConfig record {|
     # Listener authentication configurations
     ListenerAuthConfig[] auth?;
     # Function to initialize the context. If not provided, an empty context will be created
-    ContextInit contextInit = initDefaultContext; // the default initDefaultContext is not exported by this package; omit the argument rather than repeating it
+    ContextInit contextInit = initDefaultContext; // the default initDefaultContext is not exported by this package; leave the field out rather than writing it
     # The cross origin resource sharing configurations for the service
     CorsConfig cors?;
     # GraphiQL client configurations

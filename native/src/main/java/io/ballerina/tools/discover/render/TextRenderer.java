@@ -50,7 +50,7 @@ public final class TextRenderer {
 
     private static final String INDENT = "  ";
     private static final String SEPARATOR = " · ";
-    private static final String DOCUMENTED = "matched by documentation only";
+    private static final String DOCUMENTED = "that mention it only in their documentation";
     private static final Pattern PAGE_ARGUMENT = Pattern.compile(" --page \\d+$");
 
     private TextRenderer() {
@@ -129,7 +129,7 @@ public final class TextRenderer {
             case DiscoverResult.ReadmeChunks chunks -> readmeChunks(layout, chunks);
             case DiscoverResult.Signature signature -> signature(layout, signature);
             case DiscoverResult.MixedListing mixed -> mixedListing(layout, mixed);
-            case DiscoverResult.EmptyBucket empty -> emptyBucket(layout, empty);
+            case DiscoverResult.EmptyBucket empty -> emptyBucket(layout, empty, where);
             case DiscoverResult.TypeRoster roster -> typeRoster(layout, roster);
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(layout, declaration);
         }
@@ -180,7 +180,7 @@ public final class TextRenderer {
             DiscoverResult.ContainerRoster.Container container = containers.get(i);
             String heading = container.listener() == null || container.unconfirmed() == null
                     ? container.listener()
-                    : container.listener() + " — not confirmed (" + container.unconfirmed() + ")";
+                    : container.listener() + " — unverified (" + container.unconfirmed() + ")";
             byListener.computeIfAbsent(heading, key -> new ArrayList<>()).add(i);
         }
         boolean paired = !byListener.containsKey(null) || byListener.size() > 1;
@@ -193,9 +193,9 @@ public final class TextRenderer {
             String listener = group.getKey();
             List<Integer> rows = group.getValue();
             TextTable table = new TextTable(TextTable.Column.LEFT,
-                    TextTable.Column.count("resource", "resources"),
-                    TextTable.Column.count("remote", "remote"),
-                    TextTable.Column.count("normal", "normal"),
+                    TextTable.Column.count("resource method", "resource methods"),
+                    TextTable.Column.count("remote method", "remote methods"),
+                    TextTable.Column.count("method", "methods"),
                     TextTable.Column.LEFT);
             for (int row : rows) {
                 DiscoverResult.ContainerRoster.Container container = containers.get(row);
@@ -215,7 +215,7 @@ public final class TextRenderer {
         }
         int notAttachableTotal = roster.notAttachableTotal();
         if (notAttachable.isEmpty() && notAttachableTotal > 0) {
-            layout.block(List.of("Not attachable to a listener: " + notAttachableTotal + ", on a later page"));
+            layout.block(List.of("Not attachable to a listener: " + notAttachableTotal + " more, on later pages"));
         }
         layout.section("Not attachable to a listener" + (notAttachable.size() < notAttachableTotal
                 ? " (" + notAttachable.size() + " of " + notAttachableTotal + ")" : ""), unattachable);
@@ -239,7 +239,7 @@ public final class TextRenderer {
         }
 
         Drill hereDrill = resourceDrill(here);
-        layout.section("Here", resourceTable(here, hereDrill));
+        layout.section("Paths at this level", resourceTable(here, hereDrill));
         Drill groupDrill = Drill.of(groups.groups().stream().map(DiscoverResult.PathGroups.Group::name).toList(),
                 groups.groups().stream().map(DiscoverResult.PathGroups.Group::command).toList(), "<group>");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
@@ -247,7 +247,7 @@ public final class TextRenderer {
             DiscoverResult.PathGroups.Group group = groups.groups().get(i);
             table.row(group.name(), String.valueOf(group.count()), groupDrill.explicit(i));
         }
-        layout.section("Groups (operations under each)", table);
+        layout.section("Path groups (resource methods in each)", table);
 
         layout.notices(groups.note(), groups.warning());
         layout.more(remaining(here.size() + groups.groups().size(), groups.total(), groups.paging()),
@@ -336,14 +336,14 @@ public final class TextRenderer {
     }
 
     private static void readmeChunk(Layout layout, DiscoverResult.Readme readme) {
-        layout.top("Chunk " + readme.chunk() + " of " + readme.of() + ": " + readme.title());
+        layout.top("Section " + readme.chunk() + " of " + readme.of() + ": " + readme.title());
         layout.block(List.of(readme.markdown()));
         layout.warning(readme.warning());
     }
 
     private static void readmeChunks(Layout layout, DiscoverResult.ReadmeChunks chunks) {
-        layout.top(chunks.matching() ? counted(chunks.total(), "matching chunk", "matching chunks")
-                : counted(chunks.total(), "chunk", "chunks"));
+        layout.top(chunks.matching() ? counted(chunks.total(), "matching section", "matching sections")
+                : counted(chunks.total(), "section", "sections"));
         List<DiscoverResult.ReadmeChunks.Chunk> rows = chunks.chunks();
         Drill drill = Drill.of(rows.stream().map(chunk -> String.valueOf(chunk.number())).toList(),
                 rows.stream().map(DiscoverResult.ReadmeChunks.Chunk::command).toList(), "<n>");
@@ -367,13 +367,12 @@ public final class TextRenderer {
         for (int i = 0; i < types.size(); i++) {
             List<String> block = new ArrayList<>();
             if (i == 0) {
-                block.add("Types it names (" + types.size() + ")");
+                block.add("Types it uses (" + types.size() + ")");
             }
             block.addAll(indented(types.get(i).declaration().lines().toList()));
             layout.block(block);
         }
-        closureTail(layout, signature.omitted(), signature.omittedTotal(), signature.omittedNext(),
-                signature.foreign());
+        closureTail(layout, signature.omitted(), signature.foreign());
         List<String> documentedDrill = documented(layout, signature.documented());
         layout.notices(signature.note(), signature.warning());
         layout.more(remaining(signature.documented().names().size(), signature.documented().total(),
@@ -386,22 +385,22 @@ public final class TextRenderer {
         DiscoverResult.MixedListing.Counts counts = mixed.counts();
         List<String> parts = new ArrayList<>();
         if (counts.resources() > 0) {
-            parts.add(counted(counts.resources(), "resource path", "resource paths"));
+            parts.add(counted(counts.resources(), "resource method", "resource methods"));
         }
         if (counts.remote() > 0) {
             parts.add(counted(counts.remote(), "remote method", "remote methods"));
         }
         if (counts.normal() > 0) {
-            parts.add(counted(counts.normal(), "normal method", "normal methods"));
+            parts.add(counted(counts.normal(), "method", "methods"));
         }
         layout.top(String.join(", ", parts));
         Drill drill = resourceDrill(mixed.resources());
-        layout.section("Resources (->)", resourceTable(mixed.resources(), drill));
+        layout.section("Resource methods (->)", resourceTable(mixed.resources(), drill));
         List<DiscoverResult.Method> methods = new ArrayList<>(mixed.remote());
         methods.addAll(mixed.normal());
         Drill methodDrill = methodDrill(methods);
-        layout.section("Remote (->)", methodTable(mixed.remote(), methodDrill, 0));
-        layout.section("Normal (.)", methodTable(mixed.normal(), methodDrill, mixed.remote().size()));
+        layout.section("Remote methods (->)", methodTable(mixed.remote(), methodDrill, 0));
+        layout.section("Methods (.)", methodTable(mixed.normal(), methodDrill, mixed.remote().size()));
         List<String> documentedDrill = documented(layout, mixed.documented());
         layout.notices(mixed.note(), mixed.warning());
         layout.more(remaining(mixed.shown(), mixed.total(), mixed.paging()), mixed.paging());
@@ -411,11 +410,12 @@ public final class TextRenderer {
         layout.next(mixed.next());
     }
 
-    private static void emptyBucket(Layout layout, DiscoverResult.EmptyBucket empty) {
-        layout.top("This package declares nothing in " + empty.bucket() + ".");
+    private static void emptyBucket(Layout layout, DiscoverResult.EmptyBucket empty, Context where) {
+        String plural = Surface.Scope.ofVerb(empty.bucket()).map(Surface.Scope::plural).orElse(empty.bucket() + "s");
+        layout.top((where.pkg() == null ? "This package" : where.pkg()) + " has no " + plural + ".");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
         empty.elsewhere().forEach(other -> table.row(other.bucket(), String.valueOf(other.count()), other.command()));
-        layout.section("Elsewhere", table);
+        layout.section("Other buckets", table);
         layout.warning(empty.warning());
     }
 
@@ -453,30 +453,23 @@ public final class TextRenderer {
         for (int i = 0; i < types.size(); i++) {
             List<String> block = new ArrayList<>();
             if (i == 0) {
-                block.add("Types it names (" + types.size() + ")");
+                block.add("Types it uses (" + types.size() + ")");
             }
             block.addAll(indented(types.get(i).declaration().lines().toList()));
             layout.block(block);
         }
-        closureTail(layout, declaration.omitted(), declaration.omittedTotal(), declaration.omittedNext(),
-                declaration.foreign());
+        closureTail(layout, declaration.omitted(), declaration.foreign());
         layout.notices(declaration.note(), declaration.warning());
     }
 
     private static void closureTail(
-            Layout layout, List<DiscoverResult.Method> omitted, int omittedTotal, String omittedNext,
-            List<DiscoverResult.Foreign> foreign) {
-        int unlisted = Math.max(0, omittedTotal - omitted.size());
-        layout.section("Past the closure budget (" + omitted.size() + (unlisted > 0 ? " of " + omittedTotal : "") + ")",
+            Layout layout, List<DiscoverResult.Method> omitted, List<DiscoverResult.Foreign> foreign) {
+        layout.section("Other types it uses, not printed to keep this answer short (" + omitted.size() + ")",
                 commandTable(omitted));
-        layout.more(unlisted, null, "past the closure budget, listed by the type roster");
-        if (unlisted > 0) {
-            layout.next(omittedNext);
-        }
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
         foreign.forEach(type -> table.row(type.name(),
                 type.module() + (type.version() == null ? "" : " " + type.version()),
-                type.command() == null ? "(no command: package not known)" : type.command()));
+                type.command() == null ? "(package unknown: cannot be looked up)" : type.command()));
         layout.section("From other packages (" + foreign.size() + ")", table);
     }
 
@@ -567,7 +560,7 @@ public final class TextRenderer {
     private static List<String> documented(Layout layout, DiscoverResult.Documented documented) {
         List<DiscoverResult.Documented.Entry> entries = documented.entries();
         if (entries.isEmpty() && documented.total() > 0) {
-            layout.block(List.of("Matched by documentation only: " + documented.total() + ", on a later page"));
+            layout.block(List.of(documented.total() + " more mention it only in their documentation, on a later page"));
             return List.of();
         }
         List<DiscoverResult.Method> methods = new ArrayList<>();
@@ -591,7 +584,7 @@ public final class TextRenderer {
             }
         }
         int shown = entries.size();
-        layout.section("Matched by documentation only"
+        layout.section("Mentioned only in their documentation"
                 + (shown < documented.total() ? " (" + shown + " of " + documented.total() + ")" : ""), table);
         return Stream.of(resourceDrill.pattern(), methodDrill.pattern()).filter(Objects::nonNull).toList();
     }
@@ -744,7 +737,7 @@ public final class TextRenderer {
             String counted = "... " + remaining + " more" + (what == null ? "" : " " + what);
             if (paging == null) {
                 if (remaining > 0) {
-                    more.add(what == null ? counted + ", narrow further" : counted);
+                    more.add(what == null ? counted + ", narrow with --filter <keyword>" : counted);
                 }
             } else if (remaining > 0) {
                 hasLaterPages = true;

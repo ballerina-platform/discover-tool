@@ -142,6 +142,11 @@ public final class Signatures {
         return unwritableDefaults.isEmpty() ? "" : " // " + unwritableClause(unwritableDefaults);
     }
 
+    /** The same comment on a record field, which a caller leaves out of the record. */
+    public static String trailingFieldNote(List<String> unwritableDefaults) {
+        return unwritableDefaults.isEmpty() ? "" : " // " + unwritableFieldClause(unwritableDefaults);
+    }
+
     /** Ballerina doc comments, one {@code #} per line, with the trailing newline callers splice in. */
     public static String renderDescription(String description) {
         if (description.trim().isEmpty()) {
@@ -190,6 +195,15 @@ public final class Signatures {
                         + "repeating it"
                 : "the defaults " + names + " are not exported by this package; omit the arguments rather "
                         + "than repeating them";
+    }
+
+    private static String unwritableFieldClause(List<String> expressions) {
+        String names = String.join(", ", expressions);
+        return expressions.size() == 1
+                ? "the default " + names + " is not exported by this package; leave the field out rather than "
+                        + "writing it"
+                : "the defaults " + names + " are not exported by this package; leave the fields out rather "
+                        + "than writing them";
     }
 
     private static List<String> unwritableDefaults(List<Param> params) {

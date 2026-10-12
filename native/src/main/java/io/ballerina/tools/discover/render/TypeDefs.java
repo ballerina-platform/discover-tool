@@ -117,7 +117,7 @@ public final class TypeDefs {
                 String readonly = field.readonly() ? "readonly " : "";
                 String optional = field.optional() ? "?" : "";
                 String defaultValue = field.hasDefault() ? " = " + field.defaultValue() : "";
-                String caveat = Signatures.trailingNote(
+                String caveat = Signatures.trailingFieldNote(
                         field.unwritableDefault() ? List.of(field.defaultValue()) : List.of());
                 yield description + deprecated + "    " + visibility + readonly + typeName + " "
                         + Identifiers.write(field.name())
@@ -192,7 +192,7 @@ public final class TypeDefs {
     private static String renderAlias(TypeDef.Alias typeDef) {
         String description = Signatures.renderDescription(typeDef.description());
         if (typeDef.type().name().isEmpty()) {
-            return description + "// Unknown type: " + typeDef.name();
+            return description + "// Central publishes no definition for " + typeDef.name();
         }
         List<Signatures.ExternalLink> links = Signatures.collectExternalLinks(typeDef.type());
         String type = Signatures.applyPrefixToTypeName(typeDef.type().name(), links);

@@ -367,7 +367,6 @@ public final class JsonRenderer {
         json.add("types", types(signature.types()));
         if (!signature.omitted().isEmpty()) {
             json.add("omitted", methods(signature.omitted()));
-            addOmittedTotal(json, signature.omitted(), signature.omittedTotal(), signature.omittedNext());
         }
         if (!signature.foreign().isEmpty()) {
             json.add("foreign", foreign(signature.foreign()));
@@ -447,21 +446,12 @@ public final class JsonRenderer {
         json.add("types", types(declaration.types()));
         if (!declaration.omitted().isEmpty()) {
             json.add("omitted", methods(declaration.omitted()));
-            addOmittedTotal(json, declaration.omitted(), declaration.omittedTotal(), declaration.omittedNext());
         }
         if (!declaration.foreign().isEmpty()) {
             json.add("foreign", foreign(declaration.foreign()));
         }
         addNotices(json, declaration.warning(), declaration.note());
         return json;
-    }
-
-    private static void addOmittedTotal(
-            JsonObject json, List<DiscoverResult.Method> omitted, int total, String next) {
-        if (total > omitted.size()) {
-            json.addProperty("omittedTotal", total);
-            addIfPresent(json, "omittedNext", next);
-        }
     }
 
     private static JsonArray types(List<DiscoverResult.Signature.Type> types) {

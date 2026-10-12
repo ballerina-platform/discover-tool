@@ -2,7 +2,7 @@
 ballerinax/github · client · Client
 36 path groups
 
-Groups (operations under each)
+Path groups (resource methods in each)
   repos                421
   orgs                 200
   user                  93
@@ -43,23 +43,23 @@ Groups (operations under each)
 Next: bal discover ballerinax/github client Client <group>
 == service ==
 ballerinax/github · service
-This package declares nothing in service.
+ballerinax/github has no service types.
 
-Elsewhere
+Other buckets
   client     1  bal discover ballerinax/github client
   type    1228  bal discover ballerinax/github type
 == class ==
 ballerinax/github · class
-This package declares nothing in class.
+ballerinax/github has no classes.
 
-Elsewhere
+Other buckets
   client     1  bal discover ballerinax/github client
   type    1228  bal discover ballerinax/github type
 == funcs ==
 ballerinax/github · funcs
-This package declares nothing in funcs.
+ballerinax/github has no functions.
 
-Elsewhere
+Other buckets
   client     1  bal discover ballerinax/github client
   type    1228  bal discover ballerinax/github type
 == type ==

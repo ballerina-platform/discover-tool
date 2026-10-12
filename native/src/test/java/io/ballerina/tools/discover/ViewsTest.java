@@ -28,7 +28,6 @@ import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
-import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
@@ -457,9 +456,9 @@ public class ViewsTest {
         Assert.assertEquals(mixed.total(), mixed.resources().size() + mixed.remote().size() + mixed.normal().size());
         // The call form is printed on every section, because `->` versus `.` is the fact a caller came for.
         String text = TextRenderer.render(mixed);
-        Assert.assertTrue(text.contains("\n\nResources (->)\n  "), text);
-        Assert.assertTrue(text.contains("\n\nRemote (->)\n  "), text);
-        Assert.assertTrue(text.contains("\n\nNormal (.)\n  "), text);
+        Assert.assertTrue(text.contains("\n\nResource methods (->)\n  "), text);
+        Assert.assertTrue(text.contains("\n\nRemote methods (->)\n  "), text);
+        Assert.assertTrue(text.contains("\n\nMethods (.)\n  "), text);
     }
 
     @Test
@@ -681,7 +680,7 @@ public class ViewsTest {
                 sheets, new Readme.Options("1", "zzz_no_such_keyword_anywhere", 1));
         Assert.assertFalse(view.isOk());
         Assert.assertTrue(view.failure() instanceof Failure.Validation, view.failure().describe());
-        Assert.assertTrue(view.failure().describe().contains("does not match"), view.failure().describe());
+        Assert.assertTrue(view.failure().describe().contains("does not mention"), view.failure().describe());
     }
 
     @Test
@@ -731,43 +730,20 @@ public class ViewsTest {
     }
 
     @Test
-    public void aClosureThatDropsMoreThanTheCeilingReportsTheTrueTotal() {
+    public void aLeafListsEveryTypeItLeavesOutWithoutACeiling() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        DiscoverResult.TypeDeclaration status = as(DiscoverResult.TypeDeclaration.class,
-                type("ballerina__http", "StatusCodeResponse"));
-        Assert.assertEquals(status.omitted().size(), Containers.MAX_ENTRIES);
-        Assert.assertEquals(status.omittedTotal(), 47);
-        Assert.assertEquals(status.omittedNext(), "bal discover ballerina/http type");
-        com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(JsonRenderer.render(status))
-                .getAsJsonObject();
-        Assert.assertEquals(json.get("omittedTotal").getAsInt(), 47);
-        Assert.assertEquals(json.get("omittedNext").getAsString(), "bal discover ballerina/http type");
-        Assert.assertEquals(json.getAsJsonArray("omitted").size(), 40);
-        String text = TextRenderer.render(status, new TextRenderer.Context(
-                http.qualified().qualified(), null, List.of("type", "StatusCodeResponse"), null, null, null));
-        Assert.assertTrue(text.contains("Past the closure budget (40 of 47)"), text);
-        Assert.assertTrue(text.contains("\n... 7 more past the closure budget, listed by the type roster\n"
-                + "Next: bal discover ballerina/http type"), text);
-        Assert.assertEquals(text.lines().filter(line -> line.startsWith("Past the closure budget")).count(), 1L);
-
         DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
-                type("ballerina__http", "ClientError"));
-        Assert.assertEquals(config.omittedTotal(), config.omitted().size());
-        Assert.assertNull(config.omittedNext());
-        Assert.assertFalse(JsonRenderer.render(config).contains("omittedTotal"));
-        Assert.assertFalse(JsonRenderer.render(config).contains("omittedNext"));
-    }
-
-    @Test(dataProvider = "fixtures")
-    public void anOmittedTotalIsNeverBelowTheRowsListed(String slug) {
-        LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
-        for (String name : Declarations.index(loaded.library().addressable()).names()) {
-            Result<DiscoverResult> answer = Types.render(loaded, new Types.Options(List.of(name), null, 1));
-            if (answer.isOk() && answer.value() instanceof DiscoverResult.TypeDeclaration leaf) {
-                Assert.assertTrue(leaf.omittedTotal() >= leaf.omitted().size(), slug + " " + name);
-                Assert.assertTrue(leaf.omitted().size() <= Containers.MAX_ENTRIES, slug + " " + name);
-            }
-        }
+                type("ballerina__http", "Listener"));
+        Assert.assertFalse(config.omitted().isEmpty());
+        com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(JsonRenderer.render(config))
+                .getAsJsonObject();
+        Assert.assertEquals(json.getAsJsonArray("omitted").size(), config.omitted().size());
+        Assert.assertFalse(json.has("omittedTotal"));
+        Assert.assertFalse(json.has("omittedNext"));
+        String text = TextRenderer.render(config, new TextRenderer.Context(
+                http.qualified().qualified(), null, List.of("type", "Listener"), null, null, null));
+        Assert.assertTrue(text.contains(
+                "Other types it uses, not printed to keep this answer short (" + config.omitted().size() + ")"), text);
     }
 
     @Test
@@ -840,7 +816,7 @@ public class ViewsTest {
                 new DiscoverResult.Foreign("Thing3", "ballerinax/kafka.unlisted", "1.0.0", null)));
         String text = TextRenderer.render(holder, new TextRenderer.Context(
                 loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null, null, null));
-        Assert.assertTrue(text.contains("(no command: package not known)"), text);
+        Assert.assertTrue(text.contains("(package unknown: cannot be looked up)"), text);
     }
 
     @Test
@@ -930,7 +906,7 @@ public class ViewsTest {
         Assert.assertEquals(type("ballerina__http", "Response"), render(http, Surface.Scope.CLASS,
                 List.of("Response")));
         Assert.assertEquals(routedTo(type("ballerinax__kafka", "Service")),
-                new Routed("Service", "binds to kafka:Listener"));
+                new Routed("Service", "attach it to kafka:Listener"));
     }
 
     @Test
@@ -941,9 +917,9 @@ public class ViewsTest {
         Assert.assertTrue(listener.declaration().contains("class Listener {"), listener.declaration());
         Assert.assertTrue(listener.declaration().contains("function init("), listener.declaration());
         Assert.assertTrue(listener.declaration().contains("function attach("), listener.declaration());
-        Assert.assertTrue(listener.types().stream().anyMatch(each -> each.name().equals("Service")),
+        Assert.assertTrue(listener.types().stream().anyMatch(each -> each.name().equals("ConsumerConfiguration")),
                 listener.types().toString());
-        Assert.assertTrue(listener.omitted().stream().anyMatch(each -> each.name().equals("ConsumerConfiguration")),
+        Assert.assertTrue(listener.omitted().stream().anyMatch(each -> each.name().equals("Service")),
                 listener.omitted().toString());
         Assert.assertNull(listener.note());
     }
@@ -1002,7 +978,7 @@ public class ViewsTest {
         String text = TextRenderer.render(answer, new TextRenderer.Context("ballerinax/googleapis.sheets", null,
                 List.of("type"), "server", null, null));
         Assert.assertTrue(text.contains("No types.\n"), text);
-        Assert.assertTrue(text.contains("\nMatched by documentation only\n  ClientHttp1Settings\n"), text);
+        Assert.assertTrue(text.contains("\nMentioned only in their documentation\n  ClientHttp1Settings\n"), text);
         Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/googleapis.sheets type <name>"), text);
         Assert.assertEquals(JsonParser.parseString(JsonRenderer.render(answer)).getAsJsonObject()
                 .getAsJsonArray("documented").get(0).toString(), "{\"name\":\"ClientHttp1Settings\","
@@ -1056,7 +1032,7 @@ public class ViewsTest {
                 "bal discover ballerina/http client Client :...path post");
         String text = TextRenderer.render(rest, new TextRenderer.Context("ballerina/http", null,
                 List.of("client", "Client"), "entity", null, null));
-        Assert.assertTrue(text.contains("\nMatched by documentation only\n  :...path  get, post"), text);
+        Assert.assertTrue(text.contains("\nMentioned only in their documentation\n  :...path  get, post"), text);
         Assert.assertTrue(text.endsWith("\nNext: bal discover ballerina/http client Client <path> <accessor>\n"
                 + "Next: bal discover ballerina/http client Client <name>"), text);
 

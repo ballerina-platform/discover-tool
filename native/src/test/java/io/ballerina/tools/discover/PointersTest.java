@@ -106,17 +106,13 @@ public class PointersTest {
     }
 
     @Test
-    public void theCommandsPastAClosureCeilingRunAndAnswer() {
+    public void theCommandsForTypesALeafLeavesOutRunAndAnswer() {
         String slug = "ballerina__http";
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
-        DiscoverResult.TypeDeclaration status = (DiscoverResult.TypeDeclaration) expect(
-                Types.render(context, new Types.Options(List.of("StatusCodeResponse"), null, 1)));
-        Assert.assertEquals(status.omittedNext(), "bal discover ballerina/http type");
-        JsonObject roster = run(slug, centralFor(slug), status.omittedNext());
-        Assert.assertEquals(roster.get("total").getAsInt(), Types.count(context));
-        Assert.assertTrue(roster.has("next"), roster.toString());
-        status.omitted().forEach(each -> Assert.assertEquals(
-                run(slug, centralFor(slug), each.command()).get("name").getAsString(), each.name()));
+        DiscoverResult.TypeDeclaration config = (DiscoverResult.TypeDeclaration) expect(
+                Types.render(context, new Types.Options(List.of("Listener"), null, 1)));
+        Assert.assertFalse(config.omitted().isEmpty());
+        config.omitted().forEach(each -> run(slug, centralFor(slug), each.command()));
     }
 
     private static List<DiscoverResult> typeAnswers(LoadedPackage context) {
@@ -185,7 +181,6 @@ public class PointersTest {
             }
             case DiscoverResult.Signature signature -> {
                 signature.omitted().forEach(omitted -> commands.add(omitted.command()));
-                addIfPresent(commands, signature.omittedNext());
                 addForeign(commands, signature.foreign());
             }
             case DiscoverResult.MixedListing mixed -> {
@@ -203,7 +198,6 @@ public class PointersTest {
             }
             case DiscoverResult.TypeDeclaration declaration -> {
                 declaration.omitted().forEach(omitted -> commands.add(omitted.command()));
-                addIfPresent(commands, declaration.omittedNext());
                 addForeign(commands, declaration.foreign());
             }
         }

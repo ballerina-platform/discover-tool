@@ -1,16 +1,16 @@
 == client ==
 ballerina/xlsx · client
-This package declares nothing in client.
+ballerina/xlsx has no clients.
 
-Elsewhere
+Other buckets
   class   3  bal discover ballerina/xlsx class
   funcs   6  bal discover ballerina/xlsx funcs
   type   41  bal discover ballerina/xlsx type
 == service ==
 ballerina/xlsx · service
-This package declares nothing in service.
+ballerina/xlsx has no service types.
 
-Elsewhere
+Other buckets
   class   3  bal discover ballerina/xlsx class
   funcs   6  bal discover ballerina/xlsx funcs
   type   41  bal discover ballerina/xlsx type
@@ -18,9 +18,9 @@ Elsewhere
 ballerina/xlsx · class
 3 classes
 
-  Sheet     21 normal
-  Table     18 normal
-  Workbook  12 normal
+  Sheet     21 methods
+  Table     18 methods
+  Workbook  12 methods
 
 Next: bal discover ballerina/xlsx class <name>
 == funcs ==

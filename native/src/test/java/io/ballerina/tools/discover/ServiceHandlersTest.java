@@ -194,7 +194,7 @@ public class ServiceHandlersTest {
         Assert.assertTrue(text.contains("  required\n"), text);
         Assert.assertTrue(text.contains("remote function onError(kafka:Error kafkaError) returns error?\n  optional"),
                 text);
-        Assert.assertTrue(text.contains("Note: binds to kafka:Listener"), text);
+        Assert.assertTrue(text.contains("Note: attach it to kafka:Listener"), text);
         Assert.assertFalse(text.contains("No methods"), text);
 
         JsonObject answer = json(http, "ballerinax/kafka", "service", "Service");
@@ -207,7 +207,7 @@ public class ServiceHandlersTest {
         Assert.assertFalse(handlers.get(1).getAsJsonObject().get("required").getAsBoolean());
         Assert.assertEquals(consumer.getAsJsonArray("params").size(), 2);
         Assert.assertEquals(consumer.get("returns").getAsString(), "error?");
-        Assert.assertEquals(answer.get("note").getAsString(), "binds to kafka:Listener");
+        Assert.assertEquals(answer.get("note").getAsString(), "attach it to kafka:Listener");
     }
 
     @Test

@@ -829,8 +829,8 @@ public class CliTest {
 
         Capture text = run(List.of("ballerinax/kafka", "funcs"), "ballerinax__kafka", "4.6.5", true);
         Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka:4.6.5 · funcs\n"
-                        + "This package declares nothing in funcs.\n\n"
-                        + "Elsewhere\n"
+                        + "ballerinax/kafka has no functions.\n\n"
+                        + "Other buckets\n"
                         + "  client    3  bal discover ballerinax/kafka client\n"),
                 text.stdout());
     }
@@ -862,7 +862,7 @@ public class CliTest {
         Assert.assertTrue(text.startsWith("ballerinax/kafka:4.6.5 · client · Producer · send\n\n# "),
                 "the header, then the declaration's own doc comment: " + text);
         Assert.assertTrue(text.contains("remote function send("), text);
-        Assert.assertTrue(text.contains("\n\nTypes it names (2)\n  # "), text);
+        Assert.assertTrue(text.contains("\n\nTypes it uses (2)\n  # "), text);
     }
 
     @Test
@@ -941,9 +941,9 @@ public class CliTest {
 
         String text = run(argv, "ballerina__http", "2.16.6", true).stdout();
         Assert.assertTrue(text.startsWith("ballerina/http:2.16.6 · client · Client\n"), text);
-        Assert.assertTrue(text.contains("\n\nResources (->)\n  :...path  get, "), text);
-        Assert.assertTrue(text.contains("\n\nRemote (->)\n  delete\n  execute\n"), text);
-        Assert.assertTrue(text.contains("\n\nNormal (.)\n  circuitBreakerForceClose\n"), text);
+        Assert.assertTrue(text.contains("\n\nResource methods (->)\n  :...path  get, "), text);
+        Assert.assertTrue(text.contains("\n\nRemote methods (->)\n  delete\n  execute\n"), text);
+        Assert.assertTrue(text.contains("\n\nMethods (.)\n  circuitBreakerForceClose\n"), text);
     }
 
     @Test
@@ -1150,7 +1150,7 @@ public class CliTest {
         Capture text = new Capture();
         Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "zzzz"), text.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()), null, true);
-        Assert.assertTrue(text.stdout().endsWith("No matching chunks.\n"), text.stdout());
+        Assert.assertTrue(text.stdout().endsWith("No matching sections.\n"), text.stdout());
     }
 
     @Test
@@ -1204,7 +1204,7 @@ public class CliTest {
             Assert.assertEquals(exitCode, 1, argv + " -> " + capture.stdout());
             Assert.assertEquals(capture.stdout(), "");
             Assert.assertEquals(capture.field("kind"), "validation");
-            Assert.assertTrue(capture.field("message").contains("not paged"), argv + " -> " + capture.stderr());
+            Assert.assertTrue(capture.field("message").contains("only one page"), argv + " -> " + capture.stderr());
             String suggestion = capture.field("suggestion");
             Assert.assertFalse(suggestion.substring(suggestion.indexOf('`')).contains("--page"), suggestion);
         }

@@ -1,11 +1,11 @@
 == client ==
 ballerinax/sap · client · Client
-1 resource path, 7 remote methods
+7 resource methods, 7 remote methods
 
-Resources (->)
+Resource methods (->)
   :...path  post, put, patch, delete, head, get, options
 
-Remote (->)
+Remote methods (->)
   delete
   get
   head
@@ -18,23 +18,23 @@ Next: bal discover ballerinax/sap client Client <path> <accessor>
 Next: bal discover ballerinax/sap client Client <name>
 == service ==
 ballerinax/sap · service
-This package declares nothing in service.
+ballerinax/sap has no service types.
 
-Elsewhere
+Other buckets
   client  1  bal discover ballerinax/sap client
   type    4  bal discover ballerinax/sap type
 == class ==
 ballerinax/sap · class
-This package declares nothing in class.
+ballerinax/sap has no classes.
 
-Elsewhere
+Other buckets
   client  1  bal discover ballerinax/sap client
   type    4  bal discover ballerinax/sap type
 == funcs ==
 ballerinax/sap · funcs
-This package declares nothing in funcs.
+ballerinax/sap has no functions.
 
-Elsewhere
+Other buckets
   client  1  bal discover ballerinax/sap client
   type    4  bal discover ballerinax/sap type
 == type ==
