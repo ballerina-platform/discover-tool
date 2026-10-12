@@ -50,9 +50,9 @@ public class FailureTest {
     @Test
     public void candidatesAndIssuesGetLinesOfTheirOwn() {
         Assert.assertEquals(new Failure.SymbolNotFound("ballerinax/kafka", "4.6.5", null, List.of("9"),
-                        "No readme chunk of ballerinax/kafka:4.6.5 is numbered or titled '9'.", "Pick one.", null,
+                        "No readme section of ballerinax/kafka:4.6.5 is numbered or titled '9'.", "Pick one.", null,
                         List.of("1. Producer", "2. Consumer")).describeText(),
-                "error: No readme chunk of ballerinax/kafka:4.6.5 is numbered or titled '9'.\n  Pick one.\n"
+                "error: No readme section of ballerinax/kafka:4.6.5 is numbered or titled '9'.\n  Pick one.\n"
                         + "  candidates:\n    1. Producer\n    2. Consumer");
         Assert.assertEquals(new Failure.SchemaDrift("ballerinax/kafka", "4.6.5", null,
                         List.of(new Failure.SchemaIssue("docsData.modules", "expected an array")), "Report it.")

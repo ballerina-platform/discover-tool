@@ -30,7 +30,7 @@ coordinate, the form `bal pull` takes: `bal discover ballerina/http:2.15.7` (see
 | `class`   | Plain objects reached with `.`.                                                                          |
 | `funcs`   | Module-level functions.                                                                                  |
 | `type`    | Every type the module declares: records, enums, errors, type aliases, constants, module variables, annotations, listeners, and the classes, clients and service types the buckets above also list. `type <Name>` opens any of them. |
-| `readme`  | The module's README, verbatim. `readme <n>` or `readme "<title>"` opens one code-carrying section.       |
+| `readme`  | The module's README, verbatim. `readme <n>` or `readme "<title>"` opens one section.                   |
 
 The first four are derived from how a symbol is called, not from Central's `isClient`-style flags:
 `ballerina/http` declares ten clients, two of which Central files as ordinary declarations. `type` and `readme`
@@ -340,14 +340,14 @@ $ bal discover ballerinax/postgresql client
 ballerinax/postgresql:1.19.0 · client · Client
 5 remote methods, 1 method
 
-Remote (->)
+Remote methods (->)
   batchExecute
   call
   execute
   query
   queryRow
 
-Normal (.)
+Methods (.)
   close
 
 Next: bal discover ballerinax/postgresql client Client <name>
@@ -498,6 +498,8 @@ Types it uses (2)
   |};
 ```
 
+A readme of at most 10 KB prints whole, under the same header line as every other answer. A larger one lists every
+one of its sections (a heading and everything down to the next heading) with the command that opens it, never cut off.
 A large readme can be narrowed to the sections that mention a keyword:
 
 ```
@@ -519,7 +521,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | bare package                         | `buckets` (`name`, `command`), `submodules` (`name`, `summary`, `command`)                                          |
-| several containers                   | `containers` (`name`, `resources`, `remote`, `normal`, `listener`, `confirmed`, `unconfirmedReason`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
+| several containers                   | `containers` (`name`, `resources` (resource methods, not paths), `remote`, `normal`, `listener`, `confirmed`, `unconfirmedReason`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`)                 |
@@ -528,16 +530,17 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`) |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
-| readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
-| readme sections                      | `chunks` (`number`, `title`, `lines`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`                       |
+| one service type                     | `container`, `note`, `warning`; when the package describes the methods a service defines, `handlers` (`name`, `kind`, `signature`, `required`, `repeatable`, `accessors`, `doc`, `deprecated`, `params`, `returns`) and `rules` (`requirement`, `handlers`, `message`) |
+| readme                               | `readme`, `lines`, and `section`, `of`, `title` for one section                                                  |
+| readme sections                      | `sections` (`number`, `title`, `lines`, `command`), `matching` (true when narrowed by `--filter` or a title), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 
 Any answer can also carry `warning` (the version could not be confirmed against the registry), and a service
 type's answers `note` (the listener it binds to, or that it attaches to none), as can an enum member's (the enum
 it shows). `documented` lists entries a `--filter` matched
 only in their documentation, alphabetically and shaped as their listing rows are — a method, function or type
 with its `command`, a resource path once with every matching accessor's `commands` — held to the same ceiling
-and paged with the same `--page`, with `documentedTotal` giving how many there are (in text, a `Matched by
-documentation only (40 of 102)` heading and a `Next:` line with the command's shape). Beside a listing they are
+and paged with the same `--page`, with `documentedTotal` giving how many there are (in text, a `Mentioned only in their
+documentation (40 of 102)` heading and a `Next:` line with the command's shape). Beside a listing they are
 its last section, after every entry the filter matched by name; beside one signature, or as all a filter found,
 they page on their own, and `next` turns that page — absent on the last page, as on every paged answer. A
 `--filter` that matches nothing by name is still an answer (exit 0): the listing with no entries, and its
@@ -575,7 +578,7 @@ No listing shows more than **40 entries**. Over that:
 A cut listing always says so: `shown`/`total`, `page`/`pages`, `remaining` (everything after this page,
 documentation-only matches included) and `next` (the `--page` command that continues it) in JSON, or a
 `... N more (page P of Q)` line followed by `Next: <command>` in text, where `N` counts what comes after this page
-(`... N more matched by documentation only (page P of Q)` when only those are paged, beside one signature or in
+(`... N more mention it only in their documentation (page P of Q)` when only those are paged, beside one signature or in
 a listing with no entries of its own). In text, a listing that continues also ends with the command that narrows it by keyword,
 `Next: bal discover <package> <bucket> --filter <keyword>`, which is usually shorter than paging.
 

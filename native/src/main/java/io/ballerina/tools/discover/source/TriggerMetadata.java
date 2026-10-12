@@ -15,6 +15,7 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
+
 package io.ballerina.tools.discover.source;
 
 import com.google.gson.JsonArray;
@@ -49,7 +50,7 @@ import java.util.regex.Pattern;
  */
 public final class TriggerMetadata {
 
-    /** Which derivation of the cache's per-module slot holds the file, apart from the inclusions' own. */
+    /** The name of the cache slot, next to the inclusions', that holds the file. */
     private static final String DERIVATION = "trigger-metadata-1";
     private static final Pattern SUPPORTED_VERSION = Pattern.compile("v1\\.\\d+");
     private static final String NAME = "name";
@@ -65,6 +66,9 @@ public final class TriggerMetadata {
     private static final String RULES = "rules";
     private static final String SERVICE_TYPE = "serviceType";
     private static final String HANDLER_SUBJECT = "handler";
+    private static final String KIND = "kind";
+    private static final String ADD_MODE = "addMode";
+    private static final String MANY = "many";
 
     private TriggerMetadata() {
     }
@@ -177,10 +181,10 @@ public final class TriggerMetadata {
     }
 
     private static ServiceHandlers.Handler handler(JsonObject object, String prefix) {
-        ServiceHandlers.Kind kind = "resource".equals(object.get("kind").getAsString())
+        ServiceHandlers.Kind kind = ServiceHandlers.Kind.RESOURCE.label().equals(object.get(KIND).getAsString())
                 ? ServiceHandlers.Kind.RESOURCE
                 : ServiceHandlers.Kind.REMOTE;
-        boolean repeatable = "many".equals(string(object, "addMode"));
+        boolean repeatable = MANY.equals(string(object, ADD_MODE));
         List<String> accessors = new ArrayList<>();
         if (kind == ServiceHandlers.Kind.RESOURCE && object.has("accessor")) {
             object.getAsJsonObject("accessor").getAsJsonArray("values")
@@ -202,14 +206,14 @@ public final class TriggerMetadata {
     private static ServiceHandlers.Param param(JsonObject object, String prefix) {
         return new ServiceHandlers.Param(object.has(NAME) ? object.get(NAME).getAsString() : null,
                 type(object.get(TYPE), prefix), REQUIRED.equals(string(object, PRESENCE)),
-                "many".equals(string(object, "addMode")), string(object, DOC), string(object, DEPRECATED));
+                MANY.equals(string(object, ADD_MODE)), string(object, DOC), string(object, DEPRECATED));
     }
 
     private static ServiceHandlers.Rule rule(JsonObject object, Map<String, String> namesById) {
         List<String> handlers = new ArrayList<>();
         for (JsonElement subject : object.getAsJsonArray("subjects")) {
             JsonObject owner = subject.getAsJsonObject();
-            if (HANDLER_SUBJECT.equals(string(owner, "kind"))) {
+            if (HANDLER_SUBJECT.equals(string(owner, KIND))) {
                 String id = string(owner, ID);
                 String name = namesById.get(id);
                 handlers.add(name == null ? id.substring(id.lastIndexOf('.') + 1) : name);

@@ -50,6 +50,11 @@ public final class TextRenderer {
 
     private static final String INDENT = "  ";
     private static final String SEPARATOR = " · ";
+    private static final String HANDLERS_HEADING = "Methods to implement";
+    private static final String RULES_HEADING = "Rules";
+    private static final String REPEATABLE = "any number";
+    private static final String REQUIRED = "required";
+    private static final String OPTIONAL = "optional";
     private static final String DOCUMENTED = "that mention it only in their documentation";
     private static final Pattern PAGE_ARGUMENT = Pattern.compile(" --page \\d+$");
 
@@ -87,12 +92,12 @@ public final class TextRenderer {
     }
 
     /**
-     * {@code result} under a header naming where it was asked from. A whole readme is printed verbatim, without
-     * one.
+     * {@code result} under a header naming where it was asked from. A whole readme follows the header verbatim.
      */
     public static String render(DiscoverResult result, Context where) {
-        if (result instanceof DiscoverResult.Readme readme && readme.chunk() == null) {
-            return verbatimReadme(readme);
+        if (result instanceof DiscoverResult.Readme readme && readme.section() == null) {
+            String header = header(where, null);
+            return header == null ? verbatimReadme(readme) : header + "\n\n" + verbatimReadme(readme);
         }
         Layout layout = new Layout();
         layout.top(header(where, containerOf(result)));
@@ -125,8 +130,8 @@ public final class TextRenderer {
             case DiscoverResult.ResourceList resources -> resourceList(layout, resources);
             case DiscoverResult.MethodList methods -> methodList(layout, methods);
             case DiscoverResult.ServiceHandlerList handlers -> serviceHandlers(layout, handlers);
-            case DiscoverResult.Readme readme -> readmeChunk(layout, readme);
-            case DiscoverResult.ReadmeChunks chunks -> readmeChunks(layout, chunks);
+            case DiscoverResult.Readme readme -> readmeSection(layout, readme);
+            case DiscoverResult.ReadmeSections sections -> readmeSections(layout, sections);
             case DiscoverResult.Signature signature -> signature(layout, signature);
             case DiscoverResult.MixedListing mixed -> mixedListing(layout, mixed);
             case DiscoverResult.EmptyBucket empty -> emptyBucket(layout, empty, where);
@@ -273,7 +278,8 @@ public final class TextRenderer {
     private static void methodList(Layout layout, DiscoverResult.MethodList methods) {
         layout.top(methods.container() == null
                 ? counted(methods.total(), "function", "functions")
-                : counted(methods.total(), "method", "methods"));
+                : methods.remote() ? counted(methods.total(), "remote method", "remote methods")
+                        : counted(methods.total(), "method", "methods"));
         Drill drill = methodDrill(methods.methods());
         layout.block(methodTable(methods.methods(), drill).lines(INDENT));
         List<String> documentedDrill = documented(layout, methods.documented());
@@ -290,31 +296,34 @@ public final class TextRenderer {
         for (ServiceHandlers.Handler handler : list.handlers()) {
             List<String> lines = new ArrayList<>();
             lines.add(handler.signature());
-            lines.add(INDENT + presence(handler));
+            lines.add(INDENT + presence(handler.repeatable(), handler.required()));
             if (handler.deprecated() != null) {
                 lines.add(INDENT + "Deprecated: " + handler.deprecated());
             }
-            if (!handler.doc().isBlank()) {
+            if (handler.doc() != null && !handler.doc().isBlank()) {
                 lines.add(INDENT + handler.doc().strip());
             }
             for (ServiceHandlers.Param param : handler.params()) {
                 lines.add(INDENT + (param.name() == null ? "<name>" : param.name())
-                        + " (" + (param.repeatable() ? "any number" : param.required() ? "required" : "optional")
-                        + ")" + (param.doc() == null || param.doc().isBlank() ? "" : ": " + param.doc().strip()));
+                        + " (" + presence(param.repeatable(), param.required()) + ")"
+                        + (param.doc() == null || param.doc().isBlank() ? "" : ": " + param.doc().strip()));
             }
             layout.block(lines);
         }
         if (!list.rules().isEmpty()) {
             List<String> lines = new ArrayList<>();
             lines.add(RULES_HEADING);
-            list.rules().forEach(rule -> lines.add(INDENT + ruleText(rule)));
-            layout.block(lines);
+            list.rules().stream().map(TextRenderer::ruleText).filter(text -> !text.isEmpty())
+                    .forEach(text -> lines.add(INDENT + text));
+            if (lines.size() > 1) {
+                layout.block(lines);
+            }
         }
         layout.notices(list.note(), list.warning());
     }
 
-    private static String presence(ServiceHandlers.Handler handler) {
-        return handler.repeatable() ? "any number" : handler.required() ? "required" : "optional";
+    private static String presence(boolean repeatable, boolean required) {
+        return repeatable ? REPEATABLE : required ? REQUIRED : OPTIONAL;
     }
 
     private static String ruleText(ServiceHandlers.Rule rule) {
@@ -335,30 +344,30 @@ public final class TextRenderer {
         return readme.warning() == null ? readme.markdown() : readme.markdown() + "\n\nWarning: " + readme.warning();
     }
 
-    private static void readmeChunk(Layout layout, DiscoverResult.Readme readme) {
-        layout.top("Section " + readme.chunk() + " of " + readme.of() + ": " + readme.title());
+    private static void readmeSection(Layout layout, DiscoverResult.Readme readme) {
+        layout.top("Section " + readme.section() + " of " + readme.of() + ": " + readme.title());
         layout.block(List.of(readme.markdown()));
         layout.warning(readme.warning());
     }
 
-    private static void readmeChunks(Layout layout, DiscoverResult.ReadmeChunks chunks) {
-        layout.top(chunks.matching() ? counted(chunks.total(), "matching section", "matching sections")
-                : counted(chunks.total(), "section", "sections"));
-        List<DiscoverResult.ReadmeChunks.Chunk> rows = chunks.chunks();
-        Drill drill = Drill.of(rows.stream().map(chunk -> String.valueOf(chunk.number())).toList(),
-                rows.stream().map(DiscoverResult.ReadmeChunks.Chunk::command).toList(), "<n>");
+    private static void readmeSections(Layout layout, DiscoverResult.ReadmeSections sections) {
+        layout.top(sections.matching() ? counted(sections.total(), "matching section", "matching sections")
+                : counted(sections.total(), "section", "sections"));
+        List<DiscoverResult.ReadmeSections.Section> rows = sections.sections();
+        Drill drill = Drill.of(rows.stream().map(section -> String.valueOf(section.number())).toList(),
+                rows.stream().map(DiscoverResult.ReadmeSections.Section::command).toList(), "<n>");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT,
                 TextTable.Column.count("line", "lines"), TextTable.Column.LEFT);
         for (int i = 0; i < rows.size(); i++) {
-            DiscoverResult.ReadmeChunks.Chunk chunk = rows.get(i);
-            table.row(String.valueOf(chunk.number()), chunk.title(), String.valueOf(chunk.lines()),
+            DiscoverResult.ReadmeSections.Section section = rows.get(i);
+            table.row(String.valueOf(section.number()), section.title(), String.valueOf(section.lines()),
                     drill.explicit(i));
         }
         layout.block(table.lines(INDENT));
-        layout.warning(chunks.warning());
-        layout.more(remaining(rows.size(), chunks.total(), chunks.paging()), chunks.paging());
+        layout.warning(sections.warning());
+        layout.more(remaining(rows.size(), sections.total(), sections.paging()), sections.paging());
         layout.next(drill.pattern());
-        layout.next(chunks.next());
+        layout.next(sections.next());
     }
 
     private static void signature(Layout layout, DiscoverResult.Signature signature) {
@@ -464,7 +473,7 @@ public final class TextRenderer {
 
     private static void closureTail(
             Layout layout, List<DiscoverResult.Method> omitted, List<DiscoverResult.Foreign> foreign) {
-        layout.section("Other types it uses, not printed to keep this answer short (" + omitted.size() + ")",
+        layout.section("Other types it uses, not printed (" + omitted.size() + ")",
                 commandTable(omitted));
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
         foreign.forEach(type -> table.row(type.name(),
@@ -492,8 +501,6 @@ public final class TextRenderer {
         return parts.isEmpty() ? null : String.join(SEPARATOR, parts);
     }
 
-    private static final String HANDLERS_HEADING = "Methods to implement";
-    private static final String RULES_HEADING = "Rules";
 
     private static String containerOf(DiscoverResult result) {
         return switch (result) {
@@ -502,6 +509,7 @@ public final class TextRenderer {
             case DiscoverResult.MethodList methods -> methods.container();
             case DiscoverResult.MixedListing mixed -> mixed.container();
             case DiscoverResult.Signature signature -> signature.container();
+            case DiscoverResult.ServiceHandlerList handlers -> handlers.container();
             default -> null;
         };
     }

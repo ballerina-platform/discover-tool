@@ -251,6 +251,7 @@ public sealed interface DiscoverResult {
      *
      * @param container the container that declares them, or {@code null} for module-level functions
      * @param methods the methods shown, alphabetical, up to the ceiling
+     * @param remote whether they are all remote methods, which the count then names
      * @param shown how many are in this response
      * @param total how many the container declares
      * @param paging which page this is, or {@code null} when the whole listing fit on one
@@ -262,8 +263,8 @@ public sealed interface DiscoverResult {
      *     {@code service} bucket
      */
     record MethodList(
-            String container, List<Method> methods, int shown, int total, Paging paging, String next,
-            Documented documented, String warning, String note) implements DiscoverResult { }
+            String container, List<Method> methods, boolean remote, int shown, int total, Paging paging,
+            String next, Documented documented, String warning, String note) implements DiscoverResult { }
 
     /**
      * What a service type's package says a service of it must or may define: the methods to implement, and the
@@ -288,20 +289,20 @@ public sealed interface DiscoverResult {
     }
 
     /**
-     * The {@code readme} bucket's own answer: the whole readme verbatim, or — when a chunk selector resolved to
+     * The {@code readme} bucket's own answer: the whole readme verbatim, or — when a section selector resolved to
      * exactly one section — that section alone. No entry ceiling applies here; unlike every other listing this
      * bucket answers, the RFC's own text for it is "returns that module's README, verbatim", with no size limit
      * of any kind.
      *
-     * @param markdown the readme, or the one resolved chunk, verbatim
+     * @param markdown the readme, or the one resolved section, verbatim
      * @param lines how many lines {@code markdown} holds
-     * @param chunk the chunk's 1-based number, or {@code null} for the whole readme
-     * @param of how many chunks the readme carries, or {@code null} for the whole readme
-     * @param title the chunk's own heading, or {@code null} for the whole readme
+     * @param section the section's 1-based number, or {@code null} for the whole readme
+     * @param of how many sections the readme carries, or {@code null} for the whole readme
+     * @param title the section's own heading, or {@code null} for the whole readme
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      */
-    record Readme(String markdown, int lines, Integer chunk, Integer of, String title, String warning)
+    record Readme(String markdown, int lines, Integer section, Integer of, String title, String warning)
             implements DiscoverResult {
 
         public Readme(String markdown, int lines, String warning) {
@@ -310,27 +311,28 @@ public sealed interface DiscoverResult {
     }
 
     /**
-     * A roster of readme chunks to choose one from: those matching a selector or {@code --filter}, up to the
-     * ceiling every other listing obeys, or — for a readme too large to print whole — every chunk it has.
+     * A roster of readme sections to choose one from: those matching a selector or {@code --filter}, up to the
+     * ceiling every other listing obeys, or — for a readme too large to print whole — every section it has.
      *
-     * @param chunks the chunks shown, up to the ceiling
-     * @param total how many chunks actually match
+     * @param sections the sections shown, up to the ceiling
+     * @param total how many sections actually match
      * @param paging which page this is, or {@code null} when every match fit on one
      * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
-     * @param matching whether the chunks are the ones that matched something, rather than all the readme has
+     * @param matching whether the sections are the ones that matched something, rather than all the readme has
      */
-    record ReadmeChunks(List<Chunk> chunks, int total, Paging paging, String next, String warning, boolean matching)
+    record ReadmeSections(
+            List<Section> sections, int total, Paging paging, String next, String warning, boolean matching)
             implements DiscoverResult {
 
         /**
          * @param number the 1-based address a caller types
          * @param title the heading it sits under
-         * @param lines how many lines the chunk holds
+         * @param lines how many lines the section holds
          * @param command the command that opens it
          */
-        public record Chunk(int number, String title, int lines, String command) { }
+        public record Section(int number, String title, int lines, String command) { }
     }
 
     /**

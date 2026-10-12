@@ -422,11 +422,11 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aPaginatedMethodListNamesTheNextPageInBothRenderings() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
-                methods(TWILIO, "createAccount", "createAddress"), 40, 199, new DiscoverResult.Paging(1, 5, 159),
+                methods(TWILIO, "createAccount", "createAddress"), true, 40, 199, new DiscoverResult.Paging(1, 5, 159),
                 TWILIO + " --page 2", DiscoverResult.Documented.NONE, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
-                "199 methods",
+                "199 remote methods",
                 "",
                 "  createAccount",
                 "  createAddress",
@@ -447,7 +447,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void aLaterPageCountsOnlyWhatComesAfterIt() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
-                methods(TWILIO, "deleteConferenceRecording"), 40, 199, new DiscoverResult.Paging(2, 5, 119),
+                methods(TWILIO, "deleteConferenceRecording"), true, 40, 199, new DiscoverResult.Paging(2, 5, 119),
                 "bal discover ballerinax/twilio client Client --page 3", DiscoverResult.Documented.NONE, null, null);
         Assert.assertTrue(TextRenderer.render(result).endsWith(lines(
                 "... 119 more (page 2 of 5)",
@@ -455,7 +455,7 @@ public class DiscoverResultRenderingTest {
                 "Next: " + TWILIO + " --page 3")));
 
         DiscoverResult last = new DiscoverResult.MethodList("Client",
-                methods(TWILIO, "updateUsageTrigger"), 39, 199, new DiscoverResult.Paging(5, 5, 0), null,
+                methods(TWILIO, "updateUsageTrigger"), true, 39, 199, new DiscoverResult.Paging(5, 5, 0), null,
                 DiscoverResult.Documented.NONE, null, null);
         Assert.assertTrue(TextRenderer.render(last).endsWith("Last page (page 5 of 5)\nNext: " + TWILIO + " <name>"));
         Assert.assertFalse(JsonParser.parseString(JsonRenderer.render(last)).getAsJsonObject().has("next"));
@@ -469,26 +469,26 @@ public class DiscoverResultRenderingTest {
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("readme").getAsString(), "## Overview\n\nbody");
         Assert.assertEquals(json.get("lines").getAsInt(), 3);
-        Assert.assertFalse(json.has("chunk"), "the whole readme names no chunk");
+        Assert.assertFalse(json.has("section"), "the whole readme names no section");
     }
 
     @Test
-    public void oneChunkCarriesItsPositionInJsonAndAHeaderLineInText() {
+    public void oneSectionCarriesItsPositionInJsonAndAHeaderLineInText() {
         DiscoverResult result = new DiscoverResult.Readme("## Quickstart\n\ncode", 3, 2, 5, "Quickstart", null);
         Assert.assertEquals(TextRenderer.render(result), "Section 2 of 5: Quickstart\n\n## Quickstart\n\ncode");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
-        Assert.assertEquals(json.get("chunk").getAsInt(), 2);
+        Assert.assertEquals(json.get("section").getAsInt(), 2);
         Assert.assertEquals(json.get("of").getAsInt(), 5);
         Assert.assertEquals(json.get("title").getAsString(), "Quickstart");
     }
 
     @Test
-    public void severalMatchingChunksAreARosterInBothRenderings() {
-        DiscoverResult result = new DiscoverResult.ReadmeChunks(
+    public void severalMatchingSectionsAreARosterInBothRenderings() {
+        DiscoverResult result = new DiscoverResult.ReadmeSections(
                 List.of(
-                        new DiscoverResult.ReadmeChunks.Chunk(1, "Overview", 10, "bal discover pkg readme 1"),
-                        new DiscoverResult.ReadmeChunks.Chunk(3, "Quickstart", 25, "bal discover pkg readme 3")),
+                        new DiscoverResult.ReadmeSections.Section(1, "Overview", 10, "bal discover pkg readme 1"),
+                        new DiscoverResult.ReadmeSections.Section(3, "Quickstart", 25, "bal discover pkg readme 3")),
                 2, null, null, null, true);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 matching sections",
@@ -498,19 +498,20 @@ public class DiscoverResultRenderingTest {
                 "",
                 "Next: bal discover pkg readme <n>"));
 
-        JsonArray chunks = JsonParser.parseString(JsonRenderer.render(result))
-                .getAsJsonObject().getAsJsonArray("chunks");
-        Assert.assertEquals(chunks.get(1).getAsJsonObject().get("number").getAsInt(), 3);
-        Assert.assertEquals(chunks.get(1).getAsJsonObject().get("command").getAsString(), "bal discover pkg readme 3");
+        JsonArray sections = JsonParser.parseString(JsonRenderer.render(result))
+                .getAsJsonObject().getAsJsonArray("sections");
+        Assert.assertEquals(sections.get(1).getAsJsonObject().get("number").getAsInt(), 3);
+        Assert.assertEquals(sections.get(1).getAsJsonObject().get("command").getAsString(),
+                "bal discover pkg readme 3");
     }
 
     @Test
-    public void noChunkMatchingTheFilterIsNoneInTextAndAnEmptyArrayInJson() {
-        DiscoverResult result = new DiscoverResult.ReadmeChunks(List.of(), 0, null, null, null, true);
+    public void noSectionMatchingTheFilterIsNoneInTextAndAnEmptyArrayInJson() {
+        DiscoverResult result = new DiscoverResult.ReadmeSections(List.of(), 0, null, null, null, true);
         Assert.assertEquals(TextRenderer.render(result), "No matching sections.");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
-        Assert.assertEquals(json.getAsJsonArray("chunks").size(), 0);
+        Assert.assertEquals(json.getAsJsonArray("sections").size(), 0);
         Assert.assertEquals(json.get("total").getAsInt(), 0);
     }
 
@@ -563,7 +564,7 @@ public class DiscoverResultRenderingTest {
                 "... 1 more that mention it only in their documentation (page 1 of 2)",
                 "Next: bal discover pkg client Client <name>",
                 "Next: " + command + " --page 2")), text);
-        Assert.assertTrue(text.contains("Other types it uses, not printed to keep this answer short (1)\n"
+        Assert.assertTrue(text.contains("Other types it uses, not printed (1)\n"
                 + "  Gist  bal discover pkg type Gist\n"), text);
         Assert.assertFalse(text.contains("narrow with"), text);
     }
@@ -573,7 +574,8 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
                 List.of(new DiscoverResult.Method("createCall", "bal discover ballerinax/twilio client Client "
                         + "createCall")),
-                1, 199, new DiscoverResult.Paging(1, 5, 159), "bal discover ballerinax/twilio client Client --page 2",
+                false, 1, 199, new DiscoverResult.Paging(1, 5, 159),
+                "bal discover ballerinax/twilio client Client --page 2",
                 DiscoverResult.Documented.NONE, null, null);
         String text = TextRenderer.render(result, new TextRenderer.Context("ballerinax/twilio", null,
                 List.of("client"), null, null, null));
@@ -627,7 +629,7 @@ public class DiscoverResultRenderingTest {
                 "  public type BaseGist record {|",
                 "  |};",
                 "",
-                "Other types it uses, not printed to keep this answer short (1)",
+                "Other types it uses, not printed (1)",
                 "  GistFile  bal discover pkg type GistFile",
                 "",
                 "Note: relocated to gists/'public"));

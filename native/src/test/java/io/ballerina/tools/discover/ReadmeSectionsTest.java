@@ -31,7 +31,7 @@ import java.util.Optional;
  *
  * @since 0.1.0
  */
-public class ReadmeChunkingTest {
+public class ReadmeSectionsTest {
 
     private static LoadedPackage withReadme(String markdown) {
         LoadedPackage base = FixtureCorpus.loadedFixture("ballerinax__kafka");
@@ -41,13 +41,23 @@ public class ReadmeChunkingTest {
     }
 
     private static List<String> titles(String markdown) {
-        return Readme.chunksOf(withReadme(markdown)).stream().map(Readme.Chunk::title).toList();
+        return Readme.sectionsOf(withReadme(markdown)).stream().map(Readme.Section::title).toList();
     }
 
     @Test
     public void everyHeadingOpensASectionProseOnlyOnesIncluded() {
         Assert.assertEquals(titles("intro\n\n# A\ntext\n## B\n```\ncode\n```\n### C\nmore"),
                 List.of("Introduction", "A", "B", "C"));
+    }
+
+    @Test
+    public void aReadmeWithWindowsLineEndingsIsCutIntoSectionsToo() {
+        Assert.assertEquals(titles("# A\r\ntext\r\n## B\r\nmore\r\n"), List.of("A", "B"));
+    }
+
+    @Test
+    public void aLineOfInlineCodeStartingWithBackticksOpensNoFence() {
+        Assert.assertEquals(titles("# A\n```x``` is inline\n# B\ntext"), List.of("A", "B"));
     }
 
     @Test
@@ -92,13 +102,13 @@ public class ReadmeChunkingTest {
                     .append('\n');
         }
         DiscoverResult result = Readme.render(withReadme(markdown.toString()), Readme.Options.BARE).value();
-        DiscoverResult.ReadmeChunks listing = (DiscoverResult.ReadmeChunks) result;
-        Assert.assertEquals(listing.chunks().size(), sections);
+        DiscoverResult.ReadmeSections listing = (DiscoverResult.ReadmeSections) result;
+        Assert.assertEquals(listing.sections().size(), sections);
         Assert.assertEquals(listing.total(), sections);
         Assert.assertNull(listing.paging());
         Assert.assertNull(listing.next());
         Assert.assertFalse(listing.matching());
-        Assert.assertEquals(listing.chunks().get(59).command(), "bal discover ballerinax/kafka readme 60");
+        Assert.assertEquals(listing.sections().get(59).command(), "bal discover ballerinax/kafka readme 60");
     }
 
     @Test
@@ -106,10 +116,10 @@ public class ReadmeChunkingTest {
         LoadedPackage loaded = withReadme("# Example\none\n# Other\n# Example\ntwo");
         Result<DiscoverResult> view = Readme.render(loaded, new Readme.Options("example", null, 1));
         Assert.assertTrue(view.isOk(), view.isOk() ? "" : view.failure().describe());
-        DiscoverResult.ReadmeChunks listing = (DiscoverResult.ReadmeChunks) view.value();
-        Assert.assertEquals(listing.chunks().stream().map(DiscoverResult.ReadmeChunks.Chunk::number).toList(),
+        DiscoverResult.ReadmeSections listing = (DiscoverResult.ReadmeSections) view.value();
+        Assert.assertEquals(listing.sections().stream().map(DiscoverResult.ReadmeSections.Section::number).toList(),
                 List.of(1, 3));
-        Assert.assertTrue(listing.chunks().get(1).command().endsWith("readme 3"), listing.chunks().toString());
+        Assert.assertTrue(listing.sections().get(1).command().endsWith("readme 3"), listing.sections().toString());
     }
 
     @Test

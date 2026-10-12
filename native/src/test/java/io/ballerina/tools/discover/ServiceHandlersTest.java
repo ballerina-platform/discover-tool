@@ -15,6 +15,7 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
+
 package io.ballerina.tools.discover;
 
 import com.google.gson.JsonArray;
@@ -29,6 +30,8 @@ import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.LocalBalas;
 import io.ballerina.tools.discover.cli.Cli;
 import io.ballerina.tools.discover.model.ServiceHandlers;
+import io.ballerina.tools.discover.render.DiscoverResult;
+import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.source.TriggerMetadata;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -208,6 +211,27 @@ public class ServiceHandlersTest {
         Assert.assertEquals(consumer.getAsJsonArray("params").size(), 2);
         Assert.assertEquals(consumer.get("returns").getAsString(), "error?");
         Assert.assertEquals(answer.get("note").getAsString(), "attach it to kafka:Listener");
+    }
+
+    @Test
+    public void aHandlerWithoutADocRendersInText() {
+        ServiceHandlers.Handler handler = new ServiceHandlers.Handler("onEvent", ServiceHandlers.Kind.REMOTE, true,
+                false, List.of(), null, null, List.of(), null);
+        String text = TextRenderer.render(new DiscoverResult.ServiceHandlerList(
+                "Service", List.of(handler), List.of(new ServiceHandlers.Rule(null, List.of(), null)), null, null));
+        Assert.assertEquals(text, "Service\nMethods to implement (1)\n\nremote function onEvent()\n  required");
+    }
+
+    @Test
+    public void aHandlerNameThatMatchesNothingListsTheMethodsToImplement() {
+        HttpOptions http = central(true);
+        StringBuilder err = new StringBuilder();
+        int code = Cli.run(List.of("ballerinax/kafka", "service", "Service", "nosuch", "--output", "json"),
+                new Cli.Streams(out -> { }, err::append), http);
+        Assert.assertEquals(code, 1, err.toString());
+        JsonObject failure = JsonParser.parseString(err.toString()).getAsJsonObject();
+        Assert.assertEquals(failure.get("kind").getAsString(), "symbol-not-found");
+        Assert.assertEquals(failure.get("command").getAsString(), "bal discover ballerinax/kafka service Service");
     }
 
     @Test

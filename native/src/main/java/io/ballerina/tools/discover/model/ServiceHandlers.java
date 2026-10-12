@@ -15,6 +15,7 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
+
 package io.ballerina.tools.discover.model;
 
 import java.util.List;

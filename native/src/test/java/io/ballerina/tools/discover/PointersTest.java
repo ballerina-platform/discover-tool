@@ -99,8 +99,8 @@ public class PointersTest {
         answers.addAll(typeAnswers(context));
         answers.add(expect(Readme.render(context, Readme.Options.BARE)));
         answers.add(expect(Readme.render(context, new Readme.Options(null, "config", 1))));
-        for (Readme.Chunk chunk : Readme.chunksOf(context)) {
-            answers.add(expect(Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1))));
+        for (Readme.Section section : Readme.sectionsOf(context)) {
+            answers.add(expect(Readme.render(context, new Readme.Options(String.valueOf(section.number()), null, 1))));
         }
         return answers;
     }
@@ -173,11 +173,11 @@ public class PointersTest {
                 // The handlers a service defines are code to write, not commands to run.
             }
             case DiscoverResult.Readme ignored -> {
-                // No embedded command fields on the whole-readme/single-chunk answer.
+                // No embedded command fields on the whole-readme/single-section answer.
             }
-            case DiscoverResult.ReadmeChunks chunks -> {
-                chunks.chunks().forEach(chunk -> commands.add(chunk.command()));
-                addIfPresent(commands, chunks.next());
+            case DiscoverResult.ReadmeSections sections -> {
+                sections.sections().forEach(section -> commands.add(section.command()));
+                addIfPresent(commands, sections.next());
             }
             case DiscoverResult.Signature signature -> {
                 signature.omitted().forEach(omitted -> commands.add(omitted.command()));

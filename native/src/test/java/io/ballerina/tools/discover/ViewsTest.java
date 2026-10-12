@@ -654,27 +654,27 @@ public class ViewsTest {
     }
 
     @Test
-    public void aReadmeChunkIsASectionWithItsProseAndIsAddressableTwoWays() {
-        // Chunks keep their prose: a code-only extract would discard most of `googleapis.sheets`' readme —
+    public void aReadmeSectionIsASectionWithItsProseAndIsAddressableTwoWays() {
+        // Sections keep their prose: a code-only extract would discard most of `googleapis.sheets`' readme —
         // including "if you intend to use deleteSpreadsheet you must also enable the Google Drive API", which is
         // not inferable from any signature.
         LoadedPackage sheets = FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets");
-        List<Readme.Chunk> chunks = Readme.chunksOf(sheets);
-        Assert.assertFalse(chunks.isEmpty(), "sheets' readme carries code in several sections");
+        List<Readme.Section> sections = Readme.sectionsOf(sheets);
+        Assert.assertFalse(sections.isEmpty(), "sheets' readme carries code in several sections");
 
         Result<DiscoverResult> byNumber = Readme.render(sheets, new Readme.Options("1", null, 1));
         Assert.assertTrue(byNumber.isOk(), byNumber.isOk() ? "" : byNumber.failure().describe());
         DiscoverResult.Readme numberResult = (DiscoverResult.Readme) byNumber.value();
-        Assert.assertEquals(numberResult.chunk(), Integer.valueOf(1));
+        Assert.assertEquals(numberResult.section(), Integer.valueOf(1));
 
-        Result<DiscoverResult> byTitle = Readme.render(sheets, new Readme.Options(chunks.get(0).title(), null, 1));
+        Result<DiscoverResult> byTitle = Readme.render(sheets, new Readme.Options(sections.get(0).title(), null, 1));
         Assert.assertTrue(byTitle.isOk(), byTitle.isOk() ? "" : byTitle.failure().describe());
         Assert.assertEquals(((DiscoverResult.Readme) byTitle.value()).markdown(), numberResult.markdown(),
-                "a title and its number are the same chunk");
+                "a title and its number are the same section");
     }
 
     @Test
-    public void aChunkSelectorCombinedWithAFilterThatDoesNotMatchFailsRatherThanIgnoringTheFilter() {
+    public void aSectionSelectorCombinedWithAFilterThatDoesNotMatchFailsRatherThanIgnoringTheFilter() {
         LoadedPackage sheets = FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets");
         Result<DiscoverResult> view = Readme.render(
                 sheets, new Readme.Options("1", "zzz_no_such_keyword_anywhere", 1));
@@ -684,7 +684,7 @@ public class ViewsTest {
     }
 
     @Test
-    public void aChunkThatDoesNotExistNamesEveryChunkThatDoes() {
+    public void aSectionThatDoesNotExistNamesEverySectionThatDoes() {
         Result<DiscoverResult> view = Readme.render(FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"),
                 new Readme.Options("999", null, 1));
         Assert.assertFalse(view.isOk());
@@ -743,7 +743,18 @@ public class ViewsTest {
         String text = TextRenderer.render(config, new TextRenderer.Context(
                 http.qualified().qualified(), null, List.of("type", "Listener"), null, null, null));
         Assert.assertTrue(text.contains(
-                "Other types it uses, not printed to keep this answer short (" + config.omitted().size() + ")"), text);
+                "Other types it uses, not printed (" + config.omitted().size() + ")"), text);
+    }
+
+    @Test
+    public void everyTypeAPrintedTypeReferencesIsPrintedOrListed() {
+        DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
+                type("ballerina__http", "ClientConfiguration"));
+        List<String> accounted = new ArrayList<>(config.types().stream().map(DiscoverResult.Signature.Type::name)
+                .toList());
+        config.omitted().forEach(omitted -> accounted.add(omitted.name()));
+        Assert.assertTrue(accounted.containsAll(List.of("ClientAuthConfig", "CredentialsConfig", "BearerTokenConfig",
+                "JwtIssuerConfig", "OAuth2GrantConfig")), accounted.toString());
     }
 
     @Test
@@ -961,7 +972,8 @@ public class ViewsTest {
         Assert.assertFalse(page.isOk());
         Assert.assertEquals(page.failure(), new Failure.Validation(
                 "Page 9 is out of range: this listing has 67 entries on 2 pages.",
-                "Pass a page from 1 to 2, e.g. `bal discover ballerinax/kafka type --page 2`."));
+                "Pass a page from 1 to 2, e.g. `bal discover ballerinax/kafka type --page 2`.",
+                "bal discover ballerinax/kafka type --page 2"));
     }
 
     @Test
