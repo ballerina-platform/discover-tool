@@ -65,8 +65,11 @@ public final class CentralClient {
     private static final String REGISTRY_PACKAGES_URL = CENTRAL_BASE_URL + "registry/packages/";
     private static final String DOCS_URL = CENTRAL_BASE_URL + "docs/";
 
-    /** The least an attempt is given, so a budget spent to the millisecond still makes a real request. */
+    /** The least the first attempt is given, so a budget spent to the millisecond still makes a real request. */
     private static final long MIN_ATTEMPT_TIMEOUT_MS = 1;
+
+    /** The least time worth a retry: a request given less cannot complete, and would only be counted as an attempt. */
+    private static final long MIN_RETRY_TIMEOUT_MS = 250;
 
     private static final int BAD_REQUEST = 400;
     private static final int NOT_FOUND = 404;
@@ -333,9 +336,13 @@ public final class CentralClient {
                         : backoffMs(attempt - 1, options.baseDelayMs(), options.jitter());
                 options.sleep(Math.min(remaining, wait));
             }
+            long remainingMs = deadline - options.now();
+            if (attempt > 0 && remainingMs < MIN_RETRY_TIMEOUT_MS) {
+                break;
+            }
             made++;
-            long remainingMs = Math.max(MIN_ATTEMPT_TIMEOUT_MS, deadline - options.now());
-            last = attemptFetch(url, Math.min(options.timeoutMs(), remainingMs), options);
+            long timeoutMs = Math.min(options.timeoutMs(), Math.max(remainingMs, MIN_ATTEMPT_TIMEOUT_MS));
+            last = attemptFetch(url, timeoutMs, options);
             switch (last) {
                 case Outcome.Body body -> {
                     return Result.ok(body.value());
@@ -573,6 +580,12 @@ public final class CentralClient {
             // One the reader resolved is not: telling them to "omit the version" names what they already did.
             if (isNotFound(response)) {
                 return Result.err(missingVersion(qualified, resolved, options));
+            }
+            if (resolved.source() == ResolvedVersion.Source.LATEST
+                    && response.failure() instanceof Failure.Upstream upstream && upstream.reached()) {
+                return Result.err(upstream.suggesting(Failure.UPSTREAM_SUGGESTION + " Or read an earlier release by "
+                        + "writing its version after the package: " + qualified.qualified() + ":<version>.")
+                        .about(qualified.qualified(), version.text()));
             }
             return about(response, qualified, version);
         }

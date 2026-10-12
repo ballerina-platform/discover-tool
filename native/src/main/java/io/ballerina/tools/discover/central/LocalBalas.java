@@ -92,7 +92,9 @@ public final class LocalBalas implements ModuleSources {
     /**
      * The exact version's module, from whichever platform directory ({@code java21}, {@code any}, …) holds it.
      * Anything short of that — no such version, no such module, an unreadable or over-{@link Bala.Limits} copy —
-     * is empty; a platform directory that cannot be read is skipped for the next.
+     * is empty; a platform directory that cannot be read, or holds the module over the limits, is skipped whole
+     * (its trigger metadata too, as {@link Bala#moduleSources} does) for the next. A platform with trigger metadata
+     * only is the answer only when no platform holds the module's sources.
      */
     @Override
     public Optional<Map<String, String>> moduleSources(
@@ -104,15 +106,23 @@ public final class LocalBalas implements ModuleSources {
         } catch (IOException | RuntimeException unreadable) {
             return Optional.empty();
         }
+        Map<String, String> metadataOnly = null;
         for (Path platform : platforms) {
-            Map<String, String> files = new TreeMap<>(
-                    readModule(platform.resolve(Bala.MODULES_DIR).resolve(moduleId)).orElse(Map.of()));
+            Module module = readModule(platform.resolve(Bala.MODULES_DIR).resolve(moduleId));
+            if (module.overLimit()) {
+                continue;
+            }
+            Map<String, String> files = new TreeMap<>(module.files());
+            boolean hasSources = !files.isEmpty();
             readTriggerMetadata(platform).ifPresent(metadata -> files.put(Bala.TRIGGER_METADATA, metadata));
-            if (!files.isEmpty()) {
+            if (hasSources) {
                 return Optional.of(files);
             }
+            if (!files.isEmpty() && metadataOnly == null) {
+                metadataOnly = files;
+            }
         }
-        return Optional.empty();
+        return Optional.ofNullable(metadataOnly);
     }
 
     private static Optional<String> readTriggerMetadata(Path platform) {
@@ -126,9 +136,15 @@ public final class LocalBalas implements ModuleSources {
         }
     }
 
-    private static Optional<Map<String, String>> readModule(Path moduleDir) {
+    private record Module(Map<String, String> files, boolean overLimit) {
+
+        static final Module ABSENT = new Module(Map.of(), false);
+        static final Module OVER_LIMIT = new Module(Map.of(), true);
+    }
+
+    private static Module readModule(Path moduleDir) {
         if (!Files.isDirectory(moduleDir)) {
-            return Optional.empty();
+            return Module.ABSENT;
         }
         Bala.Limits limits = Bala.Limits.DEFAULT;
         Map<String, String> files = new TreeMap<>();
@@ -142,13 +158,13 @@ public final class LocalBalas implements ModuleSources {
                 kept += size;
                 if (size > limits.sourceBytes() || kept > limits.moduleBytes()
                         || files.size() >= limits.moduleFiles()) {
-                    return Optional.empty();
+                    return Module.OVER_LIMIT;
                 }
                 files.put(String.valueOf(source.getFileName()), Files.readString(source, StandardCharsets.UTF_8));
             }
         } catch (IOException | RuntimeException unreadable) {
-            return Optional.empty();
+            return Module.ABSENT;
         }
-        return files.isEmpty() ? Optional.empty() : Optional.of(files);
+        return new Module(files, false);
     }
 }

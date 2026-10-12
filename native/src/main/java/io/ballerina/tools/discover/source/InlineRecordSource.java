@@ -18,12 +18,15 @@
 
 package io.ballerina.tools.discover.source;
 
+import io.ballerina.compiler.syntax.tree.FunctionBodyNode;
 import io.ballerina.compiler.syntax.tree.Node;
 import io.ballerina.compiler.syntax.tree.NonTerminalNode;
 import io.ballerina.compiler.syntax.tree.RecordFieldNode;
 import io.ballerina.compiler.syntax.tree.RecordFieldWithDefaultValueNode;
 import io.ballerina.compiler.syntax.tree.RecordTypeDescriptorNode;
 import io.ballerina.compiler.syntax.tree.SyntaxKind;
+import io.ballerina.compiler.syntax.tree.TypeDefinitionNode;
+import io.ballerina.tools.discover.model.Defaults;
 import io.ballerina.tools.discover.model.InlineRecords;
 
 import java.util.HashSet;
@@ -37,6 +40,9 @@ import java.util.regex.Pattern;
  * The inline record types of a module's source — every {@code record {...}} that is not the body of a type
  * definition — with the optionality and default each field declares.
  *
+ * <p>Only what a caller's types can come from is read: function bodies and private type definitions declare
+ * records no package API mentions. A default that names a declaration of the package, or runs long, is dropped.
+ *
  * <p>Two declarations with the same field names and different answers are ambiguous, so neither is recovered.
  *
  * @since 0.1.0
@@ -45,6 +51,7 @@ final class InlineRecordSource {
 
     private static final Pattern LINE_BREAK = Pattern.compile("\\s*\\R\\s*");
     private static final String LINE_COMMENT = "//";
+    private static final int MAX_DEFAULT_LENGTH = 80;
 
     private InlineRecordSource() {
     }
@@ -59,6 +66,10 @@ final class InlineRecordSource {
 
     private static void visit(Node node, Map<List<String>, Map<String, InlineRecords.Member>> found,
             Set<List<String>> ambiguous) {
+        if (node instanceof FunctionBodyNode
+                || node instanceof TypeDefinitionNode definition && definition.visibilityQualifier().isEmpty()) {
+            return;
+        }
         if (node instanceof RecordTypeDescriptorNode record
                 && record.parent().kind() != SyntaxKind.TYPE_DEFINITION) {
             record(record, found, ambiguous);
@@ -96,7 +107,8 @@ final class InlineRecordSource {
         if (trimmed.contains(LINE_COMMENT) && LINE_BREAK.matcher(trimmed).find()) {
             return null;
         }
-        return LINE_BREAK.matcher(trimmed).replaceAll(" ");
+        String joined = LINE_BREAK.matcher(trimmed).replaceAll(" ");
+        return joined.length() <= MAX_DEFAULT_LENGTH && Defaults.isWritable(joined, Set.of()) ? joined : null;
     }
 
     private static String unquoted(String identifier) {

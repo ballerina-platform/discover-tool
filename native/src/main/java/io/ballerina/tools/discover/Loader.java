@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover;
 
+import com.google.gson.JsonPrimitive;
 import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
@@ -38,10 +39,12 @@ import io.ballerina.tools.discover.views.Readmes;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -281,15 +284,22 @@ public final class Loader {
             return module.cast();
         }
         PackageRepository repository = new SharedSources(fetched.repository());
-        AtomicBoolean inlineRecordsConsulted = new AtomicBoolean();
-        Library library = Pipeline.build(module.value(), Optional.empty(), names -> {
-            inlineRecordsConsulted.set(true);
-            return Optional.empty();
-        });
-        Supplier<Library> bound = Bindings.needsSource(module.value()) || inlineRecordsConsulted.get()
-                ? memoized(() -> fromSource(module.value(), SourceInclusions.load(
-                        repository, qualified, resolved, module.value().id(), options.http())))
-                : () -> library;
+        SeenInlineRecords seen = new SeenInlineRecords();
+        Library library = Pipeline.build(module.value(), Optional.empty(), seen);
+        Supplier<Library> fromSource = memoized(() -> fromSource(module.value(), SourceInclusions.load(
+                repository, qualified, resolved, module.value().id(), options.http())));
+        boolean settled = Bindings.needsSource(module.value()) || seen.any();
+        LoadedPackage.Source bound = new LoadedPackage.Source() {
+            @Override
+            public Library get() {
+                return settled ? fromSource.get() : library;
+            }
+
+            @Override
+            public boolean settles(Supplier<String> renderedJson) {
+                return seen.any() && seen.shownIn(renderedJson.get());
+            }
+        };
         String prefix = new ModuleRef(module.value().orgName(), module.value().id()).prefix();
         Supplier<Map<String, ServiceHandlers>> handlers = submodule == null && !module.value().serviceTypes().isEmpty()
                 ? memoized(() -> TriggerMetadata.load(
@@ -308,6 +318,30 @@ public final class Loader {
                 options.version(),
                 bound,
                 handlers));
+    }
+
+    private static final class SeenInlineRecords implements InlineRecords {
+
+        private final Set<String> escaped = new LinkedHashSet<>();
+
+        @Override
+        public Optional<Map<String, Member>> recover(Collection<String> fieldNames) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void produced(String record) {
+            String quoted = new JsonPrimitive(record).toString();
+            escaped.add(quoted.substring(1, quoted.length() - 1));
+        }
+
+        boolean any() {
+            return !escaped.isEmpty();
+        }
+
+        boolean shownIn(String renderedJson) {
+            return escaped.stream().anyMatch(renderedJson::contains);
+        }
     }
 
     private static Library fromSource(CentralDocs.Module module, Optional<SourceFacts> facts) {

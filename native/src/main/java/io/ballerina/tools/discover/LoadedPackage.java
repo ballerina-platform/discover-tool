@@ -60,8 +60,20 @@ public record LoadedPackage(
         List<String> modules,
         String warning,
         Version pinned,
-        Supplier<Library> bound,
+        Source bound,
         Supplier<Map<String, ServiceHandlers>> handlers) {
+
+    /** What the package source settles, read on first {@link #get()}. */
+    @FunctionalInterface
+    public interface Source {
+
+        Library get();
+
+        /** Whether an answer rendered as JSON shows an inline record whose members only the source completes. */
+        default boolean settles(Supplier<String> renderedJson) {
+            return false;
+        }
+    }
 
     /**
      * @param name the bare name {@code --module} itself takes, e.g. {@code dataloader}

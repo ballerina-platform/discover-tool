@@ -53,11 +53,22 @@ public sealed interface Failure {
      * @param suggestion what to do instead
      * @param command the caller's command with the fix applied, ready to run, or {@code null} when there is no one
      *     fix; the suggestion quotes it
+     * @param qualified the {@code org/name} the arguments were for, or {@code null} when no package was reached
+     * @param version the version that was read, or {@code null} when none was reached
      */
-    record Validation(String message, String suggestion, String command) implements Failure {
+    record Validation(String message, String suggestion, String command, String qualified, String version)
+            implements Failure {
+
+        public Validation(String message, String suggestion, String command) {
+            this(message, suggestion, command, null, null);
+        }
 
         public Validation(String message, String suggestion) {
             this(message, suggestion, null);
+        }
+
+        public Validation about(String forPackage, String atVersion) {
+            return new Validation(message, suggestion, command, forPackage, atVersion);
         }
     }
 
@@ -109,6 +120,10 @@ public sealed interface Failure {
         public Upstream about(String forPackage, String atVersion) {
             return new Upstream(url, attempts, message, suggestion, status, reached, forPackage, atVersion);
         }
+
+        public Upstream suggesting(String replacement) {
+            return new Upstream(url, attempts, message, replacement, status, reached, qualified, version);
+        }
     }
 
     /**
@@ -155,7 +170,7 @@ public sealed interface Failure {
      * @param message what was not found, as one sentence
      * @param suggestion what to try next
      * @param command the command the suggestion quotes, ready to run, or {@code null} when it quotes none
-     * @param candidates every entry of a listing no command prints — a readme's chunks — or empty
+     * @param candidates every entry of a listing no command prints — a readme's sections — or empty
      */
     record SymbolNotFound(String qualified, String version, String module, List<String> requested, String message,
             String suggestion, String command, List<String> candidates) implements Failure { }
@@ -257,6 +272,9 @@ public sealed interface Failure {
         json.addProperty("message", headline());
         switch (this) {
             case Validation f -> {
+                if (f.qualified() != null) {
+                    coordinates(json, f.qualified(), f.version(), null);
+                }
                 json.addProperty("suggestion", f.suggestion());
                 command(json, f.command());
             }
@@ -327,7 +345,7 @@ public sealed interface Failure {
     default Failure lengthened(String tail) {
         return switch (this) {
             case Validation f when f.command() != null && !tail.isEmpty() -> new Validation(f.message(),
-                    lengthened(f.suggestion(), f.command(), tail), f.command() + tail);
+                    lengthened(f.suggestion(), f.command(), tail), f.command() + tail, f.qualified(), f.version());
             case PackageNotFound f when f.command() != null && !tail.isEmpty() -> new PackageNotFound(f.qualified(),
                     f.version(), f.module(), lengthened(f.suggestion(), f.command(), tail), f.command() + tail,
                     f.candidates());
