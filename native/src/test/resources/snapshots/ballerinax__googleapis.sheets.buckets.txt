@@ -1,6 +1,6 @@
 == client ==
 ballerinax/googleapis.sheets · client · Client
-43 methods
+43 remote methods
 
   addColumnsAfter
   addColumnsAfterBySheetName

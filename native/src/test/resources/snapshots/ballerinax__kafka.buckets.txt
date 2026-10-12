@@ -8,7 +8,7 @@ ballerinax/kafka · client
 
 Next: bal discover ballerinax/kafka client <name>
 == service ==
-ballerinax/kafka · service
+ballerinax/kafka · service · Service
 Methods to implement (2)
 
 remote function onConsumerRecord(kafka:Caller caller, kafka:AnydataConsumerRecord[]|kafka:BytesConsumerRecord[] records) returns error?

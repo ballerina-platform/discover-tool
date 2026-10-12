@@ -1,6 +1,6 @@
 == client ==
 ballerinax/twilio · client · Client
-199 methods
+199 remote methods
 
   createAccount
   createAddress

@@ -1015,21 +1015,21 @@ public class CliTest {
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\"readme\":"), capture.stdout());
         Assert.assertTrue(capture.stdout().contains("\"lines\":"), capture.stdout());
-        Assert.assertFalse(capture.stdout().contains("\"chunk\":"), "the whole readme names no chunk");
+        Assert.assertFalse(capture.stdout().contains("\"section\":"), "the whole readme names no section");
     }
 
     @Test
-    public void aReadmeChunkSelectorNarrowsToOneSection() {
+    public void aReadmeSectionSelectorNarrowsToOneSection() {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerinax/kafka", "readme", "1"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertTrue(capture.stdout().contains("\"chunk\":1"), capture.stdout());
+        Assert.assertTrue(capture.stdout().contains("\"section\":1"), capture.stdout());
         Assert.assertTrue(capture.stdout().contains("\"of\":"), capture.stdout());
     }
 
     @Test
-    public void aReadmeChunkThatDoesNotExistFailsWithCandidates() {
+    public void aReadmeSectionThatDoesNotExistFailsWithCandidates() {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerinax/kafka", "readme", "999"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
@@ -1145,7 +1145,7 @@ public class CliTest {
         Assert.assertEquals(exitCode, 0, json.stderr());
         JsonObject answer = JsonParser.parseString(json.stdout()).getAsJsonObject();
         Assert.assertEquals(answer.get("total").getAsInt(), 0, answer.toString());
-        Assert.assertEquals(answer.getAsJsonArray("chunks").size(), 0, answer.toString());
+        Assert.assertEquals(answer.getAsJsonArray("sections").size(), 0, answer.toString());
 
         Capture text = new Capture();
         Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "zzzz"), text.streams(),
@@ -1161,18 +1161,19 @@ public class CliTest {
         Assert.assertTrue(capture.field("suggestion").endsWith("`bal discover ballerinax/kafka readme 1`."),
                 capture.stderr());
 
-        Capture chunks = new Capture();
-        Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "kafka"), chunks.streams(),
+        Capture sections = new Capture();
+        Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "kafka"), sections.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
         String title = null;
-        for (JsonElement chunk : JsonParser.parseString(chunks.stdout()).getAsJsonObject().getAsJsonArray("chunks")) {
-            String candidate = chunk.getAsJsonObject().get("title").getAsString();
+        for (JsonElement section : JsonParser.parseString(sections.stdout()).getAsJsonObject()
+                .getAsJsonArray("sections")) {
+            String candidate = section.getAsJsonObject().get("title").getAsString();
             if (candidate.contains(" ")) {
                 title = candidate;
                 break;
             }
         }
-        Assert.assertNotNull(title, chunks.stdout());
+        Assert.assertNotNull(title, sections.stdout());
         Capture titled = new Capture();
         Cli.run(List.of("ballerinax/kafka", "readme", title, "--filter", "zzzz"), titled.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
@@ -1223,6 +1224,30 @@ public class CliTest {
                 "2"), emptySearch.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
         Assert.assertEquals(emptySearch.field("message"),
                 "Page 2 is out of range: this listing has 0 entries on 1 page.");
+    }
+
+    @Test
+    public void aPageOutOfRangeNamesThePackageVersionAndTheCommandThatWorks() {
+        String github = "ballerinax__github";
+        Capture beyond = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/twilio", "client", "Client", "--page", "99"),
+                beyond.streams(), centralFor("ballerinax__twilio", FixtureCorpus.FIXTURE_VERSION.text())), 1);
+        Assert.assertEquals(beyond.field("qualified"), "ballerinax/twilio");
+        Assert.assertEquals(beyond.field("version"), FixtureCorpus.FIXTURE_VERSION.text());
+        Assert.assertEquals(beyond.field("command"), "bal discover ballerinax/twilio client Client --page 5");
+
+        Capture single = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "--filter", "zzzq", "--page",
+                "2"), single.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
+        Assert.assertTrue(single.field("suggestion").startsWith("This listing has only one page"),
+                single.stderr());
+        Assert.assertEquals(single.field("command"), "bal discover ballerinax/github client Client --filter zzzq");
+    }
+
+    @Test
+    public void aWholeReadmeInTextFollowsTheHeaderLineEveryAnswerHas() {
+        String text = text(centralFor("ballerinax__kafka", "4.6.5"), "ballerinax/kafka", "readme");
+        Assert.assertTrue(text.startsWith("ballerinax/kafka:4.6.5 · readme\n\n"), text);
     }
 
     @Test

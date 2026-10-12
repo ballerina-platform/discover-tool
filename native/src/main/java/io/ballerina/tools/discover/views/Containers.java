@@ -107,10 +107,14 @@ public final class Containers {
         public static Result<Page> of(int requested, int total, String command) {
             int pages = Math.max(1, (total + MAX_ENTRIES - 1) / MAX_ENTRIES);
             if (requested < 1 || requested > pages) {
+                String fixed = pages == 1 ? command : command + " --page " + pages;
                 return Result.err(new Failure.Validation(
                         "Page " + requested + " is out of range: this listing has " + total + " entries on "
                                 + pages + (pages == 1 ? " page." : " pages."),
-                        "Pass a page from 1 to " + pages + ", e.g. `" + command + " --page " + pages + "`."));
+                        pages == 1
+                                ? "This listing has only one page; drop --page: " + Failure.quoted(fixed) + "."
+                                : "Pass a page from 1 to " + pages + ", e.g. " + Failure.quoted(fixed) + ".",
+                        fixed));
             }
             int from = (requested - 1) * MAX_ENTRIES;
             return Result.ok(new Page(requested, pages, from, Math.min(from + MAX_ENTRIES, total), total));
@@ -664,9 +668,9 @@ public final class Containers {
             container = Surface.byName(Surface.of(loaded.library(), Surface.Scope.SERVICE), container.name())
                     .orElse(container);
         }
-        Optional<DiscoverResult> handlers = handlerAnswer(loaded, container, selectors, options);
+        Optional<Result<DiscoverResult>> handlers = handlerAnswer(loaded, container, selectors, options);
         if (handlers.isPresent()) {
-            return Result.ok(handlers.get());
+            return handlers.get();
         }
         int read = consumed(container, selectors);
         List<Entry> selected = select(container, selectors.subList(0, read));
@@ -692,7 +696,7 @@ public final class Containers {
 
     // A service type that only marks what a listener accepts has no methods of its own; its package may describe the
     // ones a service defines, and naming one of them narrows the answer to it.
-    private static Optional<DiscoverResult> handlerAnswer(LoadedPackage loaded, Surface.Container container,
+    private static Optional<Result<DiscoverResult>> handlerAnswer(LoadedPackage loaded, Surface.Container container,
             List<String> selectors, Options options) {
         boolean marker = container.scope() == Surface.Scope.SERVICE && !options.filtered() && selectors.size() <= 1
                 && entriesOf(container).stream().noneMatch(entry -> !(entry.fn() instanceof Fn.Constructor));
@@ -704,12 +708,16 @@ public final class Containers {
         if (!selectors.isEmpty()) {
             handlers = handlers.stream().filter(handler -> selectors.get(0).equals(handler.name())).toList();
             if (handlers.isEmpty()) {
-                return Optional.empty();
+                String base = baseCommand(loaded, container.scope(), container);
+                return Optional.of(Result.err(loaded.symbolNotFound(selectors,
+                        named(selectors.get(0)) + " is not a method to implement for " + container.name() + " in "
+                                + loaded.place() + ".",
+                        "List them: " + Failure.quoted(base) + ".", base)));
             }
         }
         List<ServiceHandlers.Rule> rules = selectors.isEmpty() ? described.get().rules() : List.of();
-        return Optional.of(new DiscoverResult.ServiceHandlerList(
-                containerName(container), handlers, rules, loaded.warning(), listenerNote(loaded, container)));
+        return Optional.of(Result.ok(new DiscoverResult.ServiceHandlerList(
+                containerName(container), handlers, rules, loaded.warning(), listenerNote(loaded, container))));
     }
 
     /**
@@ -871,7 +879,8 @@ public final class Containers {
         }
         Page window = page.value();
         List<DiscoverResult.Method> shown = window.slice(methods, 0);
-        return Result.ok(new DiscoverResult.MethodList(containerName(container), shown, shown.size(),
+        boolean remote = !methods.isEmpty() && callable.stream().allMatch(entry -> entry.fn() instanceof Fn.Remote);
+        return Result.ok(new DiscoverResult.MethodList(containerName(container), shown, remote, shown.size(),
                 methods.size(), window.paging(), window.next(command),
                 documentedOn(window, documented, methods.size()), warning, note));
     }

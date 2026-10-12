@@ -59,7 +59,7 @@ public final class JsonRenderer {
             case DiscoverResult.MethodList methods -> methodList(methods);
             case DiscoverResult.ServiceHandlerList handlers -> serviceHandlers(handlers);
             case DiscoverResult.Readme readme -> readme(readme);
-            case DiscoverResult.ReadmeChunks chunks -> readmeChunks(chunks);
+            case DiscoverResult.ReadmeSections sections -> readmeSections(sections);
             case DiscoverResult.Signature signature -> signature(signature);
             case DiscoverResult.MixedListing mixed -> mixedListing(mixed);
             case DiscoverResult.EmptyBucket empty -> emptyBucket(empty);
@@ -278,8 +278,8 @@ public final class JsonRenderer {
         JsonObject json = new JsonObject();
         json.addProperty("readme", readme.markdown());
         json.addProperty("lines", readme.lines());
-        if (readme.chunk() != null) {
-            json.addProperty("chunk", readme.chunk());
+        if (readme.section() != null) {
+            json.addProperty("section", readme.section());
             json.addProperty("of", readme.of());
             json.addProperty("title", readme.title());
         }
@@ -289,26 +289,27 @@ public final class JsonRenderer {
         return json;
     }
 
-    private static JsonObject readmeChunks(DiscoverResult.ReadmeChunks chunks) {
+    private static JsonObject readmeSections(DiscoverResult.ReadmeSections sections) {
         JsonObject json = new JsonObject();
         JsonArray array = new JsonArray();
-        for (DiscoverResult.ReadmeChunks.Chunk chunk : chunks.chunks()) {
+        for (DiscoverResult.ReadmeSections.Section section : sections.sections()) {
             JsonObject entry = new JsonObject();
-            entry.addProperty("number", chunk.number());
-            entry.addProperty("title", chunk.title());
-            entry.addProperty("lines", chunk.lines());
-            entry.addProperty("command", chunk.command());
+            entry.addProperty("number", section.number());
+            entry.addProperty("title", section.title());
+            entry.addProperty("lines", section.lines());
+            entry.addProperty("command", section.command());
             array.add(entry);
         }
-        json.add("chunks", array);
-        json.addProperty("shown", chunks.chunks().size());
-        json.addProperty("total", chunks.total());
-        addPaging(json, chunks.paging());
-        if (chunks.next() != null) {
-            json.addProperty("next", chunks.next());
+        json.add("sections", array);
+        json.addProperty("matching", sections.matching());
+        json.addProperty("shown", sections.sections().size());
+        json.addProperty("total", sections.total());
+        addPaging(json, sections.paging());
+        if (sections.next() != null) {
+            json.addProperty("next", sections.next());
         }
-        if (chunks.warning() != null) {
-            json.addProperty("warning", chunks.warning());
+        if (sections.warning() != null) {
+            json.addProperty("warning", sections.warning());
         }
         return json;
     }

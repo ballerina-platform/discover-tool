@@ -49,7 +49,8 @@ import java.util.regex.Pattern;
  * type are always printed, whatever their size, because a call cannot be written without them. Any other type —
  * a return type, or one a printed declaration refers to — is printed only while it is no larger than
  * {@link #INLINE_LIMIT_BYTES}. A class, client or service type is never inlined, since it is a surface of its own
- * rather than data. Every type left out is NAMED, each one a legal argument to {@code type}.
+ * rather than data. Every type a printed declaration refers to and the leaf does not print is NAMED, each one a
+ * legal argument to {@code type}.
  *
  * <p>Cross-package edges stop at the package boundary: {@code ballerina/http:ConnectionConfig} has a local closure
  * of one and fifteen external edges, so crossing would hide a cold fetch per edge inside an answer the caller
@@ -128,12 +129,14 @@ public final class Closure {
 
         while (!queue.isEmpty()) {
             Step step = queue.removeFirst();
-            if (step.depth() >= LEAF_DEPTH) {
-                continue;
-            }
+            boolean beyondLeaf = step.depth() >= LEAF_DEPTH;
             Set<String> included = inclusionsOf(index.get(step.name()));
             for (String referenced : localReferences(index.get(step.name()), index)) {
                 if (visited.contains(referenced)) {
+                    continue;
+                }
+                if (beyondLeaf) {
+                    omitted.add(referenced);
                     continue;
                 }
                 boolean inclusion = included.contains(referenced);

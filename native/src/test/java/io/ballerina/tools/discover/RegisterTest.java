@@ -111,8 +111,8 @@ public class RegisterTest {
         List<Answer> all = new ArrayList<>(answers(slug));
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         add(all, "readme", Readme.render(context, Readme.Options.BARE));
-        Readme.chunksOf(context).forEach(chunk -> add(all, "readme " + chunk.number(),
-                Readme.render(context, new Readme.Options(String.valueOf(chunk.number()), null, 1))));
+        Readme.sectionsOf(context).forEach(section -> add(all, "readme " + section.number(),
+                Readme.render(context, new Readme.Options(String.valueOf(section.number()), null, 1))));
         for (Answer answer : all) {
             String json = JsonRenderer.render(answer.result());
             Assert.assertFalse(json.contains("\n") || json.contains("\r"), slug + " " + answer.label() + ":\n" + json);

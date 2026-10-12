@@ -256,6 +256,23 @@ Types it uses (16)
       boolean keepAlive = false;
   |};
 
+Other types it uses, not printed (15)
+  CertKey                  bal discover ballerina/http type CertKey
+  Protocol                 bal discover ballerina/http type Protocol
+  CertValidationType       bal discover ballerina/http type CertValidationType
+  KeepAlive                bal discover ballerina/http type KeepAlive
+  Chunking                 bal discover ballerina/http type Chunking
+  CachingPolicy            bal discover ballerina/http type CachingPolicy
+  COMPRESSION_AUTO         bal discover ballerina/http type COMPRESSION_AUTO
+  COMPRESSION_ALWAYS       bal discover ballerina/http type COMPRESSION_ALWAYS
+  COMPRESSION_NEVER        bal discover ballerina/http type COMPRESSION_NEVER
+  CredentialsConfig        bal discover ballerina/http type CredentialsConfig
+  BearerTokenConfig        bal discover ballerina/http type BearerTokenConfig
+  JwtIssuerConfig          bal discover ballerina/http type JwtIssuerConfig
+  OAuth2GrantConfig        bal discover ballerina/http type OAuth2GrantConfig
+  RollingWindow            bal discover ballerina/http type RollingWindow
+  PersistentCookieHandler  bal discover ballerina/http class PersistentCookieHandler
+
 From other packages (2)
   TrustStore  ballerina/crypto 2.9.3  bal discover ballerina/crypto:2.9.3 type TrustStore
   KeyStore    ballerina/crypto 2.9.3  bal discover ballerina/crypto:2.9.3 type KeyStore
@@ -709,6 +726,71 @@ Types it uses (62)
       # The response status code object
       readonly DefaultStatus status;
   |};
+
+Other types it uses, not printed (63)
+  CommonResponse                       bal discover ballerina/http type CommonResponse
+  StatusContinue                       bal discover ballerina/http class StatusContinue
+  StatusSwitchingProtocols             bal discover ballerina/http class StatusSwitchingProtocols
+  StatusProcessing                     bal discover ballerina/http class StatusProcessing
+  StatusEarlyHints                     bal discover ballerina/http class StatusEarlyHints
+  StatusOK                             bal discover ballerina/http class StatusOK
+  StatusCreated                        bal discover ballerina/http class StatusCreated
+  StatusAccepted                       bal discover ballerina/http class StatusAccepted
+  StatusNonAuthoritativeInformation    bal discover ballerina/http class StatusNonAuthoritativeInformation
+  StatusNoContent                      bal discover ballerina/http class StatusNoContent
+  StatusResetContent                   bal discover ballerina/http class StatusResetContent
+  StatusPartialContent                 bal discover ballerina/http class StatusPartialContent
+  StatusMultiStatus                    bal discover ballerina/http class StatusMultiStatus
+  StatusAlreadyReported                bal discover ballerina/http class StatusAlreadyReported
+  StatusIMUsed                         bal discover ballerina/http class StatusIMUsed
+  StatusMultipleChoices                bal discover ballerina/http class StatusMultipleChoices
+  StatusMovedPermanently               bal discover ballerina/http class StatusMovedPermanently
+  StatusFound                          bal discover ballerina/http class StatusFound
+  StatusSeeOther                       bal discover ballerina/http class StatusSeeOther
+  StatusNotModified                    bal discover ballerina/http class StatusNotModified
+  StatusUseProxy                       bal discover ballerina/http class StatusUseProxy
+  StatusTemporaryRedirect              bal discover ballerina/http class StatusTemporaryRedirect
+  StatusPermanentRedirect              bal discover ballerina/http class StatusPermanentRedirect
+  StatusBadRequest                     bal discover ballerina/http class StatusBadRequest
+  StatusUnauthorized                   bal discover ballerina/http class StatusUnauthorized
+  StatusPaymentRequired                bal discover ballerina/http class StatusPaymentRequired
+  StatusForbidden                      bal discover ballerina/http class StatusForbidden
+  StatusNotFound                       bal discover ballerina/http class StatusNotFound
+  StatusMethodNotAllowed               bal discover ballerina/http class StatusMethodNotAllowed
+  StatusNotAcceptable                  bal discover ballerina/http class StatusNotAcceptable
+  StatusProxyAuthenticationRequired    bal discover ballerina/http class StatusProxyAuthenticationRequired
+  StatusRequestTimeout                 bal discover ballerina/http class StatusRequestTimeout
+  StatusConflict                       bal discover ballerina/http class StatusConflict
+  StatusGone                           bal discover ballerina/http class StatusGone
+  StatusLengthRequired                 bal discover ballerina/http class StatusLengthRequired
+  StatusPreconditionFailed             bal discover ballerina/http class StatusPreconditionFailed
+  StatusPayloadTooLarge                bal discover ballerina/http class StatusPayloadTooLarge
+  StatusUriTooLong                     bal discover ballerina/http class StatusUriTooLong
+  StatusUnsupportedMediaType           bal discover ballerina/http class StatusUnsupportedMediaType
+  StatusRangeNotSatisfiable            bal discover ballerina/http class StatusRangeNotSatisfiable
+  StatusExpectationFailed              bal discover ballerina/http class StatusExpectationFailed
+  StatusMisdirectedRequest             bal discover ballerina/http class StatusMisdirectedRequest
+  StatusUnprocessableEntity            bal discover ballerina/http class StatusUnprocessableEntity
+  StatusLocked                         bal discover ballerina/http class StatusLocked
+  StatusFailedDependency               bal discover ballerina/http class StatusFailedDependency
+  StatusTooEarly                       bal discover ballerina/http class StatusTooEarly
+  StatusPreconditionRequired           bal discover ballerina/http class StatusPreconditionRequired
+  StatusUnavailableDueToLegalReasons   bal discover ballerina/http class StatusUnavailableDueToLegalReasons
+  StatusUpgradeRequired                bal discover ballerina/http class StatusUpgradeRequired
+  StatusTooManyRequests                bal discover ballerina/http class StatusTooManyRequests
+  StatusRequestHeaderFieldsTooLarge    bal discover ballerina/http class StatusRequestHeaderFieldsTooLarge
+  StatusInternalServerError            bal discover ballerina/http class StatusInternalServerError
+  StatusNotImplemented                 bal discover ballerina/http class StatusNotImplemented
+  StatusBadGateway                     bal discover ballerina/http class StatusBadGateway
+  StatusServiceUnavailable             bal discover ballerina/http class StatusServiceUnavailable
+  StatusGatewayTimeout                 bal discover ballerina/http class StatusGatewayTimeout
+  StatusHttpVersionNotSupported        bal discover ballerina/http class StatusHttpVersionNotSupported
+  StatusVariantAlsoNegotiates          bal discover ballerina/http class StatusVariantAlsoNegotiates
+  StatusInsufficientStorage            bal discover ballerina/http class StatusInsufficientStorage
+  StatusLoopDetected                   bal discover ballerina/http class StatusLoopDetected
+  StatusNotExtended                    bal discover ballerina/http class StatusNotExtended
+  StatusNetworkAuthenticationRequired  bal discover ballerina/http class StatusNetworkAuthenticationRequired
+  DefaultStatus                        bal discover ballerina/http class DefaultStatus
 == ballerina__http type ResourceConfig ==
 ballerina/http · type · ResourceConfig
 
@@ -768,6 +850,12 @@ Types it uses (5)
       # Method allowed in the linked resource
       string method?;
   |};
+
+Other types it uses, not printed (4)
+  FileUserStoreConfigWithScopes        bal discover ballerina/http type FileUserStoreConfigWithScopes
+  LdapUserStoreConfigWithScopes        bal discover ballerina/http type LdapUserStoreConfigWithScopes
+  JwtValidatorConfigWithScopes         bal discover ballerina/http type JwtValidatorConfigWithScopes
+  OAuth2IntrospectionConfigWithScopes  bal discover ballerina/http type OAuth2IntrospectionConfigWithScopes
 == ballerina__http type Client ==
 ballerina/http · type · Client
 7 resource methods, 15 remote methods, 4 methods
@@ -921,6 +1009,9 @@ Types it uses (2)
       # Proxy server related options
       ProxyConfig? proxy = ();
   |};
+
+Other types it uses, not printed (1)
+  ProxyConfig  bal discover ballerinax/googleapis.sheets type ProxyConfig
 
 From other packages (14)
   BearerTokenConfig              ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type BearerTokenConfig

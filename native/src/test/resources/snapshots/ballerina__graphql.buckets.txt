@@ -1,6 +1,6 @@
 == client ==
 ballerina/graphql · client · Client
-2 methods
+2 remote methods
 
   execute
   executeWithType

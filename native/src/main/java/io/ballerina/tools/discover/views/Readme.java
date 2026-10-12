@@ -42,7 +42,8 @@ import java.util.regex.Pattern;
  *
  * <p>Bare, a readme of at most {@link #WHOLE_LIMIT_BYTES} is the RFC's base case — the whole readme, verbatim. A
  * larger one lists every one of its sections with the command that opens it, never cut off. A trailing selector (a
- * section number, or a title) and {@code --filter} are this tool's own addition, not an RFC shape.
+ * section number, or a title) and {@code --filter} are this tool's own addition, not an RFC shape. A section starts
+ * at an ATX ({@code #}) heading; setext headings are not recognised.
  *
  * @since 0.1.0
  */
@@ -56,6 +57,7 @@ public final class Readme {
     private static final String UNTITLED = "Untitled";
     private static final String FENCE_BACKTICKS = "```";
     private static final String FENCE_TILDES = "~~~";
+    private static final String LINE_BREAK = "\\r?\\n";
     private static final Pattern HEADING =
             Pattern.compile("^ {0,3}#{1,6}(?:[ \\t]+(.*?))?(?:[ \\t]+#+)?[ \\t]*$");
 
@@ -67,9 +69,9 @@ public final class Readme {
     }
 
     /**
-     * @param selector a chunk number or a title fragment, or {@code null} to address the whole readme
-     * @param filter the {@code --filter} keyword narrowing to matching chunks, or {@code null}
-     * @param page 1-indexed, meaningful only once a filtered chunk listing is over the entry ceiling
+     * @param selector a section number or a title fragment, or {@code null} to address the whole readme
+     * @param filter the {@code --filter} keyword narrowing to matching sections, or {@code null}
+     * @param page 1-indexed, meaningful only once a filtered section listing is over the entry ceiling
      */
     public record Options(String selector, String filter, int page) {
 
@@ -88,7 +90,7 @@ public final class Readme {
      * @param title the heading it sits under, or {@code Introduction} for prose before the first heading
      * @param markdown the section verbatim, prose and code together
      */
-    public record Chunk(int number, String title, String markdown) {
+    public record Section(int number, String title, String markdown) {
 
         int lines() {
             return markdown.split("\n", -1).length;
@@ -100,31 +102,31 @@ public final class Readme {
         if (markdown.isEmpty()) {
             return Result.err(noReadme(loaded));
         }
-        List<Chunk> chunks = chunksOf(markdown);
+        List<Section> sections = sectionsOf(markdown);
 
         if (options.selector() != null) {
-            return oneChunk(loaded, chunks, options.selector(), options.filtered() ? options.filter() : null);
+            return oneSection(loaded, sections, options.selector(), options.filtered() ? options.filter() : null);
         }
         if (options.filtered()) {
-            return filtered(loaded, chunks, options);
+            return filtered(loaded, sections, options);
         }
         if (markdown.getBytes(StandardCharsets.UTF_8).length > WHOLE_LIMIT_BYTES) {
-            return Result.ok(listing(loaded, chunks, chunks, false));
+            return Result.ok(listing(loaded, sections, sections, false));
         }
         return Result.ok(new DiscoverResult.Readme(markdown, lineCount(markdown), loaded.warning()));
     }
 
-    private static DiscoverResult.ReadmeChunks listing(
-            LoadedPackage loaded, List<Chunk> chunks, List<Chunk> shown, boolean matching) {
-        return new DiscoverResult.ReadmeChunks(rows(loaded, shown), shown.size(), null, null, loaded.warning(),
+    private static DiscoverResult.ReadmeSections listing(
+            LoadedPackage loaded, List<Section> sections, List<Section> shown, boolean matching) {
+        return new DiscoverResult.ReadmeSections(rows(loaded, shown), shown.size(), null, null, loaded.warning(),
                 matching);
     }
 
-    private static List<DiscoverResult.ReadmeChunks.Chunk> rows(LoadedPackage loaded, List<Chunk> chunks) {
+    private static List<DiscoverResult.ReadmeSections.Section> rows(LoadedPackage loaded, List<Section> sections) {
         String pkg = loaded.pkgArgument();
-        return chunks.stream()
-                .map(chunk -> new DiscoverResult.ReadmeChunks.Chunk(
-                        chunk.number(), chunk.title(), chunk.lines(), command(pkg) + " " + chunk.number()))
+        return sections.stream()
+                .map(section -> new DiscoverResult.ReadmeSections.Section(
+                        section.number(), section.title(), section.lines(), command(pkg) + " " + section.number()))
                 .toList();
     }
 
@@ -141,18 +143,18 @@ public final class Readme {
                                 : "Check its other modules: `bal discover " + loaded.pkgArgument(null) + "`.");
     }
 
-    /** Every addressable chunk of the resolved module's readme, in the readme's own order. */
-    public static List<Chunk> chunksOf(LoadedPackage loaded) {
-        return chunksOf(loaded.readme().orElse(""));
+    /** Every addressable section of the resolved module's readme, in the readme's own order. */
+    public static List<Section> sectionsOf(LoadedPackage loaded) {
+        return sectionsOf(loaded.readme().orElse(""));
     }
 
-    private static List<Chunk> chunksOf(String markdown) {
-        List<Chunk> chunks = new ArrayList<>();
+    private static List<Section> sectionsOf(String markdown) {
+        List<Section> sections = new ArrayList<>();
         String title = INTRODUCTION;
         List<String> body = new ArrayList<>();
         String fence = null;
 
-        for (String line : markdown.split("\n", -1)) {
+        for (String line : markdown.split(LINE_BREAK, -1)) {
             String stripped = line.stripLeading();
             if (fence != null) {
                 body.add(line);
@@ -169,14 +171,14 @@ public final class Readme {
             }
             Matcher heading = HEADING.matcher(line);
             if (heading.matches()) {
-                flush(chunks, title, body);
+                flush(sections, title, body);
                 title = heading.group(1) == null || heading.group(1).isBlank() ? UNTITLED : heading.group(1).trim();
                 body = new ArrayList<>();
             }
             body.add(line);
         }
-        flush(chunks, title, body);
-        return List.copyOf(chunks);
+        flush(sections, title, body);
+        return List.copyOf(sections);
     }
 
     // The fence's marker run (``` or ~~~, possibly longer) when the line opens one, else null.
@@ -187,7 +189,8 @@ public final class Readme {
                 while (length < stripped.length() && stripped.charAt(length) == marker.charAt(0)) {
                     length++;
                 }
-                return stripped.substring(0, length);
+                boolean inlineCode = marker.equals(FENCE_BACKTICKS) && stripped.indexOf('`', length) >= 0;
+                return inlineCode ? null : stripped.substring(0, length);
             }
         }
         return null;
@@ -199,63 +202,63 @@ public final class Readme {
                 && stripped.substring(run.length()).isBlank();
     }
 
-    private static void flush(List<Chunk> chunks, String title, List<String> body) {
+    private static void flush(List<Section> sections, String title, List<String> body) {
         String text = String.join("\n", body).strip();
         if (text.isEmpty()) {
             return;
         }
-        chunks.add(new Chunk(chunks.size() + 1, title, text));
+        sections.add(new Section(sections.size() + 1, title, text));
     }
 
     private static int lineCount(String markdown) {
         return markdown.isEmpty() ? 0 : markdown.split("\n", -1).length;
     }
 
-    private static Result<DiscoverResult> oneChunk(
-            LoadedPackage loaded, List<Chunk> chunks, String requested, String filter) {
-        Optional<Chunk> byNumber = byNumber(chunks, requested);
-        List<Chunk> found = byNumber.isPresent() ? List.of(byNumber.get()) : byTitle(chunks, requested);
+    private static Result<DiscoverResult> oneSection(
+            LoadedPackage loaded, List<Section> sections, String requested, String filter) {
+        Optional<Section> byNumber = byNumber(sections, requested);
+        List<Section> found = byNumber.isPresent() ? List.of(byNumber.get()) : byTitle(sections, requested);
         if (found.isEmpty()) {
             return Result.err(loaded.symbolNotFoundAmong(List.of(requested),
                     "No readme section of " + loaded.place() + " is numbered or titled '" + requested + "'.",
                     "Pass the number or title of one of the sections listed, or read the whole readme: `"
                             + command(loaded.pkgArgument()) + "`.",
-                    chunks.stream().map(chunk -> chunk.number() + ". " + chunk.title()).toList()));
+                    sections.stream().map(section -> section.number() + ". " + section.title()).toList()));
         }
         if (found.size() > 1) {
-            return Result.ok(listing(loaded, chunks, found, true));
+            return Result.ok(listing(loaded, sections, found, true));
         }
-        Chunk chunk = found.get(0);
-        if (filter != null && !matches(chunk, filter)) {
+        Section section = found.get(0);
+        if (filter != null && !matches(section, filter)) {
             return Result.err(new Failure.Validation(
-                    "Section " + requested + " (\"" + chunk.title() + "\") does not mention \""
+                    "Section " + requested + " (\"" + section.title() + "\") does not mention \""
                             + filter + "\".",
                     "Drop --filter to read it anyway: `" + command(loaded.pkgArgument()) + " "
                             + Texts.shellWord(requested) + "`."));
         }
-        return Result.ok(toResult(chunk, chunks.size(), loaded));
+        return Result.ok(toResult(section, sections.size(), loaded));
     }
 
-    private static Optional<Chunk> byNumber(List<Chunk> chunks, String requested) {
+    private static Optional<Section> byNumber(List<Section> sections, String requested) {
         try {
             int number = Integer.parseInt(requested.trim());
-            return chunks.stream().filter(chunk -> chunk.number() == number).findFirst();
+            return sections.stream().filter(section -> section.number() == number).findFirst();
         } catch (NumberFormatException ignored) {
             return Optional.empty();
         }
     }
 
-    // Every chunk the title names: the exact matches when there are any, else those containing it.
-    private static List<Chunk> byTitle(List<Chunk> chunks, String requested) {
+    // Every section the title names: the exact matches when there are any, else those containing it.
+    private static List<Section> byTitle(List<Section> sections, String requested) {
         String wanted = normalised(requested);
         if (wanted.isEmpty()) {
             return List.of();
         }
-        List<Chunk> exact = chunks.stream().filter(chunk -> normalised(chunk.title()).equals(wanted)).toList();
+        List<Section> exact = sections.stream().filter(section -> normalised(section.title()).equals(wanted)).toList();
         if (!exact.isEmpty()) {
             return exact;
         }
-        return chunks.stream().filter(chunk -> normalised(chunk.title()).contains(wanted)).toList();
+        return sections.stream().filter(section -> normalised(section.title()).contains(wanted)).toList();
     }
 
     // A title is typed from prose, so it is matched on its letters and digits alone, in any case.
@@ -263,32 +266,32 @@ public final class Readme {
         return title.replaceAll("[^A-Za-z0-9]", "").toLowerCase(Locale.ROOT);
     }
 
-    private static boolean matches(Chunk chunk, String filter) {
-        return Filter.matches(filter, chunk.markdown()) || Filter.matches(filter, chunk.title());
+    private static boolean matches(Section section, String filter) {
+        return Filter.matches(filter, section.markdown()) || Filter.matches(filter, section.title());
     }
 
-    private static DiscoverResult.Readme toResult(Chunk chunk, int total, LoadedPackage loaded) {
+    private static DiscoverResult.Readme toResult(Section section, int total, LoadedPackage loaded) {
         return new DiscoverResult.Readme(
-                chunk.markdown(), chunk.lines(), chunk.number(), total, chunk.title(), loaded.warning());
+                section.markdown(), section.lines(), section.number(), total, section.title(), loaded.warning());
     }
 
-    private static Result<DiscoverResult> filtered(LoadedPackage loaded, List<Chunk> chunks, Options options) {
-        List<Chunk> matched = chunks.stream().filter(chunk -> matches(chunk, options.filter())).toList();
+    private static Result<DiscoverResult> filtered(LoadedPackage loaded, List<Section> sections, Options options) {
+        List<Section> matched = sections.stream().filter(section -> matches(section, options.filter())).toList();
         String pkg = loaded.pkgArgument();
 
         if (matched.size() == 1) {
-            return Result.ok(toResult(matched.get(0), chunks.size(), loaded));
+            return Result.ok(toResult(matched.get(0), sections.size(), loaded));
         }
 
-        List<DiscoverResult.ReadmeChunks.Chunk> items = rows(loaded, matched);
+        List<DiscoverResult.ReadmeSections.Section> items = rows(loaded, matched);
         String command = command(pkg) + " --filter " + Texts.shellWord(options.filter());
         Result<Containers.Page> page = Containers.Page.of(options.page(), items.size(), command);
         if (!page.isOk()) {
             return page.cast();
         }
         Containers.Page window = page.value();
-        List<DiscoverResult.ReadmeChunks.Chunk> shown = items.subList(window.from(), window.to());
-        return Result.ok(new DiscoverResult.ReadmeChunks(
+        List<DiscoverResult.ReadmeSections.Section> shown = items.subList(window.from(), window.to());
+        return Result.ok(new DiscoverResult.ReadmeSections(
                 shown, items.size(), window.paging(), window.next(command), loaded.warning(), true));
     }
 }
