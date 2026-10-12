@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.IntSupplier;
 
 /**
  * Entry point for the {@code bal discover} CLI tool: the process wrapper.
@@ -120,15 +121,8 @@ public class DiscoverTool implements BLauncherCmd {
         // stdin is under-detected. That is the safe direction: a human gets JSON (recoverable with
         // --output text) rather than an agent's parser getting prose.
         boolean interactive = System.console() != null;
-        int code;
-        try {
-            code = Cli.run(argv, streams, http, discoverProject(), interactive);
-        } catch (RuntimeException cause) {
-            // Nothing throws by design; a defect still reaches the caller as a failure in the run's own mode.
-            Failure failure = new Failure.Internal(messageOf(cause), Failure.INTERNAL_SUGGESTION);
-            errStream.print(failure.describe(Cli.jsonOutput(argv, interactive)) + "\n");
-            code = Cli.FAILED;
-        }
+        int code = guarded(() -> Cli.run(argv, streams, http, discoverProject(), interactive), argv, interactive,
+                errStream);
 
         outStream.flush();
         errStream.flush();
@@ -137,6 +131,18 @@ public class DiscoverTool implements BLauncherCmd {
         // on the success path would skip whatever it does after a tool returns.
         if (exits && code != 0) {
             System.exit(code);
+        }
+    }
+
+    static int guarded(IntSupplier run, List<String> argv, boolean interactive, PrintStream errStream) {
+        try {
+            return run.getAsInt();
+        } catch (RuntimeException | Error cause) {
+            // Nothing throws by design; a defect, or an exhausted heap, still reaches the caller as a failure in
+            // the run's own mode.
+            Failure failure = new Failure.Internal(messageOf(cause), Failure.INTERNAL_SUGGESTION);
+            errStream.print(failure.describe(Cli.jsonOutput(argv, interactive)) + "\n");
+            return Cli.FAILED;
         }
     }
 
@@ -193,12 +199,7 @@ public class DiscoverTool implements BLauncherCmd {
             return DiskCache.at(root, directory.mode());
         }
 
-        // Nothing worked. `describe()` still has to name something for a diagnostic, so the last candidate is
-        // reported as the one that was tried.
-        CacheLocation.Candidate last = candidates.get(candidates.size() - 1);
-        return last instanceof CacheLocation.Candidate.Directory directory
-                ? DiskCache.at(Path.of(directory.root()), directory.mode())
-                : DocsCache.NULL;
+        return DocsCache.NULL;
     }
 
     private static String property(String name) {

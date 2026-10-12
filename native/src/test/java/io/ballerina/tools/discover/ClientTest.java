@@ -60,6 +60,19 @@ public class ClientTest {
     }
 
     @Test
+    public void anAttemptIsNeverGivenMoreTimeThanTheBudgetHasLeft() {
+        long[] clock = {0};
+        FakeTransport transport = FakeTransport.routing(url -> {
+            clock[0] += 900;
+            return FakeTransport.status(503);
+        });
+        CentralClient.fetchJson("https://example.test/x", fast(transport)
+                .clock(() -> clock[0]).budgetMs(1_200).timeoutMs(1_000).build());
+        Assert.assertEquals(transport.timeouts().get(0).longValue(), 1_000);
+        Assert.assertEquals(transport.timeouts().get(1).longValue(), 300);
+    }
+
+    @Test
     public void a503IsRetriedAndTheRetrysAnswerIsUsed() {
         FakeTransport transport = FakeTransport.scripted(List.of(
                 FakeTransport.status(503), FakeTransport.ok("{\"hello\":\"world\"}")));

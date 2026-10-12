@@ -343,10 +343,5 @@ public class SourceInclusionsTest {
         public List<String> listVersions(PackageKey key) {
             return List.of();
         }
-
-        @Override
-        public String describe() {
-            return "memory";
-        }
     }
 }

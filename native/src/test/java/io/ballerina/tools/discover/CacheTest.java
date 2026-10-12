@@ -282,7 +282,6 @@ public class CacheTest {
         Capture first = new Capture();
         Assert.assertEquals(Cli.run(List.of(PKG), first.streams(), http), 0);
         Assert.assertEquals(first.stderr(), "");
-        Assert.assertTrue(cache.describe().contains("unusable"));
 
         Capture again = new Capture();
         Assert.assertEquals(Cli.run(List.of(PKG), again.streams(), http), 0);
@@ -632,7 +631,6 @@ public class CacheTest {
         Assert.assertNull(DocsCache.NULL.readDocs(key));
         Assert.assertNull(DocsCache.NULL.readLatest(packageKey));
         Assert.assertEquals(DocsCache.NULL.listVersions(packageKey), List.of());
-        Assert.assertEquals(DocsCache.NULL.describe(), "disabled");
     }
 
     // Earlier builds read a module coordinate at its containing package's version and cached the answer under

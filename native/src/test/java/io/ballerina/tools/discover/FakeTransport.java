@@ -40,6 +40,7 @@ final class FakeTransport implements HttpTransport {
 
     private final Function<String, Reply> answer;
     private final List<String> urls = new ArrayList<>();
+    private final List<Long> timeouts = new ArrayList<>();
     private Function<String, Optional<byte[]>> download = url -> Optional.empty();
 
     private FakeTransport(Function<String, Reply> answer) {
@@ -98,7 +99,13 @@ final class FakeTransport implements HttpTransport {
     @Override
     public Reply get(String url, long timeoutMs) {
         urls.add(url);
+        timeouts.add(timeoutMs);
         return answer.apply(url);
+    }
+
+    /** The per-attempt timeout each {@code get} was given. */
+    List<Long> timeouts() {
+        return List.copyOf(timeouts);
     }
 
     int calls() {

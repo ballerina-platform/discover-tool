@@ -168,6 +168,16 @@ public class LocalBalasTest {
     }
 
     @Test
+    public void aPlatformWhoseCopyIsOverTheLimitDoesNotHideTheNextOne() throws IOException {
+        Path home = home("2.16.6", "java21", "http");
+        Path huge = home.resolve("repositories/central.ballerina.io/bala/ballerina/http/2.16.6/any/modules/http");
+        Files.createDirectories(huge);
+        Files.write(huge.resolve("huge.bal"), new byte[Bala.MAX_SOURCE_BYTES + 1]);
+        Assert.assertEquals(fetch(List.of(LocalBalas.homeRepository(home)), RESOLVED, FakeTransport.never()),
+                Optional.of(httpSources()));
+    }
+
+    @Test
     public void aPlatformOtherThanJava21IsFoundToo() throws IOException {
         Assert.assertEquals(fetch(List.of(LocalBalas.homeRepository(home("2.16.6", "any", "http"))), RESOLVED,
                 FakeTransport.never()), Optional.of(httpSources()));
@@ -227,11 +237,22 @@ public class LocalBalasTest {
     @Test
     public void anArchiveOrASourceFileOverItsLimitIsNoAnswer() {
         byte[] bala = bala();
-        Assert.assertTrue(Bala.moduleSources(new ByteArrayInputStream(bala), "http", 100,
-                Bala.MAX_SOURCE_BYTES).isEmpty());
-        Assert.assertTrue(Bala.moduleSources(new ByteArrayInputStream(bala), "http", Bala.MAX_ARCHIVE_BYTES, 100)
-                .isEmpty());
+        Bala.Limits roomy = Bala.Limits.DEFAULT;
+        Assert.assertTrue(Bala.moduleSources(new ByteArrayInputStream(bala), "http",
+                new Bala.Limits(100, roomy.sourceBytes(), roomy.moduleBytes(), roomy.moduleFiles())).isEmpty());
+        Assert.assertTrue(Bala.moduleSources(new ByteArrayInputStream(bala), "http",
+                new Bala.Limits(roomy.archiveBytes(), 100, roomy.moduleBytes(), roomy.moduleFiles())).isEmpty());
         Assert.assertEquals(Bala.moduleSources(new ByteArrayInputStream(bala), "http"), Optional.of(httpSources()));
+    }
+
+    @Test
+    public void aModuleOverItsTotalBytesOrFileCountIsNoAnswer() {
+        byte[] bala = bala();
+        Bala.Limits roomy = Bala.Limits.DEFAULT;
+        Assert.assertTrue(Bala.moduleSources(new ByteArrayInputStream(bala), "http",
+                new Bala.Limits(roomy.archiveBytes(), roomy.sourceBytes(), 10, roomy.moduleFiles())).isEmpty());
+        Assert.assertTrue(Bala.moduleSources(new ByteArrayInputStream(bala), "http",
+                new Bala.Limits(roomy.archiveBytes(), roomy.sourceBytes(), roomy.moduleBytes(), 0)).isEmpty());
     }
 
     @Test

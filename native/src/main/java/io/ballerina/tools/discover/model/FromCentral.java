@@ -98,11 +98,6 @@ public final class FromCentral {
         return named ? Encoding.BASIC : Encoding.REF;
     }
 
-    private static String moduleNameSuffix(String moduleName) {
-        String[] parts = moduleName.split("\\.", -1);
-        return parts.length == 0 ? moduleName : parts[parts.length - 1];
-    }
-
     // Central pads some singleton/literal type names with whitespace, which plain text would print.
     private static String typeName(CentralDocs.TypeNode type) {
         return trimmed(type.name());
@@ -176,7 +171,7 @@ public final class FromCentral {
         } else {
             link = new TypeRef.Link.External(
                     new ModuleRef(orgName, moduleName, type.version().orElse("")), recordName);
-            name = moduleNameSuffix(moduleName) + ":" + name;
+            name = ModuleRef.prefixOf(moduleName) + ":" + name;
         }
 
         return suffixed(ref(name, List.of(link)), type);

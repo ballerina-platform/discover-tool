@@ -65,6 +65,9 @@ public final class CentralClient {
     private static final String REGISTRY_PACKAGES_URL = CENTRAL_BASE_URL + "registry/packages/";
     private static final String DOCS_URL = CENTRAL_BASE_URL + "docs/";
 
+    /** The least an attempt is given, so a budget spent to the millisecond still makes a real request. */
+    private static final long MIN_ATTEMPT_TIMEOUT_MS = 1;
+
     private static final int BAD_REQUEST = 400;
     private static final int NOT_FOUND = 404;
     private static final int PROXY_AUTHENTICATION_REQUIRED = 407;
@@ -197,8 +200,8 @@ public final class CentralClient {
         }
     }
 
-    private static Outcome attemptFetch(String url, HttpOptions options) {
-        HttpTransport.Reply reply = options.transport().get(url, options.timeoutMs());
+    private static Outcome attemptFetch(String url, long timeoutMs, HttpOptions options) {
+        HttpTransport.Reply reply = options.transport().get(url, timeoutMs);
         return switch (reply) {
             case HttpTransport.Reply.TimedOut ignored -> new Outcome.TimedOut();
             case HttpTransport.Reply.Failed failed -> failed.problem() == HttpTransport.Reply.Problem.BAD_URL
@@ -331,7 +334,8 @@ public final class CentralClient {
                 options.sleep(Math.min(remaining, wait));
             }
             made++;
-            last = attemptFetch(url, options);
+            long remainingMs = Math.max(MIN_ATTEMPT_TIMEOUT_MS, deadline - options.now());
+            last = attemptFetch(url, Math.min(options.timeoutMs(), remainingMs), options);
             switch (last) {
                 case Outcome.Body body -> {
                     return Result.ok(body.value());
