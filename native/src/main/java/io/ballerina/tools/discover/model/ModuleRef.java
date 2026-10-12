@@ -90,6 +90,11 @@ public record ModuleRef(String orgName, String moduleName, String version) {
 
     /** {@code ballerinax/googleapis.gmail} → {@code gmail}: the alias an import puts in scope. */
     public String prefix() {
+        return prefixOf(moduleName);
+    }
+
+    /** The alias an import of the module named {@code moduleName} puts in scope: its last dotted segment. */
+    public static String prefixOf(String moduleName) {
         String[] parts = moduleName.split("\\.", -1);
         return parts.length == 0 ? moduleName : parts[parts.length - 1];
     }

@@ -34,8 +34,9 @@ import java.util.zip.ZipInputStream;
  * A package archive ({@code .bala}) — a zip whose {@code modules/<module-id>/} directories hold each module's
  * {@code .bal} files, beside the docs, resources and native jars this reader never needs.
  *
- * <p>Bounded on both axes, since its size is the publisher's choice: an archive past {@link #MAX_ARCHIVE_BYTES} or
- * a source file past {@link #MAX_SOURCE_BYTES} is no answer at all, the same as an archive that could not be fetched.
+ * <p>Bounded on every axis, since its size is the publisher's choice: an archive past {@link #MAX_ARCHIVE_BYTES}, a
+ * source file past {@link #MAX_SOURCE_BYTES}, or a module past {@link #MAX_MODULE_BYTES} or {@link #MAX_MODULE_FILES}
+ * is no answer at all, the same as an archive that could not be fetched.
  *
  * @since 0.1.0
  */
@@ -54,6 +55,26 @@ public final class Bala {
      */
     public static final int MAX_SOURCE_BYTES = 4 * 1024 * 1024;
 
+    /** The most source kept for one module, all its files together — a hundred times the whole of {@code http}'s. */
+    public static final long MAX_MODULE_BYTES = 16L * 1024 * 1024;
+
+    /** The most {@code .bal} files kept for one module; {@code ballerina/http}'s default module has under fifty. */
+    public static final int MAX_MODULE_FILES = 1000;
+
+    /**
+     * What a read may take.
+     *
+     * @param archiveBytes the most read off the wire
+     * @param sourceBytes the most kept of one file
+     * @param moduleBytes the most kept of all the module's files together
+     * @param moduleFiles the most files kept
+     */
+    public record Limits(long archiveBytes, int sourceBytes, long moduleBytes, int moduleFiles) {
+
+        public static final Limits DEFAULT =
+                new Limits(MAX_ARCHIVE_BYTES, MAX_SOURCE_BYTES, MAX_MODULE_BYTES, MAX_MODULE_FILES);
+    }
+
     private Bala() {
     }
 
@@ -63,20 +84,29 @@ public final class Bala {
      * exactly one module. Closes {@code archive}.
      */
     public static Optional<Map<String, String>> moduleSources(InputStream archive, String moduleId) {
-        return moduleSources(archive, moduleId, MAX_ARCHIVE_BYTES, MAX_SOURCE_BYTES);
+        return moduleSources(archive, moduleId, Limits.DEFAULT);
     }
 
     /** {@link #moduleSources(InputStream, String)} under explicit limits. */
-    public static Optional<Map<String, String>> moduleSources(
-            InputStream archive, String moduleId, long maxArchiveBytes, int maxSourceBytes) {
+    public static Optional<Map<String, String>> moduleSources(InputStream archive, String moduleId, Limits limits) {
         String prefix = "modules/" + moduleId + "/";
         Map<String, String> files = new TreeMap<>();
-        try (ZipInputStream zip = new ZipInputStream(new Capped(archive, maxArchiveBytes), StandardCharsets.UTF_8)) {
+        long kept = 0;
+        try (ZipInputStream zip = new ZipInputStream(new Capped(archive, limits.archiveBytes()),
+                StandardCharsets.UTF_8)) {
             for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
                 String name = entry.getName();
                 if (!entry.isDirectory() && name.startsWith(prefix) && name.endsWith(".bal")
                         && name.indexOf('/', prefix.length()) < 0) {
-                    files.put(name.substring(prefix.length()), readSource(zip, maxSourceBytes));
+                    if (files.size() >= limits.moduleFiles()) {
+                        return Optional.empty();
+                    }
+                    byte[] source = readSource(zip, limits.sourceBytes());
+                    kept += source.length;
+                    if (kept > limits.moduleBytes()) {
+                        return Optional.empty();
+                    }
+                    files.put(name.substring(prefix.length()), new String(source, StandardCharsets.UTF_8));
                 }
             }
         } catch (IOException | IllegalArgumentException unreadable) {
@@ -85,7 +115,7 @@ public final class Bala {
         return files.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableMap(files));
     }
 
-    private static String readSource(InputStream entry, int maxBytes) throws IOException {
+    private static byte[] readSource(InputStream entry, int maxBytes) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
         for (int read = entry.read(buffer); read >= 0; read = entry.read(buffer)) {
@@ -94,7 +124,7 @@ public final class Bala {
             }
             bytes.write(buffer, 0, read);
         }
-        return bytes.toString(StandardCharsets.UTF_8);
+        return bytes.toByteArray();
     }
 
     private static final class Capped extends FilterInputStream {

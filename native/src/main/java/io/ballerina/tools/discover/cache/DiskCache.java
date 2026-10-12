@@ -432,12 +432,4 @@ public final class DiskCache implements DocsCache {
             return List.of();
         }
     }
-
-    @Override
-    public String describe() {
-        if (!usable) {
-            return root + " (unusable; caching disabled)";
-        }
-        return Files.isDirectory(root) ? root + " (writable)" : root + " (unusable; caching disabled)";
-    }
 }

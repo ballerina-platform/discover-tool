@@ -162,7 +162,7 @@ public final class TypeDefs {
      * <p>Fields are contiguous, as a record's are; a blank line separates each method from what precedes it —
      * between members, never under the header.
      */
-    public static List<String> renderMembers(List<RecordField> fields, List<Fn> methods) {
+    private static List<String> renderMembers(List<RecordField> fields, List<Fn> methods) {
         List<String> lines = new ArrayList<>();
         for (RecordField field : fields) {
             lines.add(renderRecordField(field, Owner.OBJECT));

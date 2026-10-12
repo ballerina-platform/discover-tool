@@ -91,38 +91,50 @@ public final class LocalBalas implements ModuleSources {
 
     /**
      * The exact version's module, from whichever platform directory ({@code java21}, {@code any}, …) holds it.
-     * Anything short of that — no such version, no such module, an unreadable file — is empty.
+     * Anything short of that — no such version, no such module, an unreadable or over-{@link Bala.Limits} copy —
+     * is empty; a platform directory that cannot be read is skipped for the next.
      */
     @Override
     public Optional<Map<String, String>> moduleSources(
             QualifiedName qualified, Version version, String moduleId, HttpOptions options) {
         Path versionDir = root.resolve(qualified.org()).resolve(qualified.name()).resolve(version.text());
-        try (Stream<Path> platforms = Files.list(versionDir)) {
-            for (Path platform : platforms.sorted().toList()) {
-                Optional<Map<String, String>> sources = readModule(platform.resolve("modules").resolve(moduleId));
-                if (sources.isPresent()) {
-                    return sources;
-                }
-            }
+        List<Path> platforms;
+        try (Stream<Path> listing = Files.list(versionDir)) {
+            platforms = listing.sorted().toList();
         } catch (IOException | RuntimeException unreadable) {
             return Optional.empty();
+        }
+        for (Path platform : platforms) {
+            Optional<Map<String, String>> sources = readModule(platform.resolve("modules").resolve(moduleId));
+            if (sources.isPresent()) {
+                return sources;
+            }
         }
         return Optional.empty();
     }
 
-    private static Optional<Map<String, String>> readModule(Path moduleDir) throws IOException {
+    private static Optional<Map<String, String>> readModule(Path moduleDir) {
         if (!Files.isDirectory(moduleDir)) {
             return Optional.empty();
         }
-        List<Path> sources;
-        try (Stream<Path> listing = Files.list(moduleDir)) {
-            sources = listing.filter(path -> String.valueOf(path.getFileName()).endsWith(".bal"))
-                    .filter(Files::isRegularFile)
-                    .toList();
-        }
+        Bala.Limits limits = Bala.Limits.DEFAULT;
         Map<String, String> files = new TreeMap<>();
-        for (Path source : sources) {
-            files.put(String.valueOf(source.getFileName()), Files.readString(source, StandardCharsets.UTF_8));
+        long kept = 0;
+        try (Stream<Path> listing = Files.list(moduleDir)) {
+            for (Path source : listing.filter(path -> String.valueOf(path.getFileName()).endsWith(".bal"))
+                    .filter(Files::isRegularFile)
+                    .sorted()
+                    .toList()) {
+                long size = Files.size(source);
+                kept += size;
+                if (size > limits.sourceBytes() || kept > limits.moduleBytes()
+                        || files.size() >= limits.moduleFiles()) {
+                    return Optional.empty();
+                }
+                files.put(String.valueOf(source.getFileName()), Files.readString(source, StandardCharsets.UTF_8));
+            }
+        } catch (IOException | RuntimeException unreadable) {
+            return Optional.empty();
         }
         return files.isEmpty() ? Optional.empty() : Optional.of(files);
     }

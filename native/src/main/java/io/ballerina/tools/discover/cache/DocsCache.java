@@ -126,9 +126,6 @@ public interface DocsCache {
      */
     List<String> listVersions(PackageKey key);
 
-    /** One line naming where the cache lives, or why there is none. */
-    String describe();
-
     /** A cache that stores nothing and says so. */
     DocsCache NULL = new DocsCache() {
 
@@ -179,11 +176,6 @@ public interface DocsCache {
         @Override
         public List<String> listVersions(PackageKey key) {
             return List.of();
-        }
-
-        @Override
-        public String describe() {
-            return "disabled";
         }
     };
 }

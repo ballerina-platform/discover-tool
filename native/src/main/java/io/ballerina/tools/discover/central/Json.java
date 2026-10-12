@@ -30,13 +30,13 @@ import com.google.gson.JsonObject;
  *
  * @since 0.1.0
  */
-final class Json {
+public final class Json {
 
     private Json() {
     }
 
     /** The value as a string, or {@code null} for absent and for anything that is not a string. */
-    static String string(JsonObject owner, String key) {
+    public static String string(JsonObject owner, String key) {
         JsonElement value = owner.get(key);
         if (value == null || !value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
             return null;

@@ -24,6 +24,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.central.Json;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -135,23 +136,17 @@ public final class Schema {
                 continue;
             }
             JsonObject module = entry.getAsJsonObject();
-            String id = string(module, ID);
-            String orgName = string(module, ORG_NAME);
+            String id = Json.string(module, ID);
+            String orgName = Json.string(module, ORG_NAME);
             if (id != null && orgName != null) {
                 JsonElement isDefault = module.get(IS_DEFAULT_MODULE);
-                modules.add(new CentralDocs.RelatedModule(id, orgName, Optional.ofNullable(string(module, SUMMARY)),
+                modules.add(new CentralDocs.RelatedModule(id, orgName,
+                        Optional.ofNullable(Json.string(module, SUMMARY)),
                         isDefault != null && isDefault.isJsonPrimitive()
                                 && isDefault.getAsJsonPrimitive().isBoolean() && isDefault.getAsBoolean()));
             }
         }
         return List.copyOf(modules);
-    }
-
-    private static String string(JsonObject owner, String key) {
-        JsonElement value = owner.get(key);
-        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
-                ? value.getAsString()
-                : null;
     }
 
     private static CentralDocs.TypeNode typeNode(Cursor cursor, JsonObject json, String path) {
