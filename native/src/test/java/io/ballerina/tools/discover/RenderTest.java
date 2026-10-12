@@ -239,7 +239,7 @@ public class RenderTest {
         // no visibility qualifier, because it is not a declaration.
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Alias("Opaque", "", new TypeRef(""))),
-                "// Unknown type: Opaque");
+                "// Central publishes no definition for Opaque");
         Assert.assertEquals(
                 TypeDefs.renderTypeDef(new TypeDef.Constant("NAME", "", "aep", new TypeRef("string"))),
                 "public const string NAME = \"aep\";");

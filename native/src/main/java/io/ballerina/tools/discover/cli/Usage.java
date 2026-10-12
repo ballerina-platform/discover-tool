@@ -63,7 +63,7 @@ final class Usage {
             Typical session:
 
               1. What can I ask?              bal discover ballerinax/github
-              2. A bucket, listed or one:     bal discover ballerinax/github client
+              2. List a bucket, or open one:  bal discover ballerinax/github client
                                               bal discover ballerinax/github client Client
               3. One call, fully addressed:   bal discover ballerinax/github client Client "gists/'public" get
               4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
@@ -77,6 +77,6 @@ final class Usage {
     private static final String EXIT_CODES = "Exit codes: 0 an answer, 1 a failure, 2 a usage error.";
 
     private static final String BUCKETS =
-            "Buckets, addressed as the second positional: " + String.join(", ", Commands.BUCKETS)
-                    + ". No bucket lists which of them this package has.";
+            "Buckets (the word after the package): " + String.join(", ", Commands.BUCKETS)
+                    + ". Leave it out to see which of them this package has.";
 }

@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover.cli;
 
 import io.ballerina.tools.discover.symbols.Surface;
+import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
@@ -76,20 +77,19 @@ final class Commands {
 
         @CommandLine.Option(names = "--filter", paramLabel = "<keyword>",
                 description = "Narrow an already-selected bucket to entries whose name, path, parameter or type "
-                        + "matches this keyword, client-side. Never sent to Central as a query.")
+                        + "matches this keyword. Filtering is local; nothing is sent to Central.")
         String filter;
 
         @CommandLine.Option(names = "--page", paramLabel = "<n>", defaultValue = "1",
-                description = "1-indexed. Turns the page of any listing over the entry ceiling: a roster, a "
-                        + "level of path groups, methods, resource paths, a container listed by call form, the type "
-                        + "declarations, documentation-only matches, and readme sections narrowed by --filter. A "
-                        + "page outside the listing, or against an answer that does not page, is an error.")
+                description = "Show page <n> (counting from 1) of a listing longer than " + Containers.MAX_ENTRIES
+                        + " entries. A page "
+                        + "past the last one, or against an answer that has only one page, is an error.")
         int page;
 
         @CommandLine.Option(names = {"--module", "-m"}, paramLabel = "<module>",
                 description = "Target this submodule instead of the package's default module, the same "
-                        + "everywhere including readme. The bare submodule name only — <org>/<name> is always "
-                        + "resolved as one literal, complete package coordinate.")
+                        + "everywhere including readme. The submodule's name only (for example httpscerr), not "
+                        + "<org>/<name>.<submodule>.")
         String module;
 
         // Hidden and never valid: declared only so the CLI can say the version goes in the coordinate.

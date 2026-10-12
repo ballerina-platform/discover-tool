@@ -149,8 +149,8 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 containers",
                 "",
-                "  Caller     3 remote",
-                "  Consumer  24 remote",
+                "  Caller     3 remote methods",
+                "  Consumer  24 remote methods",
                 "",
                 "Next: bal discover ballerinax/kafka client <name>"));
 
@@ -181,10 +181,10 @@ public class DiscoverResultRenderingTest {
                 "2 containers",
                 "",
                 "kafka:Listener",
-                "  Service  1 remote",
+                "  Service  1 remote method",
                 "",
                 "No listener",
-                "  Plain  1 remote",
+                "  Plain  1 remote method",
                 "",
                 "Next: bal discover ballerinax/kafka service <name>"));
 
@@ -238,7 +238,7 @@ public class DiscoverResultRenderingTest {
                                 "bal discover ballerina/http service InterceptableService")),
                 2, null, null, null, List.of(), 0);
         Assert.assertTrue(TextRenderer.render(result).contains(
-                "http:Listener — not confirmed (package source unavailable)\n  InterceptableService"));
+                "http:Listener — unverified (package source unavailable)\n  InterceptableService"));
 
         JsonArray containers = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject()
                 .getAsJsonArray("containers");
@@ -263,7 +263,7 @@ public class DiscoverResultRenderingTest {
                 "http:Listener",
                 "  Service",
                 "",
-                "Not attachable to a listener: 5, on a later page",
+                "Not attachable to a listener: 5 more, on later pages",
                 "",
                 "... 5 more (page 1 of 2)",
                 "Next: bal discover ballerina/http service <name>",
@@ -279,7 +279,7 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "91 containers",
                 "",
-                "  A  1 remote",
+                "  A  1 remote method",
                 "",
                 "... 51 more (page 1 of 3)",
                 "Next: bal discover pkg class <name>",
@@ -303,7 +303,7 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "42 path groups",
                 "",
-                "Groups (operations under each)",
+                "Path groups (resource methods in each)",
                 "  repos  421",
                 "  orgs   124",
                 "",
@@ -334,10 +334,10 @@ public class DiscoverResultRenderingTest {
                 "Client",
                 "1 resource path here, 1 path group",
                 "",
-                "Here",
+                "Paths at this level",
                 "  repos/:owner/:repo  get, patch, delete",
                 "",
-                "Groups (operations under each)",
+                "Path groups (resource methods in each)",
                 "  repos/actions  38",
                 "",
                 "Next: bal discover ballerinax/github client Client <path> <accessor>",
@@ -475,7 +475,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void oneChunkCarriesItsPositionInJsonAndAHeaderLineInText() {
         DiscoverResult result = new DiscoverResult.Readme("## Quickstart\n\ncode", 3, 2, 5, "Quickstart", null);
-        Assert.assertEquals(TextRenderer.render(result), "Chunk 2 of 5: Quickstart\n\n## Quickstart\n\ncode");
+        Assert.assertEquals(TextRenderer.render(result), "Section 2 of 5: Quickstart\n\n## Quickstart\n\ncode");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("chunk").getAsInt(), 2);
@@ -491,7 +491,7 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.ReadmeChunks.Chunk(3, "Quickstart", 25, "bal discover pkg readme 3")),
                 2, null, null, null, true);
         Assert.assertEquals(TextRenderer.render(result), lines(
-                "2 matching chunks",
+                "2 matching sections",
                 "",
                 "  1  Overview    10 lines",
                 "  3  Quickstart  25 lines",
@@ -507,7 +507,7 @@ public class DiscoverResultRenderingTest {
     @Test
     public void noChunkMatchingTheFilterIsNoneInTextAndAnEmptyArrayInJson() {
         DiscoverResult result = new DiscoverResult.ReadmeChunks(List.of(), 0, null, null, null, true);
-        Assert.assertEquals(TextRenderer.render(result), "No matching chunks.");
+        Assert.assertEquals(TextRenderer.render(result), "No matching sections.");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.getAsJsonArray("chunks").size(), 0);
@@ -522,7 +522,7 @@ public class DiscoverResultRenderingTest {
                 List.of(new DiscoverResult.Signature.Parameter("headers", "map<string|string[]>", "{}", null, ""),
                         new DiscoverResult.Signature.Parameter(
                                 "queries", "GistsListPublicQueries", null, "inclusion", "Queries to send")),
-                "BaseGist[]|error", false, types, omitted, omitted.size(), null, List.of(),
+                "BaseGist[]|error", false, types, omitted, List.of(),
                 DiscoverResult.Documented.NONE, null, null, null, note);
     }
 
@@ -531,14 +531,14 @@ public class DiscoverResultRenderingTest {
         String command = "bal discover pkg client Client echo --filter the";
         DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
-                false, List.of(), List.of(), 0, null, List.of(),
+                false, List.of(), List.of(), List.of(),
                 new DiscoverResult.Documented(
                         List.copyOf(methods("bal discover pkg client Client", "ping", "auth")), 82),
                 new DiscoverResult.Paging(2, 3, 2),
                 command + " --page 3", null, null);
         String text = TextRenderer.render(result);
-        Assert.assertTrue(text.contains("\nMatched by documentation only (2 of 82)\n  ping\n  auth\n"), text);
-        Assert.assertTrue(text.endsWith("\n... 2 more matched by documentation only (page 2 of 3)\n"
+        Assert.assertTrue(text.contains("\nMentioned only in their documentation (2 of 82)\n  ping\n  auth\n"), text);
+        Assert.assertTrue(text.endsWith("\n... 2 more that mention it only in their documentation (page 2 of 3)\n"
                 + "Next: bal discover pkg client Client <name>\nNext: " + command + " --page 3"), text);
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
@@ -549,23 +549,23 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
-    public void aLeafFooterLabelsTheClosuresCountApartFromTheDocumentationOnlyPage() {
+    public void aLeafListsEveryTypeItLeavesOutBeforeTheDocumentationOnlyPage() {
         String command = "bal discover pkg client Client echo --filter the";
         DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
-                false, List.of(), List.of(new DiscoverResult.Method("Gist", "bal discover pkg type Gist")), 3,
-                "bal discover pkg type", List.of(),
+                false, List.of(), List.of(new DiscoverResult.Method("Gist", "bal discover pkg type Gist")),
+                List.of(),
                 new DiscoverResult.Documented(List.copyOf(methods("bal discover pkg client Client", "ping")), 41),
                 new DiscoverResult.Paging(1, 2, 1),
                 command + " --page 2", null, null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.endsWith(lines(
-                "... 2 more past the closure budget, listed by the type roster",
-                "... 1 more matched by documentation only (page 1 of 2)",
-                "Next: bal discover pkg type",
+                "... 1 more that mention it only in their documentation (page 1 of 2)",
                 "Next: bal discover pkg client Client <name>",
                 "Next: " + command + " --page 2")), text);
-        Assert.assertFalse(text.contains("narrow further"), text);
+        Assert.assertTrue(text.contains("Other types it uses, not printed to keep this answer short (1)\n"
+                + "  Gist  bal discover pkg type Gist\n"), text);
+        Assert.assertFalse(text.contains("narrow with"), text);
     }
 
     @Test
@@ -623,11 +623,11 @@ public class DiscoverResultRenderingTest {
                 "resource function get gists/'public(map<string|string[]> headers = {}, *GistsListPublicQueries "
                         + "queries) returns BaseGist[]|error;",
                 "",
-                "Types it names (1)",
+                "Types it uses (1)",
                 "  public type BaseGist record {|",
                 "  |};",
                 "",
-                "Past the closure budget (1)",
+                "Other types it uses, not printed to keep this answer short (1)",
                 "  GistFile  bal discover pkg type GistFile",
                 "",
                 "Note: relocated to gists/'public"));
@@ -651,16 +651,16 @@ public class DiscoverResultRenderingTest {
                 null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
-                "1 resource path, 2 remote methods, 1 normal method",
+                "1 resource method, 2 remote methods, 1 method",
                 "",
-                "Resources (->)",
+                "Resource methods (->)",
                 "  :...path  get, post",
                 "",
-                "Remote (->)",
+                "Remote methods (->)",
                 "  execute",
                 "  get",
                 "",
-                "Normal (.)",
+                "Methods (.)",
                 "  getCookieStore",
                 "",
                 "Next: " + HTTP + " <path> <accessor>",
@@ -689,15 +689,15 @@ public class DiscoverResultRenderingTest {
                 new DiscoverResult.Documented(List.copyOf(methods("bal discover pkg client Client", "forward")), 3),
                 null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
-                "2 remote methods, 2 normal methods",
+                "2 remote methods, 2 methods",
                 "",
-                "Remote (->)",
+                "Remote methods (->)",
                 "  execute",
                 "",
-                "Normal (.)",
+                "Methods (.)",
                 "  'close  bal discover pkg client Client \"'close\"",
                 "",
-                "Matched by documentation only (1 of 3)",
+                "Mentioned only in their documentation (1 of 3)",
                 "  forward",
                 "",
                 "... 2 more (page 1 of 2)",
@@ -725,9 +725,9 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.EmptyBucket.Elsewhere("class", 4, "bal discover ballerinax/kafka class")),
                 null);
         Assert.assertEquals(TextRenderer.render(result), lines(
-                "This package declares nothing in funcs.",
+                "This package has no functions.",
                 "",
-                "Elsewhere",
+                "Other buckets",
                 "  client  3  bal discover ballerinax/kafka client",
                 "  class   4  bal discover ballerinax/kafka class"));
 

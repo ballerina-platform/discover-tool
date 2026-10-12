@@ -154,7 +154,7 @@ public final class Loader {
      */
     public static String unverifiedWarning(boolean stale) {
         return stale
-                ? "the registry was unreachable, so this version came off disk unchecked"
+                ? "Central could not be reached; using the cached copy, which may not be the latest version"
                 : null;
     }
 

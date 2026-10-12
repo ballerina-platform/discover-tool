@@ -322,7 +322,7 @@ public final class Containers {
 
     private static String listenerNote(LoadedPackage loaded, Surface.Container container) {
         if (Surface.isUnattachable(loaded.library(), container)) {
-            return "not attachable to any listener this package declares";
+            return "no listener in this package accepts it directly";
         }
         String names = listenerNames(container);
         if (names == null) {
@@ -330,12 +330,12 @@ public final class Containers {
         }
         Optional<Service> foreign = foreignPairing(container);
         if (foreign.isPresent()) {
-            return "binds to " + names + "; declared in " + foreign.get().declaredIn().map(ModuleRef::coordinate)
+            return "attach it to " + names + "; declared in " + foreign.get().declaredIn().map(ModuleRef::coordinate)
                     .orElse("") + foreignCommand(loaded, foreign.get()).map(command -> " — " + command).orElse("");
         }
         return unsettled(container)
-                .map(binding -> "may bind to " + names + " — not confirmed: " + binding.reason())
-                .orElse("binds to " + names);
+                .map(binding -> "probably attaches to " + names + " (unverified: " + binding.reason() + ")")
+                .orElse("attach it to " + names);
     }
 
     private static Optional<Bindings.Binding> unsettled(Surface.Container container) {
@@ -391,7 +391,7 @@ public final class Containers {
         List<DiscoverResult.ContainerRoster.Container> items = window.slice(bindable, 0).stream()
                 .map(container -> new DiscoverResult.ContainerRoster.Container(
                         container.name(),
-                        (int) container.operations().stream().map(PathTree.Operation::segments).distinct().count(),
+                        container.operations().size(),
                         (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
                         (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
                         listenerNames(container),
@@ -784,8 +784,8 @@ public final class Containers {
                 .toList();
 
         Declarations index = Declarations.index(loaded.library().addressable());
-        List<String> roots = Closure.rootsOf(fn, index);
-        Closure.Result closure = roots.isEmpty()
+        Closure.Roots roots = Closure.rootsOf(fn, index);
+        Closure.Result closure = roots.parameters().isEmpty() && roots.others().isEmpty()
                 ? null
                 : Closure.leaf(roots, index);
         List<DiscoverResult.Signature.Type> types = closure == null ? List.of() : closure.types(index);
@@ -815,8 +815,7 @@ public final class Containers {
                 fn instanceof Fn.Resource resource ? resource.accessor() : null,
                 fn instanceof Fn.Resource ? PathTree.join(entry.path()) : null,
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
-                types, omitted, closure == null ? 0 : closure.omitted().size(),
-                closure == null ? null : Types.omittedNext(loaded, closure), foreign,
+                types, omitted, foreign,
                 documentedOn(window, documented, 0), window.paging(), window.next(command),
                 loaded.warning(), note));
     }
@@ -843,7 +842,9 @@ public final class Containers {
         List<DiscoverResult.Method> shownNormal = window.slice(normal, resources.size() + remote.size());
         return Result.ok(new DiscoverResult.MixedListing(containerName(container),
                 shownResources, shownRemote, shownNormal,
-                new DiscoverResult.MixedListing.Counts(resources.size(), remote.size(), normal.size()),
+                new DiscoverResult.MixedListing.Counts(
+                        resources.stream().mapToInt(resource -> resource.accessors().size()).sum(),
+                        remote.size(), normal.size()),
                 shownResources.size() + shownRemote.size() + shownNormal.size(), total, window.paging(),
                 window.next(command), documentedOn(window, documented, total), warning, note));
     }

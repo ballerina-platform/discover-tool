@@ -441,7 +441,8 @@ public class CacheTest {
 
         Assert.assertEquals(exitCode, 0);
         Assert.assertTrue(offline.stdout().contains(
-                "\"warning\":\"the registry was unreachable, so this version came off disk unchecked\""),
+                "\"warning\":\"Central could not be reached; using the cached copy, "
+                        + "which may not be the latest version\""),
                 offline.stdout());
     }
 
@@ -471,7 +472,8 @@ public class CacheTest {
 
         Assert.assertEquals(exitCode, 0);
         Assert.assertTrue(capture.stdout().contains(
-                "\"warning\":\"the registry was unreachable, so this version came off disk unchecked\""),
+                "\"warning\":\"Central could not be reached; using the cached copy, "
+                        + "which may not be the latest version\""),
                 capture.stdout());
     }
 
@@ -497,14 +499,15 @@ public class CacheTest {
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
         Assert.assertEquals(jsonExit, 0);
         Assert.assertTrue(json.stdout().contains(
-                "\"warning\":\"the registry was unreachable, so this version came off disk unchecked\""),
+                "\"warning\":\"Central could not be reached; using the cached copy, "
+                        + "which may not be the latest version\""),
                 json.stdout());
 
         Capture text = new Capture();
         int textExit = Cli.run(List.of(PKG, "--output", "text"), text.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
         Assert.assertEquals(textExit, 0);
-        Assert.assertTrue(text.stdout().contains("\n\nWarning: the registry was unreachable"), text.stdout());
+        Assert.assertTrue(text.stdout().contains("\n\nWarning: Central could not be reached"), text.stdout());
     }
 
     @Test

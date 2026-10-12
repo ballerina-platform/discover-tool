@@ -217,9 +217,9 @@ public final class Readme {
         List<Chunk> found = byNumber.isPresent() ? List.of(byNumber.get()) : byTitle(chunks, requested);
         if (found.isEmpty()) {
             return Result.err(loaded.symbolNotFoundAmong(List.of(requested),
-                    "No readme chunk of " + loaded.place() + " is numbered or titled '" + requested + "'.",
-                    "The candidates are every chunk this readme publishes; pass one of the numbers, or read the "
-                            + "readme whole: `" + command(loaded.pkgArgument()) + "`.",
+                    "No readme section of " + loaded.place() + " is numbered or titled '" + requested + "'.",
+                    "Pass the number or title of one of the sections listed, or read the whole readme: `"
+                            + command(loaded.pkgArgument()) + "`.",
                     chunks.stream().map(chunk -> chunk.number() + ". " + chunk.title()).toList()));
         }
         if (found.size() > 1) {
@@ -228,7 +228,7 @@ public final class Readme {
         Chunk chunk = found.get(0);
         if (filter != null && !matches(chunk, filter)) {
             return Result.err(new Failure.Validation(
-                    "Chunk " + requested + " (\"" + chunk.title() + "\") does not match --filter \""
+                    "Section " + requested + " (\"" + chunk.title() + "\") does not mention \""
                             + filter + "\".",
                     "Drop --filter to read it anyway: `" + command(loaded.pkgArgument()) + " "
                             + Texts.shellWord(requested) + "`."));

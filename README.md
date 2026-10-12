@@ -41,10 +41,9 @@ are not callable, so they have no containers or members.
 `type` lists its declarations grouped by kind (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`,
 `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`) and pages them like any listing; `--filter` is how a large one — `ballerinax/github` declares
 over a thousand records — is narrowed. `type <Name>` prints the declaration whole, then the declarations it
-names one level deep, within a size budget: what the budget left out is listed with the command that opens each
-one (up to 40; `omittedTotal` or an `... N more` line says how many there were in all, and `omittedNext` or the
-`Next:` line is the command that lists them: the whole `type` roster), and so are the declarations another
-package owns (`bal discover ballerina/http type BearerTokenConfig`).
+names one level deep, each only while it is no larger than 6 KB and never a class; every type it uses but does
+not print is listed, all of them, with the command that opens each, and so are the declarations another package
+owns (`bal discover ballerina/http type BearerTokenConfig`).
 It takes one name and no `--filter`. A class, client or service type answers as its own bucket does
 (`type Response` as `class Response`), a listener — opened nowhere else — prints its own declaration, `init` and
 its other methods included, with the types it uses, and an enum member (`HTTP_1_1`) answers with the enum that
@@ -58,8 +57,8 @@ from (see Paths and The contract, below).
 | Flag                   | Meaning                                                                                                |
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
-| `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Applied client-side to the fetched payload, never sent to Central. |
-| `--page <n>`           | Turn the page of a listing over the entry ceiling — every listing pages: a roster, a level of path groups, methods, resource paths, a container listed by call form, the `type` declarations, documentation-only matches, and readme sections narrowed by `--filter`. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
+| `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Filtering is local to the fetched payload; nothing is sent to Central. |
+| `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <module>` | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. |
 
@@ -99,8 +98,8 @@ and the `Next:` commands. A listing whose JSON gives every row its own command (
 resource row) prints the shape those commands share once, as a `Next:` line with a placeholder; a row whose
 command does not fit that shape (a path that needs shell quoting, say) carries its own beside it.
 
-Several containers in one bucket are a roster with their member counts — resource paths, not the operations
-on them, so http's one `:...path` answering seven accessors counts once; service types are listed under the
+Several containers in one bucket are a roster with their member counts — resource methods (one per path and
+accessor), so http's one `:...path` answering seven accessors counts seven; service types are listed under the
 listener they bind to, and the ones no listener accepts are listed apart, still addressable by name:
 
 ```
@@ -108,16 +107,16 @@ $ bal discover ballerina/http client
 ballerina/http:2.16.6 · client
 10 clients
 
-  Caller                                              5 remote  1 normal
-  Client                                 1 resource  15 remote  4 normal
-  ClientOAuth2Handler                                 1 remote  2 normal
-  ClientObject                           1 resource  15 remote
-  FailoverClient                         1 resource  15 remote  1 normal
-  ListenerLdapUserStoreBasicAuthHandler               2 remote
-  ListenerOAuth2Handler                               1 remote
-  LoadBalanceClient                      1 resource  15 remote
-  StatusCodeClient                       1 resource  15 remote  4 normal
-  StatusCodeClientObject                 1 resource  15 remote
+  Caller                                                     5 remote methods  1 method
+  Client                                 1 resource method  15 remote methods  4 methods
+  ClientOAuth2Handler                                        1 remote method   2 methods
+  ClientObject                           1 resource method  15 remote methods
+  FailoverClient                         1 resource method  15 remote methods  1 method
+  ListenerLdapUserStoreBasicAuthHandler                      2 remote methods
+  ListenerOAuth2Handler                                      1 remote method
+  LoadBalanceClient                      1 resource method  15 remote methods
+  StatusCodeClient                       1 resource method  15 remote methods  4 methods
+  StatusCodeClientObject                 1 resource method  15 remote methods
 
 Next: bal discover ballerina/http client <name>
 
@@ -126,7 +125,7 @@ ballerina/http:2.16.6 · service
 7 service types
 
 http:Listener
-  InterceptableService  1 normal
+  InterceptableService  1 method
   Service
   ServiceContract
 
@@ -158,13 +157,13 @@ ballerina/http:2.16.6 · service
 http:Listener
   Service
 
-http:Listener — not confirmed (package source unavailable)
+http:Listener — unverified (package source unavailable)
   ServiceContract
   RequestInterceptor
   ResponseInterceptor
   RequestErrorInterceptor
   ResponseErrorInterceptor
-  InterceptableService      1 normal
+  InterceptableService      1 method
 
 Next: bal discover ballerina/http service <name>
 ```
@@ -192,7 +191,7 @@ remote function onError(kafka:Error kafkaError) returns error?
   Invoked when polling fails, or when a polled batch cannot be dispatched, [...]
   kafkaError (required): The failure that prevented the batch from being delivered.
 
-Note: binds to kafka:Listener
+Note: attach it to kafka:Listener
 ```
 
 A listener whose `attach` takes another package's type points there:
@@ -213,7 +212,7 @@ $ bal discover ballerinax/github client
 ballerinax/github:6.0.0 · client · Client
 36 path groups
 
-Groups (operations under each)
+Path groups (resource methods in each)
   repos                421
   orgs                 200
   user                  93
@@ -283,10 +282,10 @@ $ bal discover ballerinax/github client Client repos
 ballerinax/github:6.0.0 · client · Client · repos
 1 resource path here, 64 path groups
 
-Here
+Paths at this level
   repos/:owner/:repo  get, delete, patch
 
-Groups (operations under each)
+Path groups (resource methods in each)
   repos/:owner/:repo/actions                   72
   repos/:owner/:repo/branches                  36
   repos/:owner/:repo/pulls                     31
@@ -341,7 +340,7 @@ caller has to get right:
 ```
 $ bal discover ballerinax/postgresql client
 ballerinax/postgresql:1.19.0 · client · Client
-5 remote methods, 1 normal method
+5 remote methods, 1 method
 
 Remote (->)
   batchExecute
@@ -374,7 +373,7 @@ ballerinax/kafka:4.6.5 · client · Producer · send
 # + return - A `kafka:Error` if send action fails to send data or else '()'
 isolated remote function send(AnydataProducerRecord producerRecord) returns Error?;
 
-Types it names (2)
+Types it uses (2)
   # Details related to the anydata producer record.
   public type AnydataProducerRecord record {|
       # Topic to which the record will be appended
@@ -433,7 +432,7 @@ ballerinax/twilio:5.0.2 · client · Client · --filter message
   listNotification
   updateMessage
 
-Matched by documentation only
+Mentioned only in their documentation
   listAvailablePhoneNumberLocal
   listAvailablePhoneNumberMachineToMachine
   listAvailablePhoneNumberMobile
@@ -481,7 +480,7 @@ ballerinax/kafka:4.6.5 · type · TopicPartitionOffset
 # Represents a topic partition and an offset with a timestamp.
 public type TopicPartitionOffset [TopicPartition, OffsetAndTimestamp?];
 
-Types it names (2)
+Types it uses (2)
   # Represents a topic partition.
   public type TopicPartition record {|
       # Topic to which the partition is related
@@ -506,7 +505,7 @@ A large readme can be narrowed to the sections that mention a keyword:
 ```
 $ bal discover ballerinax/kafka readme --filter producer
 ballerinax/kafka:4.6.5 · readme · --filter producer
-2 matching chunks
+2 matching sections
 
   1  Kafka producer      18 lines
   4  Data serialization  26 lines
@@ -527,9 +526,9 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`)                 |
 | more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
 | type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
-| one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `omittedTotal`, `omittedNext`, `foreign` (`name`, `module`, `version`, `command`) |
+| one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`) |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
 | readme                               | `readme`, `lines`, and `chunk`, `of`, `title` for one section                                                    |
 | readme sections                      | `chunks` (`number`, `title`, `lines`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`                       |
@@ -550,7 +549,7 @@ documentation-only matches if it has any.
 
 Every listing is alphabetical: containers in a roster, service types under their listener (and the listeners
 themselves), methods, resource paths and `type` declarations within their kind. The exception is a level of path
-groups, which goes by the number of operations under each, largest first (alphabetical among equals), because it is
+groups, which goes by the number of resource methods under each, largest first (alphabetical among equals), because it is
 read to choose where to go next.
 
 ### The entry ceiling
@@ -569,7 +568,7 @@ No listing shows more than **40 entries**. Over that:
   way, as one sequence — resource paths, then remote methods, then normal ones — so a page can end partway
   through one section and pick up the next; each page keeps the section headings (`resources`, `remote`,
   `normal` in JSON) for whatever it holds and omits the ones it holds nothing of, while `counts` (and the text
-  header, `111 remote methods, 1 normal method`) gives every form's size across the whole listing, so a form
+  header, `111 remote methods, 1 method`) gives every form's size across the whole listing, so a form
   that only appears on a later page is never hidden;
 - documentation-only matches page as described above; a roster's `--filter` keeps a container whose own name
   matches (opened whole, since a container with no methods has nothing else to match) as well as one with a
@@ -622,7 +621,7 @@ $ bal discover ballerinax/kafka client NoSuchContainer | cat
 ```
 
 In text it is `error: <message>`, then the suggestion and anything else the failure carries (schema issues, a
-readme's chunks) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
+readme's sections) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
 
 ```
 $ bal discover ballerina/http:2.15

@@ -282,14 +282,13 @@ public final class Types {
     private static Result<DiscoverResult> declaration(
             LoadedPackage loaded, Declarations index, String name, String note) {
         TypeDef typeDef = index.get(name);
-        Closure.Result closure = Closure.leaf(List.of(name), index);
+        Closure.Result closure = Closure.leaf(Closure.Roots.askedFor(List.of(name)), index);
         List<DiscoverResult.Signature.Type> types = closure.types(index).stream()
                 .filter(type -> !type.name().equals(name))
                 .toList();
         return Result.ok(new DiscoverResult.TypeDeclaration(name, kindOf(loaded.library(), typeDef).noun(),
-                TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure), closure.omitted().size(),
-                omittedNext(loaded, closure), foreignOf(loaded, closure, index, List.of()), loaded.warning(),
-                note));
+                TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure),
+                foreignOf(loaded, closure, index, List.of()), loaded.warning(), note));
     }
 
     private static List<TypeDef.Enumeration> enumsWithMember(LoadedPackage loaded, String member) {
@@ -303,10 +302,9 @@ public final class Types {
     private static DiscoverResult annotationLeaf(LoadedPackage loaded, Declarations index, String name) {
         Library.AnnotationDef annotation = annotationNamed(loaded.library(), name).orElseThrow();
         List<String> roots = annotation.type().map(type -> Closure.rootsOf(type, index)).orElse(List.of());
-        Closure.Result closure = Closure.leaf(roots, index);
+        Closure.Result closure = Closure.leaf(Closure.Roots.askedFor(roots), index);
         return new DiscoverResult.TypeDeclaration(name, DiscoverResult.TypeRoster.Kind.ANNOTATIONS.noun(),
                 Documents.renderAnnotation(annotation), closure.types(index), omittedOf(loaded, closure),
-                closure.omitted().size(), omittedNext(loaded, closure),
                 foreignOf(loaded, closure, index, annotation.type().map(List::of).orElse(List.of())),
                 loaded.warning(), null);
     }
@@ -315,17 +313,11 @@ public final class Types {
         return library.annotations().stream().filter(candidate -> candidate.name().equals(name)).findFirst();
     }
 
-    /** What a closure's budget left out, each with the command that opens it, up to the listing ceiling. */
+    /** Every name a closure left out, each with the command that opens it. */
     static List<DiscoverResult.Method> omittedOf(LoadedPackage loaded, Closure.Result closure) {
         return closure.omitted().stream()
-                .limit(Containers.MAX_ENTRIES)
                 .map(missing -> new DiscoverResult.Method(missing, commandFor(loaded, missing)))
                 .toList();
-    }
-
-    /** What reaches the names past the ceiling: the whole roster, which pages and takes {@code --filter}. */
-    static String omittedNext(LoadedPackage loaded, Closure.Result closure) {
-        return closure.omitted().size() > Containers.MAX_ENTRIES ? baseCommand(loaded) : null;
     }
 
     private static String commandFor(LoadedPackage loaded, String name) {

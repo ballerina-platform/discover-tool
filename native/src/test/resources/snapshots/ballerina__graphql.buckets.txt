@@ -21,8 +21,8 @@ Next: bal discover ballerina/graphql service <name>
 ballerina/graphql · class
 2 classes
 
-  Context  8 normal
-  Field    7 normal
+  Context  8 methods
+  Field    7 methods
 
 Next: bal discover ballerina/graphql class <name>
 == funcs ==

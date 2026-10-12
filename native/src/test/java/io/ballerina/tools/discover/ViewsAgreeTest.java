@@ -270,7 +270,7 @@ public class ViewsAgreeTest {
         for (String name : index.names()) {
             // A record whose field is an array of itself is ordinary, so this is a real cycle risk rather than a
             // hypothetical one. The walk returning at all is the assertion; an unguarded one would not.
-            Closure.Result closure = Closure.leaf(List.of(name), index);
+            Closure.Result closure = Closure.leaf(Closure.Roots.askedFor(List.of(name)), index);
             Assert.assertEquals(new HashSet<>(closure.names()).size(), closure.names().size(),
                     "the closure repeated a declaration for " + name);
             Assert.assertTrue(closure.names().isEmpty() || closure.names().get(0).equals(name),
@@ -278,33 +278,18 @@ public class ViewsAgreeTest {
         }
     }
 
-    /**
-     * The closure is BOUNDED, and anything it dropped is NAMED.
-     *
-     * <p>A budget that dropped names silently would be worse than an unbounded dump; a name is a legal
-     * {@code type} argument, so naming them keeps a truncated closure actionable.
-     */
+    /** Everything a leaf leaves out is NAMED, resolvable, and not also printed. */
     @Test(dataProvider = "fixtures")
-    public void aTruncatedClosureNamesEveryTypeItDroppedAndEachIsResolvable(String slug) {
+    public void aClosureNamesEveryTypeItLeavesOutAndEachIsResolvable(String slug) {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         Declarations index = Declarations.index(context.library().addressable());
-        int truncated = 0;
         for (String name : index.names()) {
-            Closure.Result closure = Closure.of(List.of(name), index, Closure.LEAF_BYTES, Closure.UNBOUNDED);
-            if (!closure.truncated()) {
-                continue;
-            }
-            truncated++;
+            Closure.Result closure = Closure.leaf(Closure.Roots.askedFor(List.of(name)), index);
             for (String omitted : closure.omitted()) {
                 Assert.assertNotNull(index.get(omitted), name + " omitted an unresolvable name: " + omitted);
                 Assert.assertFalse(closure.names().contains(omitted),
                         name + " listed " + omitted + " as omitted and printed it too");
             }
-        }
-        // Not every fixture has a closure large enough to truncate, so this is a report rather than a floor —
-        // but `ballerina/http` does, and that is the case the budget was measured against.
-        if ("ballerina__http".equals(slug)) {
-            Assert.assertTrue(truncated > 0, "http's ClientConfiguration closure was 24,183 bytes unbounded");
         }
     }
 

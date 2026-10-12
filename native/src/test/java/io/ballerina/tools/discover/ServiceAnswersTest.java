@@ -121,8 +121,8 @@ public class ServiceAnswersTest {
         }
         String text = run(central("ballerina__http", false), "ballerina/http", "service", "--output", "text");
         Assert.assertTrue(text.contains("http:Listener\n  Service"), text);
-        Assert.assertTrue(text.contains("http:Listener — not confirmed (package source unavailable)\n"
-                + "  InterceptableService      1 normal\n"
+        Assert.assertTrue(text.contains("http:Listener — unverified (package source unavailable)\n"
+                + "  InterceptableService      1 method\n"
                 + "  RequestErrorInterceptor"), text);
     }
 
@@ -139,17 +139,17 @@ public class ServiceAnswersTest {
     public void aServiceTypeReachedThroughTypeSaysWhatTheServiceBucketSays() {
         HttpOptions http = central("ballerina__http", true);
         String through = json(http, "ballerina/http", "type", "RequestInterceptor").get("note").getAsString();
-        Assert.assertTrue(through.contains("not attachable to any listener this package declares"), through);
+        Assert.assertTrue(through.contains("no listener in this package accepts it directly"), through);
         String bound = json(http, "ballerina/http", "type", "InterceptableService").get("note").getAsString();
-        Assert.assertTrue(bound.contains("binds to http:Listener"), bound);
-        Assert.assertFalse(bound.contains("not confirmed"), bound);
+        Assert.assertTrue(bound.contains("attach it to http:Listener"), bound);
+        Assert.assertFalse(bound.contains("unverified"), bound);
     }
 
     @Test
     public void withoutTheSourceTheNoteSaysTheSourceWasUnavailable() {
         String note = json(central("ballerina__http", false), "ballerina/http", "service", "ServiceContract")
                 .get("note").getAsString();
-        Assert.assertTrue(note.contains("may bind to http:Listener — not confirmed: the package source"), note);
+        Assert.assertTrue(note.contains("probably attaches to http:Listener (unverified: the package source"), note);
     }
 
     @Test

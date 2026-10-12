@@ -8,14 +8,14 @@ compiles; a readme, a web search and a remembered API are not.
 Typical session:
 
   1. What can I ask?              bal discover ballerinax/github
-  2. A bucket, listed or one:     bal discover ballerinax/github client
+  2. List a bucket, or open one:  bal discover ballerinax/github client
                                   bal discover ballerinax/github client Client
   3. One call, fully addressed:   bal discover ballerinax/github client Client "gists/'public" get
   4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
   5. One specific version:        bal discover ballerina/http:2.15.7 client Client
 
-Buckets, addressed as the second positional: client, service, class, funcs, type,
-readme. No bucket lists which of them this package has.
+Buckets (the word after the package): client, service, class, funcs, type, readme.
+Leave it out to see which of them this package has.
 
 With no version after the package, the one your project's Dependencies.toml locks is
 read (found from the current directory up), else Central's latest.
@@ -24,17 +24,14 @@ Exit codes: 0 an answer, 1 a failure, 2 a usage error.
   --output json|text      Override the TTY-detected default: human text at an
                           interactive terminal, JSON otherwise.
   --filter <keyword>      Narrow an already-selected bucket to entries whose name,
-                          path, parameter or type matches this keyword, client-side.
-                          Never sent to Central as a query.
-  --page <n>              1-indexed. Turns the page of any listing over the entry
-                          ceiling: a roster, a level of path groups, methods,
-                          resource paths, a container listed by call form, the type
-                          declarations, documentation-only matches, and readme
-                          sections narrowed by --filter. A page outside the listing,
-                          or against an answer that does not page, is an error.
+                          path, parameter or type matches this keyword. Filtering is
+                          local; nothing is sent to Central.
+  --page <n>              Show page <n> (counting from 1) of a listing longer than
+                          40 entries. A page past the last one, or against an answer
+                          that has only one page, is an error.
   -m, --module <module>   Target this submodule instead of the package's default
-                          module, the same everywhere including readme. The bare
-                          submodule name only — <org>/<name> is always resolved as
-                          one literal, complete package coordinate.
+                          module, the same everywhere including readme. The
+                          submodule's name only (for example httpscerr), not
+                          <org>/<name>.<submodule>.
   --refresh               Ignore any cached copy and rewrite it. Worth passing only
                           when a name should exist and does not.

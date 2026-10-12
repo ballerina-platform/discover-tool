@@ -1,15 +1,15 @@
 == client ==
 ballerinax/postgresql · client · Client
-5 remote methods, 1 normal method
+5 remote methods, 1 method
 
-Remote (->)
+Remote methods (->)
   batchExecute
   call
   execute
   query
   queryRow
 
-Normal (.)
+Methods (.)
   close
 
 Next: bal discover ballerinax/postgresql client Client <name>
@@ -26,43 +26,43 @@ ballerinax/postgresql · class
   BitStringArrayValue
   BitStringValue
   BoxArrayValue
-  BoxOutParameter           1 normal
+  BoxOutParameter           1 method
   BoxValue
-  ByteaOutParameter         1 normal
+  ByteaOutParameter         1 method
   CidrArrayValue
-  CidrOutParameter          1 normal
+  CidrOutParameter          1 method
   CidrValue
   CircleArrayValue
-  CircleOutParameter        1 normal
+  CircleOutParameter        1 method
   CircleValue
-  CustomResultIterator      2 normal
+  CustomResultIterator      2 methods
   CustomTypeValue
   DateRangeArrayValue
-  DateRangeOutParameter     1 normal
+  DateRangeOutParameter     1 method
   DateRangeValue
-  EnumOutParameter          1 normal
+  EnumOutParameter          1 method
   EnumValue
   InetArrayValue
-  InetOutParameter          1 normal
+  InetOutParameter          1 method
   InetValue
-  InOutParameter            1 normal
+  InOutParameter            1 method
   IntegerRangeArrayValue
-  IntegerRangeOutParameter  1 normal
+  IntegerRangeOutParameter  1 method
   IntegerRangeValue
   IntervalArrayValue
-  IntervalOutParameter      1 normal
+  IntervalOutParameter      1 method
   IntervalValue
   JsonArrayValue
   JsonBinaryArrayValue
   JsonBinaryValue
-  JsonbOutParameter         1 normal
-  JsonOutParameter          1 normal
+  JsonbOutParameter         1 method
+  JsonOutParameter          1 method
   JsonPathArrayValue
-  JsonPathOutParameter      1 normal
+  JsonPathOutParameter      1 method
   JsonPathValue
   JsonValue
   LineArrayValue
-  LineOutParameter          1 normal
+  LineOutParameter          1 method
 
 ... 85 more (page 1 of 4)
 Next: bal discover ballerinax/postgresql class <name>
@@ -70,9 +70,9 @@ Next: bal discover ballerinax/postgresql class --page 2
 Next: bal discover ballerinax/postgresql class --filter <keyword>
 == funcs ==
 ballerinax/postgresql · funcs
-This package declares nothing in funcs.
+ballerinax/postgresql has no functions.
 
-Elsewhere
+Other buckets
   client     1  bal discover ballerinax/postgresql client
   service    1  bal discover ballerinax/postgresql service
   class    125  bal discover ballerinax/postgresql class

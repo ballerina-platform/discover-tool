@@ -38,20 +38,18 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The transitive type closure a leaf inlines, from a declaration or from a signature.
+ * The types a leaf inlines under its declaration or signature, one level deep.
  *
  * <p>Starting from a CALLABLE as well as from a declaration is what makes the common flow one call rather than two:
  * the real closure for github's cache DELETE includes {@code ActionsDeleteActionsCacheByKeyQueries} — the
  * included-record parameter whose FIELDS are the call's named arguments — which is the fact an agent needs to
  * write the call at all and which no signature line spells out.
  *
- * <p><b>BREADTH-FIRST, AND BOUNDED.</b> {@code ballerina/http}'s {@code ClientConfiguration} is 38 declarations
- * and 24,183 bytes unbounded. Breadth-first because a shallow field is likelier to be needed than a four-levels-deep
- * one, so a budget that truncates should truncate the far end. Every dropped name is NAMED rather than silently
- * missing, which keeps a truncated closure actionable: each one is a legal argument to {@code type}.
- *
- * <p><b>The roots are never dropped.</b> They are what was asked for, so they are charged before the budget is
- * consulted; a budget that could refuse the question is worse than a large answer.
+ * <p>What is inlined is decided per type, never by cutting a leaf short. The type asked for and every parameter's
+ * type are always printed, whatever their size, because a call cannot be written without them. Any other type —
+ * a return type, or one a printed declaration refers to — is printed only while it is no larger than
+ * {@link #INLINE_LIMIT_BYTES}. A class, client or service type is never inlined, since it is a surface of its own
+ * rather than data. Every type left out is NAMED, each one a legal argument to {@code type}.
  *
  * <p>Cross-package edges stop at the package boundary: {@code ballerina/http:ConnectionConfig} has a local closure
  * of one and fifteen external edges, so crossing would hide a cold fetch per edge inside an answer the caller
@@ -61,15 +59,10 @@ import java.util.regex.Pattern;
  */
 public final class Closure {
 
-    /**
-     * How many bytes a LEAF's closure may print — the declarations inlined under one fully-resolved result,
-     * whether a signature's or a declaration's own. It bounds a closure (how many types a result transitively
-     * names), unrelated to the entry ceiling on a listing.
-     */
-    public static final int LEAF_BYTES = 6_000;
+    /** The largest declaration, rendered, that is inlined when it is not a parameter's type or the one asked for. */
+    public static final int INLINE_LIMIT_BYTES = 6_000;
 
-    /** Every level. The depth argument exists for the one-level inlining a single-result view does. */
-    public static final int UNBOUNDED = Integer.MAX_VALUE;
+    private static final int LEAF_DEPTH = 1;
 
     /** Identifiers inside a rendered type expression. Builtins fall out by not being declarations. */
     private static final Pattern IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
@@ -78,7 +71,7 @@ public final class Closure {
     }
 
     /**
-     * A closure: the declarations to print, in walk order, and the ones the budget left out.
+     * The declarations to print, in walk order, and the ones left out.
      *
      * @param names every declaration to render, roots first
      * @param omitted names reached but not printed, each a legal {@code type} argument
@@ -97,37 +90,45 @@ public final class Closure {
     }
 
     /**
-     * The depth-1 closure a leaf inlines. An inclusion ({@code *T}) states that another record's fields ARE this
-     * one's, so it does not consume the depth: {@code ClientConfiguration}'s own field types would otherwise
-     * be hidden behind the records it includes.
+     * Where a root comes from, which decides whether it can be left out.
+     *
+     * @param asked the declarations the caller named: always printed, even a class
+     * @param parameters the types of a signature's parameters: always printed unless a class
+     * @param others the remaining roots, such as a return type: printed within {@link #INLINE_LIMIT_BYTES}
      */
-    public static Result leaf(List<String> roots, Declarations index) {
-        return of(roots, index, LEAF_BYTES, 1);
+    public record Roots(List<String> asked, List<String> parameters, List<String> others) {
+
+        public static Roots askedFor(List<String> names) {
+            return new Roots(names, List.of(), List.of());
+        }
     }
 
     /**
-     * The closure of a set of declaration names.
+     * The depth-1 closure a leaf inlines. An inclusion ({@code *T}) states that another record's fields ARE this
+     * one's, so it does not consume the depth and is printed whenever the record including it is:
+     * {@code ClientConfiguration}'s own field types would otherwise be hidden behind the records it includes.
      *
      * <p>The visited set is what makes it terminate on a cycle, and real packages have them — a record whose
      * field is an array of itself is ordinary.
      */
-    public static Result of(List<String> roots, Declarations index, int budgetBytes, int maxDepth) {
+    public static Result leaf(Roots roots, Declarations index) {
         Set<String> visited = new LinkedHashSet<>();
         List<String> order = new ArrayList<>();
         Set<String> omitted = new LinkedHashSet<>();
         Deque<Step> queue = new ArrayDeque<>();
 
-        for (String root : roots) {
+        for (String root : roots.asked()) {
             if (index.get(root) != null && visited.add(root)) {
                 order.add(root);
-                queue.add(new Step(root, 0));
+                queue.add(new Step(root, 0, true));
             }
         }
-        int spent = order.stream().mapToInt(name -> cost(name, index)).sum();
+        admit(roots.parameters(), true, index, visited, order, omitted, queue);
+        admit(roots.others(), false, index, visited, order, omitted, queue);
 
         while (!queue.isEmpty()) {
             Step step = queue.removeFirst();
-            if (step.depth() >= maxDepth) {
+            if (step.depth() >= LEAF_DEPTH) {
                 continue;
             }
             Set<String> included = inclusionsOf(index.get(step.name()));
@@ -135,15 +136,15 @@ public final class Closure {
                 if (visited.contains(referenced)) {
                     continue;
                 }
-                int size = cost(referenced, index);
-                if (spent + size > budgetBytes) {
+                boolean inclusion = included.contains(referenced);
+                if (!admits(referenced, step.unlimited() && inclusion, index)) {
                     omitted.add(referenced);
                     continue;
                 }
                 visited.add(referenced);
-                spent += size;
                 order.add(referenced);
-                queue.add(new Step(referenced, included.contains(referenced) ? step.depth() : step.depth() + 1));
+                queue.add(new Step(referenced, inclusion ? step.depth() : step.depth() + 1,
+                        step.unlimited() && inclusion));
             }
         }
         // A name reached late may also have been printed early on another branch; the omission list is what the
@@ -152,23 +153,46 @@ public final class Closure {
         return new Result(List.copyOf(order), List.copyOf(omitted));
     }
 
-    private record Step(String name, int depth) { }
-
-    private static int cost(String name, Declarations index) {
-        TypeDef typeDef = index.get(name);
-        return typeDef == null ? 0 : Texts.byteLength(TypeDefs.renderTypeDef(typeDef)) + 2;
+    private static void admit(
+            List<String> names, boolean unlimited, Declarations index, Set<String> visited, List<String> order,
+            Set<String> omitted, Deque<Step> queue) {
+        for (String name : names) {
+            if (index.get(name) == null || visited.contains(name)) {
+                continue;
+            }
+            if (!admits(name, unlimited, index)) {
+                omitted.add(name);
+                continue;
+            }
+            visited.add(name);
+            order.add(name);
+            queue.add(new Step(name, 0, unlimited));
+        }
     }
 
-    /** The same-package declarations a signature names — its parameters' types and its return's. */
-    public static List<String> rootsOf(Fn fn, Declarations index) {
-        List<String> roots = new ArrayList<>();
+    private static boolean admits(String name, boolean unlimited, Declarations index) {
+        TypeDef typeDef = index.get(name);
+        if (typeDef instanceof TypeDef.ObjectDef) {
+            return false;
+        }
+        return unlimited || Texts.byteLength(TypeDefs.renderTypeDef(typeDef)) <= INLINE_LIMIT_BYTES;
+    }
+
+    private record Step(String name, int depth, boolean unlimited) { }
+
+    /** The same-package declarations a signature names, its parameters' types apart from its return's. */
+    public static Roots rootsOf(Fn fn, Declarations index) {
+        List<String> parameters = new ArrayList<>();
         for (Param param : fn.params()) {
-            addLocalNames(param.type(), index, roots);
+            addLocalNames(param.type(), index, parameters);
         }
+        List<String> others = new ArrayList<>();
         if (fn.returns().hasType()) {
-            addLocalNames(fn.returns().type(), index, roots);
+            addLocalNames(fn.returns().type(), index, others);
         }
-        return List.copyOf(new LinkedHashSet<>(roots));
+        others.removeAll(parameters);
+        return new Roots(List.of(), List.copyOf(new LinkedHashSet<>(parameters)),
+                List.copyOf(new LinkedHashSet<>(others)));
     }
 
     /** The same-package declarations one type expression names, for a declaration that has no signature. */

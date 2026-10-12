@@ -28,23 +28,23 @@ ballerinax/googleapis.gmail · client · Client
 Next: bal discover ballerinax/googleapis.gmail client Client <path> <accessor>
 == service ==
 ballerinax/googleapis.gmail · service
-This package declares nothing in service.
+ballerinax/googleapis.gmail has no service types.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/googleapis.gmail client
   type    39  bal discover ballerinax/googleapis.gmail type
 == class ==
 ballerinax/googleapis.gmail · class
-This package declares nothing in class.
+ballerinax/googleapis.gmail has no classes.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/googleapis.gmail client
   type    39  bal discover ballerinax/googleapis.gmail type
 == funcs ==
 ballerinax/googleapis.gmail · funcs
-This package declares nothing in funcs.
+ballerinax/googleapis.gmail has no functions.
 
-Elsewhere
+Other buckets
   client   1  bal discover ballerinax/googleapis.gmail client
   type    39  bal discover ballerinax/googleapis.gmail type
 == type ==

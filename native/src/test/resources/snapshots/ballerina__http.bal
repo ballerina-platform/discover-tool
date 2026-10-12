@@ -10,7 +10,7 @@ import ballerina/http;
 public type Accepted record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusAccepted status = STATUS_ACCEPTED_OBJ; // the default STATUS_ACCEPTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusAccepted status = STATUS_ACCEPTED_OBJ; // the default STATUS_ACCEPTED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents HTTP access log configuration.
@@ -32,21 +32,21 @@ public type AccessLogConfiguration record {|
 public type AlreadyReported record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusAlreadyReported status = STATUS_ALREADY_REPORTED_OBJ; // the default STATUS_ALREADY_REPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusAlreadyReported status = STATUS_ALREADY_REPORTED_OBJ; // the default STATUS_ALREADY_REPORTED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `BadGateway`.
 public type BadGateway record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusBadGateway status = STATUS_BAD_GATEWAY_OBJ; // the default STATUS_BAD_GATEWAY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusBadGateway status = STATUS_BAD_GATEWAY_OBJ; // the default STATUS_BAD_GATEWAY_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `BadRequest`.
 public type BadRequest record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusBadRequest status = STATUS_BAD_REQUEST_OBJ; // the default STATUS_BAD_REQUEST_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusBadRequest status = STATUS_BAD_REQUEST_OBJ; // the default STATUS_BAD_REQUEST_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents token for Bearer token authentication.
@@ -279,14 +279,14 @@ public type CompressionConfig record {|
 public type Conflict record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusConflict status = STATUS_CONFLICT_OBJ; // the default STATUS_CONFLICT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusConflict status = STATUS_CONFLICT_OBJ; // the default STATUS_CONFLICT_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `Continue`.
 public type Continue record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusContinue status = STATUS_CONTINUE_OBJ; // the default STATUS_CONTINUE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusContinue status = STATUS_CONTINUE_OBJ; // the default STATUS_CONTINUE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Client configuration for cookies.
@@ -346,7 +346,7 @@ public type CorsConfig record {|
 public type Created record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusCreated status = STATUS_CREATED_OBJ; // the default STATUS_CREATED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusCreated status = STATUS_CREATED_OBJ; // the default STATUS_CREATED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents credentials for Basic Auth authentication.
@@ -375,7 +375,7 @@ public type Detail record {
 public type EarlyHints record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusEarlyHints status = STATUS_EARLY_HINTS_OBJ; // the default STATUS_EARLY_HINTS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusEarlyHints status = STATUS_EARLY_HINTS_OBJ; // the default STATUS_EARLY_HINTS_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents the structure of the HTTP error payload.
@@ -398,14 +398,14 @@ public type ErrorPayload record {
 public type ExpectationFailed record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusExpectationFailed status = STATUS_EXPECTATION_FAILED_OBJ; // the default STATUS_EXPECTATION_FAILED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusExpectationFailed status = STATUS_EXPECTATION_FAILED_OBJ; // the default STATUS_EXPECTATION_FAILED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `FailedDependency`.
 public type FailedDependency record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusFailedDependency status = STATUS_FAILED_DEPENDENCY_OBJ; // the default STATUS_FAILED_DEPENDENCY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusFailedDependency status = STATUS_FAILED_DEPENDENCY_OBJ; // the default STATUS_FAILED_DEPENDENCY_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Provides a set of HTTP related configurations and failover related configurations.
@@ -450,28 +450,28 @@ public type FollowRedirects record {|
 public type Forbidden record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusForbidden status = STATUS_FORBIDDEN_OBJ; // the default STATUS_FORBIDDEN_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusForbidden status = STATUS_FORBIDDEN_OBJ; // the default STATUS_FORBIDDEN_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `Found`.
 public type Found record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusFound status = STATUS_FOUND_OBJ; // the default STATUS_FOUND_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusFound status = STATUS_FOUND_OBJ; // the default STATUS_FOUND_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `GatewayTimeout`.
 public type GatewayTimeout record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusGatewayTimeout status = STATUS_GATEWAY_TIMEOUT_OBJ; // the default STATUS_GATEWAY_TIMEOUT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusGatewayTimeout status = STATUS_GATEWAY_TIMEOUT_OBJ; // the default STATUS_GATEWAY_TIMEOUT_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `Gone`.
 public type Gone record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusGone status = STATUS_GONE_OBJ; // the default STATUS_GONE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusGone status = STATUS_GONE_OBJ; // the default STATUS_GONE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents the parsed header value details
@@ -589,14 +589,14 @@ public type HttpServiceConfig record {|
 public type HttpVersionNotSupported record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusHttpVersionNotSupported status = STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ; // the default STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusHttpVersionNotSupported status = STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ; // the default STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `IMUsed`.
 public type IMUsed record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusIMUsed status = STATUS_IM_USED_OBJ; // the default STATUS_IM_USED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusIMUsed status = STATUS_IM_USED_OBJ; // the default STATUS_IM_USED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Provides a set of cloneable configurations for HTTP listener.
@@ -623,14 +623,14 @@ public type InferredListenerConfiguration record {|
 public type InsufficientStorage record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusInsufficientStorage status = STATUS_INSUFFICIENT_STORAGE_OBJ; // the default STATUS_INSUFFICIENT_STORAGE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusInsufficientStorage status = STATUS_INSUFFICIENT_STORAGE_OBJ; // the default STATUS_INSUFFICIENT_STORAGE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `InternalServerError`.
 public type InternalServerError record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusInternalServerError status = STATUS_INTERNAL_SERVER_ERROR_OBJ; // the default STATUS_INTERNAL_SERVER_ERROR_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusInternalServerError status = STATUS_INTERNAL_SERVER_ERROR_OBJ; // the default STATUS_INTERNAL_SERVER_ERROR_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents JWT issuer configurations for JWT authentication.
@@ -670,7 +670,7 @@ public type LdapUserStoreConfigWithScopes record {|
 public type LengthRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusLengthRequired status = STATUS_LENGTH_REQUIRED_OBJ; // the default STATUS_LENGTH_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusLengthRequired status = STATUS_LENGTH_REQUIRED_OBJ; // the default STATUS_LENGTH_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents a server-provided hyperlink
@@ -742,7 +742,7 @@ public type ListenerHttp1Settings record {|
     # Defines the maximum number of requests that can be processed at a given time on a single
     # connection. By default 10 requests can be pipelined on a single connection and user can
     # change this limit appropriately.
-    int maxPipelinedRequests = MAX_PIPELINED_REQUESTS; // the default MAX_PIPELINED_REQUESTS is not exported by this package; omit the argument rather than repeating it
+    int maxPipelinedRequests = MAX_PIPELINED_REQUESTS; // the default MAX_PIPELINED_REQUESTS is not exported by this package; leave the field out rather than writing it
 |};
 
 # Configures the SSL/TLS options to be used for HTTP service.
@@ -803,7 +803,7 @@ public type Local record {|
 public type Locked record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusLocked status = STATUS_LOCKED_OBJ; // the default STATUS_LOCKED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusLocked status = STATUS_LOCKED_OBJ; // the default STATUS_LOCKED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents HTTP access log file configuration.
@@ -818,42 +818,42 @@ public type LogFileConfig record {|
 public type LoopDetected record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusLoopDetected status = STATUS_LOOP_DETECTED_OBJ; // the default STATUS_LOOP_DETECTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusLoopDetected status = STATUS_LOOP_DETECTED_OBJ; // the default STATUS_LOOP_DETECTED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `MethodNotAllowed`.
 public type MethodNotAllowed record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMethodNotAllowed status = STATUS_METHOD_NOT_ALLOWED_OBJ; // the default STATUS_METHOD_NOT_ALLOWED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMethodNotAllowed status = STATUS_METHOD_NOT_ALLOWED_OBJ; // the default STATUS_METHOD_NOT_ALLOWED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `MisdirectedRequest`.
 public type MisdirectedRequest record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMisdirectedRequest status = STATUS_MISDIRECTED_REQUEST_OBJ; // the default STATUS_MISDIRECTED_REQUEST_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMisdirectedRequest status = STATUS_MISDIRECTED_REQUEST_OBJ; // the default STATUS_MISDIRECTED_REQUEST_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `MovedPermanently`.
 public type MovedPermanently record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMovedPermanently status = STATUS_MOVED_PERMANENTLY_OBJ; // the default STATUS_MOVED_PERMANENTLY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMovedPermanently status = STATUS_MOVED_PERMANENTLY_OBJ; // the default STATUS_MOVED_PERMANENTLY_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `MultipleChoices`.
 public type MultipleChoices record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMultipleChoices status = STATUS_MULTIPLE_CHOICES_OBJ; // the default STATUS_MULTIPLE_CHOICES_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMultipleChoices status = STATUS_MULTIPLE_CHOICES_OBJ; // the default STATUS_MULTIPLE_CHOICES_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `MultiStatus`.
 public type MultiStatus record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusMultiStatus status = STATUS_MULTI_STATUS_OBJ; // the default STATUS_MULTI_STATUS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusMultiStatus status = STATUS_MULTI_STATUS_OBJ; // the default STATUS_MULTI_STATUS_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # A record for providing mutual SSL handshake results.
@@ -868,7 +868,7 @@ public type MutualSslHandshake record {|
 public type NetworkAuthenticationRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `NetworkAuthorizationRequired`.
@@ -878,7 +878,7 @@ public type NetworkAuthorizationRequired record {|
     # The response status code obj
     # # Deprecated
     # This record is deprecated. Please use `NetworkAuthenticationRequired` instead.
-    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `NoContent`.
@@ -886,49 +886,49 @@ public type NoContent record {|
     # The response headers
     map<string|int|boolean|string[]|int[]|boolean[]> headers?;
     # The response status code obj
-    readonly StatusNoContent status = STATUS_NO_CONTENT_OBJ; // the default STATUS_NO_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNoContent status = STATUS_NO_CONTENT_OBJ; // the default STATUS_NO_CONTENT_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `NonAuthoritativeInformation`.
 public type NonAuthoritativeInformation record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNonAuthoritativeInformation status = STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ; // the default STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNonAuthoritativeInformation status = STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ; // the default STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `NotAcceptable`.
 public type NotAcceptable record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotAcceptable status = STATUS_NOT_ACCEPTABLE_OBJ; // the default STATUS_NOT_ACCEPTABLE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotAcceptable status = STATUS_NOT_ACCEPTABLE_OBJ; // the default STATUS_NOT_ACCEPTABLE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `NotExtended`.
 public type NotExtended record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotExtended status = STATUS_NOT_EXTENDED_OBJ; // the default STATUS_NOT_EXTENDED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotExtended status = STATUS_NOT_EXTENDED_OBJ; // the default STATUS_NOT_EXTENDED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `NotFound`.
 public type NotFound record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotFound status = STATUS_NOT_FOUND_OBJ; // the default STATUS_NOT_FOUND_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotFound status = STATUS_NOT_FOUND_OBJ; // the default STATUS_NOT_FOUND_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `NotImplemented`.
 public type NotImplemented record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotImplemented status = STATUS_NOT_IMPLEMENTED_OBJ; // the default STATUS_NOT_IMPLEMENTED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotImplemented status = STATUS_NOT_IMPLEMENTED_OBJ; // the default STATUS_NOT_IMPLEMENTED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `NotModified`.
 public type NotModified record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusNotModified status = STATUS_NOT_MODIFIED_OBJ; // the default STATUS_NOT_MODIFIED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusNotModified status = STATUS_NOT_MODIFIED_OBJ; // the default STATUS_NOT_MODIFIED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents OAuth2 client credentials grant configurations for OAuth2 authentication.
@@ -970,35 +970,35 @@ public type OAuth2RefreshTokenGrantConfig record {|
 public type Ok record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusOK status = STATUS_OK_OBJ; // the default STATUS_OK_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusOK status = STATUS_OK_OBJ; // the default STATUS_OK_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `PartialContent`.
 public type PartialContent record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPartialContent status = STATUS_PARTIAL_CONTENT_OBJ; // the default STATUS_PARTIAL_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPartialContent status = STATUS_PARTIAL_CONTENT_OBJ; // the default STATUS_PARTIAL_CONTENT_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `PayloadTooLarge`.
 public type PayloadTooLarge record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPayloadTooLarge status = STATUS_PAYLOAD_TOO_LARGE_OBJ; // the default STATUS_PAYLOAD_TOO_LARGE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPayloadTooLarge status = STATUS_PAYLOAD_TOO_LARGE_OBJ; // the default STATUS_PAYLOAD_TOO_LARGE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `PaymentRequired`.
 public type PaymentRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPaymentRequired status = STATUS_PAYMENT_REQUIRED_OBJ; // the default STATUS_PAYMENT_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPaymentRequired status = STATUS_PAYMENT_REQUIRED_OBJ; // the default STATUS_PAYMENT_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `PermanentRedirect`.
 public type PermanentRedirect record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPermanentRedirect status = STATUS_PERMANENT_REDIRECT_OBJ; // the default STATUS_PERMANENT_REDIRECT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPermanentRedirect status = STATUS_PERMANENT_REDIRECT_OBJ; // the default STATUS_PERMANENT_REDIRECT_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Configurations for managing HTTP client connection pool.
@@ -1028,28 +1028,28 @@ public type PoolConfiguration record {|
 public type PreconditionFailed record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPreconditionFailed status = STATUS_PRECONDITION_FAILED_OBJ; // the default STATUS_PRECONDITION_FAILED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPreconditionFailed status = STATUS_PRECONDITION_FAILED_OBJ; // the default STATUS_PRECONDITION_FAILED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `PreconditionRequired`.
 public type PreconditionRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusPreconditionRequired status = STATUS_PRECONDITION_REQUIRED_OBJ; // the default STATUS_PRECONDITION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusPreconditionRequired status = STATUS_PRECONDITION_REQUIRED_OBJ; // the default STATUS_PRECONDITION_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `Processing`.
 public type Processing record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusProcessing status = STATUS_PROCESSING_OBJ; // the default STATUS_PROCESSING_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusProcessing status = STATUS_PROCESSING_OBJ; // the default STATUS_PROCESSING_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `ProxyAuthenticationRequired`.
 public type ProxyAuthenticationRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusProxyAuthenticationRequired status = STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusProxyAuthenticationRequired status = STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Proxy server configurations to be used with the HTTP client endpoint.
@@ -1081,7 +1081,7 @@ public type QueryParams record {|
 public type RangeNotSatisfiable record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusRangeNotSatisfiable status = STATUS_RANGE_NOT_SATISFIABLE_OBJ; // the default STATUS_RANGE_NOT_SATISFIABLE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusRangeNotSatisfiable status = STATUS_RANGE_NOT_SATISFIABLE_OBJ; // the default STATUS_RANGE_NOT_SATISFIABLE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Presents a read-only view of the remote address.
@@ -1098,7 +1098,7 @@ public type Remote record {|
 public type RequestHeaderFieldsTooLarge record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusRequestHeaderFieldsTooLarge status = STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ; // the default STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusRequestHeaderFieldsTooLarge status = STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ; // the default STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Provides inbound request URI, total header and entity body size threshold configurations.
@@ -1120,14 +1120,14 @@ public type RequestLimitConfigs record {|
 public type RequestTimeout record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusRequestTimeout status = STATUS_REQUEST_TIMEOUT_OBJ; // the default STATUS_REQUEST_TIMEOUT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusRequestTimeout status = STATUS_REQUEST_TIMEOUT_OBJ; // the default STATUS_REQUEST_TIMEOUT_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `ResetContent`.
 public type ResetContent record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusResetContent status = STATUS_RESET_CONTENT_OBJ; // the default STATUS_RESET_CONTENT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusResetContent status = STATUS_RESET_CONTENT_OBJ; // the default STATUS_RESET_CONTENT_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Provides inbound response status line, total header and entity body size threshold configurations.
@@ -1176,7 +1176,7 @@ public type Scopes record {|
 public type SeeOther record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusSeeOther status = STATUS_SEE_OTHER_OBJ; // the default STATUS_SEE_OTHER_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusSeeOther status = STATUS_SEE_OTHER_OBJ; // the default STATUS_SEE_OTHER_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Provides settings related to server socket configuration.
@@ -1190,7 +1190,7 @@ public type ServerSocketConfig record {|
 public type ServiceUnavailable record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusServiceUnavailable status = STATUS_SERVICE_UNAVAILABLE_OBJ; // the default STATUS_SERVICE_UNAVAILABLE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusServiceUnavailable status = STATUS_SERVICE_UNAVAILABLE_OBJ; // the default STATUS_SERVICE_UNAVAILABLE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents a Server Sent Event emitted from a service.
@@ -1228,7 +1228,7 @@ public type StatusCodeRecord record {|
 public type SwitchingProtocols record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusSwitchingProtocols status = STATUS_SWITCHING_PROTOCOLS_OBJ; // the default STATUS_SWITCHING_PROTOCOLS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusSwitchingProtocols status = STATUS_SWITCHING_PROTOCOLS_OBJ; // the default STATUS_SWITCHING_PROTOCOLS_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents a single service and its related configurations.
@@ -1243,21 +1243,21 @@ public type TargetService record {|
 public type TemporaryRedirect record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusTemporaryRedirect status = STATUS_TEMPORARY_REDIRECT_OBJ; // the default STATUS_TEMPORARY_REDIRECT_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusTemporaryRedirect status = STATUS_TEMPORARY_REDIRECT_OBJ; // the default STATUS_TEMPORARY_REDIRECT_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `TooEarly`.
 public type TooEarly record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusTooEarly status = STATUS_TOO_EARLY_OBJ; // the default STATUS_TOO_EARLY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusTooEarly status = STATUS_TOO_EARLY_OBJ; // the default STATUS_TOO_EARLY_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `TooManyRequests`.
 public type TooManyRequests record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusTooManyRequests status = STATUS_TOO_MANY_REQUESTS_OBJ; // the default STATUS_TOO_MANY_REQUESTS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusTooManyRequests status = STATUS_TOO_MANY_REQUESTS_OBJ; // the default STATUS_TOO_MANY_REQUESTS_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents HTTP trace log configuration.
@@ -1279,56 +1279,56 @@ public type TraceLogAdvancedConfiguration record {|
 public type Unauthorized record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUnauthorized status = STATUS_UNAUTHORIZED_OBJ; // the default STATUS_UNAUTHORIZED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUnauthorized status = STATUS_UNAUTHORIZED_OBJ; // the default STATUS_UNAUTHORIZED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `UnavailableDueToLegalReasons`.
 public type UnavailableDueToLegalReasons record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUnavailableDueToLegalReasons status = STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ; // the default STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUnavailableDueToLegalReasons status = STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ; // the default STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `UnprocessableEntity`.
 public type UnprocessableEntity record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUnprocessableEntity status = STATUS_UNPROCESSABLE_ENTITY_OBJ; // the default STATUS_UNPROCESSABLE_ENTITY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUnprocessableEntity status = STATUS_UNPROCESSABLE_ENTITY_OBJ; // the default STATUS_UNPROCESSABLE_ENTITY_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `UnsupportedMediaType`.
 public type UnsupportedMediaType record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUnsupportedMediaType status = STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ; // the default STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUnsupportedMediaType status = STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ; // the default STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `UpgradeRequired`.
 public type UpgradeRequired record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUpgradeRequired status = STATUS_UPGRADE_REQUIRED_OBJ; // the default STATUS_UPGRADE_REQUIRED_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUpgradeRequired status = STATUS_UPGRADE_REQUIRED_OBJ; // the default STATUS_UPGRADE_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `UriTooLong`.
 public type UriTooLong record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUriTooLong status = STATUS_URI_TOO_LONG_OBJ; // the default STATUS_URI_TOO_LONG_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUriTooLong status = STATUS_URI_TOO_LONG_OBJ; // the default STATUS_URI_TOO_LONG_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `UseProxy`.
 public type UseProxy record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusUseProxy status = STATUS_USE_PROXY_OBJ; // the default STATUS_USE_PROXY_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusUseProxy status = STATUS_USE_PROXY_OBJ; // the default STATUS_USE_PROXY_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # The status code response record of `VariantAlsoNegotiates`.
 public type VariantAlsoNegotiates record {|
     *CommonResponse;
     # The response status code obj
-    readonly StatusVariantAlsoNegotiates status = STATUS_VARIANT_ALSO_NEGOTIATES_OBJ; // the default STATUS_VARIANT_ALSO_NEGOTIATES_OBJ is not exported by this package; omit the argument rather than repeating it
+    readonly StatusVariantAlsoNegotiates status = STATUS_VARIANT_ALSO_NEGOTIATES_OBJ; // the default STATUS_VARIANT_ALSO_NEGOTIATES_OBJ is not exported by this package; leave the field out rather than writing it
 |};
 
 # Represents a client error that occurred due to all the load balance endpoint failure.

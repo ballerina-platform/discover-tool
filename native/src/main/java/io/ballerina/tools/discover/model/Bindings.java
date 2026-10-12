@@ -87,8 +87,7 @@ public final class Bindings {
                 "listener publishes no attach()"),
         UNNAMED_ATTACH_TARGET("the listener's attach() takes no named service type to pair with",
                 "attach() names no service type"),
-        SOURCE_UNAVAILABLE("the package source, which shows which service types include the listener's attach() "
-                + "type, was unavailable", "package source unavailable"),
+        SOURCE_UNAVAILABLE("the package source could not be read", "package source unavailable"),
         NONE(null, null);
 
         private final String reason;

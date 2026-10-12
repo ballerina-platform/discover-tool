@@ -49,23 +49,23 @@ Next: bal discover ballerinax/twilio client Client --page 2
 Next: bal discover ballerinax/twilio client Client --filter <keyword>
 == service ==
 ballerinax/twilio · service
-This package declares nothing in service.
+ballerinax/twilio has no service types.
 
-Elsewhere
+Other buckets
   client    1  bal discover ballerinax/twilio client
   type    279  bal discover ballerinax/twilio type
 == class ==
 ballerinax/twilio · class
-This package declares nothing in class.
+ballerinax/twilio has no classes.
 
-Elsewhere
+Other buckets
   client    1  bal discover ballerinax/twilio client
   type    279  bal discover ballerinax/twilio type
 == funcs ==
 ballerinax/twilio · funcs
-This package declares nothing in funcs.
+ballerinax/twilio has no functions.
 
-Elsewhere
+Other buckets
   client    1  bal discover ballerinax/twilio client
   type    279  bal discover ballerinax/twilio type
 == type ==

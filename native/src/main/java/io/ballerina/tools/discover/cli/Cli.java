@@ -281,7 +281,7 @@ public final class Cli {
     private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
         String command = coordinate.command(root.module) + tail(rest(root), filter, FIRST_PAGE);
         return new Failure.Validation(
-                "Page " + root.page + " is out of range: this answer is not paged.",
+                "This answer has only one page, so --page does not apply.",
                 "Drop --page: " + Failure.quoted(command) + ".", command);
     }
 

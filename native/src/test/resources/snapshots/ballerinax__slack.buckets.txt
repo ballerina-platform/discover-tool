@@ -2,7 +2,7 @@
 ballerinax/slack · client · Client
 174 path groups
 
-Groups (operations under each)
+Path groups (resource methods in each)
   admin.apps.approve                                        1
   admin.apps.approved.list                                  1
   admin.apps.requests.list                                  1
@@ -50,23 +50,23 @@ Next: bal discover ballerinax/slack client Client --page 2
 Next: bal discover ballerinax/slack client Client --filter <keyword>
 == service ==
 ballerinax/slack · service
-This package declares nothing in service.
+ballerinax/slack has no service types.
 
-Elsewhere
+Other buckets
   client    1  bal discover ballerinax/slack client
   type    507  bal discover ballerinax/slack type
 == class ==
 ballerinax/slack · class
-This package declares nothing in class.
+ballerinax/slack has no classes.
 
-Elsewhere
+Other buckets
   client    1  bal discover ballerinax/slack client
   type    507  bal discover ballerinax/slack type
 == funcs ==
 ballerinax/slack · funcs
-This package declares nothing in funcs.
+ballerinax/slack has no functions.
 
-Elsewhere
+Other buckets
   client    1  bal discover ballerinax/slack client
   type    507  bal discover ballerinax/slack type
 == type ==

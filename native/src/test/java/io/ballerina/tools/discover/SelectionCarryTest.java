@@ -321,7 +321,7 @@ public class SelectionCarryTest {
         JsonObject second = middle.json();
         Assert.assertFalse(second.has("resources"), second.toString());
         Assert.assertEquals(second.getAsJsonObject("counts").toString(),
-                "{\"resources\":1,\"remote\":60,\"normal\":30}", "page 2 still names every form it does not hold");
+                "{\"resources\":7,\"remote\":60,\"normal\":30}", "page 2 still names every form it does not hold");
         Assert.assertEquals(strings(second, "remote").size(), 21, second.toString());
         Assert.assertEquals(strings(second, "normal").size(), 19, second.toString());
         Assert.assertEquals(second.get("next").getAsString(), HTTP + " --page 3");
@@ -342,8 +342,8 @@ public class SelectionCarryTest {
         Assert.assertEquals(normal.stream().distinct().count(), 30L, "a page repeated or skipped an entry");
 
         Run text = run(http, HTTP + " --page 2 --output text");
-        Assert.assertTrue(text.out().contains("\n\nRemote (->)\n  "), text.out());
-        Assert.assertTrue(text.out().contains("\n\nNormal (.)\n  "), text.out());
+        Assert.assertTrue(text.out().contains("\n\nRemote methods (->)\n  "), text.out());
+        Assert.assertTrue(text.out().contains("\n\nMethods (.)\n  "), text.out());
         Assert.assertTrue(text.out().contains("\n... 11 more (page 2 of 3)\nNext: " + HTTP + " <name>\nNext: " + HTTP
                 + " --page 3"), text.out());
     }
@@ -398,7 +398,7 @@ public class SelectionCarryTest {
 
         Run text = run("ballerinax__redis", command + " --output text");
         Assert.assertTrue(text.out().startsWith(
-                "ballerinax/redis:0.0.0-fixture · client · Client\n111 remote methods, 1 normal method\n"), text.out());
+                "ballerinax/redis:0.0.0-fixture · client · Client\n111 remote methods, 1 method\n"), text.out());
     }
 
     /**
@@ -431,8 +431,9 @@ public class SelectionCarryTest {
         Assert.assertEquals(documented.stream().distinct().count(), 102L, "a page repeated or skipped a name");
 
         Run text = run("ballerinax__redis", command + " --output text");
-        Assert.assertTrue(text.out().contains("\nMatched by documentation only (40 of 102)\n"), text.out());
-        Assert.assertTrue(text.out().endsWith("\n... 62 more matched by documentation only (page 1 of 3)\n"
+        Assert.assertTrue(text.out().contains("\nMentioned only in their documentation (40 of 102)\n"), text.out());
+        Assert.assertTrue(text.out().endsWith(
+                "\n... 62 more that mention it only in their documentation (page 1 of 3)\n"
                 + "Next: bal discover ballerinax/redis client Client <name>\nNext: " + command + " --page 2\n"),
                 text.out());
     }
@@ -521,9 +522,9 @@ public class SelectionCarryTest {
                 "page 2 widened back out to the whole bucket");
     }
 
-    /** A path with several accessors is one resource path, not one per accessor, in a roster as in a listing. */
+    /** A roster counts resource methods, one per path and accessor, as the listing it opens does. */
     @Test
-    public void aRosterCountsResourcePathsNotOperations() {
+    public void aRosterCountsResourceMethodsAsTheListingItOpensDoes() {
         JsonObject roster = answer("ballerina__http", "bal discover ballerina/http client");
         for (JsonElement element : roster.getAsJsonArray("containers")) {
             JsonObject container = element.getAsJsonObject();
