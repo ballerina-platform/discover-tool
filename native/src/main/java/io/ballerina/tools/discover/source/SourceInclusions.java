@@ -66,7 +66,7 @@ public final class SourceInclusions {
      * Which derivation produced a cached answer. Bumped whenever what {@link #parse} records changes, so an answer
      * an older reader cached is never served in place of what this one would derive.
      */
-    public static final String DERIVATION = "4";
+    public static final String DERIVATION = "5";
 
     private static final String INCLUSIONS = "inclusions";
     private static final String INLINE_RECORDS = "inlineRecords";

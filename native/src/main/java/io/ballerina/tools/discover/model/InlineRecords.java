@@ -35,11 +35,15 @@ import java.util.Optional;
  *
  * @since 0.1.0
  */
-@FunctionalInterface
 public interface InlineRecords {
 
     /** No source was read: every inline record stays as the payload describes it. */
-    InlineRecords NONE = names -> Optional.empty();
+    InlineRecords NONE = new InlineRecords() {
+        @Override
+        public Optional<Map<String, Member>> recover(Collection<String> fieldNames) {
+            return Optional.empty();
+        }
+    };
 
     /**
      * @param optional whether the field is declared with {@code ?}
@@ -49,6 +53,10 @@ public interface InlineRecords {
 
     /** The members by field name for the inline record declaring exactly {@code fieldNames}, when known. */
     Optional<Map<String, Member>> recover(Collection<String> fieldNames);
+
+    /** Called with each inline record that has members, as the library spells it, whether or not it was recovered. */
+    default void produced(String record) {
+    }
 
     /**
      * Inline records as a module's source declares them.

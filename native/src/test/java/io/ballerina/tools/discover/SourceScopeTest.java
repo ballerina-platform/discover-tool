@@ -18,6 +18,8 @@
 
 package io.ballerina.tools.discover;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.cli.Cli;
 import org.testng.Assert;
@@ -41,7 +43,10 @@ public class SourceScopeTest {
     private static final String VERSION_ENTRY = "/registry/packages/ballerina/http/2.16.6";
 
     private static FakeTransport central(List<String> sourceRequests) {
-        String docs = FixtureCorpus.loadRawFixture("ballerina__http").toString();
+        return central(sourceRequests, FixtureCorpus.loadRawFixture("ballerina__http").toString());
+    }
+
+    private static FakeTransport central(List<String> sourceRequests, String docs) {
         return FakeTransport.routing(url -> {
             if (url.contains("/docs/")) {
                 return FakeTransport.ok(docs);
@@ -58,8 +63,12 @@ public class SourceScopeTest {
     }
 
     private static List<String> sourceRequestsOf(List<String> argv) {
+        return sourceRequestsOf(argv, FixtureCorpus.loadRawFixture("ballerina__http").toString());
+    }
+
+    private static List<String> sourceRequestsOf(List<String> argv, String docs) {
         List<String> requests = new ArrayList<>();
-        HttpOptions http = HttpOptions.builder().transport(central(requests)).baseDelayMs(1)
+        HttpOptions http = HttpOptions.builder().transport(central(requests, docs)).baseDelayMs(1)
                 .sleeper(millis -> {
                 })
                 .build();
@@ -90,6 +99,8 @@ public class SourceScopeTest {
                 {List.of("ballerina/http", "client", "Client")},
                 {List.of("ballerina/http", "class")},
                 {List.of("ballerina/http", "funcs")},
+                {List.of("ballerina/http", "type", "CredentialsConfig")},
+                {List.of("ballerina/http", "type", "ClientAuthConfig")},
         };
     }
 
@@ -97,6 +108,18 @@ public class SourceScopeTest {
     @Test(dataProvider = "answersWithoutInlineRecords")
     public void anAnswerPrintingNoInlineRecordNeverReadsTheSource(List<String> argv) {
         Assert.assertEquals(sourceRequestsOf(argv), List.of(), argv + " asked for the package source");
+    }
+
+    /** A readme quoting a record type says nothing about the library's inline records. */
+    @Test
+    public void aReadmeQuotingRecordSyntaxNeverReadsTheSource() {
+        JsonObject docs = FixtureCorpus.loadRawFixture("ballerina__http").getAsJsonObject();
+        for (JsonElement module : docs.getAsJsonObject("docsData").getAsJsonArray("modules")) {
+            module.getAsJsonObject().addProperty("description",
+                    "```ballerina\nrecord {| int a; |} value = {a: 1};\n```");
+        }
+        List<String> argv = List.of("ballerina/http", "readme");
+        Assert.assertEquals(sourceRequestsOf(argv, docs.toString()), List.of(), argv + " asked for the source");
     }
 
     /** Optionality and defaults of an inline record's members are only in the source. */

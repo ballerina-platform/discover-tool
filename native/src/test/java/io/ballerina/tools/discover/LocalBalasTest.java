@@ -178,6 +178,41 @@ public class LocalBalasTest {
     }
 
     @Test
+    public void aPlatformWithOnlyMetadataDoesNotHideALaterOneWithSources() throws IOException {
+        Path home = home("2.16.6", "java21", "http");
+        Path metadata = home.resolve("repositories/central.ballerina.io/bala/ballerina/http/2.16.6/any")
+                .resolve(Bala.TRIGGER_METADATA);
+        Files.createDirectories(metadata.getParent());
+        Files.writeString(metadata, "{}");
+        Map<String, String> found = fetch(List.of(LocalBalas.homeRepository(home)), RESOLVED, FakeTransport.never())
+                .orElseThrow();
+        Assert.assertEquals(found.keySet(), httpSources().keySet());
+    }
+
+    @Test
+    public void anOverLimitModuleTakesItsPlatformsMetadataWithIt() throws IOException {
+        Path home = temporary();
+        Path platform = home.resolve("repositories/central.ballerina.io/bala/ballerina/http/2.16.6/java21");
+        Path huge = platform.resolve("modules/http");
+        Files.createDirectories(huge);
+        Files.write(huge.resolve("huge.bal"), new byte[Bala.MAX_SOURCE_BYTES + 1]);
+        Files.createDirectories(platform.resolve("metadata"));
+        Files.writeString(platform.resolve(Bala.TRIGGER_METADATA), "{}");
+        Assert.assertTrue(LocalBalas.homeRepository(home).moduleSources(HTTP, VERSION, "http",
+                HttpOptions.builder().build()).isEmpty());
+    }
+
+    @Test
+    public void aMetadataFileOverItsLimitIsSkippedAndTheSourcesStillRead() {
+        Map<String, byte[]> entries = new java.util.TreeMap<>();
+        httpSources().forEach((file, text) ->
+                entries.put("modules/http/" + file, text.getBytes(StandardCharsets.UTF_8)));
+        entries.put(Bala.TRIGGER_METADATA, new byte[Bala.MAX_SOURCE_BYTES + 1]);
+        Assert.assertEquals(Bala.moduleSources(new ByteArrayInputStream(zip(entries)), "http"),
+                Optional.of(httpSources()));
+    }
+
+    @Test
     public void aPlatformOtherThanJava21IsFoundToo() throws IOException {
         Assert.assertEquals(fetch(List.of(LocalBalas.homeRepository(home("2.16.6", "any", "http"))), RESOLVED,
                 FakeTransport.never()), Optional.of(httpSources()));

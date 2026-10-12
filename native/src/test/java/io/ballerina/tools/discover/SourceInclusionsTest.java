@@ -279,6 +279,30 @@ public class SourceInclusionsTest {
     }
 
     @Test
+    public void onlyRecordsAPackageApiCanMentionAreRecovered() {
+        InlineRecords.Declared records = SourceInclusions.parseFacts(Map.of("types.bal", """
+                public type Config record {|
+                    record {|string host?; int port;|} server;
+                    record {|string patience = DEFAULT_WAIT; string name = "n"; string other = "a plain string literal "
+                        + "that goes on and on and on for far longer than any default worth printing is";|} limits;
+                |};
+                type Hidden record {| record {|string secret?; int code;|} inner; |};
+                public function run() {
+                    record {|string local?; int count;|} value = {count: 1};
+                }
+                """)).orElseThrow().inlineRecords();
+
+        Assert.assertTrue(records.recover(List.of("host", "port")).orElseThrow().get("host").optional());
+        Assert.assertTrue(records.recover(List.of("code", "secret")).isEmpty(), "a private type is not API");
+        Assert.assertTrue(records.recover(List.of("count", "local")).isEmpty(), "a function body is not API");
+        Map<String, InlineRecords.Member> limits = records.recover(List.of("name", "other", "patience"))
+                .orElseThrow(() -> new AssertionError(records.toString()));
+        Assert.assertNull(limits.get("patience").defaultValue(), "a package's own constant cannot be written");
+        Assert.assertEquals(limits.get("name").defaultValue(), "\"n\"");
+        Assert.assertNull(limits.get("other").defaultValue(), "a long default is not worth printing");
+    }
+
+    @Test
     public void refreshRereadsTheSource() {
         AtomicInteger fetched = new AtomicInteger();
         PackageRepository counting = new PackageRepository() {

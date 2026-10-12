@@ -42,7 +42,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -73,9 +72,6 @@ import java.util.stream.Collectors;
  * @since 0.1.0
  */
 public final class Cli {
-
-    // An inline record with members: the one thing in an answer that only the package source can complete.
-    private static final Pattern INLINE_RECORD = Pattern.compile("record \\{\\|?\\s*[^\\s|}]");
 
     private static final String OUTPUT_FLAG = "--output";
 
@@ -201,10 +197,10 @@ public final class Cli {
 
         Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
         if (!answer.isOk()) {
-            return fail(answer.failure(), streams, json);
+            return fail(readAt(answer.failure(), loaded.value()), streams, json);
         }
         if (root.page != FIRST_PAGE && answer.value().paging() == null) {
-            return fail(notPaged(root, coordinate.value(), filter), streams, json);
+            return fail(readAt(notPaged(root, coordinate.value(), filter), loaded.value()), streams, json);
         }
         String read = loaded.value().version().text();
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
@@ -217,7 +213,7 @@ public final class Cli {
     private static Result<DiscoverResult> answer(
             LoadedPackage loaded, String bucket, List<String> rest, String filter, int page) {
         Result<DiscoverResult> plain = answerFrom(loaded, bucket, rest, filter, page);
-        if (!plain.isOk() || !INLINE_RECORD.matcher(JsonRenderer.render(plain.value())).find()) {
+        if (!plain.isOk() || !loaded.bound().settles(() -> JsonRenderer.render(plain.value()))) {
             return plain;
         }
         LoadedPackage settled = loaded.withSource();
@@ -276,6 +272,12 @@ public final class Cli {
 
     private static List<String> rest(Commands.Root root) {
         return root.rest == null ? List.of() : root.rest;
+    }
+
+    private static Failure readAt(Failure failure, LoadedPackage loaded) {
+        return failure instanceof Failure.Validation validation
+                ? validation.about(loaded.qualified().qualified(), loaded.version().text())
+                : failure;
     }
 
     private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {

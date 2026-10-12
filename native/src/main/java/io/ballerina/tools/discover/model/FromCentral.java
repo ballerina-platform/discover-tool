@@ -309,7 +309,9 @@ public final class FromCentral {
             }
             links.addAll(typeRef.links());
         }
-        return ref((isExclusive(closed, hasRest) ? CLOSED_RECORD : OPEN_RECORD).formatted(fields), links);
+        TypeRef record = ref((isExclusive(closed, hasRest) ? CLOSED_RECORD : OPEN_RECORD).formatted(fields), links);
+        scope.inlineRecords().produced(record.name());
+        return record;
     }
 
     // A rest member is only legal in a closed record, so it makes an open one closed.

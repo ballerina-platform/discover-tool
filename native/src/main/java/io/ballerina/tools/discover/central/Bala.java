@@ -36,7 +36,8 @@ import java.util.zip.ZipInputStream;
  *
  * <p>Bounded on every axis, since its size is the publisher's choice: an archive past {@link #MAX_ARCHIVE_BYTES}, a
  * source file past {@link #MAX_SOURCE_BYTES}, or a module past {@link #MAX_MODULE_BYTES} or {@link #MAX_MODULE_FILES}
- * is no answer at all, the same as an archive that could not be fetched.
+ * is no answer at all, the same as an archive that could not be fetched. The optional {@link #TRIGGER_METADATA} is
+ * the exception: one over {@link #MAX_SOURCE_BYTES} is skipped, and the module's sources are still read.
  *
  * @since 0.1.0
  */
@@ -109,20 +110,23 @@ public final class Bala {
             for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
                 String name = entry.getName();
                 if (TRIGGER_METADATA.equals(name)) {
-                    files.put(TRIGGER_METADATA,
-                            new String(readSource(zip, limits.sourceBytes()), StandardCharsets.UTF_8));
+                    readSource(zip, limits.sourceBytes())
+                            .ifPresent(metadata -> files.put(TRIGGER_METADATA, utf8(metadata)));
                 } else if (!entry.isDirectory() && name.startsWith(prefix) && name.endsWith(".bal")
                         && name.indexOf('/', prefix.length()) < 0) {
                     if (sourceFiles >= limits.moduleFiles()) {
                         return Optional.empty();
                     }
-                    byte[] source = readSource(zip, limits.sourceBytes());
-                    kept += source.length;
+                    Optional<byte[]> source = readSource(zip, limits.sourceBytes());
+                    if (source.isEmpty()) {
+                        return Optional.empty();
+                    }
+                    kept += source.get().length;
                     if (kept > limits.moduleBytes()) {
                         return Optional.empty();
                     }
                     sourceFiles++;
-                    files.put(name.substring(prefix.length()), new String(source, StandardCharsets.UTF_8));
+                    files.put(name.substring(prefix.length()), utf8(source.get()));
                 }
             }
         } catch (IOException | IllegalArgumentException unreadable) {
@@ -131,16 +135,21 @@ public final class Bala {
         return files.isEmpty() ? Optional.empty() : Optional.of(Collections.unmodifiableMap(files));
     }
 
-    private static byte[] readSource(InputStream entry, int maxBytes) throws IOException {
+    private static String utf8(byte[] bytes) {
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    // Empty when the entry is over the limit; the rest of it is skipped by the next getNextEntry.
+    private static Optional<byte[]> readSource(InputStream entry, int maxBytes) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
         for (int read = entry.read(buffer); read >= 0; read = entry.read(buffer)) {
             if (bytes.size() + read > maxBytes) {
-                throw new IOException("a source file is over " + maxBytes + " bytes");
+                return Optional.empty();
             }
             bytes.write(buffer, 0, read);
         }
-        return bytes.toByteArray();
+        return Optional.of(bytes.toByteArray());
     }
 
     private static final class Capped extends FilterInputStream {
