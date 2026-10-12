@@ -489,7 +489,7 @@ public class DiscoverResultRenderingTest {
                 List.of(
                         new DiscoverResult.ReadmeChunks.Chunk(1, "Overview", 10, "bal discover pkg readme 1"),
                         new DiscoverResult.ReadmeChunks.Chunk(3, "Quickstart", 25, "bal discover pkg readme 3")),
-                2, null, null, null);
+                2, null, null, null, true);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 matching chunks",
                 "",
@@ -506,7 +506,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void noChunkMatchingTheFilterIsNoneInTextAndAnEmptyArrayInJson() {
-        DiscoverResult result = new DiscoverResult.ReadmeChunks(List.of(), 0, null, null, null);
+        DiscoverResult result = new DiscoverResult.ReadmeChunks(List.of(), 0, null, null, null, true);
         Assert.assertEquals(TextRenderer.render(result), "No matching chunks.");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();

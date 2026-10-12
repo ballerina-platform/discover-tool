@@ -286,8 +286,8 @@ public sealed interface DiscoverResult {
     }
 
     /**
-     * More than one readme chunk matches a selector or {@code --filter} — the roster to choose one from, the same
-     * ceiling every other listing in this tool obeys.
+     * A roster of readme chunks to choose one from: those matching a selector or {@code --filter}, up to the
+     * ceiling every other listing obeys, or — for a readme too large to print whole — every chunk it has.
      *
      * @param chunks the chunks shown, up to the ceiling
      * @param total how many chunks actually match
@@ -295,8 +295,9 @@ public sealed interface DiscoverResult {
      * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
+     * @param matching whether the chunks are the ones that matched something, rather than all the readme has
      */
-    record ReadmeChunks(List<Chunk> chunks, int total, Paging paging, String next, String warning)
+    record ReadmeChunks(List<Chunk> chunks, int total, Paging paging, String next, String warning, boolean matching)
             implements DiscoverResult {
 
         /**

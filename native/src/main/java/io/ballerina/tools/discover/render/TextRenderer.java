@@ -294,7 +294,8 @@ public final class TextRenderer {
     }
 
     private static void readmeChunks(Layout layout, DiscoverResult.ReadmeChunks chunks) {
-        layout.top(counted(chunks.total(), "matching chunk", "matching chunks"));
+        layout.top(chunks.matching() ? counted(chunks.total(), "matching chunk", "matching chunks")
+                : counted(chunks.total(), "chunk", "chunks"));
         List<DiscoverResult.ReadmeChunks.Chunk> rows = chunks.chunks();
         Drill drill = Drill.of(rows.stream().map(chunk -> String.valueOf(chunk.number())).toList(),
                 rows.stream().map(DiscoverResult.ReadmeChunks.Chunk::command).toList(), "<n>");
