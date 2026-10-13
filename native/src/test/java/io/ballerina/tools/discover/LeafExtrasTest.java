@@ -54,16 +54,36 @@ public class LeafExtrasTest {
     @Test
     public void aMethodSaysHowToConstructItsContainerFromItsInit() {
         DiscoverResult.Signature send = leaf("ballerinax__kafka", Surface.Scope.CLIENT, "Producer", "send");
-        Assert.assertEquals(send.create().code(), "kafka:Producer producer = check new (string|string[] "
-                + "bootstrapServers, *kafka:ProducerConfiguration config);");
+        Assert.assertEquals(send.create().code(), "kafka:Producer producer = check new (bootstrapServers, config);");
+        Assert.assertEquals(send.create().init(), "init(string|string[] bootstrapServers, "
+                + "*kafka:ProducerConfiguration config)");
         Assert.assertEquals(send.create().command(), "bal discover ballerinax/kafka client Producer init");
     }
 
     @Test
-    public void aVariableThatWouldBeAKeywordTakesThePrefixAndDefaultsAreKept() {
+    public void aVariableThatWouldBeAKeywordTakesThePrefixAndADefaultedParameterIsLeftOut() {
         DiscoverResult.Signature get = leaf("ballerinax__github", Surface.Scope.CLIENT, "Client", "gists", "get");
-        Assert.assertEquals(get.create().code(), "github:Client githubClient = check new (github:ConnectionConfig "
-                + "config, string serviceUrl = \"https://api.github.com\");");
+        Assert.assertEquals(get.create().code(), "github:Client githubClient = check new (config);");
+        Assert.assertEquals(get.create().init(), "init(github:ConnectionConfig config, string serviceUrl = "
+                + "\"https://api.github.com\")");
+    }
+
+    @Test
+    public void aRunOfCapitalsIsLowerCasedUpToTheNextWordAndAClassWithNoInitTakesNoArguments() {
+        Payload payload = Payload.pkg();
+        payload.with("clients", Decl.client("HTTPClient", Decl.method("send").on("isRemote")));
+        payload.with("classes", Decl.client("Plain", Decl.method("go")));
+        Library library = Pipeline.build(payload.module());
+        LoadedPackage acme = new LoadedPackage(QualifiedName.parse("acme/acme").value(), FixtureCorpus.FIXTURE_VERSION,
+                library, Optional.empty(), null, List.of(), List.of(), null, null, () -> library, Map::of);
+        DiscoverResult.Signature send = (DiscoverResult.Signature) Containers.render(acme, Surface.Scope.CLIENT,
+                new Containers.Options(List.of("HTTPClient", "send"))).value();
+        Assert.assertEquals(send.create().code(), "acme:HTTPClient httpClient = new ();");
+        DiscoverResult.Signature go = (DiscoverResult.Signature) Containers.render(acme, Surface.Scope.CLASS,
+                new Containers.Options(List.of("Plain", "go"))).value();
+        Assert.assertEquals(go.create().code(), "acme:Plain plain = new ();");
+        Assert.assertNull(go.create().init());
+        Assert.assertNull(go.create().command());
     }
 
     @Test
@@ -76,7 +96,9 @@ public class LeafExtrasTest {
     public void theLineRendersAfterTheDeclarationAndAsItsOwnJsonObject() {
         DiscoverResult.Signature send = leaf("ballerinax__kafka", Surface.Scope.CLIENT, "Producer", "send");
         String text = TextRenderer.render(send);
-        Assert.assertTrue(text.contains(";\n\nCreate it\n  kafka:Producer producer = check new ("), text);
+        Assert.assertTrue(text.contains(";\n\nCreate it\n  kafka:Producer producer = check new (bootstrapServers, "
+                + "config);\n  init(string|string[] bootstrapServers, *kafka:ProducerConfiguration config)\n  bal "
+                + "discover ballerinax/kafka client Producer init\n"), text);
         JsonObject create = JsonParser.parseString(JsonRenderer.render(send)).getAsJsonObject()
                 .getAsJsonObject("create");
         Assert.assertEquals(create.get("command").getAsString(), "bal discover ballerinax/kafka client Producer init");

@@ -442,7 +442,8 @@ public final class JsonRenderer {
         if (signature.create() != null) {
             JsonObject create = new JsonObject();
             create.addProperty("code", signature.create().code());
-            create.addProperty("command", signature.create().command());
+            addIfPresent(create, "init", signature.create().init());
+            addIfPresent(create, "command", signature.create().command());
             json.add("create", create);
         }
         if (!signature.callers().isEmpty()) {
