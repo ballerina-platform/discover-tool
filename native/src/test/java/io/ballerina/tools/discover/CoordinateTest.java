@@ -131,5 +131,15 @@ public class CoordinateTest {
                 "Invalid package name 'kafka': a package is named with its organization, <org>/kafka.");
         Assert.assertEquals(bare.suggestion(), "`bal discover search kafka` lists the packages that match, with their "
                 + "organizations.");
+        Assert.assertEquals(bare.command(), "bal discover search kafka");
+    }
+
+    @Test
+    public void aCorrectedCoordinateCarriesTheRestOfTheCommandAndASearchDoesNot() {
+        Result<Coordinate> npm = Coordinate.parse("ballerinax/kafka@4.6.5", " client Producer");
+        Assert.assertEquals(((Failure.Validation) npm.failure()).command(),
+                "bal discover ballerinax/kafka:4.6.5 client Producer");
+        Result<Coordinate> bare = Coordinate.parse("kafka", " client Producer");
+        Assert.assertEquals(((Failure.Validation) bare.failure()).command(), "bal discover search kafka");
     }
 }

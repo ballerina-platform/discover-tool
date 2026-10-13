@@ -210,6 +210,8 @@ public class CliTest {
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("nosuchbucket"), capture.stderr());
         Assert.assertTrue(capture.field("suggestion").contains("client, service, class, funcs"), capture.stderr());
+        Assert.assertEquals(capture.field("command"), "bal discover ballerinax/kafka search nosuchbucket",
+                "a member typed without its bucket is found by the search");
     }
 
     // A selector the container does not read, with the command that drops it.
@@ -1233,7 +1235,11 @@ public class CliTest {
             Assert.assertEquals(exitCode, 2);
             Assert.assertEquals(capture.field("kind"), "validation");
             Assert.assertTrue(capture.field("message").contains("numbered from 1"), capture.stderr());
+            Assert.assertEquals(capture.field("command"), "bal discover ballerinax/github client", capture.stderr());
         }
+        Capture search = new Capture();
+        Assert.assertEquals(Cli.run(List.of("search", "kafka send", "--page", "0"), search.streams(), never()), 2);
+        Assert.assertEquals(search.field("command"), "bal discover search \"kafka send\"", search.stderr());
     }
 
     @Test

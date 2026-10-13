@@ -18,7 +18,10 @@
 
 package io.ballerina.tools.discover;
 
+import io.ballerina.tools.discover.views.SearchCentral;
+
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,23 +50,31 @@ public record Coordinate(QualifiedName qualified, Version version) {
     private static final Pattern THREE_NUMBERS = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)$");
 
     public static Result<Coordinate> parse(String input) {
+        return parse(input, "");
+    }
+
+    /**
+     * @param tail the rest of the caller's command, after the package — appended to a corrected coordinate's
+     *     command, so the fix it offers is the caller's whole command
+     */
+    public static Result<Coordinate> parse(String input, String tail) {
         int colon = input.indexOf(VERSION_SEPARATOR);
         String pkg = colon < 0 ? input : input.substring(0, colon);
         if (pkg.indexOf(QUOTE) >= 0) {
             return fix("A package name is written unescaped, but " + input + " quotes part of it the way an "
-                    + "import does.", input.replace(String.valueOf(QUOTE), ""));
+                    + "import does.", input.replace(String.valueOf(QUOTE), ""), tail);
         }
         Result<QualifiedName> qualified = QualifiedName.parse(pkg);
         if (!qualified.isOk()) {
-            return invalidName(input, qualified);
+            return invalidName(input, qualified, tail);
         }
         if (colon < 0) {
             return Result.ok(new Coordinate(qualified.value(), null));
         }
-        return version(qualified.value(), input, input.substring(colon + 1));
+        return version(qualified.value(), input, input.substring(colon + 1), tail);
     }
 
-    private static Result<Coordinate> version(QualifiedName qualified, String input, String version) {
+    private static Result<Coordinate> version(QualifiedName qualified, String input, String version, String tail) {
         if (Version.isComplete(version)) {
             return Result.ok(new Coordinate(qualified, Version.parse(version).value()));
         }
@@ -75,14 +86,14 @@ public record Coordinate(QualifiedName qualified, Version version) {
         String unprefixed = version.substring(VERSION_PREFIX.length());
         if (version.toLowerCase(Locale.ROOT).startsWith(VERSION_PREFIX) && Version.isComplete(unprefixed)) {
             return fix(quoted(version, input) + " is not a version: a version has no leading v.",
-                    pkg + VERSION_SEPARATOR + unprefixed);
+                    pkg + VERSION_SEPARATOR + unprefixed, tail);
         }
         Matcher numbers = THREE_NUMBERS.matcher(version);
         if (numbers.matches()) {
             String stripped = new BigInteger(numbers.group(1)) + "." + new BigInteger(numbers.group(2)) + "."
                     + new BigInteger(numbers.group(3));
             return fix(quoted(version, input) + " is not a version: a number in a version has no leading zero.",
-                    pkg + VERSION_SEPARATOR + stripped);
+                    pkg + VERSION_SEPARATOR + stripped, tail);
         }
         return Result.err(new Failure.Validation(quoted(version, input) + " is not a complete version.",
                 "Write it in full, " + pkg + COMPLETE_FORM + ", or drop it" + LOCKED_OR_LATEST + pkg));
@@ -92,26 +103,27 @@ public record Coordinate(QualifiedName qualified, Version version) {
         return "'" + version + "' in '" + input + "'";
     }
 
-    private static Result<Coordinate> invalidName(String input, Result<QualifiedName> invalid) {
+    private static Result<Coordinate> invalidName(String input, Result<QualifiedName> invalid, String tail) {
         int at = input.lastIndexOf(NPM_SEPARATOR);
         if (at > 0) {
             String rewritten = input.substring(0, at) + VERSION_SEPARATOR + input.substring(at + 1);
             if (parse(rewritten).isOk()) {
                 return fix("Invalid package name '" + input + "': a version follows a ':', not an '@'.",
-                        rewritten);
+                        rewritten, tail);
             }
         }
         if (input.indexOf('/') < 0 && QualifiedName.parse(ORG_PLACEHOLDER + "/" + input).isOk()) {
+            String search = SearchCentral.command(List.of(input));
             return Result.err(new Failure.Validation(
                     "Invalid package name '" + input + "': a package is named with its organization, <org>/"
                             + input + ".",
-                    "`bal discover search " + input + "` lists the packages that match, with their organizations."));
+                    Failure.quoted(search) + " lists the packages that match, with their organizations.", search));
         }
         return invalid.cast();
     }
 
-    private static Result<Coordinate> fix(String message, String corrected) {
-        String command = COMMAND + Texts.shellWord(corrected);
+    private static Result<Coordinate> fix(String message, String corrected, String tail) {
+        String command = COMMAND + Texts.shellWord(corrected) + tail;
         return Result.err(new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command));
     }
 

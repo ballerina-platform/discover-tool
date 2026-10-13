@@ -89,8 +89,6 @@ public final class Cli {
 
     private static final int FIRST_PAGE = 1;
 
-    private static final String COMMAND = "bal discover ";
-
     private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
 
     private static final String PLACEHOLDER_VERSION = "<version>";
@@ -167,9 +165,9 @@ public final class Cli {
                     "Pass '<org>/<name>', e.g. bal discover ballerinax/github."));
         }
 
-        Result<Coordinate> coordinate = Coordinate.parse(root.pkg);
+        Result<Coordinate> coordinate = Coordinate.parse(root.pkg, Coordinate.moduleArgument(root.module) + tail(root));
         if (!coordinate.isOk()) {
-            return usage.error(coordinate.failure().lengthened(Coordinate.moduleArgument(root.module) + tail(root)));
+            return usage.error(coordinate.failure());
         }
         QualifiedName qualified = coordinate.value().qualified();
 
@@ -184,7 +182,7 @@ public final class Cli {
         List<String> rest = rest(root);
         String bucket = rest.isEmpty() ? null : rest.get(0);
         if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
-            return usage.error(unknownBucket(bucket));
+            return usage.error(unknownBucket(bucket, coordinate.value().command(root.module)));
         }
 
         String filter = root.filter;
@@ -222,25 +220,12 @@ public final class Cli {
     private static int searchCentral(Commands.Root root, Streams streams, HttpOptions http, boolean json,
             UsageErrors usage) {
         List<String> keywords = rest(root);
-        String command = COMMAND + SearchCentral.VERB;
-        if (keywords.isEmpty()) {
-            return usage.error(new Failure.Validation("The search needs at least one keyword.",
-                    "Write " + Failure.quoted(command + " <keyword>") + "."));
-        }
-        String typed = command + tail(keywords, null, FIRST_PAGE);
-        if (root.module != null) {
-            return usage.error(new Failure.Validation("--module reads one package's submodule, and a search covers "
-                    + "all of Central.", "Drop --module: " + Failure.quoted(typed) + ".", typed));
-        }
-        if (root.filter != null) {
-            String fixed = typed + " " + Texts.shellWord(root.filter);
-            return usage.error(new Failure.Validation("The --filter option narrows a listing, and a search is not "
-                    + "one.", "Add its keyword to the search instead: " + Failure.quoted(fixed) + ".", fixed));
-        }
         Failure invalid = rejectInvalidOutput(root);
-        if (invalid == null && root.page < FIRST_PAGE) {
-            invalid = new Failure.Validation("Page " + root.page + " is out of range: pages are numbered from 1.",
-                    "Pass --page 1 or later, or drop it for the first page.");
+        if (invalid == null) {
+            invalid = SearchCentral.misuse(keywords, root.module, root.filter);
+        }
+        if (invalid == null) {
+            invalid = pageBeforeFirst(root.page, SearchCentral.command(keywords));
         }
         if (invalid != null) {
             return usage.error(invalid);
@@ -300,7 +285,8 @@ public final class Cli {
             return Types.misuse(command, new Types.Options(selectors, filter, root.page));
         }
         if (Search.BUCKET.equals(bucket)) {
-            return Search.misuse(new Coordinate(qualified, version).command(root.module), selectors, filter);
+            return Search.misuse(new Coordinate(qualified, version).command(root.module) + " " + Search.BUCKET,
+                    selectors, filter);
         }
         if (Surface.Scope.MODULE.verb().equals(bucket)) {
             return Containers.extraFunctionNames(command, new Containers.Options(selectors, filter, root.page));
@@ -350,10 +336,14 @@ public final class Cli {
                 "Drop --page: " + Failure.quoted(command) + ".", command);
     }
 
-    private static Failure unknownBucket(String token) {
+    // A name typed where the bucket goes is most often a member's (`go doc` leaves the bucket out too): the search
+    // finds whichever container declares it.
+    private static Failure unknownBucket(String token, String pkg) {
+        String search = pkg + " " + Search.BUCKET + " " + Texts.shellWord(token);
         return new Failure.Validation(
                 "'" + token + "' is not a bucket.",
-                "The buckets are " + String.join(", ", Commands.BUCKETS) + ".");
+                "The buckets are " + String.join(", ", Commands.BUCKETS) + ". To find what is named '" + token
+                        + "': " + Failure.quoted(search) + ".", search);
     }
 
     /**
@@ -394,12 +384,17 @@ public final class Cli {
             return new Failure.Validation("The --filter option needs a keyword.",
                     "Write --filter <keyword>, or drop it to list everything.");
         }
-        if (root.page < FIRST_PAGE) {
-            return new Failure.Validation(
-                    "Page " + root.page + " is out of range: pages are numbered from 1.",
-                    "Pass --page 1 or later, or drop it for the first page.");
+        Failure page = pageBeforeFirst(root.page, coordinate.command(root.module) + tail(rest(root), root.filter,
+                FIRST_PAGE));
+        return page != null ? page : rejectVersionArguments(root, coordinate.qualified());
+    }
+
+    private static Failure pageBeforeFirst(int page, String firstPage) {
+        if (page >= FIRST_PAGE) {
+            return null;
         }
-        return rejectVersionArguments(root, coordinate.qualified());
+        return new Failure.Validation("Page " + page + " is out of range: pages are numbered from 1.",
+                "Drop --page for the first page: " + Failure.quoted(firstPage) + ".", firstPage);
     }
 
     private static Failure versionFlag(Commands.Root root) {
