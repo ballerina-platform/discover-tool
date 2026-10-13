@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.cli;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
+import io.ballerina.tools.discover.views.Search;
 import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
 
@@ -53,7 +54,7 @@ final class Commands {
 
     static final List<String> BUCKETS = Stream.concat(
             Arrays.stream(Surface.Scope.values()).map(Surface.Scope::verb),
-            Stream.of(Types.BUCKET, Readme.BUCKET)).toList();
+            Stream.of(Types.BUCKET, Readme.BUCKET, Search.BUCKET)).toList();
 
     static final String VERSION_FLAG = "--version";
 

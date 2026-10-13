@@ -57,20 +57,20 @@ import java.util.Map;
 public class CliTest {
 
     /** Captures both streams, so a test can assert stdout stayed empty on failure. */
-    private static final class Capture {
+    static final class Capture {
 
         private final StringBuilder out = new StringBuilder();
         private final StringBuilder err = new StringBuilder();
 
-        private Cli.Streams streams() {
+        Cli.Streams streams() {
             return new Cli.Streams(out::append, err::append);
         }
 
-        private String stdout() {
+        String stdout() {
             return out.toString();
         }
 
-        private String stderr() {
+        String stderr() {
             return err.toString();
         }
 
@@ -80,13 +80,13 @@ public class CliTest {
             return parsed.getAsJsonObject();
         }
 
-        private String field(String name) {
+        String field(String name) {
             JsonElement value = failure().get(name);
             return value == null ? null : value.getAsString();
         }
     }
 
-    private static HttpOptions centralFor(String slug, String version) {
+    static HttpOptions centralFor(String slug, String version) {
         String docs = FixtureCorpus.loadRawFixture(slug).toString();
         return options(FakeTransport.routing(url -> url.contains("/docs/")
                 ? FakeTransport.ok(docs)
@@ -132,7 +132,7 @@ public class CliTest {
                 .build();
     }
 
-    private static HttpOptions never() {
+    static HttpOptions never() {
         return options(FakeTransport.never());
     }
 
@@ -1542,6 +1542,7 @@ public class CliTest {
             "Next: bal discover ballerinax/kafka client <name>",
             "Next: bal discover ballerinax/kafka service <name>",
             "Next: bal discover ballerinax/kafka class <name>",
+            "Next: bal discover ballerinax/kafka search <keyword>",
             "");
 
     @Test

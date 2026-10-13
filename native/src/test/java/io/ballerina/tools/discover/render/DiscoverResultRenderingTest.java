@@ -72,7 +72,8 @@ public class DiscoverResultRenderingTest {
                 "Readme  bal discover ballerinax/kafka readme  11 sections",
                 "",
                 "Next: bal discover ballerinax/kafka client <name>",
-                "Next: bal discover ballerinax/kafka funcs <name>"));
+                "Next: bal discover ballerinax/kafka funcs <name>",
+                "Next: bal discover ballerinax/kafka search <keyword>"));
     }
 
     @Test

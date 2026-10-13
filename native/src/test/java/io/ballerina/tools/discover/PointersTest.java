@@ -29,6 +29,7 @@ import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.Readme;
+import io.ballerina.tools.discover.views.Search;
 import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -81,6 +82,7 @@ public class PointersTest {
     private static List<DiscoverResult> answersOf(LoadedPackage context) {
         List<DiscoverResult> answers = new ArrayList<>();
         answers.add(Overview.of(context));
+        answers.add(expect(Search.render(context, new Search.Options(List.of("e"), 1))));
         for (Surface.Scope scope : Surface.Scope.values()) {
             answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of()))));
             answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of(), "config", 1))));
@@ -199,6 +201,10 @@ public class PointersTest {
                 mixed.remote().forEach(method -> commands.add(method.command()));
                 mixed.normal().forEach(method -> commands.add(method.command()));
                 addIfPresent(commands, mixed.next());
+            }
+            case DiscoverResult.Search search -> {
+                search.groups().forEach(group -> group.hits().forEach(hit -> commands.add(hit.command())));
+                addIfPresent(commands, search.next());
             }
             case DiscoverResult.EmptyBucket empty ->
                     empty.elsewhere().forEach(other -> commands.add(other.command()));

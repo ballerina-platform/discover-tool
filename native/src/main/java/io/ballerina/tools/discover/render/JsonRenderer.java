@@ -92,6 +92,7 @@ public final class JsonRenderer {
             case DiscoverResult.EmptyBucket empty -> emptyBucket(empty);
             case DiscoverResult.TypeRoster roster -> typeRoster(roster);
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(declaration);
+            case DiscoverResult.Search search -> search(search);
         };
     }
 
@@ -486,6 +487,53 @@ public final class JsonRenderer {
         addDocumented(json, roster.documented());
         addIfPresent(json, "warning", roster.warning());
         return json;
+    }
+
+    private static JsonObject search(DiscoverResult.Search search) {
+        JsonObject json = new JsonObject();
+        json.add("keywords", strings(search.keywords()));
+        for (DiscoverResult.Search.Group group : search.groups()) {
+            JsonArray hits = new JsonArray();
+            group.hits().forEach(hit -> hits.add(hit(group.kind(), hit)));
+            json.add(group.kind().key(), hits);
+        }
+        JsonObject counts = new JsonObject();
+        search.counts().forEach((kind, count) -> counts.addProperty(kind.key(), count));
+        json.add("counts", counts);
+        json.addProperty("shown", search.shown());
+        json.addProperty("total", search.total());
+        addPaging(json, search.paging());
+        addIfPresent(json, "next", search.next());
+        if (search.total() == 0) {
+            json.addProperty("overview", search.overview());
+        }
+        addIfPresent(json, "warning", search.warning());
+        return json;
+    }
+
+    private static JsonObject hit(DiscoverResult.Search.Kind kind, DiscoverResult.Search.Hit hit) {
+        JsonObject entry = new JsonObject();
+        switch (kind) {
+            case RESOURCES -> {
+                entry.addProperty("container", hit.container());
+                entry.addProperty("path", hit.name());
+                entry.addProperty("accessor", hit.detail());
+            }
+            case README -> {
+                entry.addProperty("number", Integer.parseInt(hit.detail()));
+                entry.addProperty("title", hit.name());
+            }
+            case TYPES -> {
+                entry.addProperty("name", hit.name());
+                entry.addProperty("kind", hit.detail());
+            }
+            default -> {
+                addIfPresent(entry, "container", hit.container());
+                entry.addProperty("name", hit.name());
+            }
+        }
+        entry.addProperty("command", hit.command());
+        return entry;
     }
 
     private static JsonObject typeDeclaration(DiscoverResult.TypeDeclaration declaration) {
