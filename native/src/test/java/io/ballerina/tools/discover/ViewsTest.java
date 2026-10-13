@@ -205,6 +205,25 @@ public class ViewsTest {
     }
 
     @Test
+    public void anInlinedClientCanLeaveAnotherSectionNoRowsAndItStillRendersWithItsCommand() {
+        Payload payload = Payload.pkg();
+        List<Decl> methods = new ArrayList<>();
+        for (int i = 0; i < 38; i++) {
+            methods.add(Decl.method("m" + i).on("isRemote"));
+        }
+        payload.with("clients", Decl.client("Client", methods.toArray(Decl[]::new)));
+        payload.with("classes", Decl.client("Plain", Decl.method("run")), Decl.client("Other", Decl.method("run")));
+        payload.with("functions", Decl.method("f"), Decl.method("g"));
+        DiscoverResult.Overview overview = Overview.of(fromPayload(payload));
+        Assert.assertEquals(overview.sections().stream().map(section -> section.rows().size()).toList(),
+                List.of(1, 1, 0), "one row left beside 38 inlined methods and the client's own row");
+        String text = TextRenderer.render(overview, new TextRenderer.Context("test/pkg", null, List.of(), null, null,
+                null));
+        Assert.assertTrue(text.contains("\nFunctions (2)\n  ... 2 more: bal discover test/pkg funcs\n"), text);
+        Assert.assertTrue(text.contains("\nNext: bal discover test/pkg client Client <name>\n"), text);
+    }
+
+    @Test
     public void anOverviewOverTheCeilingTakesRowsFromTheLargestSectionFirst() {
         Payload payload = Payload.pkg();
         List<Decl> clients = new ArrayList<>();

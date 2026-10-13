@@ -212,6 +212,12 @@ public sealed interface Failure {
             + "build already pulled the package — those are the signatures Central publishes. Never "
             + "fall back to a remembered signature.";
 
+    /** How far a failure's listed details (candidates, owners, issues) sit under its suggestion. */
+    String DETAIL_INDENT = "    ";
+
+    /** The spaces between an owner's name column and its command. */
+    int COLUMN_GAP = 2;
+
     String UPSTREAM_SUGGESTION = "Central returned an error; run the same command again later.";
 
     /**
@@ -259,16 +265,16 @@ public sealed interface Failure {
         lines.add("  " + suggestion());
         if (this instanceof SchemaDrift f) {
             lines.add("  issues:");
-            f.issues().forEach(issue -> lines.add("    " + issue.path() + ": " + issue.message()));
+            f.issues().forEach(issue -> lines.add(DETAIL_INDENT + issue.path() + ": " + issue.message()));
         }
         if (this instanceof SymbolNotFound f && !f.candidates().isEmpty()) {
             lines.add("  candidates:");
-            f.candidates().forEach(candidate -> lines.add("    " + candidate));
+            f.candidates().forEach(candidate -> lines.add(DETAIL_INDENT + candidate));
         }
         if (this instanceof SymbolNotFound f) {
             int width = f.owners().stream().mapToInt(owner -> owner.name().length()).max().orElse(0);
-            f.owners().forEach(owner -> lines.add("    " + owner.name()
-                    + " ".repeat(width - owner.name().length() + 2) + owner.command()));
+            f.owners().forEach(owner -> lines.add(DETAIL_INDENT + owner.name()
+                    + " ".repeat(width - owner.name().length() + COLUMN_GAP) + owner.command()));
         }
         return String.join("\n", lines);
     }
