@@ -342,16 +342,7 @@ public final class JsonRenderer {
 
     private static JsonObject readmeSections(DiscoverResult.ReadmeSections sections) {
         JsonObject json = new JsonObject();
-        JsonArray array = new JsonArray();
-        for (DiscoverResult.ReadmeSections.Section section : sections.sections()) {
-            JsonObject entry = new JsonObject();
-            entry.addProperty("number", section.number());
-            entry.addProperty("title", section.title());
-            entry.addProperty("lines", section.lines());
-            entry.addProperty("command", section.command());
-            array.add(entry);
-        }
-        json.add("sections", array);
+        json.add("sections", sectionRows(sections.sections()));
         json.addProperty("matching", sections.matching());
         json.addProperty("shown", sections.sections().size());
         json.addProperty("total", sections.total());
@@ -363,6 +354,19 @@ public final class JsonRenderer {
             json.addProperty("warning", sections.warning());
         }
         return json;
+    }
+
+    private static JsonArray sectionRows(List<DiscoverResult.ReadmeSections.Section> sections) {
+        JsonArray array = new JsonArray();
+        for (DiscoverResult.ReadmeSections.Section section : sections) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("number", section.number());
+            entry.addProperty("title", section.title());
+            entry.addProperty("lines", section.lines());
+            entry.addProperty("command", section.command());
+            array.add(entry);
+        }
+        return array;
     }
 
     private static JsonArray resources(List<DiscoverResult.ResourceList.Resource> resources) {
@@ -422,6 +426,15 @@ public final class JsonRenderer {
         }
         if (!signature.foreign().isEmpty()) {
             json.add("foreign", foreign(signature.foreign()));
+        }
+        if (signature.create() != null) {
+            JsonObject create = new JsonObject();
+            create.addProperty("code", signature.create().code());
+            create.addProperty("command", signature.create().command());
+            json.add("create", create);
+        }
+        if (!signature.callers().isEmpty()) {
+            json.add("callers", sectionRows(signature.callers()));
         }
         addDocumented(json, signature.documented());
         addPaging(json, signature.paging());
