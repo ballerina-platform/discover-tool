@@ -205,7 +205,8 @@ public final class Cli {
         String read = loaded.value().version().text();
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
                 filter, Version.textOf(version), read);
-        streams.out().accept((json ? JsonRenderer.render(answer.value(), read)
+        JsonRenderer.Where about = new JsonRenderer.Where(qualified.qualified(), read, root.module);
+        streams.out().accept((json ? JsonRenderer.render(answer.value(), about)
                 : TextRenderer.render(answer.value(), where)) + "\n");
         return 0;
     }

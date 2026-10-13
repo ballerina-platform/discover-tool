@@ -588,6 +588,8 @@ public class CliTest {
         String carried = "bal discover ballerina/graphql:" + GRAPHQL_VERSION + " --module subgraph"
                 + " type FederatedEntity";
         Assert.assertTrue(capture.stdout().contains(carried), capture.stdout());
+        Assert.assertTrue(capture.stdout().startsWith("{\"qualified\":\"ballerina/graphql\",\"version\":\""
+                + GRAPHQL_VERSION + "\",\"module\":\"subgraph\","), capture.stdout());
     }
 
     @Test
@@ -600,8 +602,11 @@ public class CliTest {
         Capture json = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client"), json.streams(), http,
                 projectDir.toString()), 0, json.stderr());
-        Assert.assertEquals(JsonParser.parseString(json.stdout()).getAsJsonObject().get("version").getAsString(),
-                "4.6.5");
+        JsonObject answer = JsonParser.parseString(json.stdout()).getAsJsonObject();
+        Assert.assertEquals(answer.get("version").getAsString(), "4.6.5");
+        Assert.assertEquals(answer.get("qualified").getAsString(), "ballerinax/kafka",
+                "an answer names its package as a failure does: " + json.stdout());
+        Assert.assertFalse(answer.has("module"), json.stdout());
         Capture text = new Capture();
         Cli.run(List.of("ballerinax/kafka", "client"), text.streams(), http, projectDir.toString(), true);
         Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka:4.6.5 · client\n"), text.stdout());
@@ -1060,7 +1065,8 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type"), roster.streams(),
                 options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, roster.stderr());
-        Assert.assertEquals(roster.stdout().strip(), "{\"version\":\"" + GRAPHQL_VERSION + "\","
+        Assert.assertEquals(roster.stdout().strip(), "{\"qualified\":\"ballerina/graphql\",\"version\":\""
+                + GRAPHQL_VERSION + "\",\"module\":\"subgraph\","
                 + "\"sections\":{\"records\":[{\"name\":\"FederatedEntity\","
                 + "\"command\":\"bal discover ballerina/graphql --module subgraph type FederatedEntity\"},"
                 + "{\"name\":\"Representation\",\"command\":\"bal discover ballerina/graphql --module subgraph "
@@ -1458,7 +1464,8 @@ public class CliTest {
         int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(transport));
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertTrue(capture.stdout().startsWith("{\"version\":\"1.8.0\",\"buckets\":"), capture.stdout());
+        Assert.assertTrue(capture.stdout().startsWith("{\"qualified\":\"ballerina/graphql\",\"version\":\"1.8.0\","
+                + "\"module\":\"subgraph\",\"buckets\":"), capture.stdout());
     }
 
     @Test
