@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.views;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
@@ -44,9 +45,10 @@ import java.util.stream.Collectors;
  * <p><b>THE MATCHING RULE.</b> Each keyword is matched as a case-insensitive substring of a symbol's name, and a
  * symbol matches when every keyword does. The name is a container's, a function's or a type's own name, a method's
  * own name (not its container's), a resource method's path and accessor ({@code repos/:owner/:repo/issues post}),
- * and a readme section's title. Names are read without Ballerina's escapes, as every answer prints them. Unlike a
- * selector this is a keyword search, so it is lenient by design; unlike {@code --filter}, it reads names only, never
- * parameters, types or documentation.
+ * a readme section's title, and a submodule's name: the names inside another module are not searched, so a module
+ * named for the keywords is listed as the place to search next. Names are read without Ballerina's escapes, as every
+ * answer prints them. Unlike a selector this is a keyword search, so it is lenient by design; unlike
+ * {@code --filter}, it reads names only, never parameters, types or documentation.
  *
  * <p>Matches are grouped by kind in {@link DiscoverResult.Search.Kind} order and paged as one sequence under the
  * entry ceiling. No match is an answer, not a failure: it points back at the package's overview.
@@ -105,6 +107,7 @@ public final class Search {
         collectCallables(loaded, keywords, found);
         collectTypes(loaded, keywords, found);
         collectReadme(loaded, keywords, found);
+        collectSubmodules(loaded, keywords, found);
 
         List<DiscoverResult.Search.Hit> all = found.values().stream().flatMap(List::stream).toList();
         String command = loaded.command() + " " + BUCKET + words(options.keywords());
@@ -207,6 +210,17 @@ public final class Search {
             if (matches(section.title(), keywords)) {
                 found.get(DiscoverResult.Search.Kind.README).add(new DiscoverResult.Search.Hit(section.title(), null,
                         null, section.number(), loaded.command() + " " + Readme.BUCKET + " " + section.number()));
+            }
+        }
+    }
+
+    // Names in another module are not searched, but a module named for the keywords is the place to search next.
+    private static void collectSubmodules(LoadedPackage loaded, List<String> keywords,
+            Map<DiscoverResult.Search.Kind, List<DiscoverResult.Search.Hit>> found) {
+        for (LoadedPackage.Submodule submodule : loaded.submodules()) {
+            if (matches(submodule.name(), keywords)) {
+                found.get(DiscoverResult.Search.Kind.SUBMODULES).add(new DiscoverResult.Search.Hit(submodule.name(),
+                        null, null, Coordinate.COMMAND + loaded.pkgArgument(submodule.name())));
             }
         }
     }

@@ -1248,6 +1248,16 @@ public class CliTest {
     }
 
     @Test
+    public void aSearchOfTheDefaultModuleListsASubmoduleNamedForTheKeyword() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "search", "loader"), capture.streams(),
+                options(graphqlCentral())), 0, capture.stderr());
+        JsonObject found = JsonParser.parseString(capture.stdout()).getAsJsonObject();
+        Assert.assertEquals(found.getAsJsonArray("submodules").get(0).toString(),
+                "{\"name\":\"dataloader\",\"command\":\"bal discover ballerina/graphql --module dataloader\"}");
+    }
+
+    @Test
     public void aTypeAskedInAContainerBucketIsPointedAtWithItsPlainName() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "'ProducerConfiguration"),
