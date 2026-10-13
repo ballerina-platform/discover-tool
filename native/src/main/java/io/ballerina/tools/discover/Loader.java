@@ -301,7 +301,8 @@ public final class Loader {
             }
         };
         String prefix = new ModuleRef(module.value().orgName(), module.value().id()).prefix();
-        Supplier<Map<String, ServiceHandlers>> handlers = submodule == null && !module.value().serviceTypes().isEmpty()
+        boolean serves = !module.value().serviceTypes().isEmpty() || !module.value().listeners().isEmpty();
+        Supplier<Map<String, ServiceHandlers>> handlers = submodule == null && serves
                 ? memoized(() -> TriggerMetadata.load(
                         repository, qualified, resolved, module.value().id(), prefix, options.http()))
                 : Map::of;
