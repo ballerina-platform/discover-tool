@@ -200,8 +200,7 @@ public final class Containers {
             return misplaced.isPresent() ? Result.err(misplaced.get()) : Result.ok(emptyBucket(loaded, scope));
         }
         if (selectors.isEmpty()) {
-            // Another module's service type has nothing here to open; the roster is what carries its command.
-            if (containers.size() == 1 && foreignPairing(containers.get(0)).isEmpty()) {
+            if (containers.size() == 1) {
                 return answer(loaded, scope, containers.get(0), List.of(), options);
             }
             return roster(loaded, scope, containers, options);
@@ -249,11 +248,15 @@ public final class Containers {
         if (!select(container, selectors.subList(0, consumed(container, selectors))).isEmpty()) {
             return true;
         }
-        String plain = Identifiers.plain(selectors.get(0));
         return selectors.size() == 1 && container.scope() == Surface.Scope.SERVICE
                 && loaded.handlersOf(container.name())
-                        .map(described -> described.handlers().stream().anyMatch(h -> plain.equals(h.name())))
+                        .map(described -> described.handlers().stream()
+                                .anyMatch(handler -> names(handler, selectors.get(0))))
                         .orElse(false);
+    }
+
+    private static boolean names(ServiceHandlers.Handler handler, String typed) {
+        return handler.name() != null && Identifiers.plain(typed).equals(Identifiers.plain(handler.name()));
     }
 
     private static Failure severalOwners(LoadedPackage loaded, List<Surface.Container> owners, Options options) {
@@ -514,12 +517,10 @@ public final class Containers {
                 .toList();
     }
 
+    // Another module's service type opens here too: the listener's package may describe the methods a service of it
+    // defines, and its answer otherwise names the module that declares it.
     private static String openCommand(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, Options options) {
-        Optional<String> foreign = foreignPairing(container).flatMap(service -> foreignCommand(loaded, service));
-        if (foreign.isPresent()) {
-            return foreign.get();
-        }
         return baseCommand(loaded, scope, container)
                 + (namedByFilter(container, options) ? "" : filterArgument(options));
     }
@@ -772,7 +773,7 @@ public final class Containers {
             return handlers.get();
         }
         if (container.scope() == Surface.Scope.SERVICE && selectors.isEmpty() && !options.filtered()
-                && members(container).isEmpty() && foreignPairing(container).isEmpty()) {
+                && members(container).isEmpty()) {
             return Result.ok(serviceExamples(loaded, container));
         }
         int read = consumed(container, selectors);
@@ -823,7 +824,7 @@ public final class Containers {
         }
         List<ServiceHandlers.Handler> handlers = described.get().handlers();
         if (!selectors.isEmpty()) {
-            handlers = handlers.stream().filter(handler -> selectors.get(0).equals(handler.name())).toList();
+            handlers = handlers.stream().filter(handler -> names(handler, selectors.get(0))).toList();
             if (handlers.isEmpty()) {
                 String base = baseCommand(loaded, container.scope(), container);
                 return Optional.of(Result.err(loaded.symbolNotFound(selectors,

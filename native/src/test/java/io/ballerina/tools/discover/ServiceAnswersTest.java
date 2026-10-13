@@ -32,6 +32,7 @@ import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
+import io.ballerina.tools.discover.views.Overview;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -153,25 +154,25 @@ public class ServiceAnswersTest {
     }
 
     @Test
-    public void anotherPackagesDefaultModuleIsOpenedInThatPackage() {
+    public void anotherPackagesServiceTypeOpensInTheListenersPackageAndNamesWhereItIsDeclared() {
         HttpOptions http = central("ballerinax__postgresql", false);
-        JsonObject answer = json(http, "ballerinax/postgresql", "service", "cdc:Service");
-        Assert.assertEquals(answer.get("container").getAsString(), "cdc:Service");
-        Assert.assertTrue(answer.get("note").getAsString()
-                .contains("declared in ballerinax/cdc — bal discover ballerinax/cdc service Service"));
-        JsonObject roster = json(http, "ballerinax/postgresql", "service");
-        Assert.assertTrue(roster.getAsJsonArray("containers").asList().stream()
-                .map(JsonElement::getAsJsonObject)
-                .anyMatch(container -> "cdc:Service".equals(container.get("name").getAsString())
-                        && "bal discover ballerinax/cdc service Service".equals(
-                                container.get("command").getAsString())), roster.toString());
+        for (List<String> argv : List.of(List.of("ballerinax/postgresql", "service", "cdc:Service"),
+                List.of("ballerinax/postgresql", "service"))) {
+            JsonObject answer = json(http, argv.toArray(new String[0]));
+            Assert.assertEquals(answer.get("container").getAsString(), "cdc:Service", argv.toString());
+            Assert.assertTrue(answer.get("note").getAsString()
+                    .contains("declared in ballerinax/cdc — bal discover ballerinax/cdc service Service"));
+        }
+        JsonObject overview = json(http, "ballerinax/postgresql");
+        Assert.assertEquals(overview.getAsJsonObject("serviceTypes").getAsJsonArray("entries").get(0)
+                .getAsJsonObject().get("command").getAsString(), "bal discover ballerinax/postgresql service "
+                + "cdc:Service", "the listener's package may describe the methods a service of it defines");
     }
 
     @Test
     public void aSiblingModulesServiceTypeIsReachedThroughModule() {
         LoadedPackage loaded = attaching(Node.external("test", "pkg.events", "Service"), null, "events");
-        Assert.assertEquals(roster(loaded).containers().get(0).command(),
-                "bal discover test/pkg --module events service Service");
+        Assert.assertEquals(rowCommand(loaded), "bal discover test/pkg service events:Service");
         Assert.assertTrue(open(loaded, "events:Service").get("note").getAsString()
                 .contains("declared in test/pkg.events — bal discover test/pkg --module events service Service"));
     }
@@ -179,29 +180,28 @@ public class ServiceAnswersTest {
     @Test
     public void aSiblingModulesServiceTypeIsReachedThroughModuleFromAnotherSubmodule() {
         LoadedPackage loaded = attaching(Node.external("test", "pkg.b", "Service"), "a", "a", "b");
-        Assert.assertEquals(roster(loaded).containers().get(0).command(),
-                "bal discover test/pkg --module b service Service");
+        Assert.assertTrue(bare(loaded).get("note").getAsString()
+                .endsWith(" — bal discover test/pkg --module b service Service"), bare(loaded).toString());
     }
 
     @Test
     public void aForeignServiceTypeNeedingQuotesIsQuotedInItsCommand() {
         LoadedPackage loaded = attaching(Node.external("test", "pkg.b", "'Service"), "a", "a", "b");
-        Assert.assertEquals(roster(loaded).containers().get(0).command(),
-                "bal discover test/pkg --module b service \"'Service\"");
+        Assert.assertTrue(bare(loaded).get("note").getAsString()
+                .endsWith(" — bal discover test/pkg --module b service \"'Service\""), bare(loaded).toString());
     }
 
     @Test
     public void theDefaultModuleIsReachedFromASubmoduleWithoutModule() {
         LoadedPackage loaded = attachingIn("pkg.core", Node.external("test", "pkg.core", "Service"), "events");
-        Assert.assertEquals(roster(loaded).containers().get(0).command(),
-                "bal discover test/pkg.core service Service");
+        Assert.assertTrue(bare(loaded).get("note").getAsString()
+                .endsWith(" — bal discover test/pkg.core service Service"), bare(loaded).toString());
     }
 
     @Test
     public void aPackageWhoseNameMerelyExtendsThisOneIsOpenedThroughItsLocalStub() {
         LoadedPackage loaded = attaching(Node.external("test", "pkg.driver", "Service"), null, "events");
-        Assert.assertEquals(roster(loaded).containers().get(0).command(),
-                "bal discover test/pkg service driver:Service");
+        Assert.assertEquals(rowCommand(loaded), "bal discover test/pkg service driver:Service");
         String note = open(loaded, "driver:Service").get("note").getAsString();
         Assert.assertTrue(note.endsWith("declared in test/pkg.driver"), note);
     }
@@ -209,7 +209,7 @@ public class ServiceAnswersTest {
     @Test
     public void anotherPackagesSubmoduleIsOpenedThroughItsLocalStub() {
         LoadedPackage loaded = attaching(Node.external("other", "lib.events", "Service"), null);
-        String command = roster(loaded).containers().get(0).command();
+        String command = rowCommand(loaded);
         Assert.assertEquals(command, "bal discover test/pkg service events:Service");
 
         JsonObject answer = open(loaded, command.substring(command.lastIndexOf(' ') + 1));
@@ -236,9 +236,16 @@ public class ServiceAnswersTest {
                 library, Optional.empty(), module, children, List.of(submodules), null, null, () -> library, Map::of);
     }
 
-    private static DiscoverResult.ContainerRoster roster(LoadedPackage loaded) {
-        return (DiscoverResult.ContainerRoster) Containers.render(loaded, Surface.Scope.SERVICE,
-                new Containers.Options(List.of(), null, 1)).value();
+    // The command the package's overview opens its one service type with.
+    private static String rowCommand(LoadedPackage loaded) {
+        return Overview.of(loaded).sections().stream()
+                .filter(section -> Surface.Scope.SERVICE.verb().equals(section.bucket()))
+                .findFirst().orElseThrow().rows().get(0).command();
+    }
+
+    private static JsonObject bare(LoadedPackage loaded) {
+        return JsonParser.parseString(JsonRenderer.render(Containers.render(loaded, Surface.Scope.SERVICE,
+                new Containers.Options(List.of(), null, 1)).value())).getAsJsonObject();
     }
 
     private static JsonObject open(LoadedPackage loaded, String selector) {

@@ -14,11 +14,48 @@ Methods (.)
 
 Next: bal discover ballerinax/postgresql client Client <name>
 == service ==
-ballerinax/postgresql · service
-1 service type
+ballerinax/postgresql · service · cdc:Service
+Methods to implement (6)
 
-postgresql:CdcListener
-  cdc:Service  bal discover ballerinax/cdc service Service
+remote function onRead(record {} afterEntry, string tableName) returns error?
+  optional
+  Invoked for each row captured during the initial snapshot of a table, before streaming of live changes from the replication slot begins.
+  afterEntry (required): The row as captured. Declare a record type to project its columns.
+  tableName (required): Name of the table the row came from, useful when one service handles several tables.
+
+remote function onCreate(record {} afterEntry, string tableName) returns error?
+  optional
+  Invoked when a row is inserted.
+  afterEntry (required): The row's state after the insert. Declare a record type to project its columns.
+  tableName (required): Name of the table the change occurred in.
+
+remote function onUpdate(record {} beforeEntry, record {} afterEntry, string tableName) returns error?
+  optional
+  Invoked when a row is updated, with both the pre- and post-change images of the row. Unless the table's REPLICA IDENTITY is set to FULL, the pre-image carries only the columns that make up the replica identity (the primary key by default), with the rest unset.
+  beforeEntry (required): The row's state before the update.
+  afterEntry (required): The row's state after the update.
+  tableName (required): Name of the table the change occurred in.
+
+remote function onDelete(record {} beforeEntry, string tableName) returns error?
+  optional
+  Invoked when a row is deleted. Only the pre-change image is available, and unless the table's REPLICA IDENTITY is set to FULL, it carries only the columns that make up the replica identity (the primary key by default).
+  beforeEntry (required): The row's state immediately before it was deleted.
+  tableName (required): Name of the table the change occurred in.
+
+remote function onTruncate(string tableName) returns error?
+  optional
+  Invoked when a table is truncated. No row images are available, only which table was affected.
+  tableName (required): Name of the table that was truncated.
+
+remote function onError(cdc:Error cdcError) returns error?
+  optional
+  Invoked when the connector fails to capture or dispatch a change event.
+  cdcError (required): The failure that interrupted change capture.
+
+Rules
+  At least one of: onRead, onCreate, onUpdate, onDelete, onTruncate — A CDC service must declare at least one change handler. onError alone never receives a change event, so the service would do nothing.
+
+Note: attach it to postgresql:CdcListener; declared in ballerinax/cdc — bal discover ballerinax/cdc service Service
 == class ==
 ballerinax/postgresql · class
 125 classes

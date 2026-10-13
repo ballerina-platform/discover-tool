@@ -215,15 +215,27 @@ remote function onError(kafka:Error kafkaError) returns error?
 Note: attach it to kafka:Listener
 ```
 
-A listener whose `attach` takes another package's type points there:
+A listener whose `attach` takes another package's type lists that type under the prefix it is written with, and
+opens it in the listener's own package: that package's `trigger-metadata.json` is where the methods a service of it
+defines are described (`ballerinax/cdc` publishes none). Without one, the answer is the one for a service type
+without methods. Either way the note names the package that declares it:
 
 ```
 $ bal discover ballerinax/postgresql service
-ballerinax/postgresql:1.19.0 · service
-1 service type
+ballerinax/postgresql:1.19.1 · service · cdc:Service
+Methods to implement (6)
 
-postgresql:CdcListener
-  cdc:Service  bal discover ballerinax/cdc service Service
+remote function onRead(record {} afterEntry, string tableName) returns error?
+  optional
+  Invoked for each row captured during the initial snapshot of a table, [...]
+  afterEntry (required): The row as captured. Declare a record type to project its columns.
+  tableName (required): Name of the table the row came from, useful when one service handles several tables.
+[...]
+
+Rules
+  At least one of: onRead, onCreate, onUpdate, onDelete, onTruncate — A CDC service must declare at least one change handler. [...]
+
+Note: attach it to postgresql:CdcListener; declared in ballerinax/cdc — bal discover ballerinax/cdc service Service
 ```
 
 A bucket with too many resource paths to list is grouped by path segment:

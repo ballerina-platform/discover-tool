@@ -33,6 +33,9 @@ import io.ballerina.tools.discover.model.ServiceHandlers;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.source.TriggerMetadata;
+import io.ballerina.tools.discover.symbols.Surface;
+import io.ballerina.tools.discover.views.Containers;
+import io.ballerina.tools.discover.views.Overview;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -47,6 +50,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -128,6 +132,48 @@ public class ServiceHandlersTest {
                 + "kafka:AnydataConsumerRecord[]|kafka:BytesConsumerRecord[] records) returns error?");
         Assert.assertFalse(consumer.params().get(0).required());
         Assert.assertTrue(consumer.params().get(1).required());
+    }
+
+    @Test
+    public void aListenerPackageDescribesAnotherModulesServiceTypeUnderThatModulesPrefix() {
+        Map<String, ServiceHandlers> postgresql = recorded("ballerinax__postgresql", "postgresql");
+        Assert.assertEquals(postgresql.keySet(), Set.of("cdc:Service"));
+        Assert.assertEquals(postgresql.get("cdc:Service").handlers().stream().map(ServiceHandlers.Handler::name)
+                .toList(), List.of("onRead", "onCreate", "onUpdate", "onDelete", "onTruncate", "onError"));
+    }
+
+    @Test
+    public void aForeignServiceTypeIsAnsweredFromTheListenerPackagesOwnDescription() {
+        LoadedPackage postgresql = FixtureCorpus.loadedFixture("ballerinax__postgresql");
+        for (List<String> selectors : List.of(List.<String>of(), List.of("cdc:Service"))) {
+            DiscoverResult.ServiceHandlerList answer = (DiscoverResult.ServiceHandlerList) Containers.render(
+                    postgresql, Surface.Scope.SERVICE, new Containers.Options(selectors)).value();
+            Assert.assertEquals(answer.container(), "cdc:Service");
+            Assert.assertEquals(answer.handlers().size(), 6, selectors.toString());
+            Assert.assertTrue(answer.note().startsWith("attach it to postgresql:CdcListener; declared in "
+                    + "ballerinax/cdc"), answer.note());
+        }
+        for (String typed : List.of("onCreate", "'onCreate")) {
+            DiscoverResult.ServiceHandlerList one = (DiscoverResult.ServiceHandlerList) Containers.render(postgresql,
+                    Surface.Scope.SERVICE, new Containers.Options(List.of("cdc:Service", typed))).value();
+            Assert.assertEquals(one.handlers().stream().map(ServiceHandlers.Handler::name).toList(),
+                    List.of("onCreate"), typed);
+        }
+        Assert.assertEquals(Overview.of(postgresql).sections().stream()
+                .filter(section -> section.bucket().equals("service")).findFirst().orElseThrow().rows().get(0)
+                .command(), "bal discover ballerinax/postgresql service cdc:Service",
+                "opened in the listener's package, which describes it");
+    }
+
+    @Test
+    public void aForeignServiceTypeNoPackageDescribesAnswersWithTheReadmeAndWhereItIsDeclared() {
+        LoadedPackage described = FixtureCorpus.loadedFixture("ballerinax__postgresql");
+        LoadedPackage postgresql = new LoadedPackage(described.qualified(), described.version(), described.library(),
+                described.readme(), null, List.of(), List.of(), null, null, described::library, Map::of);
+        DiscoverResult.ServiceExamples answer = (DiscoverResult.ServiceExamples) Containers.render(postgresql,
+                Surface.Scope.SERVICE, new Containers.Options(List.of("cdc:Service"))).value();
+        Assert.assertEquals(answer.container(), "cdc:Service");
+        Assert.assertTrue(answer.note().contains("declared in ballerinax/cdc"), answer.note());
     }
 
     @Test

@@ -69,6 +69,7 @@ public final class TriggerMetadata {
     private static final String KIND = "kind";
     private static final String ADD_MODE = "addMode";
     private static final String MANY = "many";
+    private static final String PACKAGE_INFO = "packageInfo";
 
     private TriggerMetadata() {
     }
@@ -79,7 +80,8 @@ public final class TriggerMetadata {
      * that publishes no description is cached too, as an empty object, so its archive is not fetched again.
      *
      * @param prefix the alias the described module is written with — {@code kafka} in {@code kafka:Caller}
-     * @return each service type that declares its handlers in the file, by the type's name
+     * @return each service type that declares its handlers in the file, by the type's name — another module's
+     *     with that module's prefix, {@code cdc:Service}
      */
     public static Map<String, ServiceHandlers> load(PackageRepository repository, QualifiedName qualified,
             CentralClient.ResolvedVersion resolved, String moduleId, String prefix, HttpOptions options) {
@@ -117,7 +119,7 @@ public final class TriggerMetadata {
                 try {
                     JsonObject serviceType = element.getAsJsonObject();
                     serviceHandlers(serviceType, topRules, prefix).ifPresent(handlers ->
-                            byType.put(serviceType.getAsJsonObject(TYPE).get(NAME).getAsString(), handlers));
+                            byType.put(serviceTypeName(serviceType.getAsJsonObject(TYPE), prefix), handlers));
                 } catch (RuntimeException unwritable) {
                     // This service type's handlers cannot be written down; the others still can.
                 }
@@ -126,6 +128,21 @@ public final class TriggerMetadata {
             return Map.of();
         }
         return byType;
+    }
+
+    // A listener can take another module's service type, which it then describes: postgresql's CdcListener takes
+    // cdc:Service. That one is keyed as the listener's package writes it, `cdc:Service`; its own by bare name.
+    private static String serviceTypeName(JsonObject type, String prefix) {
+        String name = type.get(NAME).getAsString();
+        if (!type.has(PACKAGE_INFO)) {
+            return name;
+        }
+        String declaredIn = moduleOf(type.getAsJsonObject(PACKAGE_INFO)).prefix();
+        return declaredIn.equals(prefix) ? name : declaredIn + ":" + name;
+    }
+
+    private static ModuleRef moduleOf(JsonObject packageInfo) {
+        return new ModuleRef(packageInfo.get("org").getAsString(), packageInfo.get("moduleName").getAsString());
     }
 
     private static JsonElement read(String json) {
@@ -243,10 +260,8 @@ public final class TriggerMetadata {
         if (booleanOf(object, "builtin")) {
             return name;
         }
-        if (object.has("packageInfo")) {
-            JsonObject module = object.getAsJsonObject("packageInfo");
-            return new ModuleRef(module.get("org").getAsString(), module.get("moduleName").getAsString()).prefix()
-                    + ":" + name;
+        if (object.has(PACKAGE_INFO)) {
+            return moduleOf(object.getAsJsonObject(PACKAGE_INFO)).prefix() + ":" + name;
         }
         return prefix + ":" + name;
     }
