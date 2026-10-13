@@ -415,12 +415,15 @@ public sealed interface DiscoverResult {
             String next, String warning, String note) implements DiscoverResult {
 
         /**
-         * One line of Ballerina that constructs the container, and the command that opens its constructor.
+         * One line of Ballerina that constructs the container, and its constructor's parameters.
          *
-         * @param code the line, e.g. {@code kafka:Producer producer = check new (string|string[] bootstrapServers);}
-         * @param command the command that opens the constructor's own signature
+         * @param code the line, e.g. {@code kafka:Producer producer = check new (bootstrapServers, config);}
+         * @param init the constructor's parameters as declared, e.g.
+         *     {@code init(string|string[] bootstrapServers, *kafka:ProducerConfiguration config)}, or {@code null} for
+         *     a class that declares no constructor
+         * @param command the command that opens the constructor's own signature, or {@code null} when it has none
          */
-        public record Create(String code, String command) { }
+        public record Create(String code, String init, String command) { }
 
         /**
          * @param name the parameter's name

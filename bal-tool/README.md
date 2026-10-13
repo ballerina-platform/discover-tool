@@ -397,7 +397,8 @@ ballerinax/kafka:4.6.5 · client · Producer · send
 isolated remote function send(AnydataProducerRecord producerRecord) returns Error?;
 
 Create it
-  kafka:Producer producer = check new (string|string[] bootstrapServers, *kafka:ProducerConfiguration config);
+  kafka:Producer producer = check new (bootstrapServers, config);
+  init(string|string[] bootstrapServers, *kafka:ProducerConfiguration config)
   bal discover ballerinax/kafka client Producer init
 
 Types it uses (2)
@@ -424,11 +425,13 @@ Readme sections that call it
   7  Data serialization  bal discover ballerinax/kafka readme 7
 ```
 
-*Create it* is derived from the container's `init` alone: the type with the prefix its import binds, a variable
-named after it (with the prefix when that would be a keyword: `github:Client githubClient`), `check` exactly when
-`init` declares a return type, and the parameters as `init` declares them, defaults included — a template to fill
-in. A function, a constructor, a service type and a container with no `init` (`sql:Client`, an object type) get
-none.
+*Create it* is derived from the container's `init` alone. Its first line is Ballerina that compiles once its
+arguments are in scope: the type with the prefix its import binds, a variable named after it (with the prefix when
+that would be a keyword: `github:Client githubClient`), `check` exactly when `init` declares a return type, and the
+required parameters passed by name, an included record (`*kafka:ProducerConfiguration config`) as `config`; a
+parameter with a default and a rest parameter are left out. The next line is `init`'s parameters as declared, so
+each argument's type and every default stay in view. A class with no `init` is `new ()`. A function, a constructor,
+a service type and an object type (`sql:Client`) get none.
 
 *Readme sections that call it* are read off each section's fenced code: `->name(` for a remote method; for a
 resource method its accessor (`get` when the call names none) and literal segments, with any segment matching a

@@ -438,8 +438,10 @@ public final class TextRenderer {
     private static void signature(Layout layout, DiscoverResult.Signature signature) {
         layout.block(List.of(signature.declaration()));
         if (signature.create() != null) {
-            layout.block(List.of("Create it", INDENT + signature.create().code(),
-                    INDENT + signature.create().command()));
+            List<String> create = new ArrayList<>(List.of("Create it", INDENT + signature.create().code()));
+            Stream.of(signature.create().init(), signature.create().command()).filter(Objects::nonNull)
+                    .forEach(line -> create.add(INDENT + line));
+            layout.block(create);
         }
         List<DiscoverResult.Signature.Type> types = signature.types();
         for (int i = 0; i < types.size(); i++) {

@@ -22,6 +22,7 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Param;
+import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Identifiers;
@@ -30,62 +31,88 @@ import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * The one line that constructs a client or class, derived from its {@code init} alone:
- * {@code kafka:Producer producer = check new (string|string[] bootstrapServers, *kafka:ProducerConfiguration config);}.
+ * How to construct a client or class, derived from its {@code init} alone: a line that compiles once its arguments
+ * are in scope, {@code kafka:Producer producer = check new (bootstrapServers, config);}, and {@code init}'s
+ * parameters as declared, {@code init(string|string[] bootstrapServers, *kafka:ProducerConfiguration config)}, so
+ * each argument's type is on the next line.
  *
  * <p>Every name the package declares is written with the prefix its import binds, as a caller's code spells it.
  * {@code check} is there exactly when {@code init} declares a return type, since an {@code init} can return only an
- * error or nil. The variable is the type's name with a lower-case first letter, and the prefix before it when that
- * would be a keyword ({@code github:Client githubClient}). Parameters are listed as {@code init} declares them,
- * defaults included, so the line is a template to fill in rather than code that compiles as it stands.
+ * error or nil. The variable is the type's name with its leading capitals lower-cased ({@code HTTPClient} is
+ * {@code httpClient}), and the prefix before it when that would be a keyword ({@code github:Client githubClient}).
+ * The arguments are the required parameters by name, an included record's included: a parameter with a default and
+ * a rest parameter may be left out. A class with no {@code init} is constructed with no arguments; an object type
+ * is not constructed at all.
  *
  * @since 0.1.0
  */
 final class Construction {
 
-    private static final String MODULE_SEPARATOR = ".";
+    private static final Pattern NOT_IDENTIFIER = Pattern.compile("[^A-Za-z0-9_]");
 
     private Construction() {
     }
 
-    /** How to construct {@code container}, when it is a client or a class with a constructor. */
+    /** How to construct {@code container}, when it is a client or a class that can be constructed. */
     static Optional<DiscoverResult.Signature.Create> of(LoadedPackage loaded, Surface.Container container,
             String initCommand) {
         boolean constructible = container.scope() == Surface.Scope.CLIENT || container.scope() == Surface.Scope.CLASS;
-        Optional<Fn.Constructor> init = constructible ? container.constructor() : Optional.empty();
-        if (init.isEmpty()) {
+        if (!constructible) {
             return Optional.empty();
         }
-        ModuleRef own = new ModuleRef(loaded.qualified().org(), loaded.module() == null
-                ? loaded.qualified().name()
-                : loaded.qualified().name() + MODULE_SEPARATOR + loaded.module());
-        String type = own.prefix() + ":" + container.name();
-        String params = init.get().params().stream()
-                .map(param -> written(param, own))
+        ModuleRef own = loaded.moduleRef();
+        String type = own.prefix() + ":" + container.plainName();
+        Optional<Fn.Constructor> init = container.constructor();
+        if (init.isEmpty()) {
+            return isClass(loaded, container)
+                    ? Optional.of(new DiscoverResult.Signature.Create(
+                            type + " " + variable(container, own) + " = new ();", null, null))
+                    : Optional.empty();
+        }
+        String arguments = init.get().params().stream()
+                .filter(Construction::isRequired)
+                .map(param -> Identifiers.write(param.name()))
+                .collect(Collectors.joining(", "));
+        String declared = init.get().params().stream()
+                .map(param -> Signatures.renderParam(param, written -> qualified(written, own)))
                 .collect(Collectors.joining(", "));
         String check = init.get().returns().hasType() ? "check " : "";
         return Optional.of(new DiscoverResult.Signature.Create(
-                type + " " + variable(container, own) + " = " + check + "new (" + params + ");", initCommand));
+                type + " " + variable(container, own) + " = " + check + "new (" + arguments + ");",
+                Fn.Constructor.NAME + "(" + declared + ")", initCommand));
+    }
+
+    private static boolean isRequired(Param param) {
+        return switch (param.form()) {
+            case INCLUSION -> true;
+            case REST -> false;
+            case NORMAL -> !param.hasDefault();
+        };
+    }
+
+    private static boolean isClass(LoadedPackage loaded, Surface.Container container) {
+        return loaded.library().addressable().stream()
+                .anyMatch(declared -> declared instanceof TypeDef.ObjectDef object
+                        && object.name().equals(container.name())
+                        && object.form() == TypeDef.ObjectDef.Form.CLASS);
     }
 
     private static String variable(Surface.Container container, ModuleRef own) {
-        String name = container.plainName();
-        String lower = Character.toLowerCase(name.charAt(0)) + name.substring(1);
+        String name = NOT_IDENTIFIER.matcher(container.plainName()).replaceAll("");
+        int capitals = 0;
+        while (capitals < name.length() && Character.isUpperCase(name.charAt(capitals))) {
+            capitals++;
+        }
+        // Of a run of capitals, the last starts the next word when a lower-case letter follows it: `HTTPClient`.
+        int lowered = capitals > 1 && capitals < name.length() ? capitals - 1 : Math.max(capitals, 1);
+        String lower = name.substring(0, lowered).toLowerCase(Locale.ROOT) + name.substring(lowered);
         return Identifiers.write(lower).equals(lower) ? lower : own.prefix() + name;
-    }
-
-    private static String written(Param param, ModuleRef own) {
-        String type = qualified(param.type(), own);
-        String name = Identifiers.write(param.name());
-        return switch (param.form()) {
-            case INCLUSION -> "*" + type + " " + name;
-            case REST -> type + "... " + name;
-            case NORMAL -> type + " " + name + (param.hasDefault() ? " = " + param.defaultValue() : "");
-        };
     }
 
     // The type as a caller writes it: names of other modules with their prefixes, and this module's with its own.
