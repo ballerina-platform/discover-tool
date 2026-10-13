@@ -898,9 +898,18 @@ public final class Containers {
                 fn instanceof Fn.Resource resource ? resource.accessor() : null,
                 fn instanceof Fn.Resource ? PathTree.join(entry.path()) : null,
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
-                types, omitted, foreign, create, List.of(),
+                types, omitted, foreign, create, callers(loaded, container, entry),
                 documentedOn(window, documented, 0), window.paging(), window.next(command),
                 loaded.warning(), note));
+    }
+
+    // The one place readme examples join a method's answer; dropping this call drops the feature.
+    private static List<DiscoverResult.ReadmeSections.Section> callers(LoadedPackage loaded,
+            Surface.Container container, Entry entry) {
+        return ReadmeCalls.calling(loaded, container, entry).stream()
+                .map(section -> new DiscoverResult.ReadmeSections.Section(section.number(), section.title(),
+                        section.lines(), loaded.command() + " " + Readme.BUCKET + " " + section.number()))
+                .toList();
     }
 
     private static Result<DiscoverResult> mixedAnswer(
