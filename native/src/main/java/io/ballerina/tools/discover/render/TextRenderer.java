@@ -67,8 +67,6 @@ public final class TextRenderer {
 
     private static final String SEARCH_PLACEHOLDER = "<keyword>";
 
-    private static final String COMMAND_PREFIX = "bal discover ";
-
     private TextRenderer() {
     }
 
@@ -205,7 +203,7 @@ public final class TextRenderer {
         }
         layout.warning(overview.warning());
         if (where.pkg() != null && !overview.sections().isEmpty()) {
-            layout.next("bal discover " + Coordinate.argument(where.pkg(), where.pin(), where.module()) + " search "
+            layout.next(Coordinate.COMMAND + Coordinate.argument(where.pkg(), where.pin(), where.module()) + " search "
                     + SEARCH_PLACEHOLDER);
         }
     }
@@ -588,7 +586,7 @@ public final class TextRenderer {
         layout.top(counted(search.packagesTotal(), "package", "packages") + ", "
                 + counted(search.symbolsTotal(), "symbol", "symbols"));
         List<String> packageRows = search.packages().stream()
-                .map(hit -> hit.command().substring(COMMAND_PREFIX.length()))
+                .map(DiscoverResult.CentralSearch.PackageHit::arguments)
                 .toList();
         Drill packages = Drill.of(packageRows,
                 search.packages().stream().map(DiscoverResult.CentralSearch.PackageHit::command).toList(), "<row>");
@@ -598,7 +596,7 @@ public final class TextRenderer {
         }
         layout.section(shownOf("Packages", search.packages().size(), search.packagesTotal()), packageTable);
         List<String> symbolRows = search.symbols().stream()
-                .map(hit -> hit.command().substring(COMMAND_PREFIX.length()))
+                .map(DiscoverResult.CentralSearch.SymbolHit::arguments)
                 .toList();
         Drill symbols = Drill.of(symbolRows,
                 search.symbols().stream().map(DiscoverResult.CentralSearch.SymbolHit::command).toList(), "<row>");

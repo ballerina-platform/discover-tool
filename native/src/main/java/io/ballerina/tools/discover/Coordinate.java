@@ -40,7 +40,8 @@ public record Coordinate(QualifiedName qualified, Version version) {
     private static final char QUOTE = '\'';
     private static final String VERSION_PREFIX = "v";
     private static final String ORG_PLACEHOLDER = "org";
-    private static final String COMMAND = "bal discover ";
+    /** What every command this tool prints starts with. */
+    public static final String COMMAND = "bal discover ";
     private static final String COMPLETE_FORM = ":<major>.<minor>.<patch>";
     private static final String LOCKED_OR_LATEST = " to read the version your project locks or Central's latest: ";
     private static final Pattern THREE_NUMBERS = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)$");

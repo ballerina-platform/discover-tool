@@ -25,7 +25,11 @@ import io.ballerina.tools.discover.cli.Cli;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * {@code bal discover search <keywords...>}: Central's package and symbol searches, every row followable.
@@ -116,13 +120,112 @@ public class CentralSearchTest {
     }
 
     @Test
+    public void aResourceRowCarriesItsPathAndAccessorAsTheInPackageSearchDoes() {
+        JsonObject row = search(central(), "search", "kafka").getAsJsonObject("symbols").getAsJsonArray("entries")
+                .get(1).getAsJsonObject();
+        Assert.assertEquals(row.get("container").getAsString(), "Client");
+        Assert.assertEquals(row.get("path").getAsString(), "repos/:owner/:repo/import");
+        Assert.assertEquals(row.get("accessor").getAsString(), "get");
+        Assert.assertFalse(row.has("name"), row.toString());
+    }
+
+    // One row of every symbolType Central's search answered for a spread of queries (2026-10-13), as recorded.
+    private static final Map<String, String> COMMANDS_BY_KIND = commandsByKind();
+
+    private static Map<String, String> commandsByKind() {
+        Map<String, String> commands = new LinkedHashMap<>();
+        commands.put("annotation", "sabtharm/http:2.12.3 type CallerInfo");
+        commands.put("any data type", "ballerinax/squareup:1.3.2 type Status");
+        commands.put("array type", "ballerinax/openai.text:1.0.6 type PromptItemsArray");
+        commands.put("class", "ballerinax/trigger.asb:1.2.0 class Caller");
+        commands.put("method", "ballerina/workflow:1.0.0 class DurableAgent getStatus");
+        commands.put("client", "ballerina/smpp:1.0.0 client Caller");
+        commands.put("remote method", "ballerinax/twilio:5.0.2 client Client fetchOutgoingCallerId");
+        commands.put("resource method", "luheerathantheva/newcon:0.1.0 client Client status get");
+        commands.put("configurable", "ballerina/etl:0.8.1");
+        commands.put("constant", "ballerinax/health.dicom:0.1.0 type TAG_ANCHOR_POINT_ANNOTATION_UNITS");
+        commands.put("decimal type", "ballerinax/smartsheet:1.0.2 type Id");
+        commands.put("enum", "ballerina/ldap:1.4.2 type Status");
+        commands.put("error", "ballerina/test:2201.10.4 type FunctionCallError");
+        commands.put("function", "commons/service_commons:0.1.0 --module auth funcs callerOf");
+        commands.put("function type", "tharmigan/reliable.messaging:0.4.0 type Transformer");
+        commands.put("intersection type", "tharmigan/reliable.messaging:0.4.0 type ExecutionError");
+        commands.put("listener", "ballerina/mcp:1.3.0 type Listener");
+        commands.put("listener method", "ballerina/websub:2.15.2 type Listener");
+        commands.put("map type", "ballerina/workflow:1.0.0 type JsonObject");
+        commands.put("object type", "sabtharm/http:2.12.3 type Status");
+        commands.put("object type method", "ballerina/sql:1.19.0 type SchemaClient");
+        commands.put("remote method/object", "ballerina/sql:1.19.0 client Client query");
+        commands.put("record", "ballerinax/twilio:5.0.2 type ListOutgoingCallerIdResponse");
+        commands.put("service type", "ballerina/messaging:1.0.1 service StoreService");
+        commands.put("method/service", "ballerinax/trigger.slack:0.9.0 service GroupService onGroupClose");
+        commands.put("simple name reference type", "ballerinax/discord:2.0.1 type "
+                + "InlineArrayItemsSkuIdsSkuIdsOneOf12");
+        commands.put("string type", "ballerinax/gotomeeting:1.5.2 type Status");
+        commands.put("tuple type", "tharmigan/reliable.messaging:0.4.0 type DestinationWithProcessors");
+        commands.put("type", "ballerinax/client.config:1.0.1 type AuthConfig");
+        commands.put("type descriptor type", "ballerina/protobuf:1.8.0 --module types.any type ValueTypeDesc");
+        commands.put("union type", "ballerinax/microsoft.sharepoint.sites:1.0.2 type Status");
+        commands.put("variable", "ballerinax/health.dicom:0.1.0 type VARIABLE_LENGTH_VALUE_BYTES");
+        commands.put("xml type", "ballerina/lang.xml:2201.13.2 type XmlType");
+        return commands;
+    }
+
+    @Test
+    public void everySymbolKindCentralAnswersOpensTheBucketThisToolListsItUnder() throws IOException {
+        String recorded = Files.readString(FixtureCorpus.FIXTURES_DIR.resolve("search").resolve(
+                "symbols-by-kind.json"));
+        JsonObject answer = search(FakeTransport.routing(url -> url.contains("search-symbols")
+                ? FakeTransport.ok(recorded)
+                : FakeTransport.ok(PACKAGES)), "search", "any");
+        List<String> commands = answer.getAsJsonObject("symbols").getAsJsonArray("entries").asList().stream()
+                .map(row -> row.getAsJsonObject().get("command").getAsString())
+                .sorted()
+                .toList();
+        Assert.assertEquals(commands, COMMANDS_BY_KIND.values().stream().map(args -> "bal discover " + args)
+                .sorted().toList());
+    }
+
+    @Test
+    public void aRowMissingWhatItsCommandNeedsOrOfAnUnknownKindOpensThePackage() {
+        String rows = "{\"symbols\":["
+                + symbol("acme", "pkg", "pkg", "client-method", "", "query", false, true) + ","
+                + symbol("acme", "pkg", "pkg", "listener-method", "", "attach", false, false) + ","
+                + symbol("acme", "pkg", "pkg", "client-method", "Client", "get", true, false) + ","
+                + symbol("acme", "pkg", "pkg", "something-new", "", "Thing", false, false) + ","
+                + symbol("acme", "pkg", "pkg", "client-method", "Client", "get [string ...path]", true, false)
+                + "],\"count\":5}";
+        JsonArray entries = search(FakeTransport.routing(url -> url.contains("search-symbols")
+                ? FakeTransport.ok(rows)
+                : FakeTransport.ok(PACKAGES)), "search", "any").getAsJsonObject("symbols").getAsJsonArray("entries");
+        List<String> commands = entries.asList().stream()
+                .map(row -> row.getAsJsonObject().get("command").getAsString())
+                .toList();
+        Assert.assertEquals(commands, List.of("bal discover acme/pkg:1.0.0", "bal discover acme/pkg:1.0.0",
+                "bal discover acme/pkg:1.0.0", "bal discover acme/pkg:1.0.0",
+                "bal discover acme/pkg:1.0.0 client Client :...path get"));
+    }
+
+    @Test
+    public void aSummaryIsCutAtASentencesEndNotAtAnAbbreviationAndKeepsItsUnderscores() {
+        String packages = "{\"packages\":[{\"organization\":\"a\",\"name\":\"b\",\"version\":\"1.0.0\","
+                + "\"summary\":\"Calls v2. the API, e.g. the __init hook and **bold** text. Then more.\"}],"
+                + "\"count\":1}";
+        JsonObject answer = search(FakeTransport.routing(url -> url.contains("search-symbols")
+                ? FakeTransport.ok("{\"symbols\":[],\"count\":0}")
+                : FakeTransport.ok(packages)), "search", "b");
+        Assert.assertEquals(answer.getAsJsonObject("packages").getAsJsonArray("entries").get(0).getAsJsonObject()
+                .get("summary").getAsString(), "Calls v2. the API, e.g. the __init hook and bold text.");
+    }
+
+    @Test
     public void aPageTurnsBothRankingsAtOnce() {
         FakeTransport transport = central();
         JsonObject answer = search(transport, "search", "kafka send", "--page", "2");
         Assert.assertTrue(transport.urls().stream().anyMatch(url -> url.contains("registry/packages/?q=kafka+send"
                 + "&limit=10&offset=10")), transport.urls().toString());
-        Assert.assertTrue(transport.urls().stream().anyMatch(url -> url.contains("registry/search-symbols?q=kafka+send"
-                + "&limit=25&offset=25")), transport.urls().toString());
+        Assert.assertTrue(transport.urls().stream().anyMatch(url -> url.contains("registry/search-symbols?q=kafka+AND"
+                + "+send&limit=25&offset=25")), transport.urls().toString());
         Assert.assertEquals(answer.get("page").getAsInt(), 2);
         Assert.assertEquals(answer.get("next").getAsString(), "bal discover search \"kafka send\" --page 3");
 

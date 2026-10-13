@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.render;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.model.ServiceHandlers;
 
 import java.util.Collections;
@@ -657,9 +658,14 @@ public sealed interface DiscoverResult {
          * @param qualified {@code org/name}
          * @param version the version Central matched
          * @param summary the package's own summary, its first sentence, or empty
-         * @param command the command that opens its overview
+         * @param arguments what follows {@code bal discover} in the command that opens its overview
          */
-        public record PackageHit(String qualified, String version, String summary, String command) { }
+        public record PackageHit(String qualified, String version, String summary, String arguments) {
+
+            public String command() {
+                return Coordinate.COMMAND + arguments;
+            }
+        }
 
         /**
          * @param qualified {@code org/name} of the package that declares it
@@ -667,11 +673,18 @@ public sealed interface DiscoverResult {
          * @param module the submodule that declares it, or {@code null} for the package's default module
          * @param kind what it is, in words: {@code remote method}, {@code record}
          * @param container the client, class or service type that declares a method, or {@code null}
-         * @param name its name, or a resource method's path and accessor
-         * @param command the command that opens it
+         * @param name its name, or {@code null} for a resource method
+         * @param path a resource method's path, as this tool prints it, or {@code null}
+         * @param accessor a resource method's accessor, or {@code null}
+         * @param arguments what follows {@code bal discover} in the command that opens it
          */
         public record SymbolHit(String qualified, String version, String module, String kind, String container,
-                String name, String command) { }
+                String name, String path, String accessor, String arguments) {
+
+            public String command() {
+                return Coordinate.COMMAND + arguments;
+            }
+        }
     }
 
     /**
