@@ -42,13 +42,31 @@ public final class JsonRenderer {
         return toJson(result).toString();
     }
 
-    /** {@code result} with the version it was read at as its first field. */
-    public static String render(DiscoverResult result, String version) {
+    /**
+     * {@code result} led by the package it answers about — {@code qualified}, {@code version} and, under
+     * {@code --module}, {@code module} — named as a failure names them.
+     *
+     * @param where the package, its version and module, or {@code null} for an answer about no one package
+     */
+    public static String render(DiscoverResult result, Where where) {
         JsonObject answer = new JsonObject();
-        answer.addProperty("version", version);
+        if (where != null) {
+            answer.addProperty("qualified", where.qualified());
+            answer.addProperty("version", where.version());
+            addIfPresent(answer, "module", where.module());
+        }
         toJson(result).entrySet().forEach(field -> answer.add(field.getKey(), field.getValue()));
         return answer.toString();
     }
+
+    /**
+     * The package an answer is about.
+     *
+     * @param qualified {@code org/name}
+     * @param version the version that was read
+     * @param module the {@code --module} submodule, or {@code null} for the default module
+     */
+    public record Where(String qualified, String version, String module) { }
 
     private static JsonObject toJson(DiscoverResult result) {
         return switch (result) {
