@@ -318,13 +318,13 @@ public class ViewsTest {
     @Test
     public void aMemberOnSeveralContainersFailsWithTheBucketsListing() {
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
-        // `commit` is a keyword, so the method is declared, listed and typed `'commit`.
-        assertMiss(miss(kafka, Surface.Scope.CLIENT, "'commit"),
-                "''commit' is not a client in " + kafka.label() + ".",
-                "It is a method of Caller and Consumer. List the clients: `bal discover ballerinax/kafka client`.",
-                "bal discover ballerinax/kafka client");
-        assertMiss(miss(kafka, Surface.Scope.CLIENT, "commit"), "'commit' is not a client in " + kafka.label() + ".",
-                "List the clients: `bal discover ballerinax/kafka client`.", "bal discover ballerinax/kafka client");
+        // `commit` is a keyword, declared `'commit`: listed `commit`, and typed either way.
+        for (String typed : List.of("commit", "'commit")) {
+            assertMiss(miss(kafka, Surface.Scope.CLIENT, typed), "'" + typed + "' is not a client in " + kafka.label()
+                            + ".",
+                    "It is a method of Caller and Consumer. List the clients: `bal discover ballerinax/kafka client`.",
+                    "bal discover ballerinax/kafka client");
+        }
     }
 
     @Test
@@ -403,17 +403,19 @@ public class ViewsTest {
                 "'repos/:owner/:repo/caches' is not a resource path of Client in " + github.label() + ".",
                 "List what is under repos/:owner/:repo: `" + client + " repos/:owner/:repo`.",
                 client + " repos/:owner/:repo");
-        assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "gists/public", "get"),
-                "'gists/public get' is not a resource method of Client in " + github.label() + ".",
-                "List what is under gists: `" + client + " gists`.", client + " gists");
+        assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "gists/public", "head"),
+                "'gists/public head' is not a resource method of Client in " + github.label() + ".",
+                "List what is under gists/public: `" + client + " gists/public`.", client + " gists/public");
         // A path split across two positionals is read as a path and an accessor, and is neither.
         assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "repos/:owner/:repo", "issues"),
                 "'repos/:owner/:repo issues' is not a resource method of Client in " + github.label() + ".",
                 "List what is under repos/:owner/:repo: `" + client + " repos/:owner/:repo`.",
                 client + " repos/:owner/:repo");
-        // The keyword escape is part of the segment, exactly as printed.
-        Assert.assertEquals(signature(github, Surface.Scope.CLIENT, "Client", "gists/'public", "get").path(),
-                "gists/'public");
+        // A keyword segment is printed plain, and Ballerina's own spelling of it names the same segment.
+        for (String typed : List.of("gists/public", "gists/'public")) {
+            Assert.assertEquals(signature(github, Surface.Scope.CLIENT, "Client", typed, "get").path(),
+                    "gists/public");
+        }
     }
 
     @Test
@@ -496,15 +498,17 @@ public class ViewsTest {
             Assert.assertTrue(post.declaration().contains("resource function post chat\\.postMessage"),
                     selectors + " did not resolve:\n" + post.declaration());
         }
-        // The declaration's own escaping is source spelling, not the one a command takes.
-        miss(slack, Surface.Scope.CLIENT, "Client", "post", "chat\\.postMessage");
+        // The declaration's own escaping spells the same segment; a path and its accessor are still two arguments.
+        Assert.assertEquals(signature(slack, Surface.Scope.CLIENT, "Client", "post", "chat\\.postMessage").path(),
+                "chat.postMessage");
         miss(slack, Surface.Scope.CLIENT, "Client", "post chat.postMessage");
 
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
         Assert.assertTrue(resourcePaths(render(github, Surface.Scope.CLIENT,
                 List.of("Client", "repos/:owner/:repo/code-scanning/alerts", "get"))).stream()
                 .anyMatch(path -> path.contains("code-scanning/alerts")));
-        miss(github, Surface.Scope.CLIENT, "Client", "repos/:owner/:repo/code\\-scanning/alerts", "get");
+        Assert.assertFalse(resourcePaths(render(github, Surface.Scope.CLIENT,
+                List.of("Client", "repos/:owner/:repo/code\\-scanning/alerts", "get"))).isEmpty());
     }
 
     /**
@@ -516,7 +520,7 @@ public class ViewsTest {
      * package declares.
      */
     @Test
-    public void newAddressesTheConstructorAndAKeywordPathKeepsItsEscape() {
+    public void newAddressesTheConstructorUnlessAPathIsCalledNew() {
         for (String slug : FixtureCorpus.listFixtures()) {
             LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
             for (Surface.Container container : Surface.of(loaded.library(), Surface.Scope.CLIENT)) {
@@ -530,13 +534,15 @@ public class ViewsTest {
             }
         }
 
-        // A path segment called `new` is a keyword, so it is printed, and typed, `'new`.
+        // A path segment called `new` is a keyword, declared `'new`: printed `new`, and typed either way. The
+        // printed command reaches it, so the path outranks the `new` alias; the constructor stays `init`.
         Payload payload = Payload.pkg();
         payload.with("clients", Decl.client("Items", Decl.method("init"),
                 Decl.method("get").on("isResource").with("accessor", "get").with("resourcePath", "'new")));
         LoadedPackage items = fromPayload(payload);
-        Assert.assertEquals(signature(items, Surface.Scope.CLIENT, "Items", "'new").path(), "'new");
-        Assert.assertEquals(signature(items, Surface.Scope.CLIENT, "Items", "new").kind(), "constructor");
+        Assert.assertEquals(signature(items, Surface.Scope.CLIENT, "Items", "'new").path(), "new");
+        Assert.assertEquals(signature(items, Surface.Scope.CLIENT, "Items", "new").path(), "new");
+        Assert.assertEquals(signature(items, Surface.Scope.CLIENT, "Items", "init").kind(), "constructor");
     }
 
     @Test
@@ -1054,9 +1060,9 @@ public class ViewsTest {
                         "start", 1)), "client Client repos/:owner/:repo/'import --filter start"));
         DiscoverResult.ResourceList.Resource importRow = (DiscoverResult.ResourceList.Resource)
                 escaped.documented().entries().get(0);
-        Assert.assertEquals(importRow.path(), "repos/:owner/:repo/'import");
+        Assert.assertEquals(importRow.path(), "repos/:owner/:repo/import");
         Assert.assertEquals(importRow.commands().get("put"),
-                "bal discover ballerinax/github client Client \"repos/:owner/:repo/'import\" put");
+                "bal discover ballerinax/github client Client repos/:owner/:repo/import put");
 
         DiscoverResult limits = result(Containers.render(github, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("Client"), "public", 1)), "client Client --filter public");

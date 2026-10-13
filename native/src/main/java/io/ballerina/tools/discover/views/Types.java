@@ -28,6 +28,7 @@ import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Documents;
+import io.ballerina.tools.discover.render.Identifiers;
 import io.ballerina.tools.discover.render.TypeDefs;
 import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.Filter;
@@ -88,8 +89,9 @@ public final class Types {
 
     /** What {@code name} is, when this bucket holds a type by that name: {@code record}, {@code listener}. */
     public static Optional<String> kindOf(LoadedPackage loaded, String name) {
+        String plain = Identifiers.plain(name);
         return entries(loaded.library()).stream()
-                .filter(entry -> entry.name().equals(name))
+                .filter(entry -> entry.name().equals(plain))
                 .map(entry -> entry.kind().noun())
                 .findFirst();
     }
@@ -139,13 +141,14 @@ public final class Types {
         Set<String> seenAnnotations = new LinkedHashSet<>();
         for (TypeDef typeDef : library.addressable()) {
             if (seen.add(typeDef.name())) {
-                entries.add(new Entry(kindOf(library, typeDef), typeDef.name(), Filter.surfaceOf(typeDef),
+                entries.add(new Entry(kindOf(library, typeDef), Identifiers.plain(typeDef.name()),
+                        Filter.surfaceOf(typeDef),
                         Filter.docsOf(typeDef)));
             }
         }
         for (Library.AnnotationDef annotation : library.annotations()) {
             if (seenAnnotations.add(annotation.name())) {
-                entries.add(new Entry(DiscoverResult.TypeRoster.Kind.ANNOTATIONS, annotation.name(),
+                entries.add(new Entry(DiscoverResult.TypeRoster.Kind.ANNOTATIONS, Identifiers.plain(annotation.name()),
                         annotation.name() + " " + annotation.type().map(TypeRef::name).orElse("") + " "
                                 + annotation.attachmentPoints(),
                         annotation.description()));
@@ -244,10 +247,12 @@ public final class Types {
         library.annotations().stream().map(Library.AnnotationDef::name).filter(name -> !names.contains(name))
                 .forEach(names::add);
 
-        if (!names.contains(requested)) {
+        String plain = Identifiers.plain(requested);
+        Optional<String> declared = names.stream().filter(name -> Identifiers.plain(name).equals(plain)).findFirst();
+        if (declared.isEmpty()) {
             return member(loaded, index, requested);
         }
-        String name = requested;
+        String name = declared.get();
         TypeDef typeDef = index.get(name);
         if (typeDef == null) {
             return Result.ok(annotationLeaf(loaded, index, name));
@@ -286,7 +291,8 @@ public final class Types {
         List<DiscoverResult.Signature.Type> types = closure.types(index).stream()
                 .filter(type -> !type.name().equals(name))
                 .toList();
-        return Result.ok(new DiscoverResult.TypeDeclaration(name, kindOf(loaded.library(), typeDef).noun(),
+        return Result.ok(new DiscoverResult.TypeDeclaration(Identifiers.plain(name),
+                kindOf(loaded.library(), typeDef).noun(),
                 TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure),
                 foreignOf(loaded, closure, index, List.of()), loaded.warning(), note));
     }
@@ -295,7 +301,8 @@ public final class Types {
         return loaded.library().addressable().stream()
                 .filter(TypeDef.Enumeration.class::isInstance)
                 .map(TypeDef.Enumeration.class::cast)
-                .filter(each -> each.memberNames().contains(member))
+                .filter(each -> each.memberNames().stream()
+                        .anyMatch(name -> Identifiers.plain(name).equals(Identifiers.plain(member))))
                 .toList();
     }
 
@@ -303,7 +310,8 @@ public final class Types {
         Library.AnnotationDef annotation = annotationNamed(loaded.library(), name).orElseThrow();
         List<String> roots = annotation.type().map(type -> Closure.rootsOf(type, index)).orElse(List.of());
         Closure.Result closure = Closure.leaf(Closure.Roots.askedFor(roots), index);
-        return new DiscoverResult.TypeDeclaration(name, DiscoverResult.TypeRoster.Kind.ANNOTATIONS.noun(),
+        return new DiscoverResult.TypeDeclaration(Identifiers.plain(name),
+                DiscoverResult.TypeRoster.Kind.ANNOTATIONS.noun(),
                 Documents.renderAnnotation(annotation), closure.types(index), omittedOf(loaded, closure),
                 foreignOf(loaded, closure, index, annotation.type().map(List::of).orElse(List.of())),
                 loaded.warning(), null);
@@ -316,13 +324,14 @@ public final class Types {
     /** Every name a closure left out, each with the command that opens it. */
     static List<DiscoverResult.Method> omittedOf(LoadedPackage loaded, Closure.Result closure) {
         return closure.omitted().stream()
+                .map(Identifiers::plain)
                 .map(missing -> new DiscoverResult.Method(missing, commandFor(loaded, missing)))
                 .toList();
     }
 
     private static String commandFor(LoadedPackage loaded, String name) {
         for (Surface.Scope scope : Surface.Scope.values()) {
-            if (Surface.of(loaded.library(), scope).stream().anyMatch(container -> container.name().equals(name))) {
+            if (Surface.byName(Surface.of(loaded.library(), scope), name).isPresent()) {
                 return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + Texts.shellWord(name);
             }
         }
@@ -351,7 +360,7 @@ public final class Types {
                                     loaded.argumentFor(module)
                                             .map(target -> pinnedTo(loaded, module, target))
                                             .map(target -> "bal discover " + target + " " + BUCKET + " "
-                                                    + Texts.shellWord(external.recordName()))
+                                                    + Texts.shellWord(Identifiers.plain(external.recordName())))
                                             .orElse(null)));
                 }
             }

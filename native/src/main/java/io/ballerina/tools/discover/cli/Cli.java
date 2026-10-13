@@ -31,6 +31,7 @@ import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
+import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
@@ -257,7 +258,7 @@ public final class Cli {
 
     private static String tail(List<String> rest, String filter, int page) {
         StringBuilder words = new StringBuilder();
-        rest.forEach(word -> words.append(' ').append(Texts.shellWord(word)));
+        rest.forEach(word -> words.append(' ').append(Texts.shellWord(PathTree.join(PathTree.splitPath(word)))));
         if (filter != null) {
             words.append(" --filter ").append(Texts.shellWord(filter));
         }

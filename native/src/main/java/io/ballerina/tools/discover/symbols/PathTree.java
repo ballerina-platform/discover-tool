@@ -21,9 +21,10 @@ package io.ballerina.tools.discover.symbols;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.ClientClass;
 import io.ballerina.tools.discover.model.Fn;
-import io.ballerina.tools.discover.model.ModuleRef;
+import io.ballerina.tools.discover.render.Identifiers;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,8 +57,6 @@ public record PathTree(
 
     private static final String SEPARATOR = "/";
 
-    private static final String KEYWORD_ESCAPE = "'";
-
     /** How a requested path resolved against the tree. */
     public sealed interface Resolution {
 
@@ -78,18 +77,6 @@ public record PathTree(
     }
 
     /**
-     * A literal segment with Ballerina's identifier escaping removed.
-     *
-     * <p>Central publishes github's paths as Ballerina writes them: {@code code\-scanning}, because
-     * {@code -} needs escaping in an identifier, and {@code 'import}, because {@code import} is a reserved
-     * word. Those are correct INSIDE a fence, where the line is a quotation of source — and unusable in
-     * prose or as a shell argument, which is where an agent has to type them.
-     */
-    public static String readableSegment(String text) {
-        return text.replaceAll("^'", "").replaceAll("\\\\(?=[^A-Za-z0-9_])", "");
-    }
-
-    /**
      * A whole selector unescaped — every segment of it, not just the first.
      *
      * <p>A selector copied out of a fenced signature ({@code post chat\.postMessage}) carries an accessor and
@@ -103,8 +90,10 @@ public record PathTree(
     }
 
     /**
-     * How a path segment is printed and typed: {@code repos}, {@code 'public} for a segment that is a keyword, or
-     * {@code :owner} for a parameter.
+     * How a path segment is printed and typed: {@code repos}, {@code public} for the keyword Ballerina writes
+     * {@code 'public}, or {@code :owner} for a parameter. Central publishes literal segments as Ballerina writes
+     * them ({@code code\-scanning}, {@code 'import}); those spellings belong inside a fence, where a line quotes
+     * source, and are read back as the same segment when typed.
      *
      * <p>Deliberately NOT the {@code [string owner]} declaration spelling, which belongs inside a fenced block
      * where it is a quotation of source. Colon-prefixed rather than brace-wrapped ({@code {owner}}) — the RFC's
@@ -114,7 +103,7 @@ public record PathTree(
      */
     public static String displaySegment(Fn.PathSegment segment) {
         return switch (segment) {
-            case Fn.PathSegment.Literal literal -> escaped(readableSegment(literal.text()));
+            case Fn.PathSegment.Literal literal -> Identifiers.plain(literal.text());
             case Fn.PathSegment.Parameter parameter -> parameter.type().endsWith("...")
                     ? ":..." + parameter.name()
                     : ":" + parameter.name();
@@ -156,9 +145,9 @@ public record PathTree(
         return List.copyOf(collected);
     }
 
-    /** A path as typed, one token per segment. */
+    /** A path as typed, one token per segment, each read as the plain segment it names. */
     public static List<String> splitPath(String path) {
-        return List.of(path.split(SEPARATOR, -1));
+        return Arrays.stream(path.split(SEPARATOR, -1)).map(Identifiers::plain).toList();
     }
 
     /** A path as printed. */
@@ -188,10 +177,6 @@ public record PathTree(
             matched.add(token);
         }
         return new Resolution.Found(node, List.copyOf(matched));
-    }
-
-    private static String escaped(String segment) {
-        return ModuleRef.isKeyword(segment) ? KEYWORD_ESCAPE + segment : segment;
     }
 
     /** The tree under construction. Frozen in one pass so the public shape can stay immutable. */

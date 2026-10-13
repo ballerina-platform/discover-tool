@@ -24,6 +24,7 @@ import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.model.TypeDef;
+import io.ballerina.tools.discover.render.Identifiers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -190,17 +191,18 @@ public final class Surface {
         public List<String> memberNames() {
             List<String> names = new ArrayList<>();
             constructor().ifPresent(ignored -> names.add(Fn.Constructor.NAME));
-            standalone().forEach(fn -> names.add(fn.name()));
+            standalone().forEach(fn -> names.add(Identifiers.plain(fn.name())));
             return List.copyOf(names);
         }
 
-        /** One member by exact name, {@code init} included. */
+        /** One member by exact name, {@code init} included; {@code 'commit} and {@code commit} name the same one. */
         public Optional<Fn> member(String name) {
-            if (Fn.Constructor.NAME.equals(name)) {
+            String plain = Identifiers.plain(name);
+            if (Fn.Constructor.NAME.equals(plain)) {
                 return constructor().map(Fn.class::cast);
             }
             return standalone().stream()
-                    .filter(fn -> fn.name().equals(name))
+                    .filter(fn -> Identifiers.plain(fn.name()).equals(plain))
                     .map(Fn.class::cast)
                     .findFirst();
         }
@@ -300,6 +302,7 @@ public final class Surface {
 
     /** The container named exactly {@code requested}, as the roster prints it. */
     public static Optional<Container> byName(List<Container> containers, String requested) {
-        return containers.stream().filter(container -> container.name().equals(requested)).findFirst();
+        String plain = Identifiers.plain(requested);
+        return containers.stream().filter(container -> Identifiers.plain(container.name()).equals(plain)).findFirst();
     }
 }

@@ -30,6 +30,7 @@ import io.ballerina.tools.discover.model.Service;
 import io.ballerina.tools.discover.model.ServiceHandlers;
 import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.render.DiscoverResult;
+import io.ballerina.tools.discover.render.Identifiers;
 import io.ballerina.tools.discover.render.Signatures;
 import io.ballerina.tools.discover.render.TypeDefs;
 import io.ballerina.tools.discover.symbols.Declarations;
@@ -446,7 +447,7 @@ public final class Containers {
         public String label() {
             return switch (fn) {
                 case Fn.Resource resource -> resource.accessor() + " " + String.join("/", path);
-                case Fn.Standalone named -> named.name();
+                case Fn.Standalone named -> Identifiers.plain(named.name());
                 case Fn.Constructor ignored -> Fn.Constructor.NAME;
             };
         }
@@ -474,7 +475,7 @@ public final class Containers {
         if (selectors.size() > 1) {
             return List.of();
         }
-        String token = selectors.get(0);
+        String token = Identifiers.plain(selectors.get(0));
         // `new` is the constructor, which Ballerina spells `init`. An INPUT alias only — the document still prints
         // `init`, because it prints what the package declares.
         if (NEW.equals(token) && container.constructor().isPresent()) {
@@ -815,7 +816,7 @@ public final class Containers {
         };
         String name = switch (fn) {
             case Fn.Resource ignored -> null;
-            case Fn.Standalone standalone -> standalone.name();
+            case Fn.Standalone standalone -> Identifiers.plain(standalone.name());
             case Fn.Constructor ignored -> Fn.Constructor.NAME;
         };
         return Result.ok(new DiscoverResult.Signature(
@@ -1055,8 +1056,11 @@ public final class Containers {
         return options.filtered() ? " --filter " + shellWord(options.filter()) : "";
     }
 
+    // Typed words echoed into a printed command, spelled as this tool prints them: `'public` as `public`.
     private static String shellWords(List<String> words) {
-        return words.stream().map(word -> " " + shellWord(word)).collect(Collectors.joining());
+        return words.stream()
+                .map(word -> " " + shellWord(PathTree.join(PathTree.splitPath(word))))
+                .collect(Collectors.joining());
     }
 
     private static String shellWord(String word) {

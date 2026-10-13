@@ -144,11 +144,11 @@ public class SelectionCarryTest {
         Run asked = run("ballerinax__github", "bal discover ballerinax/github class Client \"gists/'public\" get");
         Assert.assertEquals(asked.code(), 1, asked.out());
         JsonObject failure = JsonParser.parseString(asked.err()).getAsJsonObject();
-        String canonical = GITHUB + " \"gists/'public\" get";
+        String canonical = GITHUB + " gists/public get";
         Assert.assertEquals(failure.get("command").getAsString(), canonical);
         Assert.assertEquals(failure.get("suggestion").getAsString(), "It is a client: `" + canonical + "`.");
         JsonObject followed = answer("ballerinax__github", canonical);
-        Assert.assertEquals(followed.get("path").getAsString(), "gists/'public");
+        Assert.assertEquals(followed.get("path").getAsString(), "gists/public");
         Assert.assertEquals(followed.get("accessor").getAsString(), "get");
     }
 
