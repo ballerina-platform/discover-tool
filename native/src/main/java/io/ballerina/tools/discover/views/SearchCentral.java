@@ -96,6 +96,19 @@ public final class SearchCentral {
     private SearchCentral() {
     }
 
+    /**
+     * The failure for a search with no keyword, with {@code --module} or with {@code --filter}, or {@code null};
+     * checked before Central is asked.
+     */
+    public static Failure misuse(List<String> keywords, String module, String filter) {
+        if (!keywords.isEmpty() && module != null) {
+            String typed = command(keywords);
+            return new Failure.Validation("--module reads one package's submodule, and a search covers all of "
+                    + "Central.", "Drop --module: " + Failure.quoted(typed) + ".", typed);
+        }
+        return Search.misuse(Coordinate.COMMAND + VERB, keywords, filter);
+    }
+
     public static Result<DiscoverResult> render(List<String> keywords, int page, HttpOptions http) {
         List<String> terms = keywords.stream().flatMap(keyword -> Arrays.stream(WHITESPACE.split(keyword.trim())))
                 .filter(term -> !term.isEmpty())

@@ -74,18 +74,18 @@ public final class Search {
     public record Options(List<String> keywords, int page) { }
 
     /**
-     * The failure for a search with no keyword, or with {@code --filter}, or {@code null}; checked before the
-     * package is fetched.
+     * The failure for a search with no keyword, or with {@code --filter}, or {@code null}; checked before anything is
+     * fetched. Shared by this search and Central's.
      *
-     * @param command the command the package's overview is read with
+     * @param search the command that searches, without keywords: {@code bal discover ballerinax/kafka search}
      */
-    public static Failure misuse(String command, List<String> keywords, String filter) {
+    public static Failure misuse(String search, List<String> keywords, String filter) {
         if (keywords.isEmpty()) {
             return new Failure.Validation("The search needs at least one keyword.",
-                    "Write " + Failure.quoted(command + " " + BUCKET + " <keyword>") + ".");
+                    "Write " + Failure.quoted(search + " <keyword>") + ".");
         }
         if (filter != null) {
-            String fixed = command + " " + BUCKET + words(keywords) + " " + Texts.shellWord(filter);
+            String fixed = search + words(keywords) + " " + Texts.shellWord(filter);
             return new Failure.Validation("The --filter option narrows a listing, and a search is not one.",
                     "Add its keyword to the search instead: " + Failure.quoted(fixed) + ".", fixed);
         }

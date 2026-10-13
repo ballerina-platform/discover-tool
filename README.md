@@ -769,7 +769,9 @@ A usage error is a `validation` failure found before anything is looked up: an u
 a missing or invalid value (`--output xml`, `--page x`, `--page 0`, `--refresh=yes`) or given twice, no package,
 a malformed package name or incomplete version, `--version`, a version typed as a positional, an unknown bucket,
 more than one name after `funcs` or `type`, a `type` name with `--filter`, or a `search` with no keyword, with
-`--filter`, or (across Central) with `--module`. A `validation` failure that
+`--filter`, or (across Central) with `--module`. An unknown bucket's `command` searches the package for the
+word, since it is most often a member typed without its bucket (`bal discover ballerinax/kafka close`). A
+`validation` failure that
 depends on what the package holds — an extra selector a container does not read, a page past the end of the
 listing, a module with no readme — is exit 1.
 
