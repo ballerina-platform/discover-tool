@@ -122,7 +122,7 @@ public class CliTest {
                 "subgraph", FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph")));
     }
 
-    private static HttpOptions options(HttpTransport transport) {
+    static HttpOptions options(HttpTransport transport) {
         return HttpOptions.builder()
                 .transport(transport)
                 .baseDelayMs(1)

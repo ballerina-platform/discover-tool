@@ -104,7 +104,7 @@ public record Coordinate(QualifiedName qualified, Version version) {
             return Result.err(new Failure.Validation(
                     "Invalid package name '" + input + "': a package is named with its organization, <org>/"
                             + input + ".",
-                    "`bal search " + input + "` lists the packages that match, with their organizations."));
+                    "`bal discover search " + input + "` lists the packages that match, with their organizations."));
         }
         return invalid.cast();
     }
