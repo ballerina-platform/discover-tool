@@ -57,4 +57,12 @@ public class TextsTest {
         Assert.assertEquals(Texts.shellWord("say \"hi\""), "'say \"hi\"'");
         Assert.assertEquals(Texts.shellWord("it's $x"), "'it'\\''s $x'");
     }
+
+    @Test
+    public void aSummaryIsItsFirstSentenceAsPlainProse() {
+        Assert.assertEquals(Texts.firstSentence("[Kafka](https://k) is a **platform**. It is used widely."),
+                "Kafka is a platform.");
+        Assert.assertEquals(Texts.firstSentence("![b](x.svg) > Calls v2. the API, e.g. the __init hook"),
+                "Calls v2. the API, e.g. the __init hook");
+    }
 }

@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.views;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Surface;
@@ -85,7 +86,8 @@ public final class Overview {
                 : new DiscoverResult.Overview.ReadmeSummary(Readme.sectionsOf(loaded).size(),
                         loaded.command() + " " + Readme.BUCKET);
         List<DiscoverResult.Overview.Submodule> submodules = loaded.submodules().stream()
-                .map(submodule -> new DiscoverResult.Overview.Submodule(submodule.name(), submodule.summary(),
+                .map(submodule -> new DiscoverResult.Overview.Submodule(submodule.name(),
+                        Texts.firstSentence(submodule.summary()),
                         Coordinate.COMMAND + loaded.pkgArgument(submodule.name())))
                 .toList();
         DiscoverResult members = onlyClientsListing(loaded).orElse(null);

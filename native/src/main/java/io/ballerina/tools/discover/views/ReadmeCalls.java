@@ -58,7 +58,7 @@ final class ReadmeCalls {
     private static final Pattern RESOURCE_CALL = Pattern.compile("([\\w.']+)\\s*->\\s*/(" + SEGMENT + "(?:/" + SEGMENT
             + ")*)(?:\\s*\\.\\s*([A-Za-z_]\\w*))?");
     private static final Pattern DECLARATION = Pattern.compile(
-            "((?:[A-Za-z_][\\w.]*:[A-Za-z_]\\w*\\??\\s*\\|?\\s*)+)\\s+'?([A-Za-z_]\\w*)\\s*[=;,)]");
+            "([A-Za-z_][\\w.]*:[A-Za-z_]\\w*\\??(?:\\s*\\|\\s*[A-Za-z_][\\w.:]*\\??)*)\\s+'?([A-Za-z_]\\w*)\\s*[=;,)]");
     private static final Pattern SERVICE_ON = Pattern.compile(
             "\\bservice\\b[^{;]*?\\bon\\s+(new\\s+)?([A-Za-z_][\\w.]*(?::[A-Za-z_]\\w*)?)");
     private static final String DEFAULT_ACCESSOR = "get";
@@ -81,7 +81,7 @@ final class ReadmeCalls {
         for (Readme.Section section : sections) {
             String code = codeOf(section.markdown());
             boolean calls = callsIn(code, container, entry).stream()
-                    .anyMatch(receiver -> owners.owns(receiver, code, readme.toString(), entry));
+                    .anyMatch(call -> owners.owns(call, code, readme.toString(), entry));
             if (calls) {
                 found.add(section);
             }
@@ -89,20 +89,20 @@ final class ReadmeCalls {
         return List.copyOf(found);
     }
 
-    // The receiver of every call of `entry` in `code`, in order.
-    private static List<String> callsIn(String code, Surface.Container container, Containers.Entry entry) {
-        List<String> receivers = new ArrayList<>();
+    // Every call of `entry` in `code`, in order; a remote call's path is empty and its accessor null.
+    private static List<Call> callsIn(String code, Surface.Container container, Containers.Entry entry) {
+        List<Call> calls = new ArrayList<>();
         switch (entry.fn()) {
             case Fn.Remote remote -> {
                 Matcher matcher = Pattern.compile("([\\w.']+)\\s*->\\s*'?"
                         + Pattern.quote(Identifiers.plain(remote.name())) + "\\s*\\(").matcher(code);
                 while (matcher.find()) {
-                    receivers.add(matcher.group(1));
+                    calls.add(new Call(matcher.group(1), List.of(), null));
                 }
             }
             case Fn.Resource resource -> resourceCalls(code).stream()
                     .filter(call -> resolvesTo(call, container, entry.path(), resource.accessor()))
-                    .forEach(call -> receivers.add(call.receiver()));
+                    .forEach(calls::add);
             case Fn.Normal ignored -> {
                 // Not matched: `.name(` reads the same on every object.
             }
@@ -110,7 +110,7 @@ final class ReadmeCalls {
                 // Not a call.
             }
         }
-        return receivers;
+        return calls;
     }
 
     // One resource call in code: its receiver as written, its path one entry per segment (a computed one, `[owner]`,
@@ -177,7 +177,8 @@ final class ReadmeCalls {
                     .toList());
         }
 
-        boolean owns(String receiver, String section, String readme, Containers.Entry entry) {
+        boolean owns(Call call, String section, String readme, Containers.Entry entry) {
+            String receiver = call.receiver();
             String variable = Identifiers.plain(receiver.substring(receiver.lastIndexOf('.') + 1));
             List<String> types = declaredType(variable, section).or(() -> declaredType(variable, readme))
                     .orElse(List.of());
@@ -187,20 +188,21 @@ final class ReadmeCalls {
             if (others.stream().anyMatch(other -> types.contains(typeOf(other)))) {
                 return false;
             }
-            return others.stream().noneMatch(other -> declaresSame(other, entry));
+            return others.stream().noneMatch(other -> wouldAnswer(other, entry, call));
         }
 
         private String typeOf(Surface.Container each) {
             return prefix + ":" + each.plainName();
         }
 
-        private boolean declaresSame(Surface.Container other, Containers.Entry entry) {
+        // Whether `other` declares a method `call` would also reach: a remote method of the same name, or any resource
+        // the call's path and accessor match, whatever its parameters are called.
+        private boolean wouldAnswer(Surface.Container other, Containers.Entry entry, Call call) {
             return switch (entry.fn()) {
                 case Fn.Remote remote -> other.standalone().stream().anyMatch(fn -> fn instanceof Fn.Remote
                         && Identifiers.plain(fn.name()).equals(Identifiers.plain(remote.name())));
-                case Fn.Resource resource -> other.operations().stream().anyMatch(operation ->
-                        operation.fn().accessor().equals(resource.accessor())
-                                && operation.segments().equals(entry.path()));
+                case Fn.Resource ignored -> other.operations().stream().anyMatch(operation ->
+                        score(call, operation.segments(), operation.fn().accessor()) >= 0);
                 default -> false;
             };
         }

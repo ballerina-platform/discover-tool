@@ -78,8 +78,10 @@ public class SearchTest {
         Assert.assertEquals(names(search("ballerinax__kafka", 1, "COMMIT"), DiscoverResult.Search.Kind.REMOTE),
                 List.of("Caller commit", "Caller commitOffset", "Consumer commit", "Consumer commitOffset",
                         "Consumer getCommittedOffset"), "'commit is declared escaped and found plain");
-        Assert.assertFalse(names(search("ballerinax__github", 1, "code\\-scanning"),
-                DiscoverResult.Search.Kind.RESOURCES).isEmpty());
+        List<String> scanning = names(search("ballerinax__github", 1, "code\\-scanning"),
+                DiscoverResult.Search.Kind.RESOURCES);
+        Assert.assertTrue(scanning.contains("Client repos/:owner/:repo/code-scanning/alerts"), scanning.toString());
+        Assert.assertTrue(scanning.stream().allMatch(name -> name.contains("code-scanning")), scanning.toString());
     }
 
     @Test

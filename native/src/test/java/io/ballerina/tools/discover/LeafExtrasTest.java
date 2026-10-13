@@ -175,9 +175,42 @@ public class LeafExtrasTest {
     @Test
     public void onTheFixturesAKafkaCallerCommitIsNotAConsumersAndSendIsTheProducers() {
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
-        Assert.assertFalse(callers(kafka, "Producer", "send").isEmpty());
-        Assert.assertTrue(callers(kafka, "Caller", "commit").containsAll(callers(kafka, "Consumer", "commit")));
+        Assert.assertEquals(callers(kafka, "Producer", "send"), List.of(7));
+        Assert.assertEquals(callers(kafka, "Caller", "commit"), List.of(6));
+        Assert.assertEquals(callers(kafka, "Consumer", "commit"), List.of(),
+                "section 6 calls caller->commit() on a kafka:Caller");
     }
+
+    private static final String RECEIVERS = "## Field\n\n```ballerina\nclass Repo {\n    acme:Store store;\n"
+            + "    function go() {\n        var r = check self.store->/files/[\"a\"]/[\"b\"].get();\n    }\n}\n```\n\n"
+            + "## Union\n\n```ballerina\nacme:Store|error s = new ();\nvar x = check s->/items/[id].delete();\n```"
+            + "\n\n## Undeclared\n\n```ballerina\nvar y = check other->/items/[id].delete();\n```\n";
+
+    private static LoadedPackage stores() {
+        Payload payload = Payload.pkg();
+        payload.with("clients",
+                Decl.client("Store",
+                        Decl.method("get").on("isResource").with("accessor", "get")
+                                .with("resourcePath", "files/[string... path]"),
+                        Decl.method("delete").on("isResource").with("accessor", "delete")
+                                .with("resourcePath", "items/[string id]")),
+                Decl.client("Archive", Decl.method("delete").on("isResource").with("accessor", "delete")
+                        .with("resourcePath", "items/[string itemId]")));
+        Library library = Pipeline.build(payload.module());
+        return new LoadedPackage(QualifiedName.parse("acme/acme").value(), FixtureCorpus.FIXTURE_VERSION, library,
+                Optional.of(RECEIVERS), null, List.of(), List.of(), null, null, () -> library, Map::of);
+    }
+
+    @Test
+    public void aRestPathAFieldReceiverAndAUnionDeclaredReceiverAreRead() {
+        LoadedPackage stores = stores();
+        Assert.assertEquals(callers(stores, "Store", "files/:...path", "get"), List.of(1),
+                "`self.store` is the field declared acme:Store, and a rest parameter takes every remaining segment");
+        Assert.assertEquals(callers(stores, "Store", "items/:id", "delete"), List.of(2),
+                "`acme:Store|error s` is a Store; an undeclared receiver's call Archive's items/:itemId also answers");
+    }
+
+
 
     @Test
     public void aServiceTypeWithNoMethodsAnswersWithItsDocumentationAndTheSectionsThatDeclareOne() {

@@ -54,6 +54,18 @@ public final class Texts {
 
     private static final Pattern DOUBLE_QUOTE_UNSAFE = Pattern.compile("[\"$`\\\\!]");
 
+    private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^\\]]*]\\([^)]*\\)");
+
+    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]*)]\\([^)]*\\)");
+
+    private static final Pattern QUOTE_MARKS = Pattern.compile("^[>#\\s]+");
+
+    private static final Pattern EMPHASIS = Pattern.compile("(?<!\\w)(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1(?!\\w)");
+
+    private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+(?=[A-Z])");
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
     private Texts() {
     }
 
@@ -65,6 +77,18 @@ public final class Texts {
     /** UTF-8 bytes, not UTF-16 units: the closure budget a signature inlines its types under is in bytes. */
     public static int byteLength(String text) {
         return text.getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    /**
+     * A Markdown summary as one line of prose: images dropped, links as their text, emphasis and quote marks gone,
+     * cut at the first sentence's end — a full stop followed by a capital, so {@code e.g. the} and {@code v2. the}
+     * do not end one.
+     */
+    public static String firstSentence(String summary) {
+        String text = MARKDOWN_LINK.matcher(MARKDOWN_IMAGE.matcher(summary).replaceAll("")).replaceAll("$1");
+        String plain = WHITESPACE.matcher(text).replaceAll(" ").trim();
+        plain = EMPHASIS.matcher(QUOTE_MARKS.matcher(plain).replaceAll("")).replaceAll("$2").trim();
+        return SENTENCE_END.split(plain, 2)[0];
     }
 
     /** {@code A}, {@code A and B}, {@code A, B and C}. */
