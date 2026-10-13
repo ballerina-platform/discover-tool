@@ -40,6 +40,7 @@ final class Usage {
                 .append("\n").append(UsageRenderer.prose(INTRO, 0))
                 .append("\n").append(SESSION)
                 .append("\n").append(UsageRenderer.prose(BUCKETS, 0))
+                .append("\n").append(UsageRenderer.prose(SEARCH, 0))
                 .append("\n").append(UsageRenderer.prose(VERSION, 0))
                 .append(UsageRenderer.prose(EXIT_CODES, 0));
         String flags = UsageRenderer.flagList(grammar);
@@ -62,12 +63,14 @@ final class Usage {
     private static final String SESSION = """
             Typical session:
 
-              1. What can I ask?              bal discover ballerinax/github
-              2. List a bucket, or open one:  bal discover ballerinax/github client
-                                              bal discover ballerinax/github client Client
-              3. One call, fully addressed:   bal discover ballerinax/github client Client "gists/'public" get
-              4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
-              5. One specific version:        bal discover ballerina/http:2.15.7 client Client
+              1. Find a package or a symbol:  bal discover search kafka send
+              2. What a package offers:       bal discover ballerinax/kafka
+              3. Find a name inside it:       bal discover ballerinax/kafka search send
+              4. One call, fully addressed:   bal discover ballerinax/kafka client Producer send
+                                              bal discover ballerinax/github client Client gists/public get
+              5. Its container, left out:     bal discover ballerinax/kafka client send
+              6. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
+              7. One specific version:        bal discover ballerina/http:2.15.7 client Client
             """;
 
     private static final String VERSION =
@@ -78,5 +81,12 @@ final class Usage {
 
     private static final String BUCKETS =
             "Buckets (the word after the package): " + String.join(", ", Commands.BUCKETS)
-                    + ". Leave it out to see which of them this package has.";
+                    + ". Leave it out for the package's overview: its clients, service types, classes and "
+                    + "functions, types and readme, each with the command that opens it. The container may be left "
+                    + "out when exactly one in the bucket declares the member.";
+
+    private static final String SEARCH =
+            "bal discover search <keyword> ... asks Central for packages and symbols, 10 and 25 a page, ranked by "
+                    + "Central. bal discover <org>/<name> search <keyword> ... matches every name in one package, "
+                    + "locally; each keyword is a case-insensitive part of the name.";
 }

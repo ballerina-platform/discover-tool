@@ -58,6 +58,8 @@ final class ReadmeCalls {
             + ")*)(?:\\s*\\.\\s*([A-Za-z_]\\w*))?");
     private static final Pattern DECLARATION = Pattern.compile(
             "((?:[A-Za-z_][\\w.]*:[A-Za-z_]\\w*\\??\\s*\\|?\\s*)+)\\s+'?([A-Za-z_]\\w*)\\s*[=;,)]");
+    private static final Pattern SERVICE_ON = Pattern.compile(
+            "\\bservice\\b[^{;]*?\\bon\\s+(new\\s+)?([A-Za-z_][\\w.]*(?::[A-Za-z_]\\w*)?)");
     private static final String DEFAULT_ACCESSOR = "get";
     private static final String ROOT = ".";
     private static final String SEPARATOR = "/";
@@ -233,6 +235,43 @@ final class ReadmeCalls {
             }
         }
         return Optional.ofNullable(found);
+    }
+
+    /**
+     * The sections of the module's readme whose code declares a service of {@code container}: typed as it
+     * ({@code service cdc:Service on ...}), or attached to one of {@code listeners} ({@code on new http:Listener(9090)}
+     * or on a variable declared as one), or, for the only service type of a module that declares no listener, any
+     * service at all.
+     *
+     * @param listeners the listener types the service type binds to, as written: {@code http:Listener}
+     */
+    static List<Readme.Section> declaringService(LoadedPackage loaded, Surface.Container container,
+            List<String> listeners) {
+        String type = Pattern.quote(prefixOf(loaded) + ":" + container.plainName());
+        Pattern typed = Pattern.compile("\\bservice\\s+" + type + "\\b");
+        boolean anyService = loaded.library().listeners().isEmpty()
+                && Surface.of(loaded.library(), Surface.Scope.SERVICE).size() == 1;
+        List<Readme.Section> sections = Readme.sectionsOf(loaded);
+        StringBuilder readme = new StringBuilder();
+        sections.forEach(section -> readme.append(codeOf(section.markdown())));
+        List<Readme.Section> found = new ArrayList<>();
+        for (Readme.Section section : sections) {
+            String code = codeOf(section.markdown());
+            Matcher declared = SERVICE_ON.matcher(code);
+            boolean declares = typed.matcher(code).find();
+            while (!declares && declared.find()) {
+                String target = declared.group(2);
+                String listener = declared.group(1) != null
+                        ? target
+                        : declaredType(target, code).or(() -> declaredType(target, readme.toString()))
+                                .orElse(List.of()).stream().findFirst().orElse("");
+                declares = anyService || listeners.contains(listener);
+            }
+            if (declares) {
+                found.add(section);
+            }
+        }
+        return List.copyOf(found);
     }
 
     /** Every fenced block of {@code markdown}, joined; prose is never read. */

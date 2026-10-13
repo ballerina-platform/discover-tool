@@ -247,7 +247,8 @@ public class ServiceHandlersTest {
     public void aPackageWithoutTheFileAnswersAsBefore() {
         HttpOptions http = central(false);
         String text = run(http, "ballerinax/kafka", "service", "--output", "text");
-        Assert.assertTrue(text.contains("No methods."), text);
+        Assert.assertTrue(text.contains("Service declares no methods: a service of it defines its own."), text);
+        Assert.assertTrue(text.contains("Readme sections that declare one"), text);
         Assert.assertFalse(text.contains("Methods to implement"), text);
         Assert.assertFalse(json(http, "ballerinax/kafka", "service", "Service").has("handlers"));
     }
@@ -259,7 +260,8 @@ public class ServiceHandlersTest {
                         : url.matches(".*/registry/packages/[^/]+/[^/]+") ? FakeTransport.ok("[\"4.6.6\"]")
                         : FakeTransport.status(404))).baseDelayMs(1).sleeper(millis -> {
         }).build();
-        Assert.assertTrue(run(http, "ballerinax/kafka", "service", "--output", "text").contains("No methods."));
+        Assert.assertTrue(run(http, "ballerinax/kafka", "service", "--output", "text")
+                .contains("Service declares no methods: a service of it defines its own."));
     }
 
     @Test

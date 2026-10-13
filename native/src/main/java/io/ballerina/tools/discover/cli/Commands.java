@@ -78,7 +78,8 @@ final class Commands {
 
         @CommandLine.Option(names = "--filter", paramLabel = "<keyword>",
                 description = "Narrow an already-selected bucket to entries whose name, path, parameter or type "
-                        + "matches this keyword. Filtering is local; nothing is sent to Central.")
+                        + "matches this keyword. Filtering is local; nothing is sent to Central. On the bare package "
+                        + "it searches the package's names, as search does.")
         String filter;
 
         @CommandLine.Option(names = "--page", paramLabel = "<n>", defaultValue = "1",
