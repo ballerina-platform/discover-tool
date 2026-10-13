@@ -187,7 +187,7 @@ public final class TextRenderer {
             }
             if (overview.members() != null && scope == Surface.Scope.CLIENT) {
                 lines.addAll(inlined(layout, overview.members()));
-            } else {
+            } else if (drill.pattern() != null) {
                 patterns.add(drill.pattern());
             }
         }
