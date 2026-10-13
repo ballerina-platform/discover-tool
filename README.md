@@ -92,9 +92,7 @@ Classes (4)
 Types   bal discover ballerinax/kafka type    14 records, 3 enums, 3 errors, 8 aliases, 29 constants, 1 annotation, 1 listener
 Readme  bal discover ballerinax/kafka readme  11 sections
 
-Next: bal discover ballerinax/kafka client <name>
-Next: bal discover ballerinax/kafka service <name>
-Next: bal discover ballerinax/kafka class <name>
+Next: bal discover ballerinax/kafka <bucket> <name>
 Next: bal discover ballerinax/kafka search <keyword>
 
 $ bal discover ballerinax/kafka | cat
@@ -107,6 +105,49 @@ the section showing the most gives up one row at a time (the later bucket on a t
 section ends with `... N more: <command>`, the command that lists the bucket whole; in JSON each section has
 `shown`, `total` and that `command`. `ballerina/http`, the largest overview measured, shows 10 of 10 clients,
 7 service types, 10 of 83 classes and 7 functions.
+
+A package with exactly one client is most often used through it, so the overview opens it in place: under its row
+is page 1 of `client <name>`, grouped and paged by that answer's own rules (at most 40 entries; `ballerinax/github`'s
+903 resource methods show as their 36 path groups, `ballerinax/twilio`'s 199 remote methods as their first 40 with
+`client Client --page 2` among the `Next:` lines). The other sections share what that listing leaves of the 40
+rows, down to their heading and command. In JSON the listing is the client section's `members`, shaped as
+`client <name>` answers it:
+
+```
+$ bal discover ballerinax/postgresql:1.19.1
+ballerinax/postgresql:1.19.1
+
+Clients (1)
+  Client  5 remote methods  1 method
+    Remote methods (->)
+      batchExecute
+      call
+      execute
+      query
+      queryRow
+    Methods (.)
+      close
+Service types (1)
+  cdc:Service
+Classes (125)
+  BitStringArrayValue
+  BitStringValue
+  BoxArrayValue
+  BoxOutParameter      1 method
+  BoxValue
+  ByteaOutParameter    1 method
+  CidrArrayValue
+  CidrOutParameter     1 method
+  CidrValue
+  CircleArrayValue
+  ... 115 more: bal discover ballerinax/postgresql:1.19.1 class
+Types   bal discover ballerinax/postgresql:1.19.1 type    32 records, 4 enums, 1 listener
+Readme  bal discover ballerinax/postgresql:1.19.1 readme  25 sections
+
+Next: bal discover ballerinax/postgresql:1.19.1 <bucket> <name>
+Next: bal discover ballerinax/postgresql:1.19.1 client Client <name>
+Next: bal discover ballerinax/postgresql:1.19.1 search <keyword>
+```
 
 Every JSON answer is exactly one line, however long, so cutting the output with `head` or `tail` never
 leaves half an answer. The JSON samples below are that real output, unwrapped.
@@ -666,7 +707,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| bare package (overview)              | `clients`, `serviceTypes`, `classes`, `functions` (each `entries` (`name`, `resources`, `remote`, `normal`, `command`), `shown`, `total`, `command`), `types` (`counts` per kind, `command`), `readme` (`sections`, `command`), `submodules` (`name`, `summary`, `command`) |
+| bare package (overview)              | `clients`, `serviceTypes`, `classes`, `functions` (each `entries` (`name`, `resources`, `remote`, `normal`, `command`), `shown`, `total`, `command`; `clients` also `members`, the one client's own listing, when there is exactly one), `types` (`counts` per kind, `command`), `readme` (`sections`, `command`), `submodules` (`name`, `summary`, `command`) |
 | several containers                   | `containers` (`name`, `resources` (resource methods, not paths), `remote`, `normal`, `listener`, `confirmed`, `unconfirmedReason`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |

@@ -18,7 +18,9 @@
 
 package io.ballerina.tools.discover.views;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.LoadedPackage;
+import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Surface;
@@ -28,6 +30,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -39,6 +42,12 @@ import java.util.Set;
  * more than {@value Containers#MAX_ENTRIES} rows, the section showing the most gives up one row at a time (the later
  * bucket on a tie) until it fits. A section showing fewer rows than its bucket holds says so and carries the command
  * that lists the bucket whole.
+ *
+ * <p><b>ONE CLIENT IS OPENED IN PLACE.</b> A package with exactly one client is most often used through it, so its
+ * listing is inlined under its row: page 1 of {@code client <name>}, grouped and paged by that answer's own rules,
+ * so it never holds more than {@value Containers#MAX_ENTRIES} entries and, when the client has more, carries that
+ * answer's next-page command ({@code ballerinax/twilio}'s 199 methods show their first 40). The other sections then
+ * share what the inlined listing leaves of the ceiling, down to their heading and the command that lists them.
  *
  * <p>It reads only the docs payload every answer reads: which listener a service type binds to can need the package
  * source, so that stays in the {@code service} bucket's own answer.
@@ -54,8 +63,6 @@ public final class Overview {
     private static final Set<DiscoverResult.TypeRoster.Kind> LISTED_AS_SECTIONS = EnumSet.of(
             DiscoverResult.TypeRoster.Kind.CLIENTS, DiscoverResult.TypeRoster.Kind.CLASSES,
             DiscoverResult.TypeRoster.Kind.SERVICE_TYPES);
-
-    private static final String COMMAND = "bal discover ";
 
     private Overview() {
     }
@@ -79,15 +86,47 @@ public final class Overview {
                         loaded.command() + " " + Readme.BUCKET);
         List<DiscoverResult.Overview.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.Overview.Submodule(submodule.name(), submodule.summary(),
-                        COMMAND + loaded.pkgArgument(submodule.name())))
+                        Coordinate.COMMAND + loaded.pkgArgument(submodule.name())))
                 .toList();
+        DiscoverResult members = onlyClientsListing(loaded).orElse(null);
 
         int fixed = (types == null ? 0 : 1) + (readme == null ? 0 : 1) + submodules.size();
-        Map<Surface.Scope, Integer> shown = shares(rows, Containers.MAX_ENTRIES - fixed);
+        Map<Surface.Scope, List<DiscoverResult.Overview.Row>> shared = new LinkedHashMap<>(rows);
+        if (members != null) {
+            shared.remove(Surface.Scope.CLIENT);
+            fixed += 1 + shownBy(members);
+        }
+        Map<Surface.Scope, Integer> shown = shares(shared, Containers.MAX_ENTRIES - fixed);
         List<DiscoverResult.Overview.Section> sections = new ArrayList<>();
         rows.forEach((scope, all) -> sections.add(new DiscoverResult.Overview.Section(scope.verb(),
-                all.subList(0, shown.get(scope)), all.size(), loaded.command() + " " + scope.verb())));
-        return new DiscoverResult.Overview(List.copyOf(sections), types, readme, submodules, loaded.warning());
+                all.subList(0, shown.getOrDefault(scope, all.size())), all.size(),
+                loaded.command() + " " + scope.verb())));
+        return new DiscoverResult.Overview(List.copyOf(sections), types, readme, submodules, loaded.warning(),
+                members);
+    }
+
+    /** How many entries a listing the overview can open in place shows; 0 for any other answer. */
+    public static int shownBy(DiscoverResult listing) {
+        return switch (listing) {
+            case DiscoverResult.MethodList methods -> methods.shown();
+            case DiscoverResult.ResourceList resources -> resources.shown();
+            case DiscoverResult.MixedListing mixed -> mixed.shown();
+            case DiscoverResult.PathGroups groups -> groups.resources().size() + groups.groups().size();
+            default -> 0;
+        };
+    }
+
+    // The one client's own listing, when the package has exactly one and its answer is a listing.
+    private static Optional<DiscoverResult> onlyClientsListing(LoadedPackage loaded) {
+        List<Surface.Container> clients = Surface.of(loaded.library(), Surface.Scope.CLIENT);
+        if (clients.size() != 1) {
+            return Optional.empty();
+        }
+        Result<DiscoverResult> listing = Containers.render(loaded, Surface.Scope.CLIENT,
+                new Containers.Options(List.of(clients.get(0).name())));
+        return listing.isOk() && shownBy(listing.value()) > 0
+                ? Optional.of(listing.value())
+                : Optional.empty();
     }
 
     // Each section's row count: its size up to SECTION_ROWS, then the largest gives one up until all fit `room`.

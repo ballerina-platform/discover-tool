@@ -169,11 +169,39 @@ public class ViewsTest {
         int rows = overview.sections().stream().mapToInt(section -> section.rows().size()).sum()
                 + (overview.types() == null ? 0 : 1) + (overview.readme() == null ? 0 : 1)
                 + overview.submodules().size();
-        Assert.assertTrue(rows <= Containers.MAX_ENTRIES, slug + ": " + rows + " rows");
+        int inlined = overview.members() == null ? 0 : Overview.shownBy(overview.members());
+        int others = overview.sections().stream().filter(section -> overview.members() == null
+                        || !section.bucket().equals(Surface.Scope.CLIENT.verb()))
+                .mapToInt(section -> section.rows().size()).sum();
+        Assert.assertTrue(inlined <= Containers.MAX_ENTRIES, slug + ": " + inlined + " inlined");
+        Assert.assertTrue(rows + inlined <= Containers.MAX_ENTRIES || others == 0,
+                slug + ": " + rows + " rows beside " + inlined + " inlined");
         for (Surface.Scope scope : Surface.Scope.values()) {
             boolean listed = overview.sections().stream().anyMatch(section -> section.bucket().equals(scope.verb()));
             Assert.assertEquals(listed, !Surface.of(loaded.library(), scope).isEmpty(), slug + " " + scope);
         }
+    }
+
+    @Test
+    public void aPackagesOneClientIsListedInItsOverviewAsItsOwnFirstPage() {
+        DiscoverResult.Overview postgresql = Overview.of(FixtureCorpus.loadedFixture("ballerinax__postgresql"));
+        DiscoverResult.MixedListing client = (DiscoverResult.MixedListing) postgresql.members();
+        Assert.assertEquals(client.container(), "Client");
+        Assert.assertEquals(client.shown(), 6);
+        DiscoverResult.MethodList twilio = (DiscoverResult.MethodList) Overview.of(
+                FixtureCorpus.loadedFixture("ballerinax__twilio")).members();
+        Assert.assertEquals(twilio.shown(), Containers.MAX_ENTRIES);
+        Assert.assertEquals(twilio.next(), "bal discover ballerinax/twilio client Client --page 2");
+        Assert.assertNull(Overview.of(FixtureCorpus.loadedFixture("ballerinax__kafka")).members(),
+                "kafka has three clients");
+        String text = TextRenderer.render(postgresql, new TextRenderer.Context("ballerinax/postgresql", null,
+                List.of(), null, null, null));
+        Assert.assertTrue(text.contains("\nClients (1)\n  Client  5 remote methods  1 method\n    Remote methods (->)\n"
+                + "      batchExecute\n"), text);
+        Assert.assertTrue(text.contains("\nNext: bal discover ballerinax/postgresql client Client <name>\n"), text);
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(postgresql)).getAsJsonObject();
+        Assert.assertEquals(json.getAsJsonObject("clients").getAsJsonObject("members").get("container")
+                .getAsString(), "Client");
     }
 
     @Test
