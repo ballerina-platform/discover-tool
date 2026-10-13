@@ -188,7 +188,8 @@ public class LeafExtrasTest {
         Assert.assertFalse(service.sections().isEmpty(), "the readme's `service ... on new http:Listener` section");
         Assert.assertNull(service.next());
         String text = TextRenderer.render(service);
-        Assert.assertTrue(text.contains("\nService declares no methods: a service of it defines its own.\n"), text);
+        Assert.assertTrue(text.contains("\nService declares no methods; a service of this type declares its own "
+                + "resource or remote methods.\n"), text);
         Assert.assertTrue(text.contains("\nReadme sections that declare one\n"), text);
     }
 
@@ -240,6 +241,8 @@ public class LeafExtrasTest {
         JsonObject json = JsonParser.parseString(JsonRenderer.render(service)).getAsJsonObject();
         Assert.assertEquals(json.getAsJsonArray("methods").size(), 0);
         Assert.assertEquals(json.get("description").getAsString(), "Define onRead.");
+        Assert.assertEquals(service.note(), "no listener in this package accepts it; it attaches to a listener "
+                + "another package declares");
 
         LoadedPackage bare = new LoadedPackage(cdc.qualified(), cdc.version(), library, Optional.of("## Intro\n\nNo "
                 + "code.\n"), null, List.of(), List.of(), null, null, () -> library, Map::of);

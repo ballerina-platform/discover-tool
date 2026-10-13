@@ -21,10 +21,10 @@ search. Leave it out for the package's overview: its clients, service types, cla
 and functions, types and readme, each with the command that opens it. The container
 may be left out when exactly one in the bucket declares the member.
 
-bal discover search <keyword> ... asks Central for packages and symbols, 10 and 25 a
-page, ranked by Central. bal discover <org>/<name> search <keyword> ... matches
-every name in one package, locally; each keyword is a case-insensitive part of the
-name.
+bal discover search <keyword> ... asks Central for packages and the symbols that
+match every keyword, 10 and 25 a page, ranked by Central. bal discover <org>/<name>
+search <keyword> ... matches every name in one package, locally; each keyword is a
+case-insensitive part of the name.
 
 With no version after the package, the one your project's Dependencies.toml locks is
 read (found from the current directory up), else Central's latest.

@@ -67,9 +67,9 @@ public final class SearchCentral {
 
     public static final String VERB = "search";
 
-    static final int PACKAGES_PER_PAGE = 10;
+    public static final int PACKAGES_PER_PAGE = 10;
 
-    static final int SYMBOLS_PER_PAGE = 25;
+    public static final int SYMBOLS_PER_PAGE = 25;
 
     private static final String CLIENT_METHOD = "client-method";
     private static final String CLASS_METHOD = "class-method";

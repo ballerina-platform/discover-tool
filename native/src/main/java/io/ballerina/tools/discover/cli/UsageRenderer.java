@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.cli;
 
+import io.ballerina.tools.discover.Coordinate;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Model.OptionSpec;
 import picocli.CommandLine.Model.PositionalParamSpec;
@@ -41,9 +42,7 @@ final class UsageRenderer {
 
     private static final int GAP = 3;
 
-    private static final String COMMAND = "bal discover ";
-
-    private static final String USAGE = "Usage: " + COMMAND;
+    private static final String USAGE = "Usage: " + Coordinate.COMMAND;
 
     private UsageRenderer() {
     }
@@ -63,7 +62,7 @@ final class UsageRenderer {
         grammar.line().getCommandSpec().options().stream()
                 .filter(OptionSpec::usageHelp)
                 .forEach(help -> slots.add("[" + String.join("|", help.names()) + "]"));
-        return COMMAND + String.join(" ", slots);
+        return Coordinate.COMMAND + String.join(" ", slots);
     }
 
     /** Every flag the grammar accepts, {@code --help} last, as one sentence for an unknown-option failure. */

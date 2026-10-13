@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.views;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
@@ -65,7 +66,7 @@ public final class Readme {
     }
 
     private static String command(String pkg) {
-        return "bal discover " + pkg + " " + BUCKET;
+        return Coordinate.COMMAND + pkg + " " + BUCKET;
     }
 
     /**

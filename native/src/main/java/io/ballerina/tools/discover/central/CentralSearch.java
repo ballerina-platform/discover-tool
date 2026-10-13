@@ -44,6 +44,8 @@ public final class CentralSearch {
     private static final String PACKAGES = "packages";
     private static final String SYMBOLS = "symbols";
     private static final String COUNT = "count";
+    // The answer was received; it is its shape that is wrong, so it is reported as one attempt, not retried.
+    private static final int ONE_ANSWER = 1;
 
     private CentralSearch() {
     }
@@ -105,7 +107,7 @@ public final class CentralSearch {
         JsonElement count = body.isJsonObject() ? body.getAsJsonObject().get(COUNT) : null;
         if (rows == null || !rows.isJsonArray() || count == null || !count.isJsonPrimitive()
                 || !count.getAsJsonPrimitive().isNumber()) {
-            return Result.err(new Failure.Upstream(url, 1, "Central answered " + url + " without a '" + key
+            return Result.err(new Failure.Upstream(url, ONE_ANSWER, "Central answered " + url + " without a '" + key
                     + "' list and a '" + COUNT + "'", Failure.UPSTREAM_SUGGESTION, null, true));
         }
         List<T> items = new ArrayList<>();
