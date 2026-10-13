@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.render;
 
+import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.ServiceHandlers;
 import io.ballerina.tools.discover.symbols.Surface;
@@ -56,6 +57,15 @@ public final class TextRenderer {
     private static final String OPTIONAL = "optional";
     private static final String DOCUMENTED = "that mention it only in their documentation";
     private static final Pattern PAGE_ARGUMENT = Pattern.compile(" --page \\d+$");
+
+    /** How a search group's rows read in the shared command shape its {@code Next:} line prints. */
+    private static final Map<DiscoverResult.Search.Kind, String> SEARCH_PLACEHOLDERS = Map.of(
+            DiscoverResult.Search.Kind.RESOURCES, "<container> <path> <accessor>",
+            DiscoverResult.Search.Kind.REMOTE, "<container> <name>",
+            DiscoverResult.Search.Kind.METHODS, "<container> <name>",
+            DiscoverResult.Search.Kind.README, "<n>");
+
+    private static final String SEARCH_PLACEHOLDER = "<keyword>";
 
     private TextRenderer() {
     }
@@ -123,7 +133,7 @@ public final class TextRenderer {
 
     private static void fill(Layout layout, DiscoverResult result, Context where) {
         switch (result) {
-            case DiscoverResult.Overview overview -> overview(layout, overview);
+            case DiscoverResult.Overview overview -> overview(layout, overview, where);
             case DiscoverResult.ContainerRoster roster -> containerRoster(layout, roster, where);
             case DiscoverResult.PathGroups groups -> pathGroups(layout, groups);
             case DiscoverResult.ResourceList resources -> resourceList(layout, resources);
@@ -136,10 +146,11 @@ public final class TextRenderer {
             case DiscoverResult.EmptyBucket empty -> emptyBucket(layout, empty, where);
             case DiscoverResult.TypeRoster roster -> typeRoster(layout, roster);
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(layout, declaration);
+            case DiscoverResult.Search search -> search(layout, search);
         }
     }
 
-    private static void overview(Layout layout, DiscoverResult.Overview overview) {
+    private static void overview(Layout layout, DiscoverResult.Overview overview, Context where) {
         List<String> lines = new ArrayList<>();
         for (DiscoverResult.Overview.Section section : overview.sections()) {
             Surface.Scope scope = Surface.Scope.ofVerb(section.bucket()).orElse(Surface.Scope.MODULE);
@@ -189,6 +200,10 @@ public final class TextRenderer {
             layout.section("Submodules", submodules);
         }
         layout.warning(overview.warning());
+        if (where.pkg() != null && !overview.sections().isEmpty()) {
+            layout.next("bal discover " + Coordinate.argument(where.pkg(), where.pin(), where.module()) + " search "
+                    + SEARCH_PLACEHOLDER);
+        }
     }
 
     private static void containerRoster(Layout layout, DiscoverResult.ContainerRoster roster, Context where) {
@@ -487,6 +502,55 @@ public final class TextRenderer {
         layout.next(drill.pattern());
         documentedDrill.forEach(layout::next);
         layout.next(roster.next());
+    }
+
+    private static void search(Layout layout, DiscoverResult.Search search) {
+        if (search.total() == 0) {
+            layout.top("No name in this package holds " + String.join(" and ", search.keywords().stream()
+                    .map(keyword -> "'" + keyword + "'").toList()) + ".");
+            layout.warning(search.warning());
+            layout.next(search.overview());
+            return;
+        }
+        List<String> parts = new ArrayList<>();
+        search.counts().forEach((kind, count) -> parts.add(counted(count, kind.noun(), kind.plural())));
+        layout.top(String.join(", ", parts));
+        for (DiscoverResult.Search.Group group : search.groups()) {
+            List<DiscoverResult.Search.Hit> hits = group.hits();
+            List<String> literals = new ArrayList<>();
+            TextTable table = switch (group.kind()) {
+                case RESOURCES -> new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT,
+                        TextTable.Column.LEFT);
+                case REMOTE, METHODS, README, TYPES -> new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT,
+                        TextTable.Column.LEFT);
+                default -> new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
+            };
+            for (DiscoverResult.Search.Hit hit : hits) {
+                literals.add(switch (group.kind()) {
+                    case RESOURCES -> hit.container() + " " + hit.name() + " " + hit.detail();
+                    case REMOTE, METHODS -> hit.container() + " " + hit.name();
+                    case README -> hit.detail();
+                    default -> hit.name();
+                });
+            }
+            Drill drill = Drill.of(literals, hits.stream().map(DiscoverResult.Search.Hit::command).toList(),
+                    SEARCH_PLACEHOLDERS.getOrDefault(group.kind(), "<name>"));
+            for (int i = 0; i < hits.size(); i++) {
+                DiscoverResult.Search.Hit hit = hits.get(i);
+                switch (group.kind()) {
+                    case RESOURCES -> table.row(hit.container(), hit.name(), hit.detail(), drill.explicit(i));
+                    case REMOTE, METHODS -> table.row(hit.container(), hit.name(), drill.explicit(i));
+                    case README -> table.row(hit.detail(), hit.name(), drill.explicit(i));
+                    case TYPES -> table.row(hit.name(), hit.detail(), drill.explicit(i));
+                    default -> table.row(hit.name(), drill.explicit(i));
+                }
+            }
+            layout.section(capitalised(group.kind().plural()), table);
+            layout.next(drill.pattern());
+        }
+        layout.warning(search.warning());
+        layout.more(remaining(search.shown(), search.total(), search.paging()), search.paging());
+        layout.next(search.next());
     }
 
     private static void typeDeclaration(Layout layout, DiscoverResult.TypeDeclaration declaration) {

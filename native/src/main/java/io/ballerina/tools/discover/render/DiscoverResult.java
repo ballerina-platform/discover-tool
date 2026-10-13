@@ -540,6 +540,76 @@ public sealed interface DiscoverResult {
             implements DiscoverResult { }
 
     /**
+     * Every symbol and readme section of one package whose name holds every keyword, grouped by kind and paged as
+     * one sequence in kind order.
+     *
+     * @param keywords the keywords, as typed
+     * @param groups the kinds with a match on this page, in {@link Kind} order
+     * @param counts how many matched of each kind, every page included
+     * @param shown how many matches are in this response
+     * @param total how many matched across all kinds
+     * @param paging which page this is, or {@code null} when every match fit on one
+     * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
+     * @param overview the command that opens the package's overview, for an answer with no match
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     */
+    record Search(List<String> keywords, List<Group> groups, Map<Kind, Integer> counts, int shown, int total,
+            Paging paging, String next, String overview, String warning) implements DiscoverResult {
+
+        /** What a match is, in the order an answer lists them: its JSON key, then its noun, one and several. */
+        public enum Kind {
+            CLIENTS("clients", "client", "clients"),
+            SERVICE_TYPES("serviceTypes", "service type", "service types"),
+            CLASSES("classes", "class", "classes"),
+            LISTENERS("listeners", "listener", "listeners"),
+            FUNCTIONS("functions", "function", "functions"),
+            REMOTE("remote", "remote method", "remote methods"),
+            RESOURCES("resources", "resource method", "resource methods"),
+            METHODS("methods", "method", "methods"),
+            TYPES("types", "type", "types"),
+            README("readme", "readme section", "readme sections");
+
+            private final String key;
+            private final String noun;
+            private final String plural;
+
+            Kind(String key, String noun, String plural) {
+                this.key = key;
+                this.noun = noun;
+                this.plural = plural;
+            }
+
+            public String key() {
+                return key;
+            }
+
+            public String noun() {
+                return noun;
+            }
+
+            public String plural() {
+                return plural;
+            }
+        }
+
+        /**
+         * @param kind what every hit in it is
+         * @param hits the matches of that kind on this page
+         */
+        public record Group(Kind kind, List<Hit> hits) { }
+
+        /**
+         * One match.
+         *
+         * @param name its name, a resource's path, or a readme section's title
+         * @param container the container that declares a method, or {@code null}
+         * @param detail a resource's accessor, a type's kind or a readme section's number, or {@code null}
+         * @param command the command that opens it
+         */
+        public record Hit(String name, String container, String detail, String command) { }
+    }
+
+    /**
      * A bucket this package declares nothing in, and the buckets that do hold its callable surface.
      *
      * @param bucket the bucket asked for

@@ -461,6 +461,19 @@ public final class Containers {
         return options.filtered() && Filter.matches(options.filter(), container.name());
     }
 
+    /** Everything callable on {@code container} but its constructor, in the package's own order. */
+    static List<Entry> members(Surface.Container container) {
+        return entriesOf(container).stream().filter(entry -> !(entry.fn() instanceof Fn.Constructor)).toList();
+    }
+
+    /** The command that opens one member of {@code container}: its name, or a resource's path and accessor. */
+    static String memberCommand(LoadedPackage loaded, Surface.Container container, Entry entry) {
+        String base = baseCommand(loaded, container.scope(), container);
+        return entry.fn() instanceof Fn.Resource resource
+                ? base + " " + shellWord(PathTree.join(entry.path())) + " " + resource.accessor()
+                : base + " " + shellWord(entry.label());
+    }
+
     /** The command that opens {@code container} from a listing of its bucket. */
     static String openCommand(LoadedPackage loaded, Surface.Scope scope, Surface.Container container) {
         return openCommand(loaded, scope, container, new Options(List.of()));

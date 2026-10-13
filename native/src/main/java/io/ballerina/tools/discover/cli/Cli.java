@@ -36,6 +36,7 @@ import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.Readme;
+import io.ballerina.tools.discover.views.Search;
 import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
 
@@ -224,9 +225,14 @@ public final class Cli {
     private static Result<DiscoverResult> answerFrom(
             LoadedPackage loaded, String bucket, List<String> rest, String filter, int page) {
         if (bucket == null) {
-            return Result.ok(Overview.of(loaded));
+            return filter == null
+                    ? Result.ok(Overview.of(loaded))
+                    : Search.render(loaded, new Search.Options(List.of(filter), page));
         }
         List<String> selectors = rest.subList(1, rest.size());
+        if (Search.BUCKET.equals(bucket)) {
+            return Search.render(loaded, new Search.Options(selectors, page));
+        }
         if (Readme.BUCKET.equals(bucket)) {
             return Readme.render(loaded, new Readme.Options(
                     selectors.isEmpty() ? null : String.join(" ", selectors), filter, page));
@@ -248,6 +254,9 @@ public final class Cli {
         String command = new Coordinate(qualified, version).command(root.module) + " " + bucket;
         if (Types.BUCKET.equals(bucket)) {
             return Types.misuse(command, new Types.Options(selectors, filter, root.page));
+        }
+        if (Search.BUCKET.equals(bucket)) {
+            return Search.misuse(new Coordinate(qualified, version).command(root.module), selectors, filter);
         }
         if (Surface.Scope.MODULE.verb().equals(bucket)) {
             return Containers.extraFunctionNames(command, new Containers.Options(selectors, filter, root.page));

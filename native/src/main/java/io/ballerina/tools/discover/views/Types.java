@@ -87,6 +87,23 @@ public final class Types {
         return entries(loaded.library()).size();
     }
 
+    /**
+     * One declaration the bucket lists.
+     *
+     * @param kind the section it lists under
+     * @param name its name, as listed
+     * @param command the command that opens it
+     */
+    public record Declared(DiscoverResult.TypeRoster.Kind kind, String name, String command) { }
+
+    /** Every declaration the bucket lists, in the package's own order. */
+    public static List<Declared> declared(LoadedPackage loaded) {
+        String base = baseCommand(loaded);
+        return entries(loaded.library()).stream()
+                .map(entry -> new Declared(entry.kind(), entry.name(), base + " " + Texts.shellWord(entry.name())))
+                .toList();
+    }
+
     /** How many declarations of each kind the bucket holds, in roster order, every kind with at least one. */
     public static Map<DiscoverResult.TypeRoster.Kind, Integer> countsByKind(LoadedPackage loaded) {
         Map<DiscoverResult.TypeRoster.Kind, Integer> counts = new LinkedHashMap<>();

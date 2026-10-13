@@ -14,8 +14,8 @@ Typical session:
   4. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
   5. One specific version:        bal discover ballerina/http:2.15.7 client Client
 
-Buckets (the word after the package): client, service, class, funcs, type, readme.
-Leave it out to see which of them this package has.
+Buckets (the word after the package): client, service, class, funcs, type, readme,
+search. Leave it out to see which of them this package has.
 
 With no version after the package, the one your project's Dependencies.toml locks is
 read (found from the current directory up), else Central's latest.
