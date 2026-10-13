@@ -78,6 +78,23 @@ public class SymbolsTest {
     }
 
     @Test
+    public void aDeclaredSegmentIsSpelledAsTheTreePrintsItWhereverItsRestMarkSits() {
+        Assert.assertEquals(PathTree.displayDeclared("'import"), "import");
+        Assert.assertEquals(PathTree.displayDeclared("[string owner]"), ":owner");
+        for (String rest : List.of("[string... path]", "[string ...path]", "[string...path]")) {
+            Assert.assertEquals(PathTree.displayDeclared(rest), ":...path", rest);
+        }
+    }
+
+    @Test
+    public void aTypedWordIsUnescapedPerSegmentAndPlainTextPerWord() {
+        Assert.assertEquals(PathTree.plainSelector("gists/'public"), "gists/public");
+        Assert.assertEquals(PathTree.plainSelector("code\\-scanning/alerts"), "code-scanning/alerts");
+        Assert.assertEquals(Identifiers.plainText("post chat\\.postMessage 'import"), "post chat.postMessage import");
+        Assert.assertEquals(Identifiers.plainText("O'Brien"), "O'Brien", "an apostrophe inside a name is part of it");
+    }
+
+    @Test
     public void aSegmentReadsInProseWithoutTheEscapingItNeedsInSource() {
         // Central publishes github's paths as Ballerina writes them. Those spellings are right inside a fence
         // and unusable as a shell argument, which is where the agent has to type them.

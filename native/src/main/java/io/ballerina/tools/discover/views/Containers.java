@@ -1161,7 +1161,7 @@ public final class Containers {
     // Typed words echoed into a printed command, spelled as this tool prints them: `'public` as `public`.
     private static String shellWords(List<String> words) {
         return words.stream()
-                .map(word -> " " + shellWord(PathTree.join(PathTree.splitPath(word))))
+                .map(word -> " " + shellWord(PathTree.plainSelector(word)))
                 .collect(Collectors.joining());
     }
 

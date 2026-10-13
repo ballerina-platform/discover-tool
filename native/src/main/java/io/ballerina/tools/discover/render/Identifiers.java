@@ -60,6 +60,8 @@ public final class Identifiers {
 
     private static final Pattern QUOTE = Pattern.compile("^'");
 
+    private static final Pattern WORD_QUOTE = Pattern.compile("(^|(?<=[ /]))'");
+
     private static final Pattern ESCAPE = Pattern.compile("\\\\(?=[^A-Za-z0-9_])");
 
     private Identifiers() {
@@ -72,6 +74,15 @@ public final class Identifiers {
      */
     public static String plain(String name) {
         return ESCAPE.matcher(QUOTE.matcher(name).replaceFirst("")).replaceAll("");
+    }
+
+    /**
+     * {@link #plain} applied to every word and path segment of {@code text}: {@code post chat\.postMessage} is
+     * {@code post chat.postMessage}. An apostrophe INSIDE a name is part of it; only one starting a word or segment
+     * quotes an identifier.
+     */
+    public static String plainText(String text) {
+        return ESCAPE.matcher(WORD_QUOTE.matcher(text).replaceAll("")).replaceAll("");
     }
 
     /** The name, quoted if the language would otherwise read it as a keyword. */

@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -160,7 +161,12 @@ public final class Signatures {
     }
 
     private static String renderParam(Param param) {
-        String type = paramType(param);
+        return renderParam(param, Signatures::writtenType);
+    }
+
+    /** One parameter as its declaration spells it, its type written by {@code typeWriter}. */
+    public static String renderParam(Param param, Function<TypeRef, String> typeWriter) {
+        String type = typeWriter.apply(param.type());
         String name = Identifiers.write(param.name());
         return switch (param.form()) {
             case INCLUSION -> "*" + type + " " + name;
@@ -172,20 +178,20 @@ public final class Signatures {
 
     /** A parameter's type as its declaration spells it, foreign names qualified. */
     public static String paramType(Param param) {
-        return applyPrefixToTypeName(param.type().name(), collectExternalLinks(param.type()));
+        return writtenType(param.type());
+    }
+
+    private static String writtenType(TypeRef type) {
+        return applyPrefixToTypeName(type.name(), collectExternalLinks(type));
     }
 
     /** A callable's return type as its declaration spells it, or {@code null} when it returns nothing. */
     public static String returnType(Fn fn) {
-        return fn.returns().hasType()
-                ? applyPrefixToTypeName(fn.returns().type().name(), collectExternalLinks(fn.returns().type()))
-                : null;
+        return fn.returns().hasType() ? writtenType(fn.returns().type()) : null;
     }
 
     private static String renderReturns(ReturnDef returns) {
-        return returns.hasType()
-                ? " returns " + applyPrefixToTypeName(returns.type().name(), collectExternalLinks(returns.type()))
-                : "";
+        return returns.hasType() ? " returns " + writtenType(returns.type()) : "";
     }
 
     private static String unwritableClause(List<String> expressions) {

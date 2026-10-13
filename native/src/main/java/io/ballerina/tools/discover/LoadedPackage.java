@@ -81,6 +81,11 @@ public record LoadedPackage(
      */
     public record Submodule(String name, String summary) { }
 
+    /** The module being read, as an import names it: the package's default module, or the {@code --module} one. */
+    public ModuleRef moduleRef() {
+        return new ModuleRef(qualified.org(), module == null ? qualified.name() : qualified.name() + "." + module);
+    }
+
     /** {@code org/name:version} — the label every document and every failure identifies this lookup by. */
     public String label() {
         return qualified.versioned(version);
