@@ -90,7 +90,7 @@ final class ReadmeCalls {
     }
 
     // The receiver of every call of `entry` in `code`, in order.
-    static List<String> callsIn(String code, Surface.Container container, Containers.Entry entry) {
+    private static List<String> callsIn(String code, Surface.Container container, Containers.Entry entry) {
         List<String> receivers = new ArrayList<>();
         switch (entry.fn()) {
             case Fn.Remote remote -> {
@@ -113,16 +113,11 @@ final class ReadmeCalls {
         return receivers;
     }
 
-    /**
-     * One resource call in code.
-     *
-     * @param receiver what it is called on, as written
-     * @param segments the path as written, one entry per segment, a computed one ({@code [owner]}) kept bracketed
-     * @param accessor the accessor it names, {@code get} when it names none
-     */
-    record Call(String receiver, List<String> segments, String accessor) { }
+    // One resource call in code: its receiver as written, its path one entry per segment (a computed one, `[owner]`,
+    // kept bracketed), and the accessor it names, `get` when it names none.
+    private record Call(String receiver, List<String> segments, String accessor) { }
 
-    static List<Call> resourceCalls(String code) {
+    private static List<Call> resourceCalls(String code) {
         List<Call> calls = new ArrayList<>();
         Matcher matcher = RESOURCE_CALL.matcher(code);
         while (matcher.find()) {
@@ -170,13 +165,8 @@ final class ReadmeCalls {
         return declared.size() == call.segments().size() ? literals : -1;
     }
 
-    /**
-     * Who a receiver's call belongs to, read off the readme's declarations.
-     *
-     * @param prefix the import prefix the module's own types are written with
-     * @param container the container asked about
-     * @param others every other container of the module
-     */
+    // Who a receiver's call belongs to, read off the readme's declarations: `prefix` is the one the module's own types
+    // are written with, `container` the one asked about, `others` every other container of the module.
     private record Owners(String prefix, Surface.Container container, List<Surface.Container> others) {
 
         Owners(LoadedPackage loaded, Surface.Container container) {
@@ -297,8 +287,8 @@ final class ReadmeCalls {
                         .equals(container.plainName()));
     }
 
-    /** Every fenced block of {@code markdown}, joined; prose is never read. */
-    static String codeOf(String markdown) {
+    // Every fenced block of `markdown`, joined; prose is never read.
+    private static String codeOf(String markdown) {
         StringBuilder code = new StringBuilder();
         boolean inside = false;
         for (String line : markdown.split("\\R", -1)) {

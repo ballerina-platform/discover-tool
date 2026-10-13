@@ -211,7 +211,7 @@ public final class Types {
     }
 
     private static String baseCommand(LoadedPackage loaded) {
-        return "bal discover " + loaded.pkgArgument() + " " + BUCKET;
+        return Coordinate.COMMAND + loaded.pkgArgument() + " " + BUCKET;
     }
 
     private static Result<DiscoverResult> roster(LoadedPackage loaded, Options options) {
@@ -361,7 +361,7 @@ public final class Types {
     private static String commandFor(LoadedPackage loaded, String name) {
         for (Surface.Scope scope : Surface.Scope.values()) {
             if (Surface.byName(Surface.of(loaded.library(), scope), name).isPresent()) {
-                return "bal discover " + loaded.pkgArgument() + " " + scope.verb() + " " + Texts.shellWord(name);
+                return Coordinate.COMMAND + loaded.pkgArgument() + " " + scope.verb() + " " + Texts.shellWord(name);
             }
         }
         return baseCommand(loaded) + " " + Texts.shellWord(name);
@@ -388,7 +388,7 @@ public final class Types {
                                     module.pinnedVersion().orElse(null),
                                     loaded.argumentFor(module)
                                             .map(target -> pinnedTo(loaded, module, target))
-                                            .map(target -> "bal discover " + target + " " + BUCKET + " "
+                                            .map(target -> Coordinate.COMMAND + target + " " + BUCKET + " "
                                                     + Texts.shellWord(Identifiers.plain(external.recordName())))
                                             .orElse(null)));
                 }

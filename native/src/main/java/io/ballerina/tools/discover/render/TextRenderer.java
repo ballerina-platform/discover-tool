@@ -381,7 +381,8 @@ public final class TextRenderer {
         for (ServiceHandlers.Handler handler : list.handlers()) {
             List<String> lines = new ArrayList<>();
             lines.add(handler.signature());
-            lines.add(INDENT + presence(handler.repeatable(), handler.required()));
+            String presence = presence(handler.repeatable(), handler.required());
+            lines.add(INDENT + (handler.name() == null ? handler.id() + ", " + presence : presence));
             if (handler.deprecated() != null) {
                 lines.add(INDENT + "Deprecated: " + handler.deprecated());
             }
@@ -408,7 +409,8 @@ public final class TextRenderer {
     }
 
     private static void serviceExamples(Layout layout, DiscoverResult.ServiceExamples examples) {
-        layout.top(examples.container() + " declares no methods: a service of it defines its own.");
+        layout.top(examples.container() + " declares no methods; a service of this type declares its own resource "
+                + "or remote methods.");
         if (!examples.description().isBlank()) {
             layout.block(List.of(examples.description().strip()));
         }
@@ -589,7 +591,7 @@ public final class TextRenderer {
                 literals.add(switch (group.kind()) {
                     case RESOURCES -> hit.container() + " " + hit.name() + " " + hit.detail();
                     case REMOTE, METHODS -> hit.container() + " " + hit.name();
-                    case README -> hit.detail();
+                    case README -> String.valueOf(hit.number());
                     default -> hit.name();
                 });
             }
@@ -600,7 +602,7 @@ public final class TextRenderer {
                 switch (group.kind()) {
                     case RESOURCES -> table.row(hit.container(), hit.name(), hit.detail(), drill.explicit(i));
                     case REMOTE, METHODS -> table.row(hit.container(), hit.name(), drill.explicit(i));
-                    case README -> table.row(hit.detail(), hit.name(), drill.explicit(i));
+                    case README -> table.row(String.valueOf(hit.number()), hit.name(), drill.explicit(i));
                     case TYPES -> table.row(hit.name(), hit.detail(), drill.explicit(i));
                     default -> table.row(hit.name(), drill.explicit(i));
                 }

@@ -217,7 +217,12 @@ public final class TriggerMetadata {
                 ? type(object.getAsJsonObject("returns").get(TYPE), prefix)
                 : null;
         return new ServiceHandlers.Handler(nameOf(object), kind, REQUIRED.equals(string(object, PRESENCE)),
-                repeatable, accessors, string(object, DOC), string(object, DEPRECATED), params, returns);
+                repeatable, accessors, string(object, DOC), string(object, DEPRECATED), params, returns,
+                lastSegment(object.get(ID).getAsString()));
+    }
+
+    private static String lastSegment(String id) {
+        return id.substring(id.lastIndexOf('.') + 1);
     }
 
     private static ServiceHandlers.Param param(JsonObject object, String prefix) {
@@ -233,7 +238,7 @@ public final class TriggerMetadata {
             if (HANDLER_SUBJECT.equals(string(owner, KIND))) {
                 String id = string(owner, ID);
                 String name = namesById.get(id);
-                handlers.add(name == null ? id.substring(id.lastIndexOf('.') + 1) : name);
+                handlers.add(name == null ? lastSegment(id) : name);
             }
         }
         String id = string(object, "rule");

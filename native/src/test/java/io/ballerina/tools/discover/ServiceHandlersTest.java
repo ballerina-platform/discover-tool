@@ -31,6 +31,7 @@ import io.ballerina.tools.discover.central.LocalBalas;
 import io.ballerina.tools.discover.cli.Cli;
 import io.ballerina.tools.discover.model.ServiceHandlers;
 import io.ballerina.tools.discover.render.DiscoverResult;
+import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.source.TriggerMetadata;
 import io.ballerina.tools.discover.symbols.Surface;
@@ -187,6 +188,13 @@ public class ServiceHandlersTest {
         Assert.assertEquals(service.rules().size(), 1);
         Assert.assertEquals(service.rules().get(0).requirement(), "at least one of");
         Assert.assertEquals(service.rules().get(0).handlers(), List.of("query"));
+        Assert.assertEquals(service.handlers().get(0).id(), "query", "what the rule names it by");
+        DiscoverResult.ServiceHandlerList list = new DiscoverResult.ServiceHandlerList("Service", service.handlers(),
+                service.rules(), null, null);
+        Assert.assertTrue(TextRenderer.render(list).contains("returns anydata|error\n  query, any number\n"),
+                TextRenderer.render(list));
+        Assert.assertTrue(JsonRenderer.render(list).contains("{\"id\":\"query\",\"kind\":\"resource\""),
+                JsonRenderer.render(list));
     }
 
     @Test
@@ -262,7 +270,7 @@ public class ServiceHandlersTest {
     @Test
     public void aHandlerWithoutADocRendersInText() {
         ServiceHandlers.Handler handler = new ServiceHandlers.Handler("onEvent", ServiceHandlers.Kind.REMOTE, true,
-                false, List.of(), null, null, List.of(), null);
+                false, List.of(), null, null, List.of(), null, "onEvent");
         String text = TextRenderer.render(new DiscoverResult.ServiceHandlerList(
                 "Service", List.of(handler), List.of(new ServiceHandlers.Rule(null, List.of(), null)), null, null));
         Assert.assertEquals(text, "Service\nMethods to implement (1)\n\nremote function onEvent()\n  required");
@@ -293,7 +301,8 @@ public class ServiceHandlersTest {
     public void aPackageWithoutTheFileAnswersAsBefore() {
         HttpOptions http = central(false);
         String text = run(http, "ballerinax/kafka", "service", "--output", "text");
-        Assert.assertTrue(text.contains("Service declares no methods: a service of it defines its own."), text);
+        Assert.assertTrue(text.contains("Service declares no methods; a service of this type declares its own "
+                + "resource or remote methods."), text);
         Assert.assertTrue(text.contains("Readme sections that declare one"), text);
         Assert.assertFalse(text.contains("Methods to implement"), text);
         Assert.assertFalse(json(http, "ballerinax/kafka", "service", "Service").has("handlers"));
@@ -307,7 +316,8 @@ public class ServiceHandlersTest {
                         : FakeTransport.status(404))).baseDelayMs(1).sleeper(millis -> {
         }).build();
         Assert.assertTrue(run(http, "ballerinax/kafka", "service", "--output", "text")
-                .contains("Service declares no methods: a service of it defines its own."));
+                .contains("Service declares no methods; a service of this type declares its own resource or "
+                        + "remote methods."));
     }
 
     @Test

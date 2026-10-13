@@ -18,6 +18,10 @@
 
 package io.ballerina.tools.discover.cli;
 
+import io.ballerina.tools.discover.Coordinate;
+import io.ballerina.tools.discover.views.Search;
+import io.ballerina.tools.discover.views.SearchCentral;
+
 /**
  * The PROSE of the usage text: everything a reader cannot derive from the grammar.
  *
@@ -86,7 +90,9 @@ final class Usage {
                     + "out when exactly one in the bucket declares the member.";
 
     private static final String SEARCH =
-            "bal discover search <keyword> ... asks Central for packages and symbols, 10 and 25 a page, ranked by "
-                    + "Central. bal discover <org>/<name> search <keyword> ... matches every name in one package, "
+            Coordinate.COMMAND + SearchCentral.VERB + " <keyword> ... asks Central for packages and the symbols "
+                    + "that match every keyword, " + SearchCentral.PACKAGES_PER_PAGE + " and "
+                    + SearchCentral.SYMBOLS_PER_PAGE + " a page, ranked by Central. " + Coordinate.COMMAND
+                    + "<org>/<name> " + Search.BUCKET + " <keyword> ... matches every name in one package, "
                     + "locally; each keyword is a case-insensitive part of the name.";
 }

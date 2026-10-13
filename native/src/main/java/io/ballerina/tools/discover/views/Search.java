@@ -195,8 +195,10 @@ public final class Search {
                         declared.name(), null, declared.kind().noun(), declared.command()));
             }
         }
-        found.get(DiscoverResult.Search.Kind.TYPES)
-                .sort(Comparator.comparing(DiscoverResult.Search.Hit::name, Texts.LOCALE_ORDER));
+        for (DiscoverResult.Search.Kind sorted : List.of(DiscoverResult.Search.Kind.TYPES,
+                DiscoverResult.Search.Kind.LISTENERS)) {
+            found.get(sorted).sort(Comparator.comparing(DiscoverResult.Search.Hit::name, Texts.LOCALE_ORDER));
+        }
     }
 
     private static void collectReadme(LoadedPackage loaded, List<String> keywords,
@@ -204,8 +206,7 @@ public final class Search {
         for (Readme.Section section : Readme.sectionsOf(loaded)) {
             if (matches(section.title(), keywords)) {
                 found.get(DiscoverResult.Search.Kind.README).add(new DiscoverResult.Search.Hit(section.title(), null,
-                        String.valueOf(section.number()),
-                        loaded.command() + " " + Readme.BUCKET + " " + section.number()));
+                        null, section.number(), loaded.command() + " " + Readme.BUCKET + " " + section.number()));
             }
         }
     }

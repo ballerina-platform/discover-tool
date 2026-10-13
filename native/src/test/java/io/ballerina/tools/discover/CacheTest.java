@@ -479,9 +479,9 @@ public class CacheTest {
 
     @Test
     public void aBarePackageWarningFlowsThroughBothRenderers() {
-        // The bare package's own path, this time: a stale cache plus a dead registry, threaded through
-        // `Cli.bucketList` and out through both `JsonRenderer` and `TextRenderer`, not the hand-built
-        // `DiscoverResult` the renderer unit tests use.
+        // The bare package's own path, this time: a stale cache plus a dead registry, threaded through its
+        // overview and out through both `JsonRenderer` and `TextRenderer`, not the hand-built `DiscoverResult` the
+        // renderer unit tests use.
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};

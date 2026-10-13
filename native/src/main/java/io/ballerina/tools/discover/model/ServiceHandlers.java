@@ -66,9 +66,11 @@ public record ServiceHandlers(List<Handler> handlers, List<Rule> rules) {
      * @param deprecated why it should not be used, or {@code null}
      * @param params its parameters, in declaration order
      * @param returns its return type, or {@code null} when it declares none
+     * @param id the package's own id for it, last segment only ({@code query}): what a {@link Rule} names a handler
+     *     with no {@code name} by
      */
     public record Handler(String name, Kind kind, boolean required, boolean repeatable, List<String> accessors,
-            String doc, String deprecated, List<Param> params, String returns) {
+            String doc, String deprecated, List<Param> params, String returns, String id) {
 
         public Handler {
             accessors = List.copyOf(accessors);
@@ -101,7 +103,8 @@ public record ServiceHandlers(List<Handler> handlers, List<Rule> rules) {
 
     /**
      * @param requirement the constraint, in words — {@code exactly one of}, {@code at least one of}, …
-     * @param handlers the handlers it ranges over, by name; empty when it ranges over other things
+     * @param handlers the handlers it ranges over, by name, or by {@link Handler#id()} for one with no name; empty
+     *     when it ranges over other things
      * @param message the package's own wording, or {@code null}
      */
     public record Rule(String requirement, List<String> handlers, String message) {

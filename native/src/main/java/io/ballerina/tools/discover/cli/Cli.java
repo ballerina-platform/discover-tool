@@ -79,7 +79,7 @@ public final class Cli {
 
     private static final String OUTPUT_FLAG = "--output";
 
-    private static final String HELP = "bal discover --help";
+    private static final String HELP = Coordinate.COMMAND + "--help";
 
     private static final String RUN_HELP = "Run `" + HELP + "` for usage.";
 
