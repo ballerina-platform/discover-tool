@@ -67,6 +67,10 @@ public final class TextRenderer {
 
     private static final String SEARCH_PLACEHOLDER = "<keyword>";
 
+    private static final String BUCKET_PLACEHOLDER = "<bucket>";
+
+    private static final String NEXT = "Next: ";
+
     private TextRenderer() {
     }
 
@@ -154,6 +158,7 @@ public final class TextRenderer {
 
     private static void overview(Layout layout, DiscoverResult.Overview overview, Context where) {
         List<String> lines = new ArrayList<>();
+        List<String> patterns = new ArrayList<>();
         for (DiscoverResult.Overview.Section section : overview.sections()) {
             Surface.Scope scope = Surface.Scope.ofVerb(section.bucket()).orElse(Surface.Scope.MODULE);
             lines.add(capitalised(scope.plural()) + " (" + section.total() + ")");
@@ -180,7 +185,11 @@ public final class TextRenderer {
             if (rows.size() < section.total()) {
                 lines.add(INDENT + "... " + (section.total() - rows.size()) + " more: " + section.command());
             }
-            layout.next(drill.pattern());
+            if (overview.members() != null && scope == Surface.Scope.CLIENT) {
+                lines.addAll(inlined(layout, overview.members()));
+            } else {
+                patterns.add(drill.pattern());
+            }
         }
         TextTable summary = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
         if (overview.types() != null) {
@@ -202,10 +211,36 @@ public final class TextRenderer {
             layout.section("Submodules", submodules);
         }
         layout.warning(overview.warning());
-        if (where.pkg() != null && !overview.sections().isEmpty()) {
-            layout.next(Coordinate.COMMAND + Coordinate.argument(where.pkg(), where.pin(), where.module()) + " search "
-                    + SEARCH_PLACEHOLDER);
+        String pkg = where.pkg() == null
+                ? null
+                : Coordinate.COMMAND + Coordinate.argument(where.pkg(), where.pin(), where.module());
+        String bucketPattern = pkg + " " + BUCKET_PLACEHOLDER + " <name>";
+        boolean foldable = pkg != null && patterns.size() > 1 && patterns.stream().allMatch(pattern ->
+                overview.sections().stream().anyMatch(section ->
+                        pattern.equals(bucketPattern.replace(BUCKET_PLACEHOLDER, section.bucket()))));
+        if (foldable) {
+            layout.next(bucketPattern);
+        } else {
+            patterns.forEach(layout::next);
         }
+        layout.inlinedNext.forEach(layout::next);
+        if (pkg != null && !overview.sections().isEmpty()) {
+            layout.next(pkg + " search " + SEARCH_PLACEHOLDER);
+        }
+    }
+
+    // A listing opened in place under its row: its headings one level below the row, their entries below them, its
+    // count of what is left after them, and its Next: commands among the overview's own.
+    private static List<String> inlined(Layout layout, DiscoverResult listing) {
+        Layout inner = new Layout();
+        fill(inner, listing, Context.NONE);
+        List<String> lines = new ArrayList<>();
+        inner.blocks.forEach(block -> lines.addAll(block.get(0).startsWith(INDENT)
+                ? indented(block)
+                : indented(indented(block))));
+        inner.more.forEach(line -> lines.add(INDENT + INDENT + line));
+        inner.next.forEach(line -> layout.inlinedNext.add(line.substring(NEXT.length())));
+        return lines;
     }
 
     private static void containerRoster(Layout layout, DiscoverResult.ContainerRoster roster, Context where) {
@@ -857,6 +892,7 @@ public final class TextRenderer {
         private final List<String> more = new ArrayList<>();
         private final List<String> next = new ArrayList<>();
         private boolean hasLaterPages;
+        private final List<String> inlinedNext = new ArrayList<>();
 
         void top(String line) {
             if (line != null) {
@@ -918,8 +954,8 @@ public final class TextRenderer {
 
         /** A {@code Next:} line for {@code command}, once however many times it is offered. */
         void next(String command) {
-            if (command != null && !next.contains("Next: " + command)) {
-                next.add("Next: " + command);
+            if (command != null && !next.contains(NEXT + command)) {
+                next.add(NEXT + command);
             }
         }
 

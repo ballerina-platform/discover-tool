@@ -110,9 +110,11 @@ public sealed interface DiscoverResult {
      *     describe — empty for a package that publishes only its default module; never cut
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
+     * @param members the package's one client's own listing, page 1 as naming it under {@code client} answers it,
+     *     when the package has exactly one client; else {@code null}
      */
     record Overview(List<Section> sections, TypeCounts types, ReadmeSummary readme, List<Submodule> submodules,
-            String warning)
+            String warning, DiscoverResult members)
             implements DiscoverResult {
 
         /**

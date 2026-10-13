@@ -53,7 +53,7 @@ public class DiscoverResultRenderingTest {
                                 1, KAFKA + " funcs")),
                 new DiscoverResult.Overview.TypeCounts(
                         new LinkedHashMap<>(Map.of(DiscoverResult.TypeRoster.Kind.RECORDS, 14)), KAFKA + " type"),
-                new DiscoverResult.Overview.ReadmeSummary(11, KAFKA + " readme"), submodules, warning);
+                new DiscoverResult.Overview.ReadmeSummary(11, KAFKA + " readme"), submodules, warning, null);
     }
 
     @Test
@@ -71,8 +71,7 @@ public class DiscoverResultRenderingTest {
                 "Types   bal discover ballerinax/kafka type    14 records",
                 "Readme  bal discover ballerinax/kafka readme  11 sections",
                 "",
-                "Next: bal discover ballerinax/kafka client <name>",
-                "Next: bal discover ballerinax/kafka funcs <name>",
+                "Next: bal discover ballerinax/kafka <bucket> <name>",
                 "Next: bal discover ballerinax/kafka search <keyword>"));
     }
 
@@ -95,7 +94,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void anEmptyOverviewSaysSoInTextAndIsAnEmptyObjectInJson() {
-        DiscoverResult result = new DiscoverResult.Overview(List.of(), null, null, List.of(), null);
+        DiscoverResult result = new DiscoverResult.Overview(List.of(), null, null, List.of(), null, null);
         Assert.assertEquals(TextRenderer.render(result), "Nothing to list.");
         Assert.assertEquals(JsonRenderer.render(result), "{}");
     }
@@ -106,7 +105,7 @@ public class DiscoverResultRenderingTest {
                 new DiscoverResult.Overview.Submodule("dataloader", "load data from a source with batching and caching",
                         "bal discover ballerina/graphql --module dataloader"),
                 new DiscoverResult.Overview.Submodule("subgraph", "create subgraphs for a federated GraphQL service",
-                        "bal discover ballerina/graphql --module subgraph")), null);
+                        "bal discover ballerina/graphql --module subgraph")), null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Nothing to list.",
                 "",

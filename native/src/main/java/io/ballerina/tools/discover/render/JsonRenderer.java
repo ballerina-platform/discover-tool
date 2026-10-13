@@ -116,6 +116,11 @@ public final class JsonRenderer {
             entry.addProperty("shown", section.rows().size());
             entry.addProperty("total", section.total());
             entry.addProperty("command", section.command());
+            if (overview.members() != null && Surface.Scope.CLIENT.verb().equals(section.bucket())) {
+                JsonObject members = toJson(overview.members());
+                members.remove("warning");
+                entry.add("members", members);
+            }
             json.add(OVERVIEW_KEYS.getOrDefault(section.bucket(), section.bucket()), entry);
         }
         if (overview.types() != null) {

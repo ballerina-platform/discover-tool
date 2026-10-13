@@ -1593,9 +1593,7 @@ public class CliTest {
                     + "1 annotation, 1 listener",
             "Readme  bal discover ballerinax/kafka readme  11 sections",
             "",
-            "Next: bal discover ballerinax/kafka client <name>",
-            "Next: bal discover ballerinax/kafka service <name>",
-            "Next: bal discover ballerinax/kafka class <name>",
+            "Next: bal discover ballerinax/kafka <bucket> <name>",
             "Next: bal discover ballerinax/kafka search <keyword>",
             "");
 
