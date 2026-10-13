@@ -608,28 +608,34 @@ Next: bal discover ballerinax/kafka client <container> <name>
 
 `bal discover search <keyword> ...` asks Central: its package search (what `bal search` asks) and its symbol
 search across every package, 10 packages and 25 symbols a page, each row with the `bal discover` command that
-opens it, pinned to the version Central matched. The ranking is Central's, so the same keywords can rank
-differently as Central changes. `--page <n>` turns both rankings at once; `shown` and `total` are reported for
-each. It is not cached.
+opens it, pinned to the version Central matched. Symbols must match every keyword (the query joins them with
+Central's `AND`); packages are ranked on the keywords as typed, since Central's package search has no such
+operator. The ranking is Central's, so the same keywords can rank differently as Central changes. `--page <n>`
+turns both rankings at once; `shown` and `total` are reported for each. It is not cached.
+
+A symbol row opens what it names in the bucket this tool lists it under: a method in its container's bucket, a
+function under `funcs`, a declaration under `type`. A plain method of an object type opens the object
+(`type SchemaClient`), since Central does not say whether that object is a client or a class; a row of a kind no
+bucket lists (a `configurable`), or one missing the container or path its command needs, opens the package.
 
 ```
 $ bal discover search kafka send
 search · kafka send
-8 packages, 1869 symbols
+8 packages, 33 symbols
 
 Packages (8)
   ballerinax/kafka:4.6.6            Apache Kafka is a distributed event streaming platform used for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications.
   wso2/choreo.sendemail:0.6.1       Demo connector to send an email.
   ...
 
-Symbols (25 of 1869)
-  remote method    ballerinax/kafka:4.6.6 client Producer send
-  remote method    ballerina/email:2.14.1 client SmtpClient send
-  ...
-  resource method  ballerinax/mailchimp.transactional:1.0.2 client Client messages/send post
+Symbols (25 of 33)
+  remote method  ballerinax/kafka:4.6.6 client Producer send
+  remote method  ballerinax/kafka:4.6.6 client Producer sendWithMetadata
+  error          thambaru/debezium_to_kafka:0.2.1 type KafkaPublishError
+  remote method  xlibb/solace.semp:0.2.0 client Client getMsgVpnKafkaSenders
   ...
 
-... 1844 more (page 1 of 75)
+... 8 more (page 1 of 2)
 Next: bal discover <row>
 Next: bal discover search kafka send --page 2
 ```
@@ -653,7 +659,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
 | one service type                     | `container`, `note`, `warning`; when the package describes the methods a service defines, `handlers` (`name`, `kind`, `signature`, `required`, `repeatable`, `accessors`, `doc`, `deprecated`, `params`, `returns`) and `rules` (`requirement`, `handlers`, `message`); when it declares none and describes none, `methods` (empty), `description`, `examples` (`number`, `title`, `lines`, `command`) and `next` (the readme) when no section declares one |
 | search in a package                  | `keywords`, then per kind with a match `clients`, `serviceTypes`, `classes`, `listeners`, `functions` (`name`, `command`), `remote`, `methods` (`container`, `name`, `command`), `resources` (`container`, `path`, `accessor`, `command`), `types` (`name`, `kind`, `command`), `readme` (`number`, `title`, `command`); `counts` (per kind), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and `overview` when nothing matched |
-| search of Central                    | `keywords`, `packages` (`entries` (`qualified`, `version`, `summary`, `command`), `shown`, `total`), `symbols` (`entries` (`qualified`, `version`, `module`, `kind`, `container`, `name`, `command`), `shown`, `total`), `page`, `pages`, `remaining`, `next`; it names no one package, so it has no `qualified` |
+| search of Central                    | `keywords`, `packages` (`entries` (`qualified`, `version`, `summary`, `command`), `shown`, `total`), `symbols` (`entries` (`qualified`, `version`, `module`, `kind`, `container`, `name` or, for a resource method, `path` and `accessor`, `command`), `shown`, `total`), `page`, `pages`, `remaining`, `next`; it names no one package, so it has no `qualified` |
 | readme                               | `readme`, `lines`, and `section`, `of`, `title` for one section                                                  |
 | readme sections                      | `sections` (`number`, `title`, `lines`, `command`), `matching` (true when narrowed by `--filter` or a title), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 

@@ -559,7 +559,9 @@ public final class JsonRenderer {
             addIfPresent(entry, "module", hit.module());
             entry.addProperty("kind", hit.kind());
             addIfPresent(entry, "container", hit.container());
-            entry.addProperty("name", hit.name());
+            addIfPresent(entry, "name", hit.name());
+            addIfPresent(entry, "path", hit.path());
+            addIfPresent(entry, "accessor", hit.accessor());
             entry.addProperty("command", hit.command());
             symbols.add(entry);
         }
