@@ -210,7 +210,8 @@ public final class Cli {
             return fail(readAt(notPaged(root, coordinate.value(), filter), loaded.value()), streams, json);
         }
         String read = loaded.value().version().text();
-        TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, rest,
+        List<String> shown = echoed(rest);
+        TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, shown,
                 filter, Version.textOf(version), read);
         JsonRenderer.Where about = new JsonRenderer.Where(qualified.qualified(), read, root.module);
         streams.out().accept((json ? JsonRenderer.render(answer.value(), about)
@@ -309,7 +310,7 @@ public final class Cli {
 
     private static String tail(List<String> rest, String filter, int page) {
         StringBuilder words = new StringBuilder();
-        rest.forEach(word -> words.append(' ').append(Texts.shellWord(PathTree.join(PathTree.splitPath(word)))));
+        echoed(rest).forEach(word -> words.append(' ').append(Texts.shellWord(word)));
         if (filter != null) {
             words.append(" --filter ").append(Texts.shellWord(filter));
         }
@@ -317,6 +318,15 @@ public final class Cli {
             words.append(" --page ").append(page);
         }
         return words.toString();
+    }
+
+    // The typed words as this tool prints them: a name or path spelled without Ballerina's escapes, as every answer
+    // prints it. A readme title and a search keyword are text, not identifiers, so they are echoed as typed.
+    private static List<String> echoed(List<String> rest) {
+        if (rest.isEmpty() || Readme.BUCKET.equals(rest.get(0)) || Search.BUCKET.equals(rest.get(0))) {
+            return rest;
+        }
+        return rest.stream().map(PathTree::plainSelector).toList();
     }
 
     private static String tail(Commands.Root root) {

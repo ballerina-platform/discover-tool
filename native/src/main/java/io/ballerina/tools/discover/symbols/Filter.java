@@ -22,6 +22,7 @@ import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.Param;
 import io.ballerina.tools.discover.model.RecordField;
 import io.ballerina.tools.discover.model.TypeDef;
+import io.ballerina.tools.discover.render.Identifiers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -72,7 +73,7 @@ public final class Filter {
      * Partition a list against a keyword.
      *
      * <p>A single case-insensitive substring match of the whole argument — no tokenising, no AND. A search, unlike a
-     * selector, so the keyword and the surface are both read through {@link PathTree#readableSelector}: the escaped
+     * selector, so the keyword and the surface are both read through {@link Identifiers#plainText}: the escaped
      * spelling ({@code chat\.postMessage}, {@code code\-scanning}, {@code 'import}) and the plain one find the same
      * entries.
      */
@@ -104,7 +105,7 @@ public final class Filter {
         if (text == null || text.isBlank()) {
             return "";
         }
-        return PathTree.readableSelector(text).trim().toLowerCase(Locale.ROOT);
+        return Identifiers.plainText(text).trim().toLowerCase(Locale.ROOT);
     }
 
     /**

@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.views;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.render.Identifiers;
+import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
@@ -62,10 +63,6 @@ final class ReadmeCalls {
             "\\bservice\\b[^{;]*?\\bon\\s+(new\\s+)?([A-Za-z_][\\w.]*(?::[A-Za-z_]\\w*)?)");
     private static final String DEFAULT_ACCESSOR = "get";
     private static final String ROOT = ".";
-    private static final String SEPARATOR = "/";
-    private static final String PARAMETER = ":";
-    private static final String REST = ":...";
-    private static final String MODULE_SEPARATOR = ".";
 
     private ReadmeCalls() {
     }
@@ -129,7 +126,7 @@ final class ReadmeCalls {
         Matcher matcher = RESOURCE_CALL.matcher(code);
         while (matcher.find()) {
             String path = matcher.group(2);
-            List<String> segments = path.isEmpty() ? List.of() : List.of(path.split(SEPARATOR, -1));
+            List<String> segments = path.isEmpty() ? List.of() : List.of(path.split(PathTree.SEPARATOR, -1));
             calls.add(new Call(matcher.group(1), segments,
                     matcher.group(3) == null ? DEFAULT_ACCESSOR : matcher.group(3)));
         }
@@ -154,14 +151,14 @@ final class ReadmeCalls {
         int literals = 0;
         for (int i = 0; i < declared.size(); i++) {
             String segment = declared.get(i);
-            if (segment.startsWith(REST)) {
+            if (segment.startsWith(PathTree.REST)) {
                 return literals;
             }
             if (i >= call.segments().size()) {
                 return -1;
             }
             String written = call.segments().get(i);
-            if (segment.startsWith(PARAMETER)) {
+            if (segment.startsWith(PathTree.PARAMETER)) {
                 continue;
             }
             if (written.startsWith("[") || !Identifiers.plain(written).equals(segment)) {
@@ -182,7 +179,7 @@ final class ReadmeCalls {
     private record Owners(String prefix, Surface.Container container, List<Surface.Container> others) {
 
         Owners(LoadedPackage loaded, Surface.Container container) {
-            this(Identifiers.plain(prefixOf(loaded)), container, Arrays.stream(Surface.Scope.values())
+            this(prefixOf(loaded), container, Arrays.stream(Surface.Scope.values())
                     .filter(scope -> scope != Surface.Scope.MODULE)
                     .flatMap(scope -> Surface.of(loaded.library(), scope).stream())
                     .filter(other -> !other.name().equals(container.name()))
@@ -219,8 +216,7 @@ final class ReadmeCalls {
     }
 
     private static String prefixOf(LoadedPackage loaded) {
-        String module = loaded.module() == null ? loaded.qualified().name() : loaded.module();
-        return module.substring(module.lastIndexOf(MODULE_SEPARATOR) + 1);
+        return Identifiers.plain(loaded.moduleRef().prefix());
     }
 
     // The types `variable` is declared with in `code` — the last declaration wins — each as `prefix:Name`.

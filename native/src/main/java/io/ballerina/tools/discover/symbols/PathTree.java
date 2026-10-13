@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Operations by path.
@@ -57,6 +58,16 @@ public record PathTree(
 
     public static final String SEPARATOR = "/";
 
+    /** What starts a path parameter's display segment: {@code :owner}. */
+    public static final String PARAMETER = ":";
+
+    /** What starts a rest parameter's display segment: {@code :...path}. */
+    public static final String REST = PARAMETER + "...";
+
+    private static final String REST_MARK = "...";
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+
     /** How a requested path resolved against the tree. */
     public sealed interface Resolution {
 
@@ -77,19 +88,6 @@ public record PathTree(
     }
 
     /**
-     * A whole selector unescaped — every segment of it, not just the first.
-     *
-     * <p>A selector copied out of a fenced signature ({@code post chat\.postMessage}) carries an accessor and
-     * several segments in one argument, and is compared against an entry's label rather than walked.
-     *
-     * <p>The {@code '} strip is anchored at a segment boundary rather than global: an apostrophe INSIDE a name is
-     * part of it, and {@code 'key} is only a quoted identifier where a segment starts.
-     */
-    public static String readableSelector(String text) {
-        return text.replaceAll("(^|(?<=[ /]))'", "").replaceAll("\\\\(?=[^A-Za-z0-9_])", "");
-    }
-
-    /**
      * How a path segment is printed and typed: {@code repos}, {@code public} for the keyword Ballerina writes
      * {@code 'public}, or {@code :owner} for a parameter. Central publishes literal segments as Ballerina writes
      * them ({@code code\-scanning}, {@code 'import}); those spellings belong inside a fence, where a line quotes
@@ -104,10 +102,30 @@ public record PathTree(
     public static String displaySegment(Fn.PathSegment segment) {
         return switch (segment) {
             case Fn.PathSegment.Literal literal -> Identifiers.plain(literal.text());
-            case Fn.PathSegment.Parameter parameter -> parameter.type().endsWith("...")
-                    ? ":..." + parameter.name()
-                    : ":" + parameter.name();
+            case Fn.PathSegment.Parameter parameter ->
+                    parameterSegment(parameter.name(), parameter.type().endsWith(REST_MARK));
         };
+    }
+
+    /**
+     * A segment of a path as Ballerina declares it, {@code 'import} or {@code [string owner]}, as
+     * {@link #displaySegment} prints it: {@code import}, {@code :owner}; a rest parameter, whichever side of the
+     * space its {@code ...} is written ({@code [string... path]}, {@code [string ...path]}), is {@code :...path}.
+     */
+    public static String displayDeclared(String declared) {
+        if (!declared.startsWith("[") || !declared.endsWith("]")) {
+            return Identifiers.plain(declared);
+        }
+        String inside = declared.substring(1, declared.length() - 1).trim();
+        String[] words = WHITESPACE.split(inside);
+        String last = words[words.length - 1];
+        String name = last.substring(last.lastIndexOf(REST_MARK) < 0 ? 0 : last.lastIndexOf(REST_MARK)
+                + REST_MARK.length());
+        return parameterSegment(Identifiers.plain(name), inside.contains(REST_MARK));
+    }
+
+    private static String parameterSegment(String name, boolean rest) {
+        return (rest ? REST : PARAMETER) + name;
     }
 
     public static List<Operation> operationsOf(ClientClass client) {
@@ -153,6 +171,11 @@ public record PathTree(
     /** A path as printed. */
     public static String join(List<String> segments) {
         return String.join(SEPARATOR, segments);
+    }
+
+    /** A typed word as this tool prints it: each {@code /}-separated segment without Ballerina's escapes. */
+    public static String plainSelector(String word) {
+        return join(splitPath(word));
     }
 
     /**

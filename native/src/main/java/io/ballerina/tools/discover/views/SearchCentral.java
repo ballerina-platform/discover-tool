@@ -61,7 +61,6 @@ public final class SearchCentral {
     private static final String LISTENER_METHOD = "listener-method";
     private static final String FUNCTION = "function";
     private static final String MODULE_SEPARATOR = ".";
-    private static final String PARAMETER_REST = "...";
     private static final Pattern WORD_SEPARATOR = Pattern.compile("-");
     private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^\\]]*]\\([^)]*\\)");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]*)]\\([^)]*\\)");
@@ -158,14 +157,7 @@ public final class SearchCentral {
     // `repos/[string owner]/'import` as this tool prints a path: `repos/:owner/import`.
     private static String plainPath(String declared) {
         return Arrays.stream(declared.split(PathTree.SEPARATOR))
-                .map(segment -> {
-                    if (!segment.startsWith("[") || !segment.endsWith("]")) {
-                        return Identifiers.plain(segment);
-                    }
-                    String[] words = WHITESPACE.split(segment.substring(1, segment.length() - 1).trim());
-                    String name = Identifiers.plain(words[words.length - 1]);
-                    return segment.contains(PARAMETER_REST) ? ":" + PARAMETER_REST + name : ":" + name;
-                })
+                .map(PathTree::displayDeclared)
                 .collect(Collectors.joining(PathTree.SEPARATOR));
     }
 

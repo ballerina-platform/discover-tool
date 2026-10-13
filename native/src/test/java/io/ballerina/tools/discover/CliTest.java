@@ -271,6 +271,16 @@ public class CliTest {
     }
 
     @Test
+    public void theHeaderSpellsATypedEscapedPathAsItIsPrinted() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "gists/'public", "get"),
+                capture.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text()), null,
+                true), 0, capture.stderr());
+        Assert.assertTrue(capture.stdout().startsWith("ballerinax/github:" + FixtureCorpus.FIXTURE_VERSION.text()
+                + " · client · Client · gists/public · get\n"), capture.stdout());
+    }
+
+    @Test
     public void aMemberItsOneContainerDeclaresIsAnsweredWithoutTheContainer() {
         String producer = "bal discover ballerinax/kafka client Producer";
         Capture send = new Capture();
