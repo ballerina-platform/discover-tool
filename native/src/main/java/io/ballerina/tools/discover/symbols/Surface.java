@@ -138,6 +138,11 @@ public final class Surface {
             return scope == Scope.MODULE;
         }
 
+        /** The name as every answer prints it: without Ballerina's escapes. */
+        public String plainName() {
+            return Identifiers.plain(name);
+        }
+
         public String label() {
             return isModule() ? "module-level functions" : name;
         }
