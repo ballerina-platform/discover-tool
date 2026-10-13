@@ -93,6 +93,7 @@ public final class JsonRenderer {
             case DiscoverResult.TypeRoster roster -> typeRoster(roster);
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(declaration);
             case DiscoverResult.Search search -> search(search);
+            case DiscoverResult.CentralSearch search -> centralSearch(search);
         };
     }
 
@@ -508,6 +509,45 @@ public final class JsonRenderer {
             json.addProperty("overview", search.overview());
         }
         addIfPresent(json, "warning", search.warning());
+        return json;
+    }
+
+    private static JsonObject centralSearch(DiscoverResult.CentralSearch search) {
+        JsonObject json = new JsonObject();
+        json.add("keywords", strings(search.keywords()));
+        JsonArray packages = new JsonArray();
+        for (DiscoverResult.CentralSearch.PackageHit hit : search.packages()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("qualified", hit.qualified());
+            entry.addProperty("version", hit.version());
+            entry.addProperty("summary", hit.summary());
+            entry.addProperty("command", hit.command());
+            packages.add(entry);
+        }
+        json.add("packages", window(packages, search.packagesTotal()));
+        JsonArray symbols = new JsonArray();
+        for (DiscoverResult.CentralSearch.SymbolHit hit : search.symbols()) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("qualified", hit.qualified());
+            entry.addProperty("version", hit.version());
+            addIfPresent(entry, "module", hit.module());
+            entry.addProperty("kind", hit.kind());
+            addIfPresent(entry, "container", hit.container());
+            entry.addProperty("name", hit.name());
+            entry.addProperty("command", hit.command());
+            symbols.add(entry);
+        }
+        json.add("symbols", window(symbols, search.symbolsTotal()));
+        addPaging(json, search.paging());
+        addIfPresent(json, "next", search.next());
+        return json;
+    }
+
+    private static JsonObject window(JsonArray entries, int total) {
+        JsonObject json = new JsonObject();
+        json.add("entries", entries);
+        json.addProperty("shown", entries.size());
+        json.addProperty("total", total);
         return json;
     }
 

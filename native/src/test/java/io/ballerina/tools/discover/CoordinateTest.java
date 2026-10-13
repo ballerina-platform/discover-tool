@@ -129,7 +129,7 @@ public class CoordinateTest {
         Failure.Validation bare = rejected("kafka");
         Assert.assertEquals(bare.message(),
                 "Invalid package name 'kafka': a package is named with its organization, <org>/kafka.");
-        Assert.assertEquals(bare.suggestion(), "`bal search kafka` lists the packages that match, with their "
+        Assert.assertEquals(bare.suggestion(), "`bal discover search kafka` lists the packages that match, with their "
                 + "organizations.");
     }
 }

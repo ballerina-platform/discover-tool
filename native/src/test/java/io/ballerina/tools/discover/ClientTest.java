@@ -272,7 +272,7 @@ public class ClientTest {
                     fast(routed).build()).failure();
             Assert.assertEquals(failure.version(), "4.6.5");
             Assert.assertEquals(failure.suggestion(),
-                    "Check the org/name spelling; `bal search <keyword>` lists what Central publishes.");
+                    "Check the org/name spelling; `bal discover search <keyword>` lists what Central publishes.");
         }
     }
 
@@ -449,7 +449,7 @@ public class ClientTest {
         Assert.assertTrue(suggestion.contains("publishes no 'nope' module (its modules are aws, aws.auth)"),
                 suggestion);
         Assert.assertFalse(suggestion.contains("--module"), suggestion);
-        Assert.assertTrue(suggestion.contains("`bal search <keyword>`"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal discover search <keyword>`"), suggestion);
     }
 
     @Test
@@ -516,7 +516,7 @@ public class ClientTest {
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
         Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
         Assert.assertTrue(failure.suggestion().contains("tried ballerinax/aws"), failure.suggestion());
-        Assert.assertTrue(failure.suggestion().contains("`bal search <keyword>`"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("`bal discover search <keyword>`"), failure.suggestion());
     }
 
     @Test

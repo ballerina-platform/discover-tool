@@ -67,6 +67,8 @@ public final class TextRenderer {
 
     private static final String SEARCH_PLACEHOLDER = "<keyword>";
 
+    private static final String COMMAND_PREFIX = "bal discover ";
+
     private TextRenderer() {
     }
 
@@ -147,6 +149,7 @@ public final class TextRenderer {
             case DiscoverResult.TypeRoster roster -> typeRoster(layout, roster);
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(layout, declaration);
             case DiscoverResult.Search search -> search(layout, search);
+            case DiscoverResult.CentralSearch search -> centralSearch(layout, search);
         }
     }
 
@@ -551,6 +554,44 @@ public final class TextRenderer {
         layout.warning(search.warning());
         layout.more(remaining(search.shown(), search.total(), search.paging()), search.paging());
         layout.next(search.next());
+    }
+
+    private static void centralSearch(Layout layout, DiscoverResult.CentralSearch search) {
+        if (search.packagesTotal() == 0 && search.symbolsTotal() == 0) {
+            layout.top("Central matches no package or symbol.");
+            return;
+        }
+        layout.top(counted(search.packagesTotal(), "package", "packages") + ", "
+                + counted(search.symbolsTotal(), "symbol", "symbols"));
+        List<String> packageRows = search.packages().stream()
+                .map(hit -> hit.command().substring(COMMAND_PREFIX.length()))
+                .toList();
+        Drill packages = Drill.of(packageRows,
+                search.packages().stream().map(DiscoverResult.CentralSearch.PackageHit::command).toList(), "<row>");
+        TextTable packageTable = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        for (int i = 0; i < packageRows.size(); i++) {
+            packageTable.row(packageRows.get(i), search.packages().get(i).summary(), packages.explicit(i));
+        }
+        layout.section(shownOf("Packages", search.packages().size(), search.packagesTotal()), packageTable);
+        List<String> symbolRows = search.symbols().stream()
+                .map(hit -> hit.command().substring(COMMAND_PREFIX.length()))
+                .toList();
+        Drill symbols = Drill.of(symbolRows,
+                search.symbols().stream().map(DiscoverResult.CentralSearch.SymbolHit::command).toList(), "<row>");
+        TextTable symbolTable = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        for (int i = 0; i < symbolRows.size(); i++) {
+            symbolTable.row(search.symbols().get(i).kind(), symbolRows.get(i), symbols.explicit(i));
+        }
+        layout.section(shownOf("Symbols", search.symbols().size(), search.symbolsTotal()), symbolTable);
+        layout.more(remaining(search.packages().size() + search.symbols().size(),
+                search.packagesTotal() + search.symbolsTotal(), search.paging()), search.paging());
+        layout.next(packages.pattern());
+        layout.next(symbols.pattern());
+        layout.next(search.next());
+    }
+
+    private static String shownOf(String heading, int shown, int total) {
+        return heading + (shown < total ? " (" + shown + " of " + total + ")" : " (" + total + ")");
     }
 
     private static void typeDeclaration(Layout layout, DiscoverResult.TypeDeclaration declaration) {

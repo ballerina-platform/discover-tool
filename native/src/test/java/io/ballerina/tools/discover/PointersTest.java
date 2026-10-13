@@ -206,6 +206,11 @@ public class PointersTest {
                 search.groups().forEach(group -> group.hits().forEach(hit -> commands.add(hit.command())));
                 addIfPresent(commands, search.next());
             }
+            case DiscoverResult.CentralSearch search -> {
+                search.packages().forEach(hit -> commands.add(hit.command()));
+                search.symbols().forEach(hit -> commands.add(hit.command()));
+                addIfPresent(commands, search.next());
+            }
             case DiscoverResult.EmptyBucket empty ->
                     empty.elsewhere().forEach(other -> commands.add(other.command()));
             case DiscoverResult.TypeRoster roster -> {

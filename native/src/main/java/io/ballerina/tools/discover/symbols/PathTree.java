@@ -55,7 +55,7 @@ public record PathTree(
      */
     public record Operation(Fn.Resource fn, List<String> segments) { }
 
-    private static final String SEPARATOR = "/";
+    public static final String SEPARATOR = "/";
 
     /** How a requested path resolved against the tree. */
     public sealed interface Resolution {

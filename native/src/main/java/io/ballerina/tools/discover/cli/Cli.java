@@ -37,6 +37,7 @@ import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.Search;
+import io.ballerina.tools.discover.views.SearchCentral;
 import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
 
@@ -87,6 +88,8 @@ public final class Cli {
     private static final int USAGE_ERROR = 2;
 
     private static final int FIRST_PAGE = 1;
+
+    private static final String COMMAND = "bal discover ";
 
     private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
 
@@ -155,6 +158,9 @@ public final class Cli {
         if (root.version != null) {
             return usage.error(versionFlag(root));
         }
+        if (SearchCentral.VERB.equals(root.pkg)) {
+            return searchCentral(root, streams, http, json, usage);
+        }
         if (root.pkg == null) {
             return usage.error(new Failure.Validation(
                     "A package is required.",
@@ -209,6 +215,43 @@ public final class Cli {
         JsonRenderer.Where about = new JsonRenderer.Where(qualified.qualified(), read, root.module);
         streams.out().accept((json ? JsonRenderer.render(answer.value(), about)
                 : TextRenderer.render(answer.value(), where)) + "\n");
+        return 0;
+    }
+
+    private static int searchCentral(Commands.Root root, Streams streams, HttpOptions http, boolean json,
+            UsageErrors usage) {
+        List<String> keywords = rest(root);
+        String command = COMMAND + SearchCentral.VERB;
+        if (keywords.isEmpty()) {
+            return usage.error(new Failure.Validation("The search needs at least one keyword.",
+                    "Write " + Failure.quoted(command + " <keyword>") + "."));
+        }
+        String typed = command + tail(keywords, null, FIRST_PAGE);
+        if (root.module != null) {
+            return usage.error(new Failure.Validation("--module reads one package's submodule, and a search covers "
+                    + "all of Central.", "Drop --module: " + Failure.quoted(typed) + ".", typed));
+        }
+        if (root.filter != null) {
+            String fixed = typed + " " + Texts.shellWord(root.filter);
+            return usage.error(new Failure.Validation("The --filter option narrows a listing, and a search is not "
+                    + "one.", "Add its keyword to the search instead: " + Failure.quoted(fixed) + ".", fixed));
+        }
+        Failure invalid = rejectInvalidOutput(root);
+        if (invalid == null && root.page < FIRST_PAGE) {
+            invalid = new Failure.Validation("Page " + root.page + " is out of range: pages are numbered from 1.",
+                    "Pass --page 1 or later, or drop it for the first page.");
+        }
+        if (invalid != null) {
+            return usage.error(invalid);
+        }
+        Result<DiscoverResult> found = SearchCentral.render(keywords, root.page, http.withRefresh(root.refresh));
+        if (!found.isOk()) {
+            return fail(found.failure(), streams, json);
+        }
+        TextRenderer.Context where = new TextRenderer.Context(null, null,
+                List.of(SearchCentral.VERB, String.join(" ", keywords)), null, null, null);
+        streams.out().accept((json ? JsonRenderer.render(found.value())
+                : TextRenderer.render(found.value(), where)) + "\n");
         return 0;
     }
 
