@@ -453,6 +453,16 @@ public class ViewsTest {
         assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "gists/public", "head"),
                 "'gists/public head' is not a resource method of Client in " + github.label() + ".",
                 "List what is under gists/public: `" + client + " gists/public`.", client + " gists/public");
+        // Left out, the one container that declares the path is settled, and the miss is the same.
+        for (List<String> typed : List.of(List.of("gists/public", "head"), List.of("head", "gists/public"))) {
+            Result<DiscoverResult> leftOut = Containers.render(github, Surface.Scope.CLIENT,
+                    new Containers.Options(typed));
+            Assert.assertFalse(leftOut.isOk(), typed.toString());
+            Failure.SymbolNotFound failure = (Failure.SymbolNotFound) leftOut.failure();
+            Assert.assertEquals(failure.message(), "'" + String.join(" ", typed) + "' is not a resource method of "
+                    + "Client in " + github.label() + ".");
+            Assert.assertEquals(failure.command(), client + " gists/public", typed.toString());
+        }
         // A path split across two positionals is read as a path and an accessor, and is neither.
         assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "repos/:owner/:repo", "issues"),
                 "'repos/:owner/:repo issues' is not a resource method of Client in " + github.label() + ".",

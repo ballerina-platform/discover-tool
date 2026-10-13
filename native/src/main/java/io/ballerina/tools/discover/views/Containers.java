@@ -65,8 +65,9 @@ import java.util.stream.Collectors;
  * <p><b>THE CONTAINER MAY BE LEFT OUT WHEN TYPED.</b> A first selector naming no container of the bucket is read
  * against each container in it; when exactly one declares what the selectors name — a member, a resource path, a
  * path and its accessor — it answers as if it had been named, and with two or more the failure lists each owner's
- * command. A container's own name always wins. Every printed command names the container, so a command printed
- * today still runs once a later version adds a second owner.
+ * command. When none declares all of it but exactly one declares a path typed whole, that one is settled and the
+ * failure is its miss, as if it had been named. A container's own name always wins. Every printed command names the
+ * container, so a command printed today still runs once a later version adds a second owner.
  *
  * <p><b>A MISS FAILS.</b> A selector is matched exactly as this tool prints it, and one that matches nothing — or
  * names something another bucket holds — is a {@code symbol-not-found} failure whose suggestion is the one command
@@ -221,7 +222,24 @@ public final class Containers {
         if (owners.size() > 1) {
             return Result.err(severalOwners(loaded, owners, options));
         }
+        List<Surface.Container> pathOwners = containers.stream()
+                .filter(container -> holdsPath(container, selectors))
+                .toList();
+        if (pathOwners.size() == 1) {
+            return answer(loaded, scope, pathOwners.get(0), selectors, options);
+        }
         return Result.err(notInBucket(loaded, scope, options));
+    }
+
+    // Whether one of the selectors is a whole path `container` declares, whatever the others name: the container
+    // is then settled, and what it does not hold under that path is its miss to report.
+    private static boolean holdsPath(Surface.Container container, List<String> selectors) {
+        if (!container.hasPaths()) {
+            return false;
+        }
+        PathTree tree = PathTree.build(container.operations());
+        return selectors.stream().anyMatch(selector ->
+                PathTree.resolve(tree, PathTree.splitPath(selector)) instanceof PathTree.Resolution.Found);
     }
 
     // Whether the selectors `container` reads name something it declares: a member, a resource path, a path and its
