@@ -21,6 +21,7 @@ package io.ballerina.tools.discover;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.constructs.Decl;
+import io.ballerina.tools.discover.constructs.Node;
 import io.ballerina.tools.discover.constructs.Payload;
 import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.Pipeline;
@@ -189,6 +190,38 @@ public class LeafExtrasTest {
         String text = TextRenderer.render(service);
         Assert.assertTrue(text.contains("\nService declares no methods: a service of it defines its own.\n"), text);
         Assert.assertTrue(text.contains("\nReadme sections that declare one\n"), text);
+    }
+
+    @Test
+    public void anUntypedServiceIsTheListenersAttachTypesNotEveryServiceTypeTheListenerAccepts() {
+        LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
+        DiscoverResult.ServiceExamples service = (DiscoverResult.ServiceExamples) Containers.render(http,
+                Surface.Scope.SERVICE, new Containers.Options(List.of("Service"))).value();
+        Assert.assertFalse(service.sections().isEmpty());
+        DiscoverResult.ServiceExamples contract = (DiscoverResult.ServiceExamples) Containers.render(http,
+                Surface.Scope.SERVICE, new Containers.Options(List.of("ServiceContract"))).value();
+        Assert.assertEquals(contract.sections(), List.of(),
+                "`service /x on new http:Listener(...)` is an http:Service, though the listener accepts both");
+    }
+
+    @Test
+    public void twoServiceTypesOnOneListenerWhoseAttachTakesEitherClaimOnlyTheServicesTypedAsThem() {
+        Payload payload = Payload.pkg();
+        payload.with("listeners", Decl.listenerAttaching(Node.structural().on("isAnonymousUnionType").members(
+                Node.named("Orders", "objectTypes").with("orgName", "test").with("moduleName", "pkg"),
+                Node.named("Events", "objectTypes").with("orgName", "test").with("moduleName", "pkg")), "Listener"));
+        payload.with("serviceTypes", Decl.serviceType("Orders"), Decl.serviceType("Events"));
+        Library library = Pipeline.build(payload.module());
+        String readme = "## Untyped\n\n```ballerina\nservice on new pkg:Listener() {\n}\n```\n\n## Typed\n\n"
+                + "```ballerina\nservice pkg:Events on new pkg:Listener() {\n}\n```\n";
+        LoadedPackage acme = new LoadedPackage(QualifiedName.parse("test/pkg").value(), FixtureCorpus.FIXTURE_VERSION,
+                library, Optional.of(readme), null, List.of(), List.of(), null, null, () -> library, Map::of);
+        for (String type : List.of("Orders", "Events")) {
+            DiscoverResult.ServiceExamples answer = (DiscoverResult.ServiceExamples) Containers.render(acme,
+                    Surface.Scope.SERVICE, new Containers.Options(List.of(type))).value();
+            Assert.assertEquals(answer.sections().stream().map(DiscoverResult.ReadmeSections.Section::title).toList(),
+                    type.equals("Events") ? List.of("Typed") : List.of(), type);
+        }
     }
 
     @Test

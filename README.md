@@ -523,9 +523,11 @@ error: 'close' is declared by Consumer and Producer in ballerinax/kafka:4.6.5.
 ```
 
 A service type that declares no methods, and whose package does not describe the ones a service defines,
-answers with its own documentation and the readme sections whose code declares such a service — typed as it,
-attached to one of its listeners, or, for a module's only service type with no listener of its own, any service
-— or, when none does, the readme's command:
+answers with its own documentation and the readme sections whose code declares such a service — typed as it;
+untyped on one of its listeners, when it is the type that listener's `attach` takes or the one service type the
+listener accepts (an untyped service on `http:Listener` is an `http:Service`, not an `http:ServiceContract`); or,
+for a module's only service type with no listener of its own, any service — or, when none does, the readme's
+command:
 
 ```
 $ bal discover ballerina/http service Service
