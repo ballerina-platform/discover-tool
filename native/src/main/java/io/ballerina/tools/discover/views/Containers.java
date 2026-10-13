@@ -318,7 +318,7 @@ public final class Containers {
         Optional<String> kind = Types.kindOf(loaded, token);
         if (kind.isPresent()) {
             return Optional.of(misplaced(loaded, token, message, "It is " + article(kind.get()),
-                    bucketCommand(loaded, Types.BUCKET) + " " + shellWord(token)));
+                    bucketCommand(loaded, Types.BUCKET) + " " + shellWord(Identifiers.plain(token))));
         }
         Optional<String> enumeration = Types.enumOf(loaded, token);
         if (enumeration.isPresent()) {

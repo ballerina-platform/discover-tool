@@ -86,11 +86,6 @@ public final class SearchCentral {
     private static final String AND = " AND ";
     private static final String MODULE_SEPARATOR = ".";
     private static final Pattern WORD_SEPARATOR = Pattern.compile("-");
-    private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^\\]]*]\\([^)]*\\)");
-    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[([^\\]]*)]\\([^)]*\\)");
-    private static final Pattern QUOTE_MARKS = Pattern.compile("^[>#\\s]+");
-    private static final Pattern EMPHASIS = Pattern.compile("(?<!\\w)(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1(?!\\w)");
-    private static final Pattern SENTENCE_END = Pattern.compile("(?<=[.!?])\\s+(?=[A-Z])");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private SearchCentral() {
@@ -136,7 +131,7 @@ public final class SearchCentral {
         }
         List<DiscoverResult.CentralSearch.PackageHit> packageHits = packages.value().items().stream()
                 .map(row -> new DiscoverResult.CentralSearch.PackageHit(row.org() + "/" + row.name(), row.version(),
-                        firstSentence(row.summary()), Coordinate.argument(row.org() + "/" + row.name(),
+                        Texts.firstSentence(row.summary()), Coordinate.argument(row.org() + "/" + row.name(),
                                 row.version(), null)))
                 .toList();
         List<DiscoverResult.CentralSearch.SymbolHit> symbolHits = symbols.value().items().stream()
@@ -238,14 +233,5 @@ public final class SearchCentral {
         return Arrays.stream(declared.split(PathTree.SEPARATOR))
                 .map(PathTree::displayDeclared)
                 .collect(Collectors.joining(PathTree.SEPARATOR));
-    }
-
-    // The summary as one line of prose: images dropped, links as their text, emphasis and quote marks gone, cut at
-    // the first sentence's end — a full stop followed by a capital, so `e.g. the` and `v2. the` are not one.
-    private static String firstSentence(String summary) {
-        String text = MARKDOWN_LINK.matcher(MARKDOWN_IMAGE.matcher(summary).replaceAll("")).replaceAll("$1");
-        String plain = WHITESPACE.matcher(text).replaceAll(" ").trim();
-        plain = EMPHASIS.matcher(QUOTE_MARKS.matcher(plain).replaceAll("")).replaceAll("$2").trim();
-        return SENTENCE_END.split(plain, 2)[0];
     }
 }

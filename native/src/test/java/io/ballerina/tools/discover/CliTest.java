@@ -1228,6 +1228,34 @@ public class CliTest {
     }
 
     @Test
+    public void aSearchUnderModuleSearchesThatModuleAndAFilteredBarePackagePages() {
+        Capture subgraph = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "search", "entity"),
+                subgraph.streams(), options(graphqlCentral())), 0, subgraph.stderr());
+        JsonObject found = JsonParser.parseString(subgraph.stdout()).getAsJsonObject();
+        Assert.assertEquals(found.get("module").getAsString(), "subgraph");
+        Assert.assertTrue(found.get("total").getAsInt() > 0, found.toString());
+        Assert.assertTrue(found.toString().contains("bal discover ballerina/graphql --module subgraph "),
+                found.toString());
+
+        String version = FixtureCorpus.FIXTURE_VERSION.text();
+        Capture second = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "--filter", "issue", "--page", "2"),
+                second.streams(), centralFor("ballerinax__github", version)), 0, second.stderr());
+        JsonObject page = JsonParser.parseString(second.stdout()).getAsJsonObject();
+        Assert.assertEquals(page.get("page").getAsInt(), 2, page.toString());
+        Assert.assertEquals(page.get("keywords").toString(), "[\"issue\"]");
+    }
+
+    @Test
+    public void aTypeAskedInAContainerBucketIsPointedAtWithItsPlainName() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "'ProducerConfiguration"),
+                capture.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1, capture.stderr());
+        Assert.assertEquals(capture.field("command"), "bal discover ballerinax/kafka type ProducerConfiguration");
+    }
+
+    @Test
     public void aPageBelowOneIsRejectedBeforeAnythingIsFetched() {
         for (String page : List.of("0", "-1")) {
             Capture capture = new Capture();
