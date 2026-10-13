@@ -62,6 +62,12 @@ import java.util.stream.Collectors;
  * declares resource functions reads {@code get}/{@code post}/{@code delete} as an accessor; on any other the same
  * token is a member name.
  *
+ * <p><b>THE CONTAINER MAY BE LEFT OUT WHEN TYPED.</b> A first selector naming no container of the bucket is read
+ * against each container in it; when exactly one declares what the selectors name — a member, a resource path, a
+ * path and its accessor — it answers as if it had been named, and with two or more the failure lists each owner's
+ * command. A container's own name always wins. Every printed command names the container, so a command printed
+ * today still runs once a later version adds a second owner.
+ *
  * <p><b>A MISS FAILS.</b> A selector is matched exactly as this tool prints it, and one that matches nothing — or
  * names something another bucket holds — is a {@code symbol-not-found} failure whose suggestion is the one command
  * to run next, never a list of guesses: an agent that reads a near miss as an answer reasons from the wrong thing.
@@ -182,10 +188,8 @@ public final class Containers {
         }
     }
 
-    public static Result<DiscoverResult> render(LoadedPackage loaded, Surface.Scope scope, Options options) {
-        if (scope == Surface.Scope.SERVICE) {
-            loaded = loaded.withSource();
-        }
+    public static Result<DiscoverResult> render(LoadedPackage asked, Surface.Scope scope, Options options) {
+        LoadedPackage loaded = scope == Surface.Scope.SERVICE ? asked.withSource() : asked;
         List<Surface.Container> containers = Surface.of(loaded.library(), scope);
         List<String> selectors = options.selectors();
         if (containers.isEmpty()) {
@@ -208,7 +212,45 @@ public final class Containers {
         if (named.isPresent()) {
             return answer(loaded, scope, named.get(), selectors.subList(1, selectors.size()), options);
         }
+        List<Surface.Container> owners = containers.stream()
+                .filter(container -> declares(loaded, container, selectors))
+                .toList();
+        if (owners.size() == 1) {
+            return answer(loaded, scope, owners.get(0), selectors, options);
+        }
+        if (owners.size() > 1) {
+            return Result.err(severalOwners(loaded, owners, options));
+        }
         return Result.err(notInBucket(loaded, scope, options));
+    }
+
+    // Whether the selectors `container` reads name something it declares: a member, a resource path, a path and its
+    // accessor, or a method a marker service type's package describes. What it does not read is reported once the
+    // container is settled, as after a container named outright.
+    private static boolean declares(LoadedPackage loaded, Surface.Container container, List<String> selectors) {
+        if (!select(container, selectors.subList(0, consumed(container, selectors))).isEmpty()) {
+            return true;
+        }
+        String plain = Identifiers.plain(selectors.get(0));
+        return selectors.size() == 1 && container.scope() == Surface.Scope.SERVICE
+                && loaded.handlersOf(container.name())
+                        .map(described -> described.handlers().stream().anyMatch(h -> plain.equals(h.name())))
+                        .orElse(false);
+    }
+
+    private static Failure severalOwners(LoadedPackage loaded, List<Surface.Container> owners, Options options) {
+        List<String> selectors = options.selectors();
+        List<String> commands = owners.stream()
+                .map(owner -> baseCommand(loaded, owner.scope(), owner)
+                        + shellWords(selectors.subList(0, consumed(owner, selectors))) + filterArgument(options))
+                .toList();
+        String typed = String.join(" ", selectors.subList(0, consumed(owners.get(0), selectors)));
+        List<String> names = owners.stream().map(Surface.Container::plainName).toList();
+        return loaded.symbolNotFoundAmong(selectors,
+                named(typed) + " is declared by " + Texts.and(names) + " in " + loaded.place() + ".",
+                "Name the one you mean: " + commands.stream().map(Failure::quoted).collect(Collectors.joining(" or "))
+                        + ".",
+                commands);
     }
 
     private static Failure notInBucket(LoadedPackage loaded, Surface.Scope scope, Options options) {
@@ -270,19 +312,22 @@ public final class Containers {
             Map.Entry<Surface.Container, Fn> owner = owners.entrySet().iterator().next();
             Surface.Container container = owner.getKey();
             return Optional.of(misplaced(loaded, token, message,
-                    "It is " + article(memberNoun(owner.getValue())) + " of " + container.name(),
+                    "It is " + article(memberNoun(owner.getValue())) + " of " + container.plainName(),
                     baseCommand(loaded, container.scope(), container) + shellWords(selectors)
                             + filterArgument(options)));
         }
         if (owners.isEmpty()) {
             return Optional.empty();
         }
-        Set<Surface.Scope> scopes = owners.keySet().stream().map(Surface.Container::scope).collect(Collectors.toSet());
-        Surface.Scope listed = scopes.size() == 1 ? scopes.iterator().next() : scope;
-        List<String> names = owners.keySet().stream().map(Surface.Container::name).toList();
-        return Optional.of(misplaced(loaded, token, message,
-                "It is a method of " + Texts.and(names) + ". List the " + listed.plural(),
-                bucketCommand(loaded, listed.verb())));
+        List<String> commands = owners.keySet().stream()
+                .map(owner -> baseCommand(loaded, owner.scope(), owner) + shellWords(selectors)
+                        + filterArgument(options))
+                .toList();
+        List<String> names = owners.keySet().stream().map(Surface.Container::plainName).toList();
+        return Optional.of(loaded.symbolNotFoundAmong(List.of(token), message,
+                "It is a method of " + Texts.and(names) + ": "
+                        + commands.stream().map(Failure::quoted).collect(Collectors.joining(" or ")) + ".",
+                commands));
     }
 
     private static Failure misplaced(LoadedPackage loaded, String token, String message, String lead, String command) {
@@ -395,7 +440,7 @@ public final class Containers {
         Page window = page.value();
         List<DiscoverResult.ContainerRoster.Container> items = window.slice(bindable, 0).stream()
                 .map(container -> new DiscoverResult.ContainerRoster.Container(
-                        container.name(),
+                        container.plainName(),
                         container.operations().size(),
                         (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
                         (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
@@ -406,7 +451,7 @@ public final class Containers {
         List<DiscoverResult.ContainerRoster.NotAttachable> notAttachable =
                 window.slice(unattachable, bindable.size()).stream()
                         .map(container -> new DiscoverResult.ContainerRoster.NotAttachable(
-                                container.name(), openCommand(loaded, scope, container, options)))
+                                container.plainName(), openCommand(loaded, scope, container, options)))
                         .toList();
         return Result.ok(new DiscoverResult.ContainerRoster(items, bindable.size() + unattachable.size(),
                 window.paging(), window.next(command), loaded.warning(), notAttachable, unattachable.size()));
@@ -534,7 +579,7 @@ public final class Containers {
         String takes = container.hasPaths()
                 ? "a member name, or a resource path and its accessor"
                 : "one " + (container.isModule() ? "function" : "member") + " name";
-        String where = container.isModule() ? scope.verb() : container.name();
+        String where = container.isModule() ? scope.verb() : container.plainName();
         return unread(selectors, consumed, where + " takes " + takes,
                 drop(selectors.subList(0, consumed), selectors.size() - consumed,
                         baseCommand(loaded, scope, container), options));
@@ -583,7 +628,7 @@ public final class Containers {
         String typed = String.join(" ", selectors);
         String what = selectors.size() > 1 ? "a resource method"
                 : selectors.get(0).contains(PATH_SEPARATOR) ? "a resource path" : "a member";
-        String message = named(typed) + " is not " + what + " of " + container.name() + " in " + loaded.place()
+        String message = named(typed) + " is not " + what + " of " + container.plainName() + " in " + loaded.place()
                 + ".";
         List<String> reached = reached(container, selectors);
         if (reached.isEmpty()) {
@@ -711,7 +756,7 @@ public final class Containers {
             if (handlers.isEmpty()) {
                 String base = baseCommand(loaded, container.scope(), container);
                 return Optional.of(Result.err(loaded.symbolNotFound(selectors,
-                        named(selectors.get(0)) + " is not a method to implement for " + container.name() + " in "
+                        named(selectors.get(0)) + " is not a method to implement for " + container.plainName() + " in "
                                 + loaded.place() + ".",
                         "List them: " + Failure.quoted(base) + ".", base)));
             }
@@ -820,7 +865,7 @@ public final class Containers {
             case Fn.Constructor ignored -> Fn.Constructor.NAME;
         };
         return Result.ok(new DiscoverResult.Signature(
-                container.isModule() ? null : container.name(), kind, name,
+                container.isModule() ? null : container.plainName(), kind, name,
                 fn instanceof Fn.Resource resource ? resource.accessor() : null,
                 fn instanceof Fn.Resource ? PathTree.join(entry.path()) : null,
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
@@ -1034,7 +1079,8 @@ public final class Containers {
     }
 
     private static String baseCommand(LoadedPackage loaded, Surface.Scope scope, Surface.Container container) {
-        return bucketCommand(loaded, scope.verb()) + (container.isModule() ? "" : " " + shellWord(container.name()));
+        return bucketCommand(loaded, scope.verb())
+                + (container.isModule() ? "" : " " + shellWord(container.plainName()));
     }
 
     private static List<DiscoverResult.Documented.Entry> documentedRows(List<Entry> entries, String base) {
@@ -1049,7 +1095,7 @@ public final class Containers {
     }
 
     private static String containerName(Surface.Container container) {
-        return container.isModule() ? null : container.name();
+        return container.isModule() ? null : container.plainName();
     }
 
     private static String filterArgument(Options options) {

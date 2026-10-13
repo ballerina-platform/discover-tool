@@ -249,14 +249,10 @@ public class CliTest {
     public void aMissIsReportedBeforeTheSelectorsAfterIt() {
         String http = "bal discover ballerina/http client";
         for (Unread miss : List.of(
-                new Unread("ballerinax__twilio", List.of("ballerinax/twilio", "client", "createAccount", "extra"),
-                        "createAccount", "bal discover ballerinax/twilio client Client createAccount extra"),
                 new Unread("ballerinax__twilio", List.of("ballerinax/twilio", "client", "createaccount", "extra"),
                         "createaccount", "bal discover ballerinax/twilio client"),
                 new Unread("ballerina__http", List.of("ballerina/http", "client", "Cookie", "isValid", "junk"),
                         "Cookie", "bal discover ballerina/http class Cookie isValid junk"),
-                new Unread("ballerina__http", List.of("ballerina/http", "client", "forward", "extra"), "forward",
-                        http),
                 new Unread("ballerina__http", List.of("ballerina/http", "client", "forwar", "extra"), "forwar",
                         http),
                 new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "forwar", "extra"),
@@ -272,6 +268,32 @@ public class CliTest {
                     capture.stderr());
             Assert.assertEquals(capture.field("command"), miss.command(), label);
         }
+    }
+
+    @Test
+    public void aMemberItsOneContainerDeclaresIsAnsweredWithoutTheContainer() {
+        String producer = "bal discover ballerinax/kafka client Producer";
+        Capture send = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "send"), send.streams(),
+                centralFor("ballerinax__kafka", "4.6.5"), null, true), 0, send.stderr());
+        Assert.assertTrue(send.stdout().startsWith("ballerinax/kafka:4.6.5 · client · Producer · send\n"),
+                send.stdout());
+
+        Capture extra = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "send", "extra"), extra.streams(),
+                centralFor("ballerinax__kafka", "4.6.5")), 1, extra.stderr());
+        Assert.assertEquals(extra.field("kind"), "validation", extra.stderr());
+        Assert.assertEquals(extra.field("command"), producer + " send", "a printed command names the container");
+
+        Capture close = new Capture();
+        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "close", "extra"), close.streams(),
+                centralFor("ballerinax__kafka", "4.6.5")), 1, close.stderr());
+        Assert.assertEquals(close.field("kind"), "symbol-not-found", close.stderr());
+        Assert.assertFalse(close.failure().has("command"), "no one owner is preferred: " + close.stderr());
+        JsonArray owners = close.failure().getAsJsonArray("candidates");
+        Assert.assertEquals(owners.size(), 2, close.stderr());
+        Assert.assertEquals(owners.get(0).getAsString(), "bal discover ballerinax/kafka client Consumer close");
+        Assert.assertEquals(owners.get(1).getAsString(), producer + " close");
     }
 
     @Test
@@ -984,9 +1006,13 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "'commit"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true), 1);
-        Assert.assertEquals(capture.stderr(), "error: ''commit' is not a client in ballerinax/kafka:4.6.5.\n"
-                + "  It is a method of Caller and Consumer. List the clients: "
-                + "`bal discover ballerinax/kafka client`.\n");
+        Assert.assertEquals(capture.stderr(), "error: ''commit' is declared by Caller and Consumer in "
+                + "ballerinax/kafka:4.6.5.\n"
+                + "  Name the one you mean: `bal discover ballerinax/kafka client Caller commit` or "
+                + "`bal discover ballerinax/kafka client Consumer commit`.\n"
+                + "  candidates:\n"
+                + "    bal discover ballerinax/kafka client Caller commit\n"
+                + "    bal discover ballerinax/kafka client Consumer commit\n");
     }
 
     @Test
