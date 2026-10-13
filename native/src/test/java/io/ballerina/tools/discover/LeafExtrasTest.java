@@ -155,4 +155,41 @@ public class LeafExtrasTest {
         Assert.assertFalse(callers(kafka, "Producer", "send").isEmpty());
         Assert.assertTrue(callers(kafka, "Caller", "commit").containsAll(callers(kafka, "Consumer", "commit")));
     }
+
+    @Test
+    public void aServiceTypeWithNoMethodsAnswersWithItsDocumentationAndTheSectionsThatDeclareOne() {
+        Result<DiscoverResult> answer = Containers.render(FixtureCorpus.loadedFixture("ballerina__http"),
+                Surface.Scope.SERVICE, new Containers.Options(List.of("Service")));
+        DiscoverResult.ServiceExamples service = (DiscoverResult.ServiceExamples) answer.value();
+        Assert.assertEquals(service.description().strip(), "The HTTP service type.");
+        Assert.assertFalse(service.sections().isEmpty(), "the readme's `service ... on new http:Listener` section");
+        Assert.assertNull(service.next());
+        String text = TextRenderer.render(service);
+        Assert.assertTrue(text.contains("\nService declares no methods: a service of it defines its own.\n"), text);
+        Assert.assertTrue(text.contains("\nReadme sections that declare one\n"), text);
+    }
+
+    @Test
+    public void theOnlyServiceTypeOfAModuleWithNoListenerTakesAnyServiceTheReadmeDeclares() {
+        Payload payload = Payload.pkg();
+        payload.with("serviceTypes", Decl.serviceType("Service").with("description", "Define onRead."));
+        Library library = Pipeline.build(payload.module());
+        LoadedPackage cdc = new LoadedPackage(QualifiedName.parse("acme/cdc").value(), FixtureCorpus.FIXTURE_VERSION,
+                library, Optional.of("## Intro\n\nText.\n\n## Define it\n\n```ballerina\nlistener mysql:CdcListener l"
+                        + " = new ();\nservice on l {\n}\n```\n"), null, List.of(), List.of(), null, null,
+                () -> library, Map::of);
+        DiscoverResult.ServiceExamples service = (DiscoverResult.ServiceExamples) Containers.render(cdc,
+                Surface.Scope.SERVICE, new Containers.Options(List.of())).value();
+        Assert.assertEquals(service.sections().stream().map(DiscoverResult.ReadmeSections.Section::title).toList(),
+                List.of("Define it"));
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(service)).getAsJsonObject();
+        Assert.assertEquals(json.getAsJsonArray("methods").size(), 0);
+        Assert.assertEquals(json.get("description").getAsString(), "Define onRead.");
+
+        LoadedPackage bare = new LoadedPackage(cdc.qualified(), cdc.version(), library, Optional.of("## Intro\n\nNo "
+                + "code.\n"), null, List.of(), List.of(), null, null, () -> library, Map::of);
+        DiscoverResult.ServiceExamples none = (DiscoverResult.ServiceExamples) Containers.render(bare,
+                Surface.Scope.SERVICE, new Containers.Options(List.of())).value();
+        Assert.assertEquals(none.next(), "bal discover acme/cdc readme", "never a dead end");
+    }
 }

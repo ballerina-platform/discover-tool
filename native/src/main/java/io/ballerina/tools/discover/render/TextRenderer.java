@@ -141,6 +141,7 @@ public final class TextRenderer {
             case DiscoverResult.ResourceList resources -> resourceList(layout, resources);
             case DiscoverResult.MethodList methods -> methodList(layout, methods);
             case DiscoverResult.ServiceHandlerList handlers -> serviceHandlers(layout, handlers);
+            case DiscoverResult.ServiceExamples examples -> serviceExamples(layout, examples);
             case DiscoverResult.Readme readme -> readmeSection(layout, readme);
             case DiscoverResult.ReadmeSections sections -> readmeSections(layout, sections);
             case DiscoverResult.Signature signature -> signature(layout, signature);
@@ -371,6 +372,19 @@ public final class TextRenderer {
             }
         }
         layout.notices(list.note(), list.warning());
+    }
+
+    private static void serviceExamples(Layout layout, DiscoverResult.ServiceExamples examples) {
+        layout.top(examples.container() + " declares no methods: a service of it defines its own.");
+        if (!examples.description().isBlank()) {
+            layout.block(List.of(examples.description().strip()));
+        }
+        TextTable sections = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        examples.sections().forEach(section ->
+                sections.row(String.valueOf(section.number()), section.title(), section.command()));
+        layout.section("Readme sections that declare one", sections);
+        layout.notices(examples.note(), examples.warning());
+        layout.next(examples.next());
     }
 
     private static String presence(boolean repeatable, boolean required) {
@@ -656,6 +670,7 @@ public final class TextRenderer {
             case DiscoverResult.MixedListing mixed -> mixed.container();
             case DiscoverResult.Signature signature -> signature.container();
             case DiscoverResult.ServiceHandlerList handlers -> handlers.container();
+            case DiscoverResult.ServiceExamples examples -> examples.container();
             default -> null;
         };
     }

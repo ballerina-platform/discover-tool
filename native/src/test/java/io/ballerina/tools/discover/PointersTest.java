@@ -182,6 +182,10 @@ public class PointersTest {
                 methods.methods().forEach(method -> commands.add(method.command()));
                 addIfPresent(commands, methods.next());
             }
+            case DiscoverResult.ServiceExamples examples -> {
+                examples.sections().forEach(section -> commands.add(section.command()));
+                addIfPresent(commands, examples.next());
+            }
             case DiscoverResult.ServiceHandlerList ignored -> {
                 // The handlers a service defines are code to write, not commands to run.
             }

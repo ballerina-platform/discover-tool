@@ -85,6 +85,7 @@ public final class JsonRenderer {
             case DiscoverResult.ResourceList resources -> resourceList(resources);
             case DiscoverResult.MethodList methods -> methodList(methods);
             case DiscoverResult.ServiceHandlerList handlers -> serviceHandlers(handlers);
+            case DiscoverResult.ServiceExamples examples -> serviceExamples(examples);
             case DiscoverResult.Readme readme -> readme(readme);
             case DiscoverResult.ReadmeSections sections -> readmeSections(sections);
             case DiscoverResult.Signature signature -> signature(signature);
@@ -322,6 +323,17 @@ public final class JsonRenderer {
         }
         addIfPresent(json, "warning", list.warning());
         addIfPresent(json, "note", list.note());
+        return json;
+    }
+
+    private static JsonObject serviceExamples(DiscoverResult.ServiceExamples examples) {
+        JsonObject json = new JsonObject();
+        json.addProperty("container", examples.container());
+        json.add("methods", new JsonArray());
+        json.addProperty("description", examples.description());
+        json.add("examples", sectionRows(examples.sections()));
+        addIfPresent(json, "next", examples.next());
+        addNotices(json, examples.warning(), examples.note());
         return json;
     }
 

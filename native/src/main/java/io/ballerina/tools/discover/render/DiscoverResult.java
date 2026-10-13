@@ -320,6 +320,21 @@ public sealed interface DiscoverResult {
     }
 
     /**
+     * A service type that declares no methods and whose package describes none: a service of it defines its own, so
+     * the answer is the type's own documentation and the readme sections whose code declares such a service — never
+     * a bare "no methods".
+     *
+     * @param container the service type
+     * @param description its documentation, verbatim, or empty
+     * @param sections the readme sections whose code declares a service of it
+     * @param next where to look when no section does: the readme, or {@code null} when the module publishes none
+     * @param warning why the loaded version cannot be trusted, or {@code null}
+     * @param note the listener the service type binds to, or that it is attachable to none, or {@code null}
+     */
+    record ServiceExamples(String container, String description, List<ReadmeSections.Section> sections, String next,
+            String warning, String note) implements DiscoverResult { }
+
+    /**
      * The {@code readme} bucket's own answer: the whole readme verbatim, or — when a section selector resolved to
      * exactly one section — that section alone. No entry ceiling applies here; unlike every other listing this
      * bucket answers, the RFC's own text for it is "returns that module's README, verbatim", with no size limit

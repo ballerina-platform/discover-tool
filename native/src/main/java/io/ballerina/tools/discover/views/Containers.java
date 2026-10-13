@@ -743,6 +743,10 @@ public final class Containers {
         if (handlers.isPresent()) {
             return handlers.get();
         }
+        if (container.scope() == Surface.Scope.SERVICE && selectors.isEmpty() && !options.filtered()
+                && members(container).isEmpty() && foreignPairing(container).isEmpty()) {
+            return Result.ok(serviceExamples(loaded, container));
+        }
         int read = consumed(container, selectors);
         List<Entry> selected = select(container, selectors.subList(0, read));
         if (selected.isEmpty() && read > 0) {
@@ -763,6 +767,20 @@ public final class Containers {
             return signature(loaded, scope, container, selectors, selected.get(0), options, documented, note);
         }
         return listing(loaded, scope, container, selectors, selected, options, documented, note);
+    }
+
+    private static DiscoverResult serviceExamples(LoadedPackage loaded, Surface.Container container) {
+        List<String> listeners = container.pairings().stream().map(Service::listener).distinct().toList();
+        List<DiscoverResult.ReadmeSections.Section> sections =
+                ReadmeCalls.declaringService(loaded, container, listeners).stream()
+                        .map(section -> new DiscoverResult.ReadmeSections.Section(section.number(), section.title(),
+                                section.lines(), loaded.command() + " " + Readme.BUCKET + " " + section.number()))
+                        .toList();
+        String next = sections.isEmpty() && loaded.readme().isPresent()
+                ? loaded.command() + " " + Readme.BUCKET
+                : null;
+        return new DiscoverResult.ServiceExamples(container.plainName(), container.description(), sections, next,
+                loaded.warning(), listenerNote(loaded, container));
     }
 
     // A service type that only marks what a listener accepts has no methods of its own; its package may describe the

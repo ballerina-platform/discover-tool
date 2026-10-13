@@ -13,14 +13,16 @@ bal discover --help
 
 ```
 bal discover <org>/<package>[:<version>] [bucket] [name ...] [flags]
+bal discover search <keyword> ...
 ```
 
 The package comes first and every further positional drills one level down. With no bucket, the answer is
-the list of buckets the package has.
+the package's overview: its clients, service types, classes and functions with their member counts, one line for
+its types by kind, one for its readme's sections, and its submodules, each with the command that opens it.
 
 `<org>/<package>` always names a package, never a module of one: `bal discover ballerinax/aws.auth` fails with
 the command that reads that module, `bal discover ballerinax/aws --module auth`. To find a package in the first
-place, use `bal search <keyword>`; `bal discover` only drills into one you already know. A version goes in the
+place, `bal discover search <keyword> ...` asks Central (see Searching, below). A version goes in the
 coordinate, the form `bal pull` takes: `bal discover ballerina/http:2.15.7` (see Which version is read, below).
 
 | Bucket    | What it holds                                                                                            |
@@ -31,6 +33,7 @@ coordinate, the form `bal pull` takes: `bal discover ballerina/http:2.15.7` (see
 | `funcs`   | Module-level functions.                                                                                  |
 | `type`    | Every type the module declares: records, enums, errors, type aliases, constants, module variables, annotations, listeners, and the classes, clients and service types the buckets above also list. `type <Name>` opens any of them. |
 | `readme`  | The module's README, verbatim. `readme <n>` or `readme "<title>"` opens one section.                   |
+| `search`  | Every name in the module that holds each keyword: `search <keyword> ...` (see Searching, below).         |
 
 The first four are derived from how a symbol is called, not from Central's `isClient`-style flags:
 `ballerina/http` declares ten clients, two of which Central files as ordinary declarations. `type` and `readme`
@@ -48,47 +51,67 @@ its other methods included, with the types it uses, and an enum member (`HTTP_1_
 declares it (`HttpVersion`) and a note naming it.
 
 Selectors after the bucket name a container, then a member: a method name, or a resource path followed by
-its accessor (`client Client "gists/'public" get`). The container is always named, even when the bucket holds
-only one, and every name is typed exactly as the listings print it: a miss fails, with the listing to choose
-from (see Paths and The contract, below).
+its accessor (`client Client gists/public get`). The container may be left out when exactly one container in
+the bucket declares what follows (`client send` answers as `client Producer send`); when several do, the failure
+lists each one's command. Every command the tool prints names the container. Every name is typed as the
+listings print it, or in Ballerina's own escaped spelling of the same identifier (`'public`, `code\-scanning`):
+anything else fails, with the listing to choose from (see Paths and The contract, below).
 
 | Flag                   | Meaning                                                                                                |
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
-| `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Filtering is local to the fetched payload; nothing is sent to Central. |
+| `--filter <keyword>`   | Narrow the selected bucket to entries whose name, path, parameter or type contains the keyword. Filtering is local to the fetched payload; nothing is sent to Central. On the bare package it runs `search <keyword>`. |
 | `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <module>` | Target a submodule instead of the default module, in every bucket including `readme`. The bare package lists the submodules it has. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. |
 
 ## Walkthrough
 
-The output below is real, produced against recorded Central payloads; live Central may have moved on since
-they were recorded.
+The output below is real, produced against recorded Central payloads (Central-wide search against live
+Central); live Central may have moved on since they were recorded.
 
 What a package has:
 
 ```
 $ bal discover ballerinax/kafka
 ballerinax/kafka:4.6.5
-5 buckets
 
-  client
-  service
-  class
-  type
-  readme
+Clients (3)
+  Caller     3 remote methods
+  Consumer  24 remote methods
+  Producer   5 remote methods
+Service types (1)
+  Service
+Classes (4)
+  AvroDeserializer  1 method
+  AvroSerializer    1 method
+  Deserializer      1 method
+  Serializer        1 method
+Types   bal discover ballerinax/kafka type    14 records, 3 enums, 3 errors, 8 aliases, 29 constants, 1 annotation, 1 listener
+Readme  bal discover ballerinax/kafka readme  11 sections
 
-Next: bal discover ballerinax/kafka <bucket>
+Next: bal discover ballerinax/kafka client <name>
+Next: bal discover ballerinax/kafka service <name>
+Next: bal discover ballerinax/kafka class <name>
+Next: bal discover ballerinax/kafka search <keyword>
 
 $ bal discover ballerinax/kafka | cat
-{"version":"4.6.5","buckets":[{"name":"client","command":"bal discover ballerinax/kafka client"},{"name":"service","command":"bal discover ballerinax/kafka service"},{"name":"class","command":"bal discover ballerinax/kafka class"},{"name":"type","command":"bal discover ballerinax/kafka type"},{"name":"readme","command":"bal discover ballerinax/kafka readme"}]}
+{"qualified":"ballerinax/kafka","version":"4.6.5","clients":{"entries":[{"name":"Caller","remote":3,"command":"bal discover ballerinax/kafka client Caller"},{"name":"Consumer","remote":24,"command":"bal discover ballerinax/kafka client Consumer"},{"name":"Producer","remote":5,"command":"bal discover ballerinax/kafka client Producer"}],"shown":3,"total":3,"command":"bal discover ballerinax/kafka client"},"serviceTypes":{"entries":[{"name":"Service","command":"bal discover ballerinax/kafka service Service"}],"shown":1,"total":1,"command":"bal discover ballerinax/kafka service"},"classes":{"entries":[{"name":"AvroDeserializer","normal":1,"command":"bal discover ballerinax/kafka class AvroDeserializer"},{"name":"AvroSerializer","normal":1,"command":"bal discover ballerinax/kafka class AvroSerializer"},{"name":"Deserializer","normal":1,"command":"bal discover ballerinax/kafka class Deserializer"},{"name":"Serializer","normal":1,"command":"bal discover ballerinax/kafka class Serializer"}],"shown":4,"total":4,"command":"bal discover ballerinax/kafka class"},"types":{"counts":{"records":14,"enums":3,"errors":3,"aliases":8,"constants":29,"annotations":1,"listeners":1},"command":"bal discover ballerinax/kafka type"},"readme":{"sections":11,"command":"bal discover ballerinax/kafka readme"}}
 ```
+
+The overview stays inside the 40-row ceiling: a bucket shows at most 10 rows, the type and readme lines are a
+row each, and submodules are never cut (no other answer lists them). If that still comes to more than 40 rows,
+the section showing the most gives up one row at a time (the later bucket on a tie) until it fits. A cut
+section ends with `... N more: <command>`, the command that lists the bucket whole; in JSON each section has
+`shown`, `total` and that `command`. `ballerina/http`, the largest overview measured, shows 10 of 10 clients,
+7 service types, 10 of 83 classes and 7 functions.
 
 Every JSON answer is exactly one line, however long, so cutting the output with `head` or `tail` never
 leaves half an answer. The JSON samples below are that real output, unwrapped.
 
-Every answer says the version it read: a JSON answer leads with a `version` key, and at a terminal the header
-names the package as `org/name:version`, whether the version was written, locked or Central's latest.
+Every answer says which package it read: a JSON answer leads with `qualified` (`org/name`), `version` and, under
+`--module`, `module`, named as a failure names them, and at a terminal the header names the package as
+`org/name:version`, whether the version was written, locked or Central's latest.
 
 At a terminal every answer opens with a header naming where it is — package, bucket, container, selector — and
 a count, lists one entry per line in aligned columns, and ends with a footer: notes, how much was left out,
@@ -266,7 +289,7 @@ ballerinax/github:6.0.0 · client · Client · gists
   gists/:gistId/commits              get
   gists/:gistId/forks                get, post
   gists/:gistId/star                 get, put, delete
-  gists/'public                      get                 bal discover ballerinax/github client Client "gists/'public" get
+  gists/public                       get
   gists/starred                      get
 
 Next: bal discover ballerinax/github client Client <path> <accessor>
@@ -308,20 +331,20 @@ rather than a guess at one:
 
 ```
 $ bal discover ballerinax/github client Client gists --filter star | cat
-{"version":"6.0.0","container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover ballerinax/github client Client gists/starred get"}}],"shown":2,"total":2}
+{"qualified":"ballerinax/github","version":"6.0.0","container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover ballerinax/github client Client gists/:gistId/star get","put":"bal discover ballerinax/github client Client gists/:gistId/star put","delete":"bal discover ballerinax/github client Client gists/:gistId/star delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover ballerinax/github client Client gists/starred get"}}],"shown":2,"total":2}
 ```
 
 Everything else that opens exactly one thing — a method, a group, a container, a submodule, a readme section —
-carries a plain `command`. A method row is `name` plus that `command`, the name quoted as one shell word where
-it needs it (`'flush`):
+carries a plain `command`. A method row is `name` plus that `command`. Names print without Ballerina's escapes
+(the method declared `'flush` is `flush`), and either spelling reaches it:
 
 ```
 $ bal discover ballerinax/kafka client Producer
 ballerinax/kafka:4.6.5 · client · Producer
-5 methods
+5 remote methods
 
-  'flush              bal discover ballerinax/kafka client Producer "'flush"
   close
+  flush
   getTopicPartitions
   send
   sendWithMetadata
@@ -329,7 +352,7 @@ ballerinax/kafka:4.6.5 · client · Producer
 Next: bal discover ballerinax/kafka client Producer <name>
 
 $ bal discover ballerinax/kafka client Producer | cat
-{"version":"4.6.5","container":"Producer","methods":[{"name":"'flush","command":"bal discover ballerinax/kafka client Producer \"'flush\""},{"name":"close","command":"bal discover ballerinax/kafka client Producer close"},{"name":"getTopicPartitions","command":"bal discover ballerinax/kafka client Producer getTopicPartitions"},{"name":"send","command":"bal discover ballerinax/kafka client Producer send"},{"name":"sendWithMetadata","command":"bal discover ballerinax/kafka client Producer sendWithMetadata"}],"shown":5,"total":5}
+{"qualified":"ballerinax/kafka","version":"4.6.5","container":"Producer","methods":[{"name":"close","command":"bal discover ballerinax/kafka client Producer close"},{"name":"flush","command":"bal discover ballerinax/kafka client Producer flush"},{"name":"getTopicPartitions","command":"bal discover ballerinax/kafka client Producer getTopicPartitions"},{"name":"send","command":"bal discover ballerinax/kafka client Producer send"},{"name":"sendWithMetadata","command":"bal discover ballerinax/kafka client Producer sendWithMetadata"}],"shown":5,"total":5}
 ```
 
 A container whose methods come in more than one call form is split by form, since `->` against `.` is what a
@@ -353,14 +376,16 @@ Methods (.)
 Next: bal discover ballerinax/postgresql client Client <name>
 
 $ bal discover ballerinax/postgresql client | cat
-{"version":"1.19.0","container":"Client","remote":[{"name":"batchExecute","command":"bal discover ballerinax/postgresql client Client batchExecute"},{"name":"call","command":"bal discover ballerinax/postgresql client Client call"},{"name":"execute","command":"bal discover ballerinax/postgresql client Client execute"},{"name":"query","command":"bal discover ballerinax/postgresql client Client query"},{"name":"queryRow","command":"bal discover ballerinax/postgresql client Client queryRow"}],"normal":[{"name":"close","command":"bal discover ballerinax/postgresql client Client close"}],"counts":{"remote":5,"normal":1},"shown":6,"total":6}
+{"qualified":"ballerinax/postgresql","version":"1.19.0","container":"Client","remote":[{"name":"batchExecute","command":"bal discover ballerinax/postgresql client Client batchExecute"},{"name":"call","command":"bal discover ballerinax/postgresql client Client call"},{"name":"execute","command":"bal discover ballerinax/postgresql client Client execute"},{"name":"query","command":"bal discover ballerinax/postgresql client Client query"},{"name":"queryRow","command":"bal discover ballerinax/postgresql client Client queryRow"}],"normal":[{"name":"close","command":"bal discover ballerinax/postgresql client Client close"}],"counts":{"remote":5,"normal":1},"shown":6,"total":6}
 ```
 
-One callable is the end of a drill-down: its declaration with its doc comment, then the declarations its
-signature names, one level deep:
+One callable is the end of a drill-down: its declaration with its doc comment; for a method of a client or
+class with an `init`, how to construct it; the declarations its signature names, one level deep; and, for a
+remote or resource method, the readme sections whose code calls it. The container is left out here, since only
+Producer declares `send`:
 
 ```
-$ bal discover ballerinax/kafka client Producer send
+$ bal discover ballerinax/kafka client send
 ballerinax/kafka:4.6.5 · client · Producer · send
 
 # Produces records to the Kafka server.
@@ -370,6 +395,10 @@ ballerinax/kafka:4.6.5 · client · Producer · send
 # + producerRecord - Record to be produced
 # + return - A `kafka:Error` if send action fails to send data or else '()'
 isolated remote function send(AnydataProducerRecord producerRecord) returns Error?;
+
+Create it
+  kafka:Producer producer = check new (string|string[] bootstrapServers, *kafka:ProducerConfiguration config);
+  bal discover ballerinax/kafka client Producer init
 
 Types it uses (2)
   # Details related to the anydata producer record.
@@ -390,7 +419,23 @@ Types it uses (2)
 
   # Defines the common error type for the module.
   public type Error distinct error;
+
+Readme sections that call it
+  7  Data serialization  bal discover ballerinax/kafka readme 7
 ```
+
+*Create it* is derived from the container's `init` alone: the type with the prefix its import binds, a variable
+named after it (with the prefix when that would be a keyword: `github:Client githubClient`), `check` exactly when
+`init` declares a return type, and the parameters as `init` declares them, defaults included — a template to fill
+in. A function, a constructor, a service type and a container with no `init` (`sql:Client`, an object type) get
+none.
+
+*Readme sections that call it* are read off each section's fenced code: `->name(` for a remote method; for a
+resource method its accessor (`get` when the call names none) and literal segments, with any segment matching a
+path parameter and the most literal resource winning, as Ballerina resolves the call. Several containers often
+declare the same method (`http:Client` and `http:FailoverClient` both `post`), so the type the readme declares
+the call's variable with decides whose call it is; a variable declared nowhere counts only when no other container
+declares the same method. A plain method (`.name(`) is never matched.
 
 A listing over the ceiling says so, with the command that continues it:
 
@@ -456,17 +501,38 @@ error: 'sendd' is not a member of Producer in ballerinax/kafka:4.6.5.
 ```
 
 So does a name asked in a bucket that does not hold it — the suggestion is the command in the bucket that does,
-`type` for a record, enum, listener or other type — and a member name typed where its container goes, with its
-owner's command, or, when several containers declare it, the bucket's listing:
+`type` for a record, enum, listener or other type, or the owner's command for a member another bucket's
+container declares — and a member several containers of the bucket declare, with each one's command:
 
 ```
 $ bal discover ballerinax/kafka client Listener
 error: 'Listener' is not a client in ballerinax/kafka:4.6.5.
   It is a listener: `bal discover ballerinax/kafka type Listener`.
 
-$ bal discover ballerinax/kafka client send
-error: 'send' is not a client in ballerinax/kafka:4.6.5.
-  It is a remote method of Producer: `bal discover ballerinax/kafka client Producer send`.
+$ bal discover ballerinax/kafka client close
+error: 'close' is declared by Consumer and Producer in ballerinax/kafka:4.6.5.
+  Name the one you mean: `bal discover ballerinax/kafka client Consumer close` or `bal discover ballerinax/kafka client Producer close`.
+  candidates:
+    bal discover ballerinax/kafka client Consumer close
+    bal discover ballerinax/kafka client Producer close
+```
+
+A service type that declares no methods, and whose package does not describe the ones a service defines,
+answers with its own documentation and the readme sections whose code declares such a service — typed as it,
+attached to one of its listeners, or, for a module's only service type with no listener of its own, any service
+— or, when none does, the readme's command:
+
+```
+$ bal discover ballerina/http service Service
+ballerina/http:2.16.6 · service · Service
+Service declares no methods: a service of it defines its own.
+
+The HTTP service type.
+
+Readme sections that declare one
+  5  Listener  bal discover ballerina/http readme 5
+
+Note: attach it to http:Listener
 ```
 
 A declaration that is not callable, read whole with the declarations it names:
@@ -513,6 +579,58 @@ ballerinax/kafka:4.6.5 · readme · --filter producer
 Next: bal discover ballerinax/kafka readme <n>
 ```
 
+## Searching
+
+`bal discover <org>/<package> search <keyword> ...` finds names inside one package, locally, with nothing sent
+to Central. Each keyword is matched as a case-insensitive substring, and a name matches when every keyword does.
+The names are a container's, a listener's, a function's or a type's own name, a method's own name (not its
+container's), a resource method's path and accessor (`repos/:owner/:repo/issues post`), and a readme section's
+title, all read without Ballerina's escapes. It reads names only, never parameters or documentation (that is
+`--filter`, inside a bucket). Matches are grouped by kind — clients, service types, classes, listeners,
+functions, remote methods, resource methods, methods, types, readme sections — and paged as one sequence under
+the 40-entry ceiling. No match is an answer (exit 0) pointing at the package's overview. `--filter <keyword>` on
+the bare package runs the same search.
+
+```
+$ bal discover ballerinax/kafka search send
+ballerinax/kafka:4.6.5 · search · send
+2 remote methods
+
+Remote methods
+  Producer  send
+  Producer  sendWithMetadata
+
+Next: bal discover ballerinax/kafka client <container> <name>
+```
+
+`bal discover search <keyword> ...` asks Central: its package search (what `bal search` asks) and its symbol
+search across every package, 10 packages and 25 symbols a page, each row with the `bal discover` command that
+opens it, pinned to the version Central matched. The ranking is Central's, so the same keywords can rank
+differently as Central changes. `--page <n>` turns both rankings at once; `shown` and `total` are reported for
+each. It is not cached.
+
+```
+$ bal discover search kafka send
+search · kafka send
+8 packages, 1869 symbols
+
+Packages (8)
+  ballerinax/kafka:4.6.6            Apache Kafka is a distributed event streaming platform used for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications.
+  wso2/choreo.sendemail:0.6.1       Demo connector to send an email.
+  ...
+
+Symbols (25 of 1869)
+  remote method    ballerinax/kafka:4.6.6 client Producer send
+  remote method    ballerina/email:2.14.1 client SmtpClient send
+  ...
+  resource method  ballerinax/mailchimp.transactional:1.0.2 client Client messages/send post
+  ...
+
+... 1844 more (page 1 of 75)
+Next: bal discover <row>
+Next: bal discover search kafka send --page 2
+```
+
 ## Output
 
 Every answer is one structured result, rendered either as text or as JSON. The JSON is one line per answer —
@@ -520,17 +638,19 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 
 | Answer                               | JSON fields                                                                                                      |
 | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| bare package                         | `buckets` (`name`, `command`), `submodules` (`name`, `summary`, `command`)                                          |
+| bare package (overview)              | `clients`, `serviceTypes`, `classes`, `functions` (each `entries` (`name`, `resources`, `remote`, `normal`, `command`), `shown`, `total`, `command`), `types` (`counts` per kind, `command`), `readme` (`sections`, `command`), `submodules` (`name`, `summary`, `command`) |
 | several containers                   | `containers` (`name`, `resources` (resource methods, not paths), `remote`, `normal`, `listener`, `confirmed`, `unconfirmedReason`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and in `service` `notAttachable` (`name`, `command`) with `notAttachableTotal` when some are on another page; `total` counts both lists |
 | resource groups                      | `container`, `resources` (ending at this prefix; `path`, `accessors`, `commands`), `groups` (`name`, `count`, `command`), `counts` (`resources`, `groups`), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`)                 |
 | more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`), `create` (`code`, `command`), `callers` (`number`, `title`, `lines`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
 | type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`) |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
-| one service type                     | `container`, `note`, `warning`; when the package describes the methods a service defines, `handlers` (`name`, `kind`, `signature`, `required`, `repeatable`, `accessors`, `doc`, `deprecated`, `params`, `returns`) and `rules` (`requirement`, `handlers`, `message`) |
+| one service type                     | `container`, `note`, `warning`; when the package describes the methods a service defines, `handlers` (`name`, `kind`, `signature`, `required`, `repeatable`, `accessors`, `doc`, `deprecated`, `params`, `returns`) and `rules` (`requirement`, `handlers`, `message`); when it declares none and describes none, `methods` (empty), `description`, `examples` (`number`, `title`, `lines`, `command`) and `next` (the readme) when no section declares one |
+| search in a package                  | `keywords`, then per kind with a match `clients`, `serviceTypes`, `classes`, `listeners`, `functions` (`name`, `command`), `remote`, `methods` (`container`, `name`, `command`), `resources` (`container`, `path`, `accessor`, `command`), `types` (`name`, `kind`, `command`), `readme` (`number`, `title`, `command`); `counts` (per kind), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and `overview` when nothing matched |
+| search of Central                    | `keywords`, `packages` (`entries` (`qualified`, `version`, `summary`, `command`), `shown`, `total`), `symbols` (`entries` (`qualified`, `version`, `module`, `kind`, `container`, `name`, `command`), `shown`, `total`), `page`, `pages`, `remaining`, `next`; it names no one package, so it has no `qualified` |
 | readme                               | `readme`, `lines`, and `section`, `of`, `title` for one section                                                  |
 | readme sections                      | `sections` (`number`, `title`, `lines`, `command`), `matching` (true when narrowed by `--filter` or a title), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 
@@ -585,12 +705,14 @@ a listing with no entries of its own). In text, a listing that continues also en
 ### Paths
 
 Path parameters print as `:name` (`repos/:owner/:repo`), which is safe unquoted in bash, zsh, fish and
-PowerShell. A segment that is a Ballerina keyword keeps its escape (`gists/'public`), and every command the
-tool prints pre-quotes such a path for the shell. A selector is matched exactly as it is printed: case-sensitive,
-a parameter only as `:owner` (not `[owner]`, `{owner}` or `owner`), an escaped segment only as listed
-(`code-scanning`, `gists/'public`), and a path whole, from its first segment, in one argument joined by `/`.
+PowerShell. A segment Ballerina has to escape prints plain (`gists/public` for `gists/'public`, `code-scanning`
+for `code\-scanning`), so a printed path needs no shell quoting; the code an answer quotes keeps Ballerina's
+spelling (`resource function get gists/'public(...)`). A selector is matched as it is printed, or in Ballerina's
+escaped spelling of the same segment: case-sensitive, a parameter only as `:owner` (not `[owner]`, `{owner}` or
+`owner`), and a path whole, from its first segment, in one argument joined by `/`.
 A path that matches nothing fails, suggesting the listing under the deepest prefix it did match.
-`new` addresses the constructor Ballerina spells `init`. A member name is one selector. On a container with
+`new` addresses the constructor Ballerina spells `init`, unless the container has a resource path `new`. A member
+name is one selector. On a container with
 resource paths, two selectors that resolve as a path and its accessor, in either order, are read together and
 win over a member of the same name; otherwise a first selector naming a method, function or `new` is read
 alone, and any other pair is read as a path and an accessor that match nothing, which fails.
@@ -635,11 +757,12 @@ Run `bal discover --help` for details.
 A usage error is a `validation` failure found before anything is looked up: an unknown option, an option with
 a missing or invalid value (`--output xml`, `--page x`, `--page 0`, `--refresh=yes`) or given twice, no package,
 a malformed package name or incomplete version, `--version`, a version typed as a positional, an unknown bucket,
-more than one name after `funcs` or `type`, or a `type` name with `--filter`. A `validation` failure that
+more than one name after `funcs` or `type`, a `type` name with `--filter`, or a `search` with no keyword, with
+`--filter`, or (across Central) with `--module`. A `validation` failure that
 depends on what the package holds — an extra selector a container does not read, a page past the end of the
 listing, a module with no readme — is exit 1.
 
-`upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
+A search that matches nothing is an answer, not a failure (exit 0). `upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
 `package-not-found` and `symbol-not-found` need a different command — `symbol-not-found` is a container, member,
 path or type not named exactly as listed, or asked in a bucket that does not hold it (a `--module` the package does not publish
 is `package-not-found` with `module`, and lists the submodules it does in `candidates`); `schema-drift` means Central's payload
@@ -687,7 +810,8 @@ password = "secret"
 The raw Central payload is cached, keyed by package coordinates, with atomic writes, and so is what a
 package's source says about its service types' inclusions (the small derived answer, never the bala). Any
 problem with the cache — missing, unreadable, corrupt, an unwritable directory — falls back to a live fetch
-silently; it is never a failure. The location is the first usable of:
+silently; it is never a failure. A search of Central is never cached, since its ranking changes as Central does.
+The location is the first usable of:
 
 1. `BAL_DISCOVER_CACHE=off` — caching disabled
 2. `BAL_DISCOVER_CACHE_DIR=<dir>`
