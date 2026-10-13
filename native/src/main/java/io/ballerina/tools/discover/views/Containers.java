@@ -461,6 +461,18 @@ public final class Containers {
         return options.filtered() && Filter.matches(options.filter(), container.name());
     }
 
+    /** The command that opens {@code container} from a listing of its bucket. */
+    static String openCommand(LoadedPackage loaded, Surface.Scope scope, Surface.Container container) {
+        return openCommand(loaded, scope, container, new Options(List.of()));
+    }
+
+    /** The module's functions as overview rows, alphabetical, each with the command that opens it. */
+    static List<DiscoverResult.Overview.Row> functionRows(LoadedPackage loaded, Surface.Container module) {
+        return methodsOf(entriesOf(module), Fn.class, baseCommand(loaded, Surface.Scope.MODULE, module)).stream()
+                .map(function -> new DiscoverResult.Overview.Row(function.name(), 0, 0, 0, function.command()))
+                .toList();
+    }
+
     private static String openCommand(
             LoadedPackage loaded, Surface.Scope scope, Surface.Container container, Options options) {
         Optional<String> foreign = foreignPairing(container).flatMap(service -> foreignCommand(loaded, service));

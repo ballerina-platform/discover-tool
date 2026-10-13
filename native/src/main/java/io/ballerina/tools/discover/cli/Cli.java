@@ -34,6 +34,7 @@ import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
+import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
@@ -85,8 +86,6 @@ public final class Cli {
     private static final int USAGE_ERROR = 2;
 
     private static final int FIRST_PAGE = 1;
-
-    private static final String COMMAND = "bal discover ";
 
     private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
 
@@ -225,7 +224,7 @@ public final class Cli {
     private static Result<DiscoverResult> answerFrom(
             LoadedPackage loaded, String bucket, List<String> rest, String filter, int page) {
         if (bucket == null) {
-            return Result.ok(bucketList(loaded));
+            return Result.ok(Overview.of(loaded));
         }
         List<String> selectors = rest.subList(1, rest.size());
         if (Readme.BUCKET.equals(bucket)) {
@@ -293,32 +292,6 @@ public final class Cli {
         return new Failure.Validation(
                 "'" + token + "' is not a bucket.",
                 "The buckets are " + String.join(", ", Commands.BUCKETS) + ".");
-    }
-
-    private static DiscoverResult.BucketList bucketList(LoadedPackage loaded) {
-        List<String> names = new ArrayList<>();
-        for (Surface.Scope scope : Surface.Scope.values()) {
-            if (!Surface.of(loaded.library(), scope).isEmpty()) {
-                names.add(scope.verb());
-            }
-        }
-        // Neither is a Surface.Scope — they are not part of the callable surface — so they are appended here
-        // rather than found by the loop above: `type`, then `readme` last, matching the RFC's worked examples.
-        if (Types.count(loaded) > 0) {
-            names.add(Types.BUCKET);
-        }
-        if (loaded.readme().isPresent()) {
-            names.add(Readme.BUCKET);
-        }
-        List<DiscoverResult.BucketList.Bucket> buckets = names.stream()
-                .map(name -> new DiscoverResult.BucketList.Bucket(name, loaded.command() + " " + name))
-                .toList();
-        List<DiscoverResult.BucketList.Submodule> submodules = loaded.submodules().stream()
-                .map(submodule -> new DiscoverResult.BucketList.Submodule(
-                        submodule.name(), submodule.summary(),
-                        COMMAND + loaded.pkgArgument(submodule.name())))
-                .toList();
-        return new DiscoverResult.BucketList(buckets, submodules, loaded.warning());
     }
 
     /**

@@ -39,70 +39,75 @@ import java.util.Map;
  */
 public class DiscoverResultRenderingTest {
 
+    private static final String KAFKA = "bal discover ballerinax/kafka";
+
+    private static DiscoverResult.Overview kafkaOverview(List<DiscoverResult.Overview.Submodule> submodules,
+            String warning) {
+        return new DiscoverResult.Overview(
+                List.of(new DiscoverResult.Overview.Section("client", List.of(
+                                new DiscoverResult.Overview.Row("Consumer", 0, 24, 0, KAFKA + " client Consumer"),
+                                new DiscoverResult.Overview.Row("Producer", 0, 5, 0, KAFKA + " client Producer")),
+                                3, KAFKA + " client"),
+                        new DiscoverResult.Overview.Section("funcs", List.of(
+                                new DiscoverResult.Overview.Row("parse", 0, 0, 0, KAFKA + " funcs parse")),
+                                1, KAFKA + " funcs")),
+                new DiscoverResult.Overview.TypeCounts(
+                        new LinkedHashMap<>(Map.of(DiscoverResult.TypeRoster.Kind.RECORDS, 14)), KAFKA + " type"),
+                new DiscoverResult.Overview.ReadmeSummary(11, KAFKA + " readme"), submodules, warning);
+    }
+
     @Test
-    public void aBucketListRendersOneBucketPerLineInText() {
-        DiscoverResult result = new DiscoverResult.BucketList(
-                buckets("client", "service", "funcs", "readme"), List.of(), null);
+    public void anOverviewListsEachBucketsFirstRowsThenTheTypeAndReadmeLines() {
+        TextRenderer.Context where = new TextRenderer.Context("ballerinax/kafka", null, List.of(), null, null, "4.6.6");
+        Assert.assertEquals(TextRenderer.render(kafkaOverview(List.of(), null), where), lines(
+                "ballerinax/kafka:4.6.6",
+                "",
+                "Clients (3)",
+                "  Consumer  24 remote methods",
+                "  Producer   5 remote methods",
+                "  ... 1 more: bal discover ballerinax/kafka client",
+                "Functions (1)",
+                "  parse",
+                "Types   bal discover ballerinax/kafka type    14 records",
+                "Readme  bal discover ballerinax/kafka readme  11 sections",
+                "",
+                "Next: bal discover ballerinax/kafka client <name>",
+                "Next: bal discover ballerinax/kafka funcs <name>"));
+    }
+
+    @Test
+    public void anOverviewGivesEveryRowItsCommandInJson() {
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(kafkaOverview(List.of(), null)))
+                .getAsJsonObject();
+        Assert.assertEquals(json.getAsJsonObject("clients").toString(),
+                "{\"entries\":[{\"name\":\"Consumer\",\"remote\":24,\"command\":\"" + KAFKA + " client Consumer\"},"
+                        + "{\"name\":\"Producer\",\"remote\":5,\"command\":\"" + KAFKA + " client Producer\"}],"
+                        + "\"shown\":2,\"total\":3,\"command\":\"" + KAFKA + " client\"}");
+        Assert.assertEquals(json.getAsJsonObject("functions").getAsJsonArray("entries").get(0).toString(),
+                "{\"name\":\"parse\",\"command\":\"" + KAFKA + " funcs parse\"}");
+        Assert.assertEquals(json.getAsJsonObject("types").toString(),
+                "{\"counts\":{\"records\":14},\"command\":\"" + KAFKA + " type\"}");
+        Assert.assertEquals(json.getAsJsonObject("readme").toString(),
+                "{\"sections\":11,\"command\":\"" + KAFKA + " readme\"}");
+        Assert.assertFalse(json.has("submodules"), "a package with no submodules carries no submodules key at all");
+    }
+
+    @Test
+    public void anEmptyOverviewSaysSoInTextAndIsAnEmptyObjectInJson() {
+        DiscoverResult result = new DiscoverResult.Overview(List.of(), null, null, List.of(), null);
+        Assert.assertEquals(TextRenderer.render(result), "Nothing to list.");
+        Assert.assertEquals(JsonRenderer.render(result), "{}");
+    }
+
+    @Test
+    public void submodulesFollowTheOverviewInTextAndAreTheirOwnArrayInJson() {
+        DiscoverResult result = new DiscoverResult.Overview(List.of(), null, null, List.of(
+                new DiscoverResult.Overview.Submodule("dataloader", "load data from a source with batching and caching",
+                        "bal discover ballerina/graphql --module dataloader"),
+                new DiscoverResult.Overview.Submodule("subgraph", "create subgraphs for a federated GraphQL service",
+                        "bal discover ballerina/graphql --module subgraph")), null);
         Assert.assertEquals(TextRenderer.render(result), lines(
-                "4 buckets",
-                "",
-                "  client",
-                "  service",
-                "  funcs",
-                "  readme"));
-    }
-
-    @Test
-    public void aBucketListAtATerminalNamesThePackageAndTheCommandThatOpensABucket() {
-        DiscoverResult result = new DiscoverResult.BucketList(buckets("client", "readme"), List.of(), null);
-        TextRenderer.Context where =
-                new TextRenderer.Context("ballerina/graphql", "subgraph", List.of(), null, null, null);
-        Assert.assertEquals(TextRenderer.render(result, where), lines(
-                "ballerina/graphql · module subgraph",
-                "2 buckets",
-                "",
-                "  client",
-                "  readme",
-                "",
-                "Next: bal discover ballerina/graphql --module subgraph <bucket>"));
-    }
-
-    @Test
-    public void aBucketListRendersEachBucketAsARowWithItsCommandInJson() {
-        DiscoverResult result = new DiscoverResult.BucketList(buckets("client", "readme"), List.of(), null);
-        String json = JsonRenderer.render(result);
-        Assert.assertEquals(
-                JsonParser.parseString(json).getAsJsonObject().getAsJsonArray("buckets").toString(),
-                "[{\"name\":\"client\",\"command\":\"bal discover ballerina/graphql client\"},"
-                        + "{\"name\":\"readme\",\"command\":\"bal discover ballerina/graphql readme\"}]");
-    }
-
-    @Test
-    public void anEmptyBucketListRendersAsNoneInTextAndAnEmptyArrayInJson() {
-        DiscoverResult result = new DiscoverResult.BucketList(buckets(), List.of(), null);
-        Assert.assertEquals(TextRenderer.render(result), "No buckets.");
-        Assert.assertEquals(JsonRenderer.render(result), "{\"buckets\":[]}");
-    }
-
-    @Test
-    public void submodulesAppearAfterTheBucketListInTextAndAsTheirOwnArrayInJson() {
-        DiscoverResult result = new DiscoverResult.BucketList(
-                buckets("client", "service", "funcs", "readme"),
-                List.of(
-                        new DiscoverResult.BucketList.Submodule("dataloader",
-                                "load data from a source with batching and caching",
-                                "bal discover ballerina/graphql --module dataloader"),
-                        new DiscoverResult.BucketList.Submodule("subgraph",
-                                "create subgraphs for a federated GraphQL service",
-                                "bal discover ballerina/graphql --module subgraph")),
-                null);
-        Assert.assertEquals(TextRenderer.render(result), lines(
-                "4 buckets",
-                "",
-                "  client",
-                "  service",
-                "  funcs",
-                "  readme",
+                "Nothing to list.",
                 "",
                 "Submodules",
                 "  dataloader  bal discover ballerina/graphql --module dataloader  "
@@ -110,27 +115,19 @@ public class DiscoverResultRenderingTest {
                 "  subgraph    bal discover ballerina/graphql --module subgraph    "
                         + "create subgraphs for a federated GraphQL service"));
 
-        JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
-        JsonArray submodules = json.getAsJsonArray("submodules");
+        JsonArray submodules = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject()
+                .getAsJsonArray("submodules");
         Assert.assertEquals(submodules.size(), 2);
-        Assert.assertEquals(submodules.get(0).getAsJsonObject().get("name").getAsString(), "dataloader");
         Assert.assertEquals(submodules.get(0).getAsJsonObject().get("command").getAsString(),
                 "bal discover ballerina/graphql --module dataloader");
     }
 
     @Test
-    public void noSubmodulesOmitsTheFieldEntirelyInJson() {
-        DiscoverResult result = new DiscoverResult.BucketList(buckets("client", "readme"), List.of(), null);
-        Assert.assertFalse(JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject().has("submodules"),
-                "a package with no submodules carries no submodules key at all");
-    }
-
-    @Test
     public void anUnverifiedVersionsWarningAppearsInBothRenderings() {
-        DiscoverResult result = new DiscoverResult.BucketList(
-                buckets("client"), List.of(), "the registry was unreachable, so this version came off disk unchecked");
-        Assert.assertTrue(TextRenderer.render(result).endsWith(
-                "\n\nWarning: the registry was unreachable, so this version came off disk unchecked"));
+        DiscoverResult result = kafkaOverview(List.of(),
+                "the registry was unreachable, so this version came off disk unchecked");
+        Assert.assertTrue(TextRenderer.render(result).contains(
+                "\n\nWarning: the registry was unreachable, so this version came off disk unchecked\n"));
         String json = JsonRenderer.render(result);
         Assert.assertEquals(
                 JsonParser.parseString(json).getAsJsonObject().get("warning").getAsString(),
@@ -762,11 +759,5 @@ public class DiscoverResultRenderingTest {
 
     private static String lines(String... lines) {
         return String.join("\n", lines);
-    }
-
-    private static List<DiscoverResult.BucketList.Bucket> buckets(String... names) {
-        return Arrays.stream(names)
-                .map(name -> new DiscoverResult.BucketList.Bucket(name, "bal discover ballerina/graphql " + name))
-                .toList();
     }
 }

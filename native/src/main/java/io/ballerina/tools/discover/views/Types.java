@@ -87,6 +87,18 @@ public final class Types {
         return entries(loaded.library()).size();
     }
 
+    /** How many declarations of each kind the bucket holds, in roster order, every kind with at least one. */
+    public static Map<DiscoverResult.TypeRoster.Kind, Integer> countsByKind(LoadedPackage loaded) {
+        Map<DiscoverResult.TypeRoster.Kind, Integer> counts = new LinkedHashMap<>();
+        for (DiscoverResult.TypeRoster.Kind kind : DiscoverResult.TypeRoster.Kind.values()) {
+            long count = entries(loaded.library()).stream().filter(entry -> entry.kind() == kind).count();
+            if (count > 0) {
+                counts.put(kind, (int) count);
+            }
+        }
+        return counts;
+    }
+
     /** What {@code name} is, when this bucket holds a type by that name: {@code record}, {@code listener}. */
     public static Optional<String> kindOf(LoadedPackage loaded, String name) {
         String plain = Identifiers.plain(name);

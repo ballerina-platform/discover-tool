@@ -27,6 +27,7 @@ import io.ballerina.tools.discover.cli.Cli;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
+import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
@@ -79,6 +80,7 @@ public class PointersTest {
 
     private static List<DiscoverResult> answersOf(LoadedPackage context) {
         List<DiscoverResult> answers = new ArrayList<>();
+        answers.add(Overview.of(context));
         for (Surface.Scope scope : Surface.Scope.values()) {
             answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of()))));
             answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of(), "config", 1))));
@@ -148,9 +150,18 @@ public class PointersTest {
     private static List<String> commandsOf(DiscoverResult result) {
         List<String> commands = new ArrayList<>();
         switch (result) {
-            case DiscoverResult.BucketList bucketList -> {
-                bucketList.buckets().forEach(bucket -> commands.add(bucket.command()));
-                bucketList.submodules().forEach(submodule -> commands.add(submodule.command()));
+            case DiscoverResult.Overview overview -> {
+                overview.sections().forEach(section -> {
+                    commands.add(section.command());
+                    section.rows().forEach(row -> commands.add(row.command()));
+                });
+                if (overview.types() != null) {
+                    commands.add(overview.types().command());
+                }
+                if (overview.readme() != null) {
+                    commands.add(overview.readme().command());
+                }
+                overview.submodules().forEach(submodule -> commands.add(submodule.command()));
             }
             case DiscoverResult.ContainerRoster roster -> {
                 roster.containers().forEach(entry -> commands.add(entry.command()));

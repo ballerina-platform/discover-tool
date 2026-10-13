@@ -31,6 +31,7 @@ import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
+import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
@@ -158,6 +159,47 @@ public class ViewsTest {
                 text.toString(), slug + " text");
         FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(slug + ".buckets.json"),
                 json.toString(), slug + " json");
+    }
+
+    /** The first answer about every fixture stays inside the entry ceiling, and every bucket it lists is there. */
+    @Test(dataProvider = "fixtures")
+    public void theOverviewStaysInsideTheEntryCeiling(String slug) {
+        LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
+        DiscoverResult.Overview overview = Overview.of(loaded);
+        int rows = overview.sections().stream().mapToInt(section -> section.rows().size()).sum()
+                + (overview.types() == null ? 0 : 1) + (overview.readme() == null ? 0 : 1)
+                + overview.submodules().size();
+        Assert.assertTrue(rows <= Containers.MAX_ENTRIES, slug + ": " + rows + " rows");
+        for (Surface.Scope scope : Surface.Scope.values()) {
+            boolean listed = overview.sections().stream().anyMatch(section -> section.bucket().equals(scope.verb()));
+            Assert.assertEquals(listed, !Surface.of(loaded.library(), scope).isEmpty(), slug + " " + scope);
+        }
+    }
+
+    @Test
+    public void anOverviewOverTheCeilingTakesRowsFromTheLargestSectionFirst() {
+        Payload payload = Payload.pkg();
+        List<Decl> clients = new ArrayList<>();
+        List<Decl> classes = new ArrayList<>();
+        List<Decl> functions = new ArrayList<>();
+        List<Decl> services = new ArrayList<>();
+        for (int i = 0; i < 15; i++) {
+            services.add(Decl.serviceType("S" + i));
+            clients.add(Decl.client("C" + i, Decl.method("send").on("isRemote")));
+            classes.add(Decl.client("K" + i, Decl.method("run")));
+            functions.add(Decl.method("f" + i));
+        }
+        payload.with("clients", clients.toArray(Decl[]::new));
+        payload.with("classes", classes.toArray(Decl[]::new));
+        payload.with("functions", functions.toArray(Decl[]::new));
+        payload.with("serviceTypes", services.toArray(Decl[]::new));
+        payload.with("records", Decl.record("R"));
+        DiscoverResult.Overview overview = Overview.of(fromPayload(payload));
+        Assert.assertEquals(overview.sections().stream().map(section -> section.rows().size()).toList(),
+                List.of(10, 10, 10, 9), "four sections of 10 and the type line are 41: the last of the largest "
+                        + "gives one up");
+        Assert.assertEquals(overview.sections().stream().map(DiscoverResult.Overview.Section::total).toList(),
+                List.of(15, 15, 15, 15));
     }
 
     /** One of each shape a leaf takes, so a change to any of them shows in a diff. */
