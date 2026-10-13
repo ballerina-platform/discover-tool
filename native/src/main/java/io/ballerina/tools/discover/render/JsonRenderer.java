@@ -21,8 +21,10 @@ package io.ballerina.tools.discover.render;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.ballerina.tools.discover.model.ServiceHandlers;
+import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * {@link DiscoverResult} → the structured JSON an agent's tooling reads by default.
@@ -34,6 +36,13 @@ import java.util.List;
  * @since 0.1.0
  */
 public final class JsonRenderer {
+
+    /** Each bucket's key in an overview: what one of its rows is, plural, as the type roster names them. */
+    private static final Map<String, String> OVERVIEW_KEYS = Map.of(
+            Surface.Scope.CLIENT.verb(), DiscoverResult.TypeRoster.Kind.CLIENTS.key(),
+            Surface.Scope.SERVICE.verb(), DiscoverResult.TypeRoster.Kind.SERVICE_TYPES.key(),
+            Surface.Scope.CLASS.verb(), DiscoverResult.TypeRoster.Kind.CLASSES.key(),
+            Surface.Scope.MODULE.verb(), Surface.Scope.MODULE.plural());
 
     private JsonRenderer() {
     }
@@ -70,7 +79,7 @@ public final class JsonRenderer {
 
     private static JsonObject toJson(DiscoverResult result) {
         return switch (result) {
-            case DiscoverResult.BucketList bucketList -> bucketList(bucketList);
+            case DiscoverResult.Overview overview -> overview(overview);
             case DiscoverResult.ContainerRoster roster -> containerRoster(roster);
             case DiscoverResult.PathGroups groups -> pathGroups(groups);
             case DiscoverResult.ResourceList resources -> resourceList(resources);
@@ -86,19 +95,43 @@ public final class JsonRenderer {
         };
     }
 
-    private static JsonObject bucketList(DiscoverResult.BucketList bucketList) {
+    private static JsonObject overview(DiscoverResult.Overview overview) {
         JsonObject json = new JsonObject();
-        JsonArray buckets = new JsonArray();
-        for (DiscoverResult.BucketList.Bucket bucket : bucketList.buckets()) {
+        for (DiscoverResult.Overview.Section section : overview.sections()) {
             JsonObject entry = new JsonObject();
-            entry.addProperty("name", bucket.name());
-            entry.addProperty("command", bucket.command());
-            buckets.add(entry);
+            JsonArray rows = new JsonArray();
+            for (DiscoverResult.Overview.Row row : section.rows()) {
+                JsonObject item = new JsonObject();
+                item.addProperty("name", row.name());
+                addIfPositive(item, "resources", row.resources());
+                addIfPositive(item, "remote", row.remote());
+                addIfPositive(item, "normal", row.normal());
+                item.addProperty("command", row.command());
+                rows.add(item);
+            }
+            entry.add("entries", rows);
+            entry.addProperty("shown", section.rows().size());
+            entry.addProperty("total", section.total());
+            entry.addProperty("command", section.command());
+            json.add(OVERVIEW_KEYS.getOrDefault(section.bucket(), section.bucket()), entry);
         }
-        json.add("buckets", buckets);
-        if (!bucketList.submodules().isEmpty()) {
+        if (overview.types() != null) {
+            JsonObject types = new JsonObject();
+            JsonObject counts = new JsonObject();
+            overview.types().counts().forEach((kind, count) -> counts.addProperty(kind.key(), count));
+            types.add("counts", counts);
+            types.addProperty("command", overview.types().command());
+            json.add("types", types);
+        }
+        if (overview.readme() != null) {
+            JsonObject readme = new JsonObject();
+            readme.addProperty("sections", overview.readme().sections());
+            readme.addProperty("command", overview.readme().command());
+            json.add("readme", readme);
+        }
+        if (!overview.submodules().isEmpty()) {
             JsonArray submodules = new JsonArray();
-            for (DiscoverResult.BucketList.Submodule submodule : bucketList.submodules()) {
+            for (DiscoverResult.Overview.Submodule submodule : overview.submodules()) {
                 JsonObject entry = new JsonObject();
                 entry.addProperty("name", submodule.name());
                 entry.addProperty("summary", submodule.summary());
@@ -107,9 +140,7 @@ public final class JsonRenderer {
             }
             json.add("submodules", submodules);
         }
-        if (bucketList.warning() != null) {
-            json.addProperty("warning", bucketList.warning());
-        }
+        addIfPresent(json, "warning", overview.warning());
         return json;
     }
 

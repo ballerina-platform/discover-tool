@@ -18,7 +18,6 @@
 
 package io.ballerina.tools.discover.render;
 
-import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.ServiceHandlers;
 import io.ballerina.tools.discover.symbols.Surface;
@@ -124,7 +123,7 @@ public final class TextRenderer {
 
     private static void fill(Layout layout, DiscoverResult result, Context where) {
         switch (result) {
-            case DiscoverResult.BucketList bucketList -> bucketList(layout, bucketList, where);
+            case DiscoverResult.Overview overview -> overview(layout, overview);
             case DiscoverResult.ContainerRoster roster -> containerRoster(layout, roster, where);
             case DiscoverResult.PathGroups groups -> pathGroups(layout, groups);
             case DiscoverResult.ResourceList resources -> resourceList(layout, resources);
@@ -140,22 +139,56 @@ public final class TextRenderer {
         }
     }
 
-    private static void bucketList(Layout layout, DiscoverResult.BucketList bucketList, Context where) {
-        layout.top(counted(bucketList.buckets().size(), "bucket", "buckets"));
-        TextTable buckets = new TextTable(TextTable.Column.LEFT);
-        bucketList.buckets().forEach(bucket -> buckets.row(bucket.name()));
-        layout.block(buckets.lines(INDENT));
-        if (!bucketList.submodules().isEmpty()) {
+    private static void overview(Layout layout, DiscoverResult.Overview overview) {
+        List<String> lines = new ArrayList<>();
+        for (DiscoverResult.Overview.Section section : overview.sections()) {
+            Surface.Scope scope = Surface.Scope.ofVerb(section.bucket()).orElse(Surface.Scope.MODULE);
+            lines.add(capitalised(scope.plural()) + " (" + section.total() + ")");
+            List<DiscoverResult.Overview.Row> rows = section.rows();
+            Drill drill = Drill.of(rows.stream().map(DiscoverResult.Overview.Row::name).toList(),
+                    rows.stream().map(DiscoverResult.Overview.Row::command).toList(), "<name>");
+            TextTable table = scope == Surface.Scope.MODULE
+                    ? new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT)
+                    : new TextTable(TextTable.Column.LEFT,
+                            TextTable.Column.count("resource method", "resource methods"),
+                            TextTable.Column.count("remote method", "remote methods"),
+                            TextTable.Column.count("method", "methods"),
+                            TextTable.Column.LEFT);
+            for (int i = 0; i < rows.size(); i++) {
+                DiscoverResult.Overview.Row row = rows.get(i);
+                if (scope == Surface.Scope.MODULE) {
+                    table.row(row.name(), drill.explicit(i));
+                } else {
+                    table.row(row.name(), String.valueOf(row.resources()), String.valueOf(row.remote()),
+                            String.valueOf(row.normal()), drill.explicit(i));
+                }
+            }
+            lines.addAll(table.lines(INDENT));
+            if (rows.size() < section.total()) {
+                lines.add(INDENT + "... " + (section.total() - rows.size()) + " more: " + section.command());
+            }
+            layout.next(drill.pattern());
+        }
+        TextTable summary = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        if (overview.types() != null) {
+            List<String> parts = new ArrayList<>();
+            overview.types().counts().forEach((kind, count) ->
+                    parts.add(count + " " + (count == 1 ? kind.noun() : kind.plural())));
+            summary.row("Types", overview.types().command(), String.join(", ", parts));
+        }
+        if (overview.readme() != null) {
+            summary.row("Readme", overview.readme().command(),
+                    counted(overview.readme().sections(), "section", "sections"));
+        }
+        lines.addAll(summary.lines(""));
+        layout.block(lines.isEmpty() ? List.of("Nothing to list.") : lines);
+        if (!overview.submodules().isEmpty()) {
             TextTable submodules = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
-            bucketList.submodules().forEach(submodule ->
+            overview.submodules().forEach(submodule ->
                     submodules.row(submodule.name(), submodule.command(), submodule.summary()));
             layout.section("Submodules", submodules);
         }
-        layout.warning(bucketList.warning());
-        if (where.pkg() != null && !bucketList.buckets().isEmpty()) {
-            layout.next("bal discover " + Coordinate.argument(where.pkg(), where.pin(), where.module())
-                    + " <bucket>");
-        }
+        layout.warning(overview.warning());
     }
 
     private static void containerRoster(Layout layout, DiscoverResult.ContainerRoster roster, Context where) {

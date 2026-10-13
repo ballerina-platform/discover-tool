@@ -97,22 +97,53 @@ public sealed interface DiscoverResult {
     }
 
     /**
-     * A package's (or a targeted module's) own top-level buckets — the answer to a bare
-     * {@code bal discover <org/name>} with no bucket and no selector.
+     * The first answer about a package (or a targeted module): its clients, service types, classes and functions
+     * with their member counts, one line for its types and one for its readme, and its submodules, each with the
+     * command that opens it — a bare {@code bal discover <org>/<name>}.
      *
-     * @param buckets the buckets this package actually declares, in a fixed order, each with the command that opens it
-     * @param submodules every OTHER module this package publishes, regardless of which one {@code buckets} itself
-     *     describes — empty for a package that publishes only its default module
+     * @param sections the callable buckets that hold something, in bucket order
+     * @param types how many declarations of each kind the {@code type} bucket holds beyond the containers the
+     *     sections list, or {@code null} when it holds none
+     * @param readme the readme's section count, or {@code null} when the module publishes no readme
+     * @param submodules every OTHER module this package publishes, regardless of which one the sections
+     *     describe — empty for a package that publishes only its default module; never cut
      * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
      *     registry — see {@code Loader.unverifiedWarning}
      */
-    record BucketList(List<Bucket> buckets, List<Submodule> submodules, String warning) implements DiscoverResult {
+    record Overview(List<Section> sections, TypeCounts types, ReadmeSummary readme, List<Submodule> submodules,
+            String warning)
+            implements DiscoverResult {
 
         /**
-         * @param name the bucket's name
+         * One callable bucket's first rows.
+         *
+         * @param bucket the bucket's name
+         * @param rows the containers (or functions) shown, alphabetical, up to the section's share of the ceiling
+         * @param total how many the bucket holds
+         * @param command the command that lists them all
+         */
+        public record Section(String bucket, List<Row> rows, int total, String command) { }
+
+        /**
+         * @param name the container's or function's name
+         * @param resources how many resource methods a container declares
+         * @param remote how many remote methods it declares
+         * @param normal how many plain methods it declares
          * @param command the command that opens it
          */
-        public record Bucket(String name, String command) { }
+        public record Row(String name, int resources, int remote, int normal, String command) { }
+
+        /**
+         * @param counts how many declarations of each kind, every kind with at least one
+         * @param command the command that lists them
+         */
+        public record TypeCounts(Map<TypeRoster.Kind, Integer> counts, String command) { }
+
+        /**
+         * @param sections how many sections the readme has
+         * @param command the command that reads it
+         */
+        public record ReadmeSummary(int sections, String command) { }
 
         /**
          * @param name the bare name {@code --module} itself takes

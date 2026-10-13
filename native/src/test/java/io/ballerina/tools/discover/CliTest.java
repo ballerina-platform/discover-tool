@@ -1079,10 +1079,12 @@ public class CliTest {
         Assert.assertEquals(transport.urls(), List.of(
                 CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
                 CentralClient.CENTRAL_BASE_URL + "docs/ballerina/graphql.dataloader/" + GRAPHQL_VERSION));
-        Assert.assertTrue(capture.stdout().contains("\"buckets\":["
-                + "{\"name\":\"class\",\"command\":\"bal discover ballerina/graphql --module dataloader class\"},"
-                + "{\"name\":\"type\",\"command\":\"bal discover ballerina/graphql --module dataloader type\"}]"),
-                capture.stdout());
+        JsonObject overview = JsonParser.parseString(capture.stdout()).getAsJsonObject();
+        Assert.assertEquals(overview.getAsJsonObject("classes").get("command").getAsString(),
+                "bal discover ballerina/graphql --module dataloader class", capture.stdout());
+        Assert.assertEquals(overview.getAsJsonObject("types").get("command").getAsString(),
+                "bal discover ballerina/graphql --module dataloader type", capture.stdout());
+        Assert.assertFalse(overview.has("clients"), capture.stdout());
     }
 
     @Test
@@ -1491,7 +1493,7 @@ public class CliTest {
                 options(transport));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().startsWith("{\"qualified\":\"ballerina/graphql\",\"version\":\"1.8.0\","
-                + "\"module\":\"subgraph\",\"buckets\":"), capture.stdout());
+                + "\"module\":\"subgraph\",\"types\":"), capture.stdout());
     }
 
     @Test
@@ -1506,7 +1508,7 @@ public class CliTest {
     }
 
     @Test
-    public void aBarePackageListsItsBucketsAsJsonOffATty() {
+    public void aBarePackageAnswersWithItsOverviewAsJsonOffATty() {
         // Not interactive (the default for this overload), so JSON — the RFC's agent-facing default, no flag
         // required.
         Capture capture = new Capture();
@@ -1514,31 +1516,41 @@ public class CliTest {
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         String out = capture.stdout();
-        Assert.assertTrue(out.contains("\"client\""), out);
-        Assert.assertTrue(out.contains("\"class\""), out);
-        Assert.assertFalse(out.contains("\"funcs\""), "kafka declares no module functions: " + out);
+        Assert.assertTrue(out.contains("\"clients\":{"), out);
+        Assert.assertTrue(out.contains("\"classes\":{"), out);
+        Assert.assertFalse(out.contains("\"functions\""), "kafka declares no module functions: " + out);
     }
 
-    private static final String KAFKA_BUCKETS = String.join("\n",
+    private static final String KAFKA_OVERVIEW = String.join("\n",
             "ballerinax/kafka:4.6.5",
-            "5 buckets",
             "",
-            "  client",
-            "  service",
-            "  class",
-            "  type",
-            "  readme",
+            "Clients (3)",
+            "  Caller     3 remote methods",
+            "  Consumer  24 remote methods",
+            "  Producer   5 remote methods",
+            "Service types (1)",
+            "  Service",
+            "Classes (4)",
+            "  AvroDeserializer  1 method",
+            "  AvroSerializer    1 method",
+            "  Deserializer      1 method",
+            "  Serializer        1 method",
+            "Types   bal discover ballerinax/kafka type    14 records, 3 enums, 3 errors, 8 aliases, 29 constants, "
+                    + "1 annotation, 1 listener",
+            "Readme  bal discover ballerinax/kafka readme  11 sections",
             "",
-            "Next: bal discover ballerinax/kafka <bucket>",
+            "Next: bal discover ballerinax/kafka client <name>",
+            "Next: bal discover ballerinax/kafka service <name>",
+            "Next: bal discover ballerinax/kafka class <name>",
             "");
 
     @Test
-    public void aBarePackageListsItsBucketsAsTextAtATerminal() {
+    public void aBarePackageAnswersWithItsOverviewAsTextAtATerminal() {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
-        Assert.assertEquals(capture.stdout(), KAFKA_BUCKETS);
+        Assert.assertEquals(capture.stdout(), KAFKA_OVERVIEW);
     }
 
     @Test
@@ -1546,12 +1558,12 @@ public class CliTest {
         Capture asText = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "text"), asText.streams(),
                 centralFor("ballerinax__kafka", "4.6.5")), 0, asText.stderr());
-        Assert.assertEquals(asText.stdout(), KAFKA_BUCKETS);
+        Assert.assertEquals(asText.stdout(), KAFKA_OVERVIEW);
 
         Capture asJson = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "json"), asJson.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true), 0, asJson.stderr());
-        Assert.assertTrue(asJson.stdout().contains("\"client\""), asJson.stdout());
+        Assert.assertTrue(asJson.stdout().contains("\"clients\":{"), asJson.stdout());
     }
 
     @Test
