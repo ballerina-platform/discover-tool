@@ -62,6 +62,7 @@ final class ReadmeCalls {
     private static final Pattern SERVICE_ON = Pattern.compile(
             "\\bservice\\b[^{;]*?\\bon\\s+(new\\s+)?([A-Za-z_][\\w.]*(?::[A-Za-z_]\\w*)?)");
     private static final String DEFAULT_ACCESSOR = "get";
+    private static final String ATTACH = "attach";
     private static final String ROOT = ".";
 
     private ReadmeCalls() {
@@ -235,16 +236,25 @@ final class ReadmeCalls {
 
     /**
      * The sections of the module's readme whose code declares a service of {@code container}: typed as it
-     * ({@code service cdc:Service on ...}), or attached to one of {@code listeners} ({@code on new http:Listener(9090)}
-     * or on a variable declared as one), or, for the only service type of a module that declares no listener, any
-     * service at all.
+     * ({@code service cdc:Service on ...}), or untyped on a listener it is the service of, or, for the only service
+     * type of a module that declares no listener, any service at all.
+     *
+     * <p>An untyped service ({@code service /x on new http:Listener(9090)}, or on a variable declared as one) takes
+     * the type of the listener's {@code attach} parameter, so it is {@code container}'s only when that parameter is
+     * {@code container} itself, or when {@code container} is the one service type that listener accepts:
+     * {@code http:Listener} also accepts {@code ServiceContract}, but an untyped service on it is an
+     * {@code http:Service}.
      *
      * @param listeners the listener types the service type binds to, as written: {@code http:Listener}
      */
     static List<Readme.Section> declaringService(LoadedPackage loaded, Surface.Container container,
             List<String> listeners) {
-        String type = Pattern.quote(prefixOf(loaded) + ":" + container.plainName());
-        Pattern typed = Pattern.compile("\\bservice\\s+" + type + "\\b");
+        String type = container.plainName().contains(":")
+                ? container.plainName()
+                : prefixOf(loaded) + ":" + container.plainName();
+        Pattern typed = Pattern.compile("\\bservice\\s+" + Pattern.quote(type) + "\\b");
+        List<String> untyped = listeners.stream().filter(listener -> takesUntyped(loaded, container, listener))
+                .toList();
         boolean anyService = loaded.library().listeners().isEmpty()
                 && Surface.of(loaded.library(), Surface.Scope.SERVICE).size() == 1;
         List<Readme.Section> sections = Readme.sectionsOf(loaded);
@@ -261,13 +271,30 @@ final class ReadmeCalls {
                         ? target
                         : declaredType(target, code).or(() -> declaredType(target, readme.toString()))
                                 .orElse(List.of()).stream().findFirst().orElse("");
-                declares = anyService || listeners.contains(listener);
+                declares = anyService || untyped.contains(listener);
             }
             if (declares) {
                 found.add(section);
             }
         }
         return List.copyOf(found);
+    }
+
+    private static boolean takesUntyped(LoadedPackage loaded, Surface.Container container, String listener) {
+        long accepted = Surface.of(loaded.library(), Surface.Scope.SERVICE).stream()
+                .filter(each -> each.pairings().stream().anyMatch(pairing -> pairing.listener().equals(listener)))
+                .count();
+        if (accepted == 1) {
+            return true;
+        }
+        String name = listener.substring(listener.indexOf(':') + 1);
+        return loaded.library().listeners().stream()
+                .filter(declared -> Identifiers.plain(declared.name()).equals(name))
+                .flatMap(declared -> declared.methods().stream())
+                .filter(method -> method instanceof Fn.Normal normal && ATTACH.equals(normal.name())
+                        && !normal.params().isEmpty())
+                .anyMatch(attach -> Identifiers.plain(attach.params().get(0).type().name().trim())
+                        .equals(container.plainName()));
     }
 
     /** Every fenced block of {@code markdown}, joined; prose is never read. */
