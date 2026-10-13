@@ -258,17 +258,30 @@ public final class Containers {
 
     private static Failure severalOwners(LoadedPackage loaded, List<Surface.Container> owners, Options options) {
         List<String> selectors = options.selectors();
-        List<String> commands = owners.stream()
-                .map(owner -> baseCommand(loaded, owner.scope(), owner)
-                        + shellWords(selectors.subList(0, consumed(owner, selectors))) + filterArgument(options))
-                .toList();
-        String typed = String.join(" ", selectors.subList(0, consumed(owners.get(0), selectors)));
+        String typed = selectors.subList(0, consumed(owners.get(0), selectors)).stream()
+                .map(PathTree::plainSelector)
+                .collect(Collectors.joining(" "));
         List<String> names = owners.stream().map(Surface.Container::plainName).toList();
-        return loaded.symbolNotFoundAmong(selectors,
+        return declaredBySeveral(loaded, selectors,
                 named(typed) + " is declared by " + Texts.and(names) + " in " + loaded.place() + ".",
-                "Name the one you mean: " + commands.stream().map(Failure::quoted).collect(Collectors.joining(" or "))
-                        + ".",
-                commands);
+                owners.stream().map(owner -> new Failure.Owner(owner.plainName(),
+                        baseCommand(loaded, owner.scope(), owner)
+                                + shellWords(selectors.subList(0, consumed(owner, selectors)))
+                                + filterArgument(options)))
+                        .toList());
+    }
+
+    // Each owner's command is the answer, so the failure lists them and quotes none; past the entry ceiling, the
+    // package's search for the name lists the rest.
+    private static Failure declaredBySeveral(LoadedPackage loaded, List<String> requested, String message,
+            List<Failure.Owner> owners) {
+        String search = loaded.command() + " " + Search.BUCKET + " " + shellWord(requested.get(0));
+        String suggestion = owners.size() > MAX_ENTRIES
+                ? "Name the one you mean; the first " + MAX_ENTRIES + " of " + owners.size() + " are below, and "
+                        + Failure.quoted(search) + " lists them all:"
+                : "Name the one you mean:";
+        return loaded.declaredBySeveral(requested, message, suggestion,
+                owners.subList(0, Math.min(owners.size(), MAX_ENTRIES)));
     }
 
     private static Failure notInBucket(LoadedPackage loaded, Surface.Scope scope, Options options) {
@@ -337,15 +350,12 @@ public final class Containers {
         if (owners.isEmpty()) {
             return Optional.empty();
         }
-        List<String> commands = owners.keySet().stream()
-                .map(owner -> baseCommand(loaded, owner.scope(), owner) + shellWords(selectors)
-                        + filterArgument(options))
-                .toList();
         List<String> names = owners.keySet().stream().map(Surface.Container::plainName).toList();
-        return Optional.of(loaded.symbolNotFoundAmong(List.of(token), message,
-                "It is a method of " + Texts.and(names) + ": "
-                        + commands.stream().map(Failure::quoted).collect(Collectors.joining(" or ")) + ".",
-                commands));
+        return Optional.of(declaredBySeveral(loaded, List.of(token),
+                message.substring(0, message.length() - 1) + "; it is a method of " + Texts.and(names) + ".",
+                owners.keySet().stream().map(owner -> new Failure.Owner(owner.plainName(),
+                        baseCommand(loaded, owner.scope(), owner) + shellWords(selectors) + filterArgument(options)))
+                        .toList()));
     }
 
     private static Failure misplaced(LoadedPackage loaded, String token, String message, String lead, String command) {

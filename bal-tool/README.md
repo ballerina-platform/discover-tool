@@ -514,11 +514,14 @@ error: 'Listener' is not a client in ballerinax/kafka:4.6.5.
 
 $ bal discover ballerinax/kafka client close
 error: 'close' is declared by Consumer and Producer in ballerinax/kafka:4.6.5.
-  Name the one you mean: `bal discover ballerinax/kafka client Consumer close` or `bal discover ballerinax/kafka client Producer close`.
-  candidates:
-    bal discover ballerinax/kafka client Consumer close
-    bal discover ballerinax/kafka client Producer close
+  Name the one you mean:
+    Consumer  bal discover ballerinax/kafka client Consumer close
+    Producer  bal discover ballerinax/kafka client Producer close
 ```
+
+A name several containers declare has no one command to run, so that failure carries none: its JSON lists each
+container in `owners`, as `{"name", "command"}` rows whose commands open what was named on it (at most 40; past
+that the suggestion quotes the package's `search` for the name).
 
 A service type that declares no methods, and whose package does not describe the ones a service defines,
 answers with its own documentation and the readme sections whose code declares such a service — typed as it;
@@ -747,7 +750,8 @@ carrying `kind`, `message` (the one-sentence headline text mode prints after `er
 package), and `version` (when one was reached) and `module` (when `--module` was passed) are keys of their own.
 When the failure has one fix, the suggestion quotes your whole command with it applied, and `command` holds
 that command, ready to run (`bal discover ballerinax/kafka client --version 4.6.5 Producer` is answered with
-`bal discover ballerinax/kafka:4.6.5 client Producer`):
+`bal discover ballerinax/kafka:4.6.5 client Producer`). When it has several, one per container that declares the
+name, it carries no `command` and lists them in `owners` instead:
 
 ```
 $ bal discover ballerinax/kafka client NoSuchContainer | cat
@@ -755,7 +759,7 @@ $ bal discover ballerinax/kafka client NoSuchContainer | cat
 ```
 
 In text it is `error: <message>`, then the suggestion and anything else the failure carries (schema issues, a
-readme's sections) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
+readme's sections, the owners) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
 
 ```
 $ bal discover ballerina/http:2.15
@@ -778,7 +782,8 @@ listing, a module with no readme — is exit 1.
 A search that matches nothing is an answer, not a failure (exit 0). `upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
 `package-not-found` and `symbol-not-found` need a different command — `symbol-not-found` is a container, member,
 path or type not named exactly as listed, or asked in a bucket that does not hold it (a `--module` the package does not publish
-is `package-not-found` with `module`, and lists the submodules it does in `candidates`); `schema-drift` means Central's payload
+is `package-not-found` with `module`, and lists the submodules it does in `candidates`; a name several containers
+declare lists them in `owners`); `schema-drift` means Central's payload
 changed shape and is for a maintainer; `internal` is a defect in `bal discover` itself, to report with the
 command that produced it. An `upstream` failure's `message` names what failed: the host, or the
 proxy and the `Settings.toml` that sets it. Its `reached` is `true` when Central answered, with an error status

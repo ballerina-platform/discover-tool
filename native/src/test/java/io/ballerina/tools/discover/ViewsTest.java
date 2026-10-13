@@ -366,12 +366,29 @@ public class ViewsTest {
             Result<DiscoverResult> answer = Containers.render(kafka, Surface.Scope.CLIENT,
                     new Containers.Options(List.of(typed)));
             Failure.SymbolNotFound failure = (Failure.SymbolNotFound) answer.failure();
-            Assert.assertEquals(failure.message(), "'" + typed + "' is declared by Caller and Consumer in "
+            Assert.assertEquals(failure.message(), "'commit' is declared by Caller and Consumer in "
                     + kafka.label() + ".");
             Assert.assertNull(failure.command());
-            Assert.assertEquals(failure.candidates(), List.of("bal discover ballerinax/kafka client Caller commit",
-                    "bal discover ballerinax/kafka client Consumer commit"));
+            Assert.assertEquals(failure.candidates(), List.of());
+            Assert.assertEquals(failure.owners(), List.of(
+                    new Failure.Owner("Caller", "bal discover ballerinax/kafka client Caller commit"),
+                    new Failure.Owner("Consumer", "bal discover ballerinax/kafka client Consumer commit")));
         }
+    }
+
+    @Test
+    public void aMemberOfSeveralContainersAskedInAnotherBucketListsEachOwnerAndQuotesNoOneCommand() {
+        LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
+        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) Containers.render(kafka, Surface.Scope.CLASS,
+                new Containers.Options(List.of("close"))).failure();
+        Assert.assertEquals(failure.message(), "'close' is not a class in " + kafka.label()
+                + "; it is a method of Consumer and Producer.");
+        Assert.assertNull(failure.command());
+        Assert.assertEquals(failure.owners().stream().map(Failure.Owner::name).toList(),
+                List.of("Consumer", "Producer"));
+        Assert.assertEquals(failure.describeText(), "error: " + failure.message() + "\n  Name the one you mean:\n"
+                + "    Consumer  bal discover ballerinax/kafka client Consumer close\n"
+                + "    Producer  bal discover ballerinax/kafka client Producer close");
     }
 
     @Test
@@ -607,8 +624,8 @@ public class ViewsTest {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         Failure.SymbolNotFound several = (Failure.SymbolNotFound) Containers.render(http, Surface.Scope.CLIENT,
                 new Containers.Options(List.of(":...path", "get", "extra"))).failure();
-        Assert.assertEquals(several.candidates().size(), 6, several.candidates().toString());
-        Assert.assertTrue(several.candidates().contains("bal discover ballerina/http client Client :...path get"));
+        Assert.assertEquals(several.owners().size(), 6, several.owners().toString());
+        Assert.assertTrue(ownerCommands(several).contains("bal discover ballerina/http client Client :...path get"));
         Result<DiscoverResult> answer = Containers.render(http, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("Client", ":...path", "get", "extra")));
         Failure.Validation unread = (Failure.Validation) answer.failure();
@@ -1263,7 +1280,7 @@ public class ViewsTest {
         Result<DiscoverResult> send = Containers.render(loaded, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("send")));
         Failure.SymbolNotFound both = (Failure.SymbolNotFound) send.failure();
-        Assert.assertEquals(both.candidates(), List.of("bal discover test/pkg client Client send",
+        Assert.assertEquals(ownerCommands(both), List.of("bal discover test/pkg client Client send",
                 "bal discover test/pkg client Other send"));
         Assert.assertEquals(as(DiscoverResult.Signature.class, render(loaded, Surface.Scope.CLIENT,
                 List.of("receive"))).container(), "Client");
@@ -1293,8 +1310,12 @@ public class ViewsTest {
         // command carries what that owner reads, so each runs.
         Failure.SymbolNotFound both = (Failure.SymbolNotFound) Containers.render(loaded, Surface.Scope.CLIENT,
                 new Containers.Options(List.of("foo", "get", "extra"))).failure();
-        Assert.assertEquals(both.candidates(), List.of("bal discover test/pkg client Methods foo",
+        Assert.assertEquals(ownerCommands(both), List.of("bal discover test/pkg client Methods foo",
                 "bal discover test/pkg client Paths foo get"));
+    }
+
+    private static List<String> ownerCommands(Failure.SymbolNotFound failure) {
+        return failure.owners().stream().map(Failure.Owner::command).toList();
     }
 
     /** Sanity: the corpus still has the path shapes these tests reason about. */

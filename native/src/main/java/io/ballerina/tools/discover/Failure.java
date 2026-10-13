@@ -171,9 +171,25 @@ public sealed interface Failure {
      * @param suggestion what to try next
      * @param command the command the suggestion quotes, ready to run, or {@code null} when it quotes none
      * @param candidates every entry of a listing no command prints — a readme's sections — or empty
+     * @param owners when what was named is declared by several containers, each of them with the command that opens
+     *     what was named on it — there is then no single command to run, so {@code command} is {@code null}
      */
     record SymbolNotFound(String qualified, String version, String module, List<String> requested, String message,
-            String suggestion, String command, List<String> candidates) implements Failure { }
+            String suggestion, String command, List<String> candidates, List<Owner> owners) implements Failure {
+
+        public SymbolNotFound(String qualified, String version, String module, List<String> requested,
+                String message, String suggestion, String command, List<String> candidates) {
+            this(qualified, version, module, requested, message, suggestion, command, candidates, List.of());
+        }
+    }
+
+    /**
+     * One of several containers that declare what was named.
+     *
+     * @param name the container's name
+     * @param command the command that opens what was named on it
+     */
+    record Owner(String name, String command) { }
 
     /**
      * A defect in this tool: something in the pipeline threw.
@@ -248,6 +264,11 @@ public sealed interface Failure {
         if (this instanceof SymbolNotFound f && !f.candidates().isEmpty()) {
             lines.add("  candidates:");
             f.candidates().forEach(candidate -> lines.add("    " + candidate));
+        }
+        if (this instanceof SymbolNotFound f) {
+            int width = f.owners().stream().mapToInt(owner -> owner.name().length()).max().orElse(0);
+            f.owners().forEach(owner -> lines.add("    " + owner.name()
+                    + " ".repeat(width - owner.name().length() + 2) + owner.command()));
         }
         return String.join("\n", lines);
     }
@@ -325,6 +346,16 @@ public sealed interface Failure {
                 command(json, f.command());
                 if (!f.candidates().isEmpty()) {
                     json.add("candidates", strings(f.candidates()));
+                }
+                if (!f.owners().isEmpty()) {
+                    JsonArray owners = new JsonArray();
+                    f.owners().forEach(owner -> {
+                        JsonObject row = new JsonObject();
+                        row.addProperty("name", owner.name());
+                        row.addProperty("command", owner.command());
+                        owners.add(row);
+                    });
+                    json.add("owners", owners);
                 }
             }
             case Internal f -> json.addProperty("suggestion", f.suggestion());

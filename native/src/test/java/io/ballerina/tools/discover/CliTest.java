@@ -302,10 +302,12 @@ public class CliTest {
                 centralFor("ballerinax__kafka", "4.6.5")), 1, close.stderr());
         Assert.assertEquals(close.field("kind"), "symbol-not-found", close.stderr());
         Assert.assertFalse(close.failure().has("command"), "no one owner is preferred: " + close.stderr());
-        JsonArray owners = close.failure().getAsJsonArray("candidates");
+        Assert.assertFalse(close.failure().has("candidates"), close.stderr());
+        JsonArray owners = close.failure().getAsJsonArray("owners");
         Assert.assertEquals(owners.size(), 2, close.stderr());
-        Assert.assertEquals(owners.get(0).getAsString(), "bal discover ballerinax/kafka client Consumer close");
-        Assert.assertEquals(owners.get(1).getAsString(), producer + " close");
+        Assert.assertEquals(owners.get(0).toString(), "{\"name\":\"Consumer\",\"command\":\"bal discover "
+                + "ballerinax/kafka client Consumer close\"}");
+        Assert.assertEquals(owners.get(1).getAsJsonObject().get("command").getAsString(), producer + " close");
     }
 
     @Test
@@ -1018,13 +1020,11 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "'commit"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true), 1);
-        Assert.assertEquals(capture.stderr(), "error: ''commit' is declared by Caller and Consumer in "
+        Assert.assertEquals(capture.stderr(), "error: 'commit' is declared by Caller and Consumer in "
                 + "ballerinax/kafka:4.6.5.\n"
-                + "  Name the one you mean: `bal discover ballerinax/kafka client Caller commit` or "
-                + "`bal discover ballerinax/kafka client Consumer commit`.\n"
-                + "  candidates:\n"
-                + "    bal discover ballerinax/kafka client Caller commit\n"
-                + "    bal discover ballerinax/kafka client Consumer commit\n");
+                + "  Name the one you mean:\n"
+                + "    Caller    bal discover ballerinax/kafka client Caller commit\n"
+                + "    Consumer  bal discover ballerinax/kafka client Consumer commit\n");
     }
 
     @Test
