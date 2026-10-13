@@ -383,6 +383,9 @@ public sealed interface DiscoverResult {
      * @param types the declarations its signature names, one level deep
      * @param omitted every declaration it names that {@code types} does not print, each with its command
      * @param foreign the declarations from other packages that {@code types} name
+     * @param create how to construct the container a method is called on, or {@code null} for a function, a
+     *     constructor, a service type, or a container with no constructor
+     * @param callers the readme sections whose code calls it, or empty
      * @param documented other entries a {@code --filter} matched only in their documentation
      * @param paging which page of {@code documented} this is, or {@code null} when it fit on one
      * @param next the ready-to-run command that turns {@code documented}'s page, or {@code null} on the last
@@ -392,9 +395,17 @@ public sealed interface DiscoverResult {
     record Signature(
             String container, String kind, String name, String accessor, String path, String form,
             String declaration, List<Parameter> params, String returns, boolean deprecated,
-            List<Type> types, List<Method> omitted, List<Foreign> foreign,
-            Documented documented, Paging paging,
+            List<Type> types, List<Method> omitted, List<Foreign> foreign, Create create,
+            List<ReadmeSections.Section> callers, Documented documented, Paging paging,
             String next, String warning, String note) implements DiscoverResult {
+
+        /**
+         * One line of Ballerina that constructs the container, and the command that opens its constructor.
+         *
+         * @param code the line, e.g. {@code kafka:Producer producer = check new (string|string[] bootstrapServers);}
+         * @param command the command that opens the constructor's own signature
+         */
+        public record Create(String code, String command) { }
 
         /**
          * @param name the parameter's name

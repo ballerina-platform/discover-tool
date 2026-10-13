@@ -423,6 +423,10 @@ public final class TextRenderer {
 
     private static void signature(Layout layout, DiscoverResult.Signature signature) {
         layout.block(List.of(signature.declaration()));
+        if (signature.create() != null) {
+            layout.block(List.of("Create it", INDENT + signature.create().code(),
+                    INDENT + signature.create().command()));
+        }
         List<DiscoverResult.Signature.Type> types = signature.types();
         for (int i = 0; i < types.size(); i++) {
             List<String> block = new ArrayList<>();
@@ -433,6 +437,10 @@ public final class TextRenderer {
             layout.block(block);
         }
         closureTail(layout, signature.omitted(), signature.foreign());
+        TextTable callers = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        signature.callers().forEach(section ->
+                callers.row(String.valueOf(section.number()), section.title(), section.command()));
+        layout.section("Readme sections that call it", callers);
         List<String> documentedDrill = documented(layout, signature.documented());
         layout.notices(signature.note(), signature.warning());
         layout.more(remaining(signature.documented().names().size(), signature.documented().total(),

@@ -521,7 +521,7 @@ public class DiscoverResultRenderingTest {
                 List.of(new DiscoverResult.Signature.Parameter("headers", "map<string|string[]>", "{}", null, ""),
                         new DiscoverResult.Signature.Parameter(
                                 "queries", "GistsListPublicQueries", null, "inclusion", "Queries to send")),
-                "BaseGist[]|error", false, types, omitted, List.of(),
+                "BaseGist[]|error", false, types, omitted, List.of(), null, List.of(),
                 DiscoverResult.Documented.NONE, null, null, null, note);
     }
 
@@ -530,7 +530,7 @@ public class DiscoverResultRenderingTest {
         String command = "bal discover pkg client Client echo --filter the";
         DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
-                false, List.of(), List.of(), List.of(),
+                false, List.of(), List.of(), List.of(), null, List.of(),
                 new DiscoverResult.Documented(
                         List.copyOf(methods("bal discover pkg client Client", "ping", "auth")), 82),
                 new DiscoverResult.Paging(2, 3, 2),
@@ -553,7 +553,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.Signature("Client", "remote", "echo", null, null, "->",
                 "remote isolated function echo(string echoStr) returns string|error;", List.of(), "string|error",
                 false, List.of(), List.of(new DiscoverResult.Method("Gist", "bal discover pkg type Gist")),
-                List.of(),
+                List.of(), null, List.of(),
                 new DiscoverResult.Documented(List.copyOf(methods("bal discover pkg client Client", "ping")), 41),
                 new DiscoverResult.Paging(1, 2, 1),
                 command + " --page 2", null, null);

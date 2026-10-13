@@ -889,12 +889,16 @@ public final class Containers {
             case Fn.Standalone standalone -> Identifiers.plain(standalone.name());
             case Fn.Constructor ignored -> Fn.Constructor.NAME;
         };
+        DiscoverResult.Signature.Create create = fn instanceof Fn.Constructor
+                ? null
+                : Construction.of(loaded, container, baseCommand(loaded, scope, container) + " "
+                        + Fn.Constructor.NAME).orElse(null);
         return Result.ok(new DiscoverResult.Signature(
                 container.isModule() ? null : container.plainName(), kind, name,
                 fn instanceof Fn.Resource resource ? resource.accessor() : null,
                 fn instanceof Fn.Resource ? PathTree.join(entry.path()) : null,
                 entry.callForm(), declaration, params, Signatures.returnType(fn), fn.isDeprecated(),
-                types, omitted, foreign,
+                types, omitted, foreign, create, List.of(),
                 documentedOn(window, documented, 0), window.paging(), window.next(command),
                 loaded.warning(), note));
     }
