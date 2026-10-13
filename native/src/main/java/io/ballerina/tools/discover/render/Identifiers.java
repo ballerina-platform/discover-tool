@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover.render;
 
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * An identifier, as Ballerina spells it.
@@ -57,7 +58,20 @@ public final class Identifiers {
             "start", "stream", "string", "table", "transaction", "transactional", "true", "type", "typedesc",
             "var", "wait", "where", "while", "worker", "xml", "xmlns");
 
+    private static final Pattern QUOTE = Pattern.compile("^'");
+
+    private static final Pattern ESCAPE = Pattern.compile("\\\\(?=[^A-Za-z0-9_])");
+
     private Identifiers() {
+    }
+
+    /**
+     * The identifier without Ballerina's escapes — {@code 'public} is {@code public}, {@code code\-scanning} is
+     * {@code code-scanning}: the same identifier, spelled as prose and a shell argument spell it. What every name and
+     * path this tool prints is, and what a typed one is compared as, so either spelling reaches the same thing.
+     */
+    public static String plain(String name) {
+        return ESCAPE.matcher(QUOTE.matcher(name).replaceFirst("")).replaceAll("");
     }
 
     /** The name, quoted if the language would otherwise read it as a keyword. */

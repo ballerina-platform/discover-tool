@@ -74,23 +74,23 @@ ballerinax/slack · type
 436 records, 70 aliases, 1 client
 
 Records
-  '200200200200AnyOf12234                                        bal discover ballerinax/slack type "'200200200200AnyOf12234"
-  '200200200AnyOf1123                                            bal discover ballerinax/slack type "'200200200AnyOf1123"
-  '200200200AnyOf1223                                            bal discover ballerinax/slack type "'200200200AnyOf1223"
-  '200200AnyOf112                                                bal discover ballerinax/slack type "'200200AnyOf112"
-  '200200AnyOf12                                                 bal discover ballerinax/slack type "'200200AnyOf12"
-  '200200AnyOf122                                                bal discover ballerinax/slack type "'200200AnyOf122"
-  '200AnyOf1                                                     bal discover ballerinax/slack type "'200AnyOf1"
-  '200AnyOf11                                                    bal discover ballerinax/slack type "'200AnyOf11"
-  '200AnyOf12                                                    bal discover ballerinax/slack type "'200AnyOf12"
-  '200Team                                                       bal discover ballerinax/slack type "'200Team"
-  '200Team1                                                      bal discover ballerinax/slack type "'200Team1"
-  '200Team2                                                      bal discover ballerinax/slack type "'200Team2"
-  '200Team3                                                      bal discover ballerinax/slack type "'200Team3"
-  '200User                                                       bal discover ballerinax/slack type "'200User"
-  '200User1                                                      bal discover ballerinax/slack type "'200User1"
-  '200User2                                                      bal discover ballerinax/slack type "'200User2"
-  '200User3                                                      bal discover ballerinax/slack type "'200User3"
+  200200200200AnyOf12234
+  200200200AnyOf1123
+  200200200AnyOf1223
+  200200AnyOf112
+  200200AnyOf12
+  200200AnyOf122
+  200AnyOf1
+  200AnyOf11
+  200AnyOf12
+  200Team
+  200Team1
+  200Team2
+  200Team3
+  200User
+  200User1
+  200User2
+  200User3
   AdminAppsApproveBody
   AdminAppsApprovedListQueries
   AdminAppsRequestsListQueries

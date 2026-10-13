@@ -228,9 +228,9 @@ public class CliTest {
                         "createInterceptors", "junk"), "junk",
                         "bal discover ballerina/http service InterceptableService createInterceptors"),
                 new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "gists/'public",
-                        "get", "extra"), "extra", gists + " \"gists/'public\" get"),
+                        "get", "extra"), "extra", gists + " gists/public get"),
                 new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "get",
-                        "gists/'public", "extra"), "extra", gists + " get \"gists/'public\""),
+                        "gists/'public", "extra"), "extra", gists + " get gists/public"),
                 new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "get", "repos",
                         ":owner", ":repo"), ":owner", gists + " get repos"))) {
             String label = String.join(" ", unread.argv());
@@ -334,7 +334,7 @@ public class CliTest {
             Assert.assertEquals(capture.stdout(), "", label);
             Assert.assertEquals(capture.field("kind"), "symbol-not-found", label);
             Assert.assertFalse(capture.failure().has("candidates"), capture.stderr());
-            String reached = selectors.contains("gists") ? "gists" : "\"gists/'public\"";
+            String reached = selectors.contains("gists") ? "gists" : "gists/public";
             Assert.assertEquals(capture.field("command"), client + " " + reached, label);
         }
         Capture split = new Capture();
@@ -377,13 +377,13 @@ public class CliTest {
 
     @Test
     public void aPathAndItsAccessorAreBothReadInEitherOrderButNeverAsOneArgument() {
-        for (List<String> selectors : List.of(List.of("gists/'public", "get"), List.of("get", "gists/'public"))) {
+        for (List<String> selectors : List.of(List.of("gists/'public", "get"), List.of("get", "gists/public"))) {
             List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
             argv.addAll(selectors);
             JsonObject json = JsonParser.parseString(
                     run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
                     .getAsJsonObject();
-            Assert.assertEquals(json.get("path").getAsString(), "gists/'public", String.join(" ", argv));
+            Assert.assertEquals(json.get("path").getAsString(), "gists/public", String.join(" ", argv));
             Assert.assertEquals(json.get("accessor").getAsString(), "get", String.join(" ", argv));
         }
         Capture one = new Capture();
@@ -1218,7 +1218,7 @@ public class CliTest {
         Capture quoted = new Capture();
         Cli.run(unpaged.get(2), quoted.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
         Assert.assertEquals(quoted.field("suggestion"),
-                "Drop --page: `bal discover ballerinax/github client Client \"gists/'public\" get`.");
+                "Drop --page: `bal discover ballerinax/github client Client gists/public get`.");
 
         Capture oneGroupedPage = new Capture();
         Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "--page", "2"),

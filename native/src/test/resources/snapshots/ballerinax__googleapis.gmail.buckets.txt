@@ -14,9 +14,9 @@ ballerinax/googleapis.gmail · client · Client
   users/:userId/messages/:id/trash                   post
   users/:userId/messages/:id/untrash                 post
   users/:userId/messages/:messageId/attachments/:id  get
-  users/:userId/messages/'import                     post                     bal discover ballerinax/googleapis.gmail client Client "users/:userId/messages/'import" post
   users/:userId/messages/batchDelete                 post
   users/:userId/messages/batchModify                 post
+  users/:userId/messages/import                      post
   users/:userId/messages/send                        post
   users/:userId/profile                              get
   users/:userId/threads                              get

@@ -22,6 +22,7 @@ import io.ballerina.tools.discover.model.ClientClass;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.TypeDef;
 import io.ballerina.tools.discover.model.TypeRef;
+import io.ballerina.tools.discover.render.Identifiers;
 import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.PathTree;
 import org.testng.Assert;
@@ -80,12 +81,12 @@ public class SymbolsTest {
     public void aSegmentReadsInProseWithoutTheEscapingItNeedsInSource() {
         // Central publishes github's paths as Ballerina writes them. Those spellings are right inside a fence
         // and unusable as a shell argument, which is where the agent has to type them.
-        Assert.assertEquals(PathTree.readableSegment("code\\-scanning"), "code-scanning");
-        Assert.assertEquals(PathTree.readableSegment("'import"), "import");
-        Assert.assertEquals(PathTree.readableSegment("app\\-manifests"), "app-manifests");
-        Assert.assertEquals(PathTree.readableSegment("rate_limit"), "rate_limit",
+        Assert.assertEquals(Identifiers.plain("code\\-scanning"), "code-scanning");
+        Assert.assertEquals(Identifiers.plain("'import"), "import");
+        Assert.assertEquals(Identifiers.plain("app\\-manifests"), "app-manifests");
+        Assert.assertEquals(Identifiers.plain("rate_limit"), "rate_limit",
                 "an underscore needs no escaping and keeps none");
-        Assert.assertEquals(PathTree.readableSegment("repos"), "repos");
+        Assert.assertEquals(Identifiers.plain("repos"), "repos");
     }
 
     @Test
@@ -93,10 +94,11 @@ public class SymbolsTest {
         PathTree tree = github();
         Assert.assertTrue(PathTree.resolve(tree, PathTree.splitPath("repos/:owner/:repo/code-scanning"))
                 instanceof PathTree.Resolution.Found);
-        Assert.assertTrue(PathTree.resolve(tree, PathTree.splitPath("gists/'public"))
-                instanceof PathTree.Resolution.Found, "a keyword segment keeps its escape");
-        for (String spelling : new String[] {
-                "repos/:owner/:repo/code\\-scanning", "gists/public", "repos/*/*", "repos/{owner}/{repo}",
+        for (String spelling : new String[] {"gists/public", "gists/'public", "repos/:owner/:repo/code\\-scanning"}) {
+            Assert.assertTrue(PathTree.resolve(tree, PathTree.splitPath(spelling)) instanceof PathTree.Resolution.Found,
+                    spelling + ": Ballerina's escape spells the same segment");
+        }
+        for (String spelling : new String[] {"repos/*/*", "repos/{owner}/{repo}",
                 "repos/owner/repo", "repos/[owner]/[repo]", "repos/[string owner]/[string repo]", "Repos",
                 "/repos", "repos/"}) {
             Assert.assertTrue(PathTree.resolve(tree, PathTree.splitPath(spelling))
