@@ -105,6 +105,13 @@ public record LoadedPackage(
                 suggestion, command, List.of());
     }
 
+    /** A name several containers declare: the failure carries each one, with the command that opens it there. */
+    public Failure declaredBySeveral(List<String> requested, String message, String suggestion,
+            List<Failure.Owner> owners) {
+        return new Failure.SymbolNotFound(qualified.qualified(), version.text(), module, requested, message,
+                suggestion, null, List.of(), owners);
+    }
+
     /** A miss in a listing no command prints, so the failure itself carries every entry of it. */
     public Failure symbolNotFoundAmong(List<String> requested, String message, String suggestion,
             List<String> candidates) {
