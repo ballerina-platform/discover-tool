@@ -599,7 +599,8 @@ public sealed interface DiscoverResult {
             RESOURCES("resources", "resource method", "resource methods"),
             METHODS("methods", "method", "methods"),
             TYPES("types", "type", "types"),
-            README("readme", "readme section", "readme sections");
+            README("readme", "readme section", "readme sections"),
+            SUBMODULES("submodules", "submodule", "submodules");
 
             private final String key;
             private final String noun;

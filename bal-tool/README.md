@@ -645,10 +645,12 @@ Next: bal discover ballerinax/kafka readme <n>
 `bal discover <org>/<package> search <keyword> ...` finds names inside one package, locally, with nothing sent
 to Central. Each keyword is matched as a case-insensitive substring, and a name matches when every keyword does.
 The names are a container's, a listener's, a function's or a type's own name, a method's own name (not its
-container's), a resource method's path and accessor (`repos/:owner/:repo/issues post`), and a readme section's
-title, all read without Ballerina's escapes. It reads names only, never parameters or documentation (that is
-`--filter`, inside a bucket). Matches are grouped by kind — clients, service types, classes, listeners,
-functions, remote methods, resource methods, methods, types, readme sections — and paged as one sequence under
+container's), a resource method's path and accessor (`repos/:owner/:repo/issues post`), a readme section's
+title and a submodule's name, all read without Ballerina's escapes. It reads names only, never parameters or
+documentation (that is `--filter`, inside a bucket), and only the module being read: a submodule whose name
+matches is listed with the command that opens it, the place to search next. Matches are grouped by kind —
+clients, service types, classes, listeners, functions, remote methods, resource methods, methods, types, readme
+sections, submodules — and paged as one sequence under
 the 40-entry ceiling. No match is an answer (exit 0) pointing at the package's overview. `--filter <keyword>` on
 the bare package runs the same search.
 
@@ -716,7 +718,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`) |
 | empty bucket                         | `bucket`, `total`, `elsewhere` (`bucket`, `count`, `command`)                                                       |
 | one service type                     | `container`, `note`, `warning`; when the package describes the methods a service defines, `handlers` (`name`, or `id` for a shape a service names itself, as `rules` refer to it, `kind`, `signature`, `required`, `repeatable`, `accessors`, `doc`, `deprecated`, `params`, `returns`) and `rules` (`requirement`, `handlers`, `message`); when it declares none and describes none, `methods` (empty), `description`, `examples` (`number`, `title`, `lines`, `command`) and `next` (the readme) when no section declares one |
-| search in a package                  | `keywords`, then per kind with a match `clients`, `serviceTypes`, `classes`, `listeners`, `functions` (`name`, `command`), `remote`, `methods` (`container`, `name`, `command`), `resources` (`container`, `path`, `accessor`, `command`), `types` (`name`, `kind`, `command`), `readme` (`number`, `title`, `command`); `counts` (per kind), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and `overview` when nothing matched |
+| search in a package                  | `keywords`, then per kind with a match `clients`, `serviceTypes`, `classes`, `listeners`, `functions` (`name`, `command`), `remote`, `methods` (`container`, `name`, `command`), `resources` (`container`, `path`, `accessor`, `command`), `types` (`name`, `kind`, `command`), `readme` (`number`, `title`, `command`), `submodules` (`name`, `command`); `counts` (per kind), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and `overview` when nothing matched |
 | search of Central                    | `keywords`, `packages` (`entries` (`qualified`, `version`, `summary`, `command`), `shown`, `total`), `symbols` (`entries` (`qualified`, `version`, `module`, `kind`, `container`, `name` or, for a resource method, `path` and `accessor`, `command`), `shown`, `total`), `page`, `pages`, `remaining`, `next`; it names no one package, so it has no `qualified` |
 | readme                               | `readme`, `lines`, and `section`, `of`, `title` for one section                                                  |
 | readme sections                      | `sections` (`number`, `title`, `lines`, `command`), `matching` (true when narrowed by `--filter` or a title), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
