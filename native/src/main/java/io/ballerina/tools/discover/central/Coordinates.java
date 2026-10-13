@@ -74,19 +74,26 @@ public final class Coordinates {
      * module, at that version, flagged as NOT its package's default, and naming THIS package's default module
      * among its {@code relatedModules} whenever that list has a readable entry. The flag tells a submodule apart
      * from a separately published package that shares the dotted name ({@code ballerinax/aws.s3} is a package, not
-     * a module of {@code ballerinax/aws}), so here an absent flag is not good enough. The related default module
-     * tells it apart from a submodule of a DIFFERENT package that shares the prefix: with {@code org/a.b} a package
-     * publishing {@code c}, {@code org/a --module b.c} reaches {@code a.b}'s page, whose default module is
-     * {@code a.b}, not {@code a}.
+     * a module of {@code ballerinax/aws}). The related default module tells it apart from a submodule of a
+     * DIFFERENT package that shares the prefix: with {@code org/a.b} a package publishing {@code c},
+     * {@code org/a --module b.c} reaches {@code a.b}'s page, whose default module is {@code a.b}, not {@code a}.
+     *
+     * <p>Pages Central published before it flagged modules ({@code kanishka/github} 0.99.18) carry no
+     * {@code isDefaultModule} anywhere. Such a page is a submodule's only when its {@code relatedModules} name this
+     * package's own module, unflagged too: the module list then says what the flag would have.
      */
     public static boolean isModulePage(JsonElement raw, QualifiedName qualified, String submodule, Version version) {
         String id = qualified.name() + "." + submodule;
         for (JsonObject module : modules(raw)) {
-            if (id.equals(Json.string(module, Schema.ID))
-                    && qualified.org().equals(Json.string(module, Schema.ORG_NAME))
-                    && version.text().equals(Json.string(module, Schema.VERSION))
-                    && flagged(module, Schema.IS_DEFAULT_MODULE, false)
-                    && namesDefaultModule(module, qualified)) {
+            if (!id.equals(Json.string(module, Schema.ID))
+                    || !qualified.org().equals(Json.string(module, Schema.ORG_NAME))
+                    || !version.text().equals(Json.string(module, Schema.VERSION))) {
+                continue;
+            }
+            if (flagged(module, Schema.IS_DEFAULT_MODULE, false) && namesDefaultModule(module, qualified)) {
+                return true;
+            }
+            if (!module.has(Schema.IS_DEFAULT_MODULE) && namesUnflaggedDefaultModule(module, qualified)) {
                 return true;
             }
         }
@@ -95,14 +102,26 @@ public final class Coordinates {
 
     // No readable entries counts as a match: drift in relatedModules must not reject every real module page.
     private static boolean namesDefaultModule(JsonObject module, QualifiedName qualified) {
-        List<JsonObject> readable = objectsIn(module, Schema.RELATED_MODULES).orElse(List.of()).stream()
+        List<JsonObject> readable = readableRelated(module);
+        return readable.isEmpty() || readable.stream().anyMatch(entry -> isPackageModule(entry, qualified)
+                && flagged(entry, Schema.IS_DEFAULT_MODULE, true));
+    }
+
+    private static boolean namesUnflaggedDefaultModule(JsonObject module, QualifiedName qualified) {
+        return readableRelated(module).stream().anyMatch(entry -> isPackageModule(entry, qualified)
+                && !entry.has(Schema.IS_DEFAULT_MODULE));
+    }
+
+    private static List<JsonObject> readableRelated(JsonObject module) {
+        return objectsIn(module, Schema.RELATED_MODULES).orElse(List.of()).stream()
                 .filter(entry -> Json.string(entry, Schema.ID) != null
                         && Json.string(entry, Schema.ORG_NAME) != null)
                 .toList();
-        return readable.isEmpty() || readable.stream().anyMatch(entry ->
-                qualified.name().equals(Json.string(entry, Schema.ID))
-                        && qualified.org().equals(Json.string(entry, Schema.ORG_NAME))
-                        && flagged(entry, Schema.IS_DEFAULT_MODULE, true));
+    }
+
+    private static boolean isPackageModule(JsonObject entry, QualifiedName qualified) {
+        return qualified.name().equals(Json.string(entry, Schema.ID))
+                && qualified.org().equals(Json.string(entry, Schema.ORG_NAME));
     }
 
     private static boolean flagged(JsonObject owner, String key, boolean expected) {
