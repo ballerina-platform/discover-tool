@@ -1490,6 +1490,44 @@ public class CliTest {
         Assert.assertFalse(bare.stdout().contains("dataloader"), bare.stdout());
     }
 
+    private static FakeTransport kanishkaCentral(JsonElement webhook) {
+        return FakeTransport.routing(url -> {
+            if (url.endsWith("/docs/kanishka/github.webhook/0.99.18")) {
+                return FakeTransport.ok(webhook.toString());
+            }
+            return url.endsWith("/registry/packages/kanishka/github")
+                    ? FakeTransport.ok("[\"0.99.18\"]")
+                    : FakeTransport.status(404);
+        });
+    }
+
+    @Test
+    public void aModulePageFromBeforeCentralFlaggedModulesIsReadWhenItsModulesNameThisPackage() {
+        // kanishka/github 0.99.18's pages carry no isDefaultModule at all, on the module or its relatedModules.
+        JsonElement page = FixtureCorpus.loadRawModulePage("kanishka__github.webhook");
+        JsonObject module = page.getAsJsonObject().getAsJsonObject("docsData").getAsJsonArray("modules").get(0)
+                .getAsJsonObject();
+        Assert.assertFalse(module.has("isDefaultModule"));
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("kanishka/github:0.99.18", "--module", "webhook", "type", "Issue"),
+                capture.streams(), options(kanishkaCentral(page))), 0, capture.stderr());
+        Assert.assertTrue(capture.stdout().contains("\"name\":\"Issue\""), capture.stdout());
+
+        JsonObject foreign = page.deepCopy().getAsJsonObject();
+        JsonObject foreignModule = foreign.getAsJsonObject("docsData").getAsJsonArray("modules").get(0)
+                .getAsJsonObject();
+        for (JsonElement related : foreignModule.getAsJsonArray("relatedModules")) {
+            JsonObject entry = related.getAsJsonObject();
+            if (entry.get("id").getAsString().equals("github")) {
+                entry.addProperty("id", "github.other");
+            }
+        }
+        Capture rejected = new Capture();
+        Assert.assertEquals(Cli.run(List.of("kanishka/github:0.99.18", "--module", "webhook"), rejected.streams(),
+                options(kanishkaCentral(foreign))), 1, rejected.stdout());
+        Assert.assertEquals(rejected.field("kind"), "package-not-found", rejected.stderr());
+    }
+
     @Test
     public void aModulePagePublishedBeforeApiDocsVersionExistedIsStillRead() {
         // graphql 1.8.0's pages carry only docsData and searchData, and a Dependencies.toml lock can still name
