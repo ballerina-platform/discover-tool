@@ -99,12 +99,15 @@ $ bal discover ballerinax/kafka | cat
 {"qualified":"ballerinax/kafka","version":"4.6.5","clients":{"entries":[{"name":"Caller","remote":3,"command":"bal discover ballerinax/kafka client Caller"},{"name":"Consumer","remote":24,"command":"bal discover ballerinax/kafka client Consumer"},{"name":"Producer","remote":5,"command":"bal discover ballerinax/kafka client Producer"}],"shown":3,"total":3,"command":"bal discover ballerinax/kafka client"},"serviceTypes":{"entries":[{"name":"Service","command":"bal discover ballerinax/kafka service Service"}],"shown":1,"total":1,"command":"bal discover ballerinax/kafka service"},"classes":{"entries":[{"name":"AvroDeserializer","normal":1,"command":"bal discover ballerinax/kafka class AvroDeserializer"},{"name":"AvroSerializer","normal":1,"command":"bal discover ballerinax/kafka class AvroSerializer"},{"name":"Deserializer","normal":1,"command":"bal discover ballerinax/kafka class Deserializer"},{"name":"Serializer","normal":1,"command":"bal discover ballerinax/kafka class Serializer"}],"shown":4,"total":4,"command":"bal discover ballerinax/kafka class"},"types":{"counts":{"records":14,"enums":3,"errors":3,"aliases":8,"constants":29,"annotations":1,"listeners":1},"command":"bal discover ballerinax/kafka type"},"readme":{"sections":11,"command":"bal discover ballerinax/kafka readme"}}
 ```
 
-The overview stays inside the 40-row ceiling: a bucket shows at most 10 rows, the type and readme lines are a
-row each, and submodules are never cut (no other answer lists them). If that still comes to more than 40 rows,
-the section showing the most gives up one row at a time (the later bucket on a tie) until it fits. A cut
-section ends with `... N more: <command>`, the command that lists the bucket whole; in JSON each section has
-`shown`, `total` and that `command`. `ballerina/http`, the largest overview measured, shows 10 of 10 clients,
-7 service types, 10 of 83 classes and 7 functions.
+The overview stays inside the 40-row ceiling: a bucket shows at most 10 rows, the type and readme lines are a row
+each, and submodules are never cut (no other answer lists them). If that still comes to more than 40 rows, the
+section showing the most gives up one row at a time (the later bucket on a tie) until it fits. A cut section ends
+with `... N more: <command>`, the command that lists the bucket whole; in JSON each section has `shown`, `total`
+and that `command`. A section's rows are ordered by how often the module's readme uses each name (a whole
+identifier in the readme's code: fenced blocks and inline code spans; prose words never count. `http:Client` uses
+`Client` in `ballerina/http` but not in another module, and `ClientConfiguration` never does), most used first;
+ties and names it never uses stay alphabetical. `ballerina/http`, the largest overview measured, shows 10 of 10
+clients, 7 service types, 10 of 83 classes and 7 functions.
 
 A package with exactly one client is most often used through it, so the overview opens it in place: under its row
 is page 1 of `client <name>`, grouped and paged by that answer's own rules (at most 40 entries; `ballerinax/github`'s
@@ -739,10 +742,10 @@ documentation-only matches if it has any.
 
 ### Order
 
-Every listing is alphabetical: containers in a roster, service types under their listener (and the listeners
-themselves), methods, resource paths and `type` declarations within their kind. The exception is a level of path
-groups, which goes by the number of resource methods under each, largest first (alphabetical among equals), because it is
-read to choose where to go next.
+Every listing is alphabetical (an overview's rows go by readme usage, above): containers in a roster, service types
+under their listener (and the listeners themselves), methods, resource paths and `type` declarations within their
+kind. The exception is a level of path groups, which goes by the number of resource methods under each, largest
+first (alphabetical among equals), because it is read to choose where to go next.
 
 ### The entry ceiling
 

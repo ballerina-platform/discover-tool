@@ -59,6 +59,8 @@ public final class Readme {
     private static final String FENCE_BACKTICKS = "```";
     private static final String FENCE_TILDES = "~~~";
     private static final String LINE_BREAK = "\\r?\\n";
+    private static final Pattern INLINE_CODE =
+            Pattern.compile("(?<![`\\\\])(`+)(?!`)(.+?)(?<!`)\\1(?!`)", Pattern.DOTALL);
     private static final Pattern HEADING =
             Pattern.compile("^ {0,3}#{1,6}(?:[ \\t]+(.*?))?(?:[ \\t]+#+)?[ \\t]*$");
 
@@ -180,6 +182,56 @@ public final class Readme {
         }
         flush(sections, title, body);
         return List.copyOf(sections);
+    }
+
+    /** Every fenced block of {@code markdown}, its lines joined, the fence lines themselves left out. */
+    static String fencedCodeOf(String markdown) {
+        StringBuilder code = new StringBuilder();
+        scan(markdown, code, null);
+        return code.toString();
+    }
+
+    /** {@link #fencedCodeOf} and every inline code span of the prose, a span never crossing a paragraph. */
+    static String codeOf(String markdown) {
+        StringBuilder code = new StringBuilder();
+        StringBuilder spans = new StringBuilder();
+        scan(markdown, code, spans);
+        return code.append(spans).toString();
+    }
+
+    // Fenced lines go to `fenced`; when `spans` is given, each prose paragraph's inline code spans go to it.
+    private static void scan(String markdown, StringBuilder fenced, StringBuilder spans) {
+        StringBuilder paragraph = new StringBuilder();
+        String fence = null;
+        for (String line : markdown.split(LINE_BREAK, -1)) {
+            String stripped = line.stripLeading();
+            if (fence != null) {
+                if (closesFence(stripped, fence)) {
+                    fence = null;
+                } else {
+                    fenced.append(line).append('\n');
+                }
+                continue;
+            }
+            fence = openedFence(stripped);
+            if (fence != null || stripped.isBlank()) {
+                spansOf(paragraph, spans);
+                paragraph.setLength(0);
+            } else {
+                paragraph.append(line).append('\n');
+            }
+        }
+        spansOf(paragraph, spans);
+    }
+
+    private static void spansOf(CharSequence paragraph, StringBuilder spans) {
+        if (spans == null) {
+            return;
+        }
+        Matcher span = INLINE_CODE.matcher(paragraph);
+        while (span.find()) {
+            spans.append(span.group(2)).append('\n');
+        }
     }
 
     // The fence's marker run (``` or ~~~, possibly longer) when the line opens one, else null.
