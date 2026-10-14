@@ -118,19 +118,19 @@ public class SelectionCarryTest {
     }
 
     @Test
-    public void aPageOutsideTheListingIsAUsageFailureNamingTheRange() {
+    public void aPageOutsideTheListingIsNotFoundNamingTheRange() {
         Run run = run("ballerinax__twilio", "bal discover client Client -p ballerinax/twilio --page 6");
-        Assert.assertEquals(run.code(), Failure.USAGE, run.out());
+        Assert.assertEquals(run.code(), Failure.NOT_FOUND, run.out());
         Assert.assertEquals(run.out(), "");
         JsonObject failure = JsonParser.parseString(run.err()).getAsJsonObject();
-        Assert.assertEquals(failure.get("kind").getAsString(), "validation");
+        Assert.assertEquals(failure.get("kind").getAsString(), "page-not-found");
         Assert.assertTrue(failure.get("message").getAsString().contains("5 pages"), run.err());
         Assert.assertTrue(failure.get("suggestion").getAsString()
                 .contains("bal discover client Client -p ballerinax/twilio --page 5"), run.err());
         Run readme = run("ballerinax__kafka", "bal discover readme -p ballerinax/kafka --filter kafka --page 9");
-        Assert.assertEquals(readme.code(), Failure.USAGE, readme.out());
+        Assert.assertEquals(readme.code(), Failure.NOT_FOUND, readme.out());
         Assert.assertEquals(JsonParser.parseString(readme.err()).getAsJsonObject().get("kind").getAsString(),
-                "validation");
+                "page-not-found");
     }
 
     @Test
@@ -368,10 +368,10 @@ public class SelectionCarryTest {
                 "page 2 widened back out to the whole client");
 
         Run outside = run(http, HTTP + " --page 4");
-        Assert.assertEquals(outside.code(), Failure.USAGE, outside.out());
+        Assert.assertEquals(outside.code(), Failure.NOT_FOUND, outside.out());
         Assert.assertEquals(outside.out(), "");
         JsonObject failure = JsonParser.parseString(outside.err()).getAsJsonObject();
-        Assert.assertEquals(failure.get("kind").getAsString(), "validation");
+        Assert.assertEquals(failure.get("kind").getAsString(), "page-not-found");
         Assert.assertTrue(failure.get("message").getAsString().contains("3 pages"), outside.err());
         Assert.assertTrue(failure.get("suggestion").getAsString().contains(HTTP + " --page 3"), outside.err());
     }

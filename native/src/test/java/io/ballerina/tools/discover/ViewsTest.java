@@ -1089,14 +1089,14 @@ public class ViewsTest {
     }
 
     @Test
-    public void aTypePageOutOfRangeIsAValidationFailureNamingTheRange() {
+    public void aTypePageOutOfRangeIsNotFoundNamingTheRange() {
         Result<DiscoverResult> page = Types.render(FixtureCorpus.loadedFixture("ballerinax__kafka"),
                 new Types.Options(List.of(), null, 9));
         Assert.assertFalse(page.isOk());
-        Assert.assertEquals(page.failure(), new Failure.Validation(
+        Assert.assertEquals(page.failure(), new Failure.PageNotFound(
                 "Page 9 is out of range: this listing has 67 entries on 2 pages.",
                 "Pass a page from 1 to 2, e.g. `bal discover type -p ballerinax/kafka --page 2`.",
-                "bal discover type -p ballerinax/kafka --page 2"));
+                "bal discover type -p ballerinax/kafka --page 2", 9, 2));
     }
 
     @Test

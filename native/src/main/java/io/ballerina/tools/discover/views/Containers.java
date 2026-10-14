@@ -117,13 +117,14 @@ public final class Containers {
             int pages = Math.max(1, (total + MAX_ENTRIES - 1) / MAX_ENTRIES);
             if (requested < 1 || requested > pages) {
                 String fixed = command.paged(pages).text();
-                return Result.err(new Failure.Validation(
-                        "Page " + requested + " is out of range: this listing has " + total + " entries on "
-                                + pages + (pages == 1 ? " page." : " pages."),
-                        pages == 1
-                                ? "This listing has only one page; drop --page: " + Failure.quoted(fixed) + "."
-                                : "Pass a page from 1 to " + pages + ", e.g. " + Failure.quoted(fixed) + ".",
-                        fixed));
+                String message = "Page " + requested + " is out of range: this listing has " + total
+                        + " entries on " + pages + (pages == 1 ? " page." : " pages.");
+                String suggestion = pages == 1
+                        ? "This listing has only one page; drop --page: " + Failure.quoted(fixed) + "."
+                        : "Pass a page from 1 to " + pages + ", e.g. " + Failure.quoted(fixed) + ".";
+                return Result.err(requested < 1
+                        ? new Failure.Validation(message, suggestion, fixed)
+                        : new Failure.PageNotFound(message, suggestion, fixed, requested, pages));
             }
             int from = (requested - 1) * MAX_ENTRIES;
             return Result.ok(new Page(requested, pages, from, Math.min(from + MAX_ENTRIES, total), total));

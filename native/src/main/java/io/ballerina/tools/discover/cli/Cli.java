@@ -605,9 +605,13 @@ public final class Cli {
     }
 
     private static Failure readAt(Failure failure, LoadedPackage loaded) {
-        return failure instanceof Failure.Validation validation
-                ? validation.about(loaded.qualified().qualified(), loaded.version().text())
-                : failure;
+        String qualified = loaded.qualified().qualified();
+        String version = loaded.version().text();
+        return switch (failure) {
+            case Failure.Validation validation -> validation.about(qualified, version);
+            case Failure.PageNotFound missing -> missing.about(qualified, version);
+            default -> failure;
+        };
     }
 
     private static Failure.Validation notPaged(Invocation call) {

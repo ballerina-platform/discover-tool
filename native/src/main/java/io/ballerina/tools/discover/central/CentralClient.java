@@ -226,8 +226,11 @@ public final class CentralClient {
         if (!answered.isOk()) {
             boolean retryable = isRetryableStatus(answered.status());
             long retryAfterMs = retryable ? parseRetryAfter(answered.retryAfter(), options.now()) : NO_RETRY_AFTER;
+            String suggestion = Failure.Upstream.isTransientStatus(answered.status(), true)
+                    ? Failure.UPSTREAM_SUGGESTION
+                    : Failure.UPSTREAM_REJECTED_SUGGESTION;
             return new Outcome.Spent(new Report("Central answered " + url + " with HTTP " + answered.status(),
-                    answered.status(), true, Failure.UPSTREAM_SUGGESTION), retryable, retryAfterMs);
+                    answered.status(), true, suggestion), retryable, retryAfterMs);
         }
         try {
             JsonElement parsed = JsonParser.parseString(answered.body());
@@ -235,7 +238,7 @@ public final class CentralClient {
         } catch (RuntimeException malformed) {
             // Upstream serving something that is not JSON is not a transient condition.
             return Outcome.Spent.of(new Report("Central answered " + url + " with a body that is not JSON: "
-                    + malformed.getMessage(), null, true, Failure.UPSTREAM_SUGGESTION), false);
+                    + malformed.getMessage(), null, true, Failure.UPSTREAM_REJECTED_SUGGESTION), false);
         }
     }
 
@@ -260,8 +263,10 @@ public final class CentralClient {
                     + RUN_AGAIN);
             case TUNNEL -> new Report(theProxy(proxy) + (proxy == null ? "" : " set in " + file)
                     + " could not connect to " + host + ": HTTP " + failed.status(), failed.status(), false,
-                    "The proxy answered but could not reach " + host + "; run the same command again later, or "
-                            + "check that the proxy allows it.");
+                    failed.status() != null && Failure.Upstream.isTransientStatus(failed.status(), false)
+                            ? "The proxy answered but could not reach " + host + "; run the same command again "
+                                    + "later, or check that the proxy allows it."
+                            : "The proxy refused to connect to " + host + "; check that the proxy allows it.");
             case PROXY_REJECTED -> rejected(options);
             case OTHER -> Report.unanswered("Could not reach " + host + through + ": " + failed.message(),
                     network(file));
@@ -594,7 +599,7 @@ public final class CentralClient {
             }
             if (resolved.source() == ResolvedVersion.Source.LATEST
                     && response.failure() instanceof Failure.Upstream upstream && upstream.reached()) {
-                return Result.err(upstream.suggesting(Failure.UPSTREAM_SUGGESTION + " Or read an earlier release by "
+                return Result.err(upstream.suggesting(upstream.suggestion() + " Or read an earlier release by "
                         + "writing its version after the package: " + qualified.qualified() + ":<version>.")
                         .about(qualified.qualified(), version.text()));
             }
