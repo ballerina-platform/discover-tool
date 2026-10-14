@@ -155,6 +155,20 @@ final class Commands {
         @CommandLine.Option(names = Command.SERVICE_FLAG, paramLabel = OWNER_LABEL,
                 description = "The service type that declares it.")
         String service;
+
+        List<Command.Owner> given() {
+            List<Command.Owner> given = new ArrayList<>();
+            if (client != null) {
+                given.add(new Command.Owner(Command.CLIENT, client));
+            }
+            if (classOwner != null) {
+                given.add(new Command.Owner(Command.CLASS, classOwner));
+            }
+            if (service != null) {
+                given.add(new Command.Owner(Command.SERVICE, service));
+            }
+            return given;
+        }
     }
 
     /**
@@ -169,6 +183,9 @@ final class Commands {
 
         @CommandLine.Mixin
         Package pkg = new Package();
+
+        @CommandLine.Mixin
+        Owners owners = new Owners();
 
         @CommandLine.Parameters(arity = "0..*", paramLabel = "<noun>")
         List<String> rest;
@@ -230,17 +247,7 @@ final class Commands {
 
         @Override
         List<Command.Owner> owners() {
-            List<Command.Owner> given = new ArrayList<>();
-            if (owners.client != null) {
-                given.add(new Command.Owner(Command.CLIENT, owners.client));
-            }
-            if (owners.classOwner != null) {
-                given.add(new Command.Owner(Command.CLASS, owners.classOwner));
-            }
-            if (owners.service != null) {
-                given.add(new Command.Owner(Command.SERVICE, owners.service));
-            }
-            return given;
+            return owners.given();
         }
     }
 }

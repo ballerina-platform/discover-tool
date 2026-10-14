@@ -103,11 +103,9 @@ public final class Cli {
 
     private static final String PLACEHOLDER_KEYWORD = "<keyword>";
 
-    private static final String END_OF_OPTIONS = "--";
 
     private static final String PATH_SEPARATOR = "/";
 
-    private static final String FLAG_START = "-";
 
     /** How many names each noun takes; {@code search} takes any number of keywords. */
     private static final Map<String, Integer> MAX_NAMES = Map.of(
@@ -220,6 +218,10 @@ public final class Cli {
         Failure option = unknownOption(grammar, call, literal);
         if (option != null) {
             return option;
+        }
+        if (!MEMBER_NOUNS.contains(call.noun()) && !call.owners().isEmpty()) {
+            return new Failure.Validation("Unknown option '" + call.owners().get(0).flag() + "'.",
+                    UsageRenderer.knownFlags(grammar.spec(call.noun())));
         }
         Failure output = rejectInvalidOutput(call.output());
         if (output != null) {
@@ -370,7 +372,7 @@ public final class Cli {
     // `literal`: how many of the last names follow `--`, where a leading dash is part of the name.
     private static Failure unknownOption(Commands.Grammar grammar, Invocation call, int literal) {
         String unknown = call.names().subList(0, Math.max(0, call.names().size() - literal)).stream()
-                .filter(name -> name.startsWith(FLAG_START) && name.length() > 1)
+                .filter(name -> name.startsWith(Command.FLAG_START) && name.length() > 1)
                 .findFirst()
                 .orElse(null);
         return unknown == null
@@ -428,10 +430,8 @@ public final class Cli {
                 search);
     }
 
-    /**
-     * An old bucket name or a plural typed as the noun ({@code funcs}, {@code methods}): the same command with the
-     * noun it meant, or {@code null}. Read off argv before parsing, since the noun decides which flags parse.
-     */
+    // An old bucket name or a plural typed as the noun: the same command with the noun it meant. Read off argv
+    // before parsing, since the noun decides which flags parse.
     private static Failure misnamedNoun(List<String> argv) {
         Commands.Grammar probe = Commands.Grammar.create();
         int at = firstWord(argv, valueOptions(probe));
@@ -457,7 +457,7 @@ public final class Cli {
     }
 
     private static int literalWords(List<String> argv) {
-        int end = argv.indexOf(END_OF_OPTIONS);
+        int end = argv.indexOf(Command.END_OF_OPTIONS);
         return end < 0 ? 0 : argv.size() - end - 1;
     }
 
@@ -465,10 +465,10 @@ public final class Cli {
     private static int firstWord(List<String> argv, Set<String> takesValue) {
         for (int i = 0; i < argv.size(); i++) {
             String token = argv.get(i);
-            if (END_OF_OPTIONS.equals(token)) {
+            if (Command.END_OF_OPTIONS.equals(token)) {
                 return i + 1 < argv.size() ? i + 1 : -1;
             }
-            if (!token.startsWith(FLAG_START)) {
+            if (!token.startsWith(Command.FLAG_START)) {
                 return i;
             }
             if (takesValue.contains(token)) {

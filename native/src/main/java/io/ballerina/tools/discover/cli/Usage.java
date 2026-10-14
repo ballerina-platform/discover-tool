@@ -21,7 +21,6 @@ package io.ballerina.tools.discover.cli;
 import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.views.SearchCentral;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -159,6 +158,9 @@ final class Usage {
     private static final String OWNER_FLAGS_ROW = "The container that declares a method or resource, for method and "
             + "resource only: one at most, left out when exactly one container declares it.";
 
+    private static final String OWNER_FLAGS_OWN_ROW = "The client, class or service type that declares it: one at "
+            + "most, left out when exactly one container declares it.";
+
     private Usage() {
     }
 
@@ -176,10 +178,8 @@ final class Usage {
                 .append("\n").append(UsageRenderer.prose(VERSION, 0))
                 .append(UsageRenderer.prose(EXIT_CODES, 0))
                 .append(UsageRenderer.prose(MORE, 0));
-        List<UsageRenderer.Row> flags = new ArrayList<>(UsageRenderer.flagRows(grammar, null));
-        flags.add(new UsageRenderer.Row(String.join("|", Command.OWNER_FLAGS) + " " + Commands.OWNER_LABEL,
-                OWNER_FLAGS_ROW));
-        return text.append("\n").append(UsageRenderer.table(flags)).toString();
+        return text.append("\n").append(UsageRenderer.table(UsageRenderer.flagRows(grammar, null, OWNER_FLAGS_ROW)))
+                .toString();
     }
 
     /** One noun's usage text: its synopsis, what it reads, examples, and its flags. */
@@ -192,7 +192,7 @@ final class Usage {
                 .append("\nExamples:\n");
         about.examples().forEach(example -> text.append("  ").append(example).append("\n"));
         text.append("\n").append(UsageRenderer.prose(EXIT_CODES, 0));
-        List<UsageRenderer.Row> own = UsageRenderer.ownFlagRows(grammar, noun);
+        List<UsageRenderer.Row> own = UsageRenderer.ownFlagRows(grammar, noun, OWNER_FLAGS_OWN_ROW);
         if (!own.isEmpty()) {
             text.append("\n").append(UsageRenderer.table(own));
         }

@@ -120,6 +120,16 @@ public class GrammarTest {
     }
 
     @Test
+    public void aContainerFlagBeforeTheNounNamesTheContainerOnlyForAMember() {
+        JsonObject leading = answer("ballerinax__kafka", "--client", "Producer", "method", "send", "-p", KAFKA);
+        Assert.assertEquals(leading.get("container").getAsString(), "Producer", leading.toString());
+        Assert.assertEquals(failure(2, null, "--client", "Producer", "client", "-p", KAFKA).field("message"),
+                "Unknown option '--client'.");
+        Assert.assertTrue(failure(2, null, "--client", "A", "method", "-p", KAFKA, "--client", "B").field("message")
+                .endsWith(" is given both before the noun and after it."));
+    }
+
+    @Test
     public void aMethodListingLeavesResourcesToResourceAndAResourceListingLeavesMethodsToMethod() {
         JsonObject methods = answer("ballerina__http", "method", "-p", "ballerina/http", "--client", "Client");
         Assert.assertFalse(methods.has("resources"), methods.toString());
@@ -316,6 +326,14 @@ public class GrammarTest {
         CliTest.Capture typo = failure(1, "ballerinax__github", "resource", "gists/nope", "get", "-p", GITHUB);
         Assert.assertEquals(typo.field("command"), "bal discover resource gists -p " + GITHUB + " --client Client",
                 typo.stderr());
+    }
+
+    @Test
+    public void aResourceMissedAmongSeveralContainersSearchesItsFirstSegmentOrListsTheResources() {
+        CliTest.Capture slash = failure(1, "ballerina__http", "resource", "/", "get", "-p", "ballerina/http");
+        Assert.assertEquals(slash.field("command"), "bal discover resource -p ballerina/http", slash.stderr());
+        CliTest.Capture typo = failure(1, "ballerina__http", "resource", ":id/nope", "get", "-p", "ballerina/http");
+        Assert.assertEquals(typo.field("command"), "bal discover search nope -p ballerina/http", typo.stderr());
     }
 
     @Test

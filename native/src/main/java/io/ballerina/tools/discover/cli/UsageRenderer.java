@@ -112,23 +112,36 @@ final class UsageRenderer {
         return required ? spelled : "[" + spelled + "]";
     }
 
-    /** Every flag {@code noun} accepts, minus {@code --help} — a row saying "this is help" is not worth one. */
-    static List<Row> flagRows(Commands.Grammar grammar, String noun) {
-        return orderedOptions(grammar.spec(noun)).stream()
-                .map(option -> new Row(label(option), description(option)))
-                .toList();
+    /**
+     * Every flag {@code noun} accepts, minus {@code --help} — a row saying "this is help" is not worth one — with
+     * the container flags as one row described by {@code owners}.
+     */
+    static List<Row> flagRows(Commands.Grammar grammar, String noun, String owners) {
+        return rows(orderedOptions(grammar.spec(noun)), owners);
     }
 
     /** The flags {@code noun} takes that the root's help does not list: the package, and the container flags. */
-    static List<Row> ownFlagRows(Commands.Grammar grammar, String noun) {
+    static List<Row> ownFlagRows(Commands.Grammar grammar, String noun, String owners) {
         Set<String> shared = grammar.spec(null).options().stream()
-                .filter(option -> !Command.PACKAGE_FLAG.equals(option.shortestName()))
-                .flatMap(option -> Stream.of(option.names()))
+                .map(OptionSpec::shortestName)
+                .filter(name -> !Command.PACKAGE_FLAG.equals(name) && !Command.OWNER_FLAGS.contains(name))
                 .collect(Collectors.toSet());
-        return orderedOptions(grammar.spec(noun)).stream()
+        return rows(orderedOptions(grammar.spec(noun)).stream()
                 .filter(option -> !shared.contains(option.shortestName()))
-                .map(option -> new Row(label(option), description(option)))
-                .toList();
+                .toList(), owners);
+    }
+
+    private static List<Row> rows(List<OptionSpec> options, String owners) {
+        List<Row> rows = new ArrayList<>();
+        for (OptionSpec option : options) {
+            String name = option.shortestName();
+            if (!Command.OWNER_FLAGS.contains(name)) {
+                rows.add(new Row(label(option), description(option)));
+            } else if (Command.OWNER_FLAGS.get(0).equals(name)) {
+                rows.add(new Row(String.join("|", Command.OWNER_FLAGS) + " " + option.paramLabel(), owners));
+            }
+        }
+        return rows;
     }
 
     private static List<OptionSpec> orderedOptions(CommandSpec spec) {

@@ -61,6 +61,8 @@ public record Command(String noun, List<String> names, Target target, Owner owne
             PACKAGE, SEARCH, CLIENT, SERVICE, CLASS, FUNCTION, TYPE, METHOD, RESOURCE, README);
 
     public static final String FLAG_PREFIX = "--";
+    public static final String END_OF_OPTIONS = "--";
+    public static final String FLAG_START = "-";
     public static final String PACKAGE_FLAG = "-p";
     public static final String PACKAGE_LONG_FLAG = FLAG_PREFIX + PACKAGE;
     public static final String CLIENT_FLAG = FLAG_PREFIX + CLIENT;
@@ -160,12 +162,16 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         return new Command(noun, names, target, owner, filter, number);
     }
 
+    // A name that starts with a dash would read as a flag, so such names go last, after `--`.
     public String text() {
         StringBuilder text = new StringBuilder(PREFIX).append(noun);
         if (target != null && PACKAGE.equals(noun)) {
             text.append(' ').append(word(target.pkg()));
         }
-        names.forEach(name -> text.append(' ').append(word(name)));
+        boolean dashed = names.stream().anyMatch(name -> name.startsWith(FLAG_START));
+        if (!dashed) {
+            names.forEach(name -> text.append(' ').append(word(name)));
+        }
         if (target != null && !PACKAGE.equals(noun)) {
             flag(text, PACKAGE_FLAG, target.pkg());
         }
@@ -180,6 +186,10 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         }
         if (page != FIRST_PAGE) {
             flag(text, PAGE_FLAG, String.valueOf(page));
+        }
+        if (dashed) {
+            text.append(' ').append(END_OF_OPTIONS);
+            names.forEach(name -> text.append(' ').append(word(name)));
         }
         return text.toString();
     }
@@ -210,6 +220,10 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         int page = FIRST_PAGE;
         for (int i = 1; i < words.size(); i++) {
             String word = words.get(i);
+            if (END_OF_OPTIONS.equals(word)) {
+                names.addAll(words.subList(i + 1, words.size()));
+                break;
+            }
             boolean flag = PACKAGE_FLAG.equals(word) || MODULE_FLAG.equals(word) || FILTER_FLAG.equals(word)
                     || PAGE_FLAG.equals(word) || OWNER_KINDS.containsKey(word);
             if (!flag) {
