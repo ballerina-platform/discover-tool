@@ -19,7 +19,8 @@ bal discover search <keyword> ...
 
 The first word says what comes back, a name after it says which one: a name means one thing, no name means a
 listing. Every noun but `package` takes the package with `-p`, and every command the tool prints is written in
-that one order: the noun, its names, `-p`, the container flag, then the other flags. `bal discover package
+that one order: the noun, its names, `-p`, the container flag, then the other flags. You may type a flag before
+the noun too (`bal discover -p ballerinax/kafka method send`). `bal discover package
 <org>/<package>` is the package's overview: its clients, service types, classes and functions with their member
 counts, one line for its types by kind, one for its readme's sections, and its submodules, each with the command
 that opens it.
@@ -590,14 +591,19 @@ error: 'Producer' is a client, not a class, in ballerinax/kafka:4.6.5.
 
 $ bal discover method close -p ballerinax/kafka
 error: 'close' is declared by Consumer and Producer in ballerinax/kafka:4.6.5.
-  Name the one you mean:
+  Name the one you mean with --client, --class, --service:
     Consumer  bal discover method close -p ballerinax/kafka --client Consumer
     Producer  bal discover method close -p ballerinax/kafka --client Producer
+Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] [--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
+Run `bal discover method --help` for details.
 ```
 
-A name several containers declare has no one command to run, so that failure carries none: its JSON lists each
-container in `owners`, as `{"name", "command"}` rows whose commands open what was named on it (at most 40; past
-that the suggestion quotes the package's `search` for the name).
+A method or resource several containers declare, asked with no container flag, is a usage error (exit 2): the
+command is incomplete, though everything it names exists. It has no one command to run, so that failure carries
+none: its JSON lists each container in `owners`, as `{"name", "command"}` rows whose commands open what was named
+on it (at most 40; past that the suggestion quotes the package's `search` for the name). A name typed as some
+other kind of thing (`bal discover class close -p ballerinax/kafka`) is still a miss (exit 1) and lists its
+owners the same way.
 
 A service type that declares no methods, and whose package does not describe the ones a service defines,
 answers with its own documentation and the readme sections whose code declares such a service — typed as it;
@@ -815,7 +821,7 @@ error naming the command that reads them, never silently dropped.
 | stdout | the answer, and nothing else                                                     |
 | stderr | on failure, exactly one failure, and nothing else                                |
 | exit 0 | success, and stdout is complete                                                  |
-| exit 2 | a usage error — the command line itself is malformed, so nothing was looked up: stdout is empty |
+| exit 2 | a usage error — the command line is malformed or incomplete: stdout is empty |
 | exit 1 | every other failure: stdout is empty, and the failure's `kind` and `suggestion` say what to do next |
 
 A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
@@ -844,22 +850,28 @@ Usage: bal discover package <org>/<name>[:<version>] [--output json|text] [--fil
 Run `bal discover package --help` for details.
 ```
 
-A usage error is a `validation` failure found before anything is looked up: an unknown option, an option with
-a missing or invalid value (`--output xml`, `--page x`, `--page 0`, `--refresh=yes`) or given twice, no noun, a
-noun without `-p`, a malformed package name or incomplete version, `--version`, a version typed as a name, an
-unknown noun, more names than a noun takes, more than one container flag, a `type` name with `--filter`, a
-`search` with no keyword, with `--filter`, or (across Central) with `--module`, and the old package-first form
-(`bal discover ballerinax/kafka client Producer`), whose `command` is the same request in the new order. An
-unknown noun's `command` searches for the word, since it is most often a name typed without its noun
-(`bal discover close -p ballerinax/kafka`). Each names the command to run when there is one, and in text ends
-with that noun's synopsis. A `validation` failure that depends on what the package holds — a page past the end of
-the listing, a module with no readme — is exit 1.
+A usage error is a `validation` failure. Most are found before anything is looked up: an unknown option, an
+option with a missing or invalid value (`--output xml`, `--page x`, `--page 0`, `--refresh=yes`), given twice, or
+given both before the noun and after it, no noun, a malformed package name or incomplete version, `--version`, a
+version typed as a name, an unknown noun, more names than a noun takes, more than one container flag, a `type`
+name with `--filter`, a `search` with no keyword, with `--filter`, or (across Central) with `--module`, and the
+old package-first form (`bal discover ballerinax/kafka client Producer`), whose `command` is the same request in
+the new order. A package typed as a name (`bal discover client ballerinax/kafka`) is moved to `-p`; a noun with no
+`-p` at all is never given a package it did not name: its `command` is the Central search for the name
+(`bal discover search send`). A plural or the old bucket name as the noun (`funcs`, `methods`) is answered with
+the noun it meant. An unknown noun's `command` searches for the word, since it is most often a name typed without
+its noun (`bal discover close -p ballerinax/kafka`). Two are found once the package is read: more names than a
+`method` or `resource` takes, read against it (`method Producer send` is `method send --client Producer`,
+`resource gists public get` is `resource gists/public get`), and a member several containers declare with no
+container flag. Each names the command to run when there is one, and in text ends with that noun's synopsis. A
+`validation` failure that depends on what the package holds — a page past the end of the listing, a module with
+no readme — is exit 1.
 
 A search that matches nothing is an answer, not a failure (exit 0). `upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
 `package-not-found` and `symbol-not-found` need a different command — `symbol-not-found` is a container, member,
 path or type not named exactly as listed, or asked as a noun that does not hold it, or a container flag naming no container of its kind (a `--module` the package does not publish
-is `package-not-found` with `module`, and lists the submodules it does in `candidates`; a name several containers
-declare lists them in `owners`); `schema-drift` means Central's payload
+is `package-not-found` with `module`, and lists the submodules it does in `candidates`; a name asked as a noun
+that does not hold it, and several containers declare, lists them in `owners`); `schema-drift` means Central's payload
 changed shape and is for a maintainer; `internal` is a defect in `bal discover` itself, to report with the
 command that produced it. An `upstream` failure's `message` names what failed: the host, or the
 proxy and the `Settings.toml` that sets it. Its `reached` is `true` when Central answered, with an error status

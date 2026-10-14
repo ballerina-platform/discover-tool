@@ -55,10 +55,19 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
         String pkg = values == null || values.pkg() == null ? root.pkg.pkg : values.pkg();
         String coordinate = Command.PACKAGE.equals(noun) ? (names.isEmpty() ? null : names.get(0)) : pkg;
         return new Invocation(noun, names, root.rest == null ? List.of() : List.copyOf(root.rest), pkg, coordinate,
-                values == null ? List.of() : values.owners(),
+                owners(root, values),
                 either(own.output, top.output), either(own.filter, top.filter),
                 own.page != Command.FIRST_PAGE ? own.page : top.page, either(own.module, top.module),
                 either(own.version, top.version), own.refresh || top.refresh);
+    }
+
+    // The container flags typed before the noun, then after it.
+    private static List<Command.Owner> owners(Commands.Root root, Commands.Noun values) {
+        List<Command.Owner> owners = new ArrayList<>(root.owners.given());
+        if (values != null) {
+            owners.addAll(values.owners());
+        }
+        return List.copyOf(owners);
     }
 
     private static String either(String own, String top) {
@@ -74,6 +83,9 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
         Commands.Flags own = values.flags;
         if (root.pkg.pkg != null && values.pkg() != null) {
             return Command.PACKAGE_LONG_FLAG;
+        }
+        if (!root.owners.given().isEmpty() && !values.owners().isEmpty()) {
+            return root.owners.given().get(0).flag();
         }
         if (top.output != null && own.output != null) {
             return Commands.OUTPUT_FLAG;

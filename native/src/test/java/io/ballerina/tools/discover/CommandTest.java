@@ -53,6 +53,13 @@ public class CommandTest {
                 "bal discover method -p ballerinax/kafka --client Producer --filter send --page 2");
     }
 
+    @Test
+    public void aNameThatStartsWithADashGoesAfterTheEndOfOptions() {
+        Command dashed = Command.of(Command.SEARCH, "-foo").in(KAFKA).paged(2);
+        Assert.assertEquals(dashed.text(), "bal discover search -p ballerinax/kafka --page 2 -- -foo");
+        Assert.assertEquals(Command.parse(dashed.text()).orElseThrow(), dashed);
+    }
+
     @DataProvider(name = "printed")
     public Object[][] printed() {
         return new Object[][] {

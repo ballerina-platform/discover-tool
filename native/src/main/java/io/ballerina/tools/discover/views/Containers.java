@@ -160,6 +160,11 @@ public final class Containers {
      */
     private static final int MAX_GROUP_DEPTH = 4;
 
+    /** How many names a resource method is asked by: its path and its accessor. */
+    private static final int PATH_AND_ACCESSOR = 2;
+
+    private static final char MEMBER_ACCESS = '.';
+
     /** Accessors a resource function may declare. Not a closed set — see {@link #isAccessor}. */
     private static final Pattern ACCESSOR = Pattern.compile("[a-z][a-zA-Z0-9]*");
 
@@ -294,7 +299,7 @@ public final class Containers {
      */
     public static Command memberMeant(LoadedPackage loaded, Ask ask, Command.Owner owner, List<String> names) {
         String noun = ask == Ask.RESOURCE ? Command.RESOURCE : Command.METHOD;
-        int takes = ask == Ask.RESOURCE ? 2 : 1;
+        int takes = ask == Ask.RESOURCE ? PATH_AND_ACCESSOR : 1;
         Optional<Surface.Container> first = Surface.byName(containersOf(loaded), names.get(0));
         if (first.isPresent()) {
             List<String> rest = names.subList(1, Math.min(names.size(), takes + 1));
@@ -310,7 +315,7 @@ public final class Containers {
         List<String> words = plainWords(names);
         List<String> joined = List.of(String.join(PathTree.SEPARATOR, words.subList(0, words.size() - 1)),
                 words.get(words.size() - 1));
-        return Stream.of(words.subList(0, 2), joined)
+        return Stream.of(words.subList(0, PATH_AND_ACCESSOR), joined)
                 .filter(asked -> containersOf(loaded).stream()
                         .filter(container -> owner == null || Identifiers.plain(container.name()).equals(owner.name()))
                         .anyMatch(container -> !select(container, Ask.RESOURCE, asked).isEmpty()))
@@ -444,14 +449,26 @@ public final class Containers {
                 return misplaced.get();
             }
         }
-        String search = loaded.command(Command.SEARCH, PathTree.plainSelector(token)).text();
+        String keyword = token;
+        if (resource) {
+            Optional<String> segment = PathTree.splitPath(PathTree.plainSelector(token)).stream()
+                    .filter(word -> !word.isEmpty() && !word.startsWith(PathTree.PARAMETER))
+                    .findFirst();
+            if (segment.isEmpty()) {
+                String listing = loaded.command(Command.RESOURCE).text();
+                return loaded.symbolNotFound(options.selectors(), message,
+                        "List the resource methods: " + Failure.quoted(listing) + ".", listing);
+            }
+            keyword = segment.get();
+        }
+        String search = loaded.command(Command.SEARCH, PathTree.plainSelector(keyword)).text();
         return loaded.symbolNotFound(options.selectors(), message,
                 "Search the package for it: " + Failure.quoted(search) + ".", search);
     }
 
     // `Producer.send`, the way code calls it: the method on the container its flag names.
     private static Optional<Failure> dotted(LoadedPackage loaded, String message, String token, Options options) {
-        int dot = token.indexOf('.');
+        int dot = token.indexOf(MEMBER_ACCESS);
         if (dot <= 0) {
             return Optional.empty();
         }
@@ -1310,7 +1327,7 @@ public final class Containers {
     }
 
     private static int literalDepth(List<String> path) {
-        return (int) path.stream().filter(segment -> !segment.startsWith(":")).count();
+        return (int) path.stream().filter(segment -> !segment.startsWith(PathTree.PARAMETER)).count();
     }
 
     // Keyed by FULL path: literal segments alone are ambiguous (repos/branches), and a parameter node can carry

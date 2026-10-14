@@ -1,6 +1,6 @@
 Usage: bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]]
-                    [--output json|text] [--filter <keyword>] [--page <n>]
-                    [-m <module>] [--refresh]
+                    [--client|--class|--service <name>] [--output json|text]
+                    [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
@@ -47,6 +47,10 @@ Run `bal discover <noun> --help` for one noun's names, flags and examples.
                                            it. With no version, the one your
                                            project's Dependencies.toml locks, else
                                            Central's latest.
+  --client|--class|--service <name>        The container that declares a method or
+                                           resource, for method and resource only:
+                                           one at most, left out when exactly one
+                                           container declares it.
   --output json|text                       Override the TTY-detected default: human
                                            text at an interactive terminal, JSON
                                            otherwise.
@@ -67,7 +71,3 @@ Run `bal discover <noun> --help` for one noun's names, flags and examples.
   --refresh                                Ignore any cached copy and rewrite it.
                                            Worth passing only when a name should
                                            exist and does not.
-  --client|--class|--service <name>        The container that declares a method or
-                                           resource, for method and resource only:
-                                           one at most, left out when exactly one
-                                           container declares it.

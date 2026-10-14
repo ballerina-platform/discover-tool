@@ -88,7 +88,7 @@ public final class TextRenderer {
      *
      * @param pkg the package, {@code org/name}, or {@code null} when unknown
      * @param module the {@code --module} submodule, or {@code null}
-     * @param trail the bucket and selectors, as typed
+     * @param trail the noun and its names, as typed
      * @param filter the {@code --filter} keyword, or {@code null}
      * @param pin the version the caller wrote in the coordinate, or {@code null}
      * @param version the version that was read, shown after the package, or {@code null} when unknown

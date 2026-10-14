@@ -100,7 +100,7 @@ public sealed interface DiscoverResult {
     /**
      * The first answer about a package (or a targeted module): its clients, service types, classes and functions
      * with their member counts, one line for its types and one for its readme, and its submodules, each with the
-     * command that opens it — a bare {@code bal discover <org>/<name>}.
+     * command that opens it — {@code bal discover package <org>/<name>}.
      *
      * @param sections the callable buckets that hold something, in bucket order
      * @param types how many declarations of each kind the {@code type} bucket holds beyond the containers the
