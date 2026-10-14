@@ -72,7 +72,7 @@ public class CentralSearchTest {
         return json.toString();
     }
 
-    private static FakeTransport central() {
+    static FakeTransport central() {
         return FakeTransport.routing(url -> url.contains("search-symbols")
                 ? FakeTransport.ok(SYMBOLS)
                 : FakeTransport.ok(PACKAGES));
@@ -241,7 +241,7 @@ public class CentralSearchTest {
         for (List<String> argv : List.of(List.of("search"), List.of("search", "kafka", "--module", "x"),
                 List.of("search", "kafka", "--filter", "send"))) {
             CliTest.Capture capture = new CliTest.Capture();
-            Assert.assertEquals(Cli.run(argv, capture.streams(), CliTest.never()), 2, argv.toString());
+            Assert.assertEquals(Cli.run(argv, capture.streams(), CliTest.never()), Failure.USAGE, argv.toString());
             Assert.assertEquals(capture.field("kind"), "validation", capture.stderr());
         }
     }

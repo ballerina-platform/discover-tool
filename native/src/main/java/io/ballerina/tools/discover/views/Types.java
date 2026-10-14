@@ -146,7 +146,7 @@ public final class Types {
      *
      * @param listing the command the types are listed with, e.g. {@code bal discover type -p ballerina/io}
      */
-    public static Failure misuse(Command listing, Options options) {
+    public static Failure.Validation misuse(Command listing, Options options) {
         if (options.selectors().size() != 1 || !options.filtered()) {
             return null;
         }

@@ -147,7 +147,7 @@ public final class Cli {
 
         Commands.Grammar grammar = Commands.Grammar.create();
         boolean json = jsonOutput(argv, interactive, grammar);
-        Failure misnamed = misnamedNoun(argv);
+        Failure.Validation misnamed = misnamedNoun(argv);
         if (misnamed != null) {
             return new UsageErrors(grammar, null, streams, json).error(misnamed);
         }
@@ -161,7 +161,7 @@ public final class Cli {
                     ? null
                     : cause.getCommandLine().getCommandSpec().name();
             UsageErrors usage = new UsageErrors(grammar, noun, streams, json);
-            Failure specific = describeParseError(cause);
+            Failure.Validation specific = describeParseError(cause);
             return specific == null
                     ? usage.helpError(firstLine(cause.getMessage()))
                     : usage.error(specific);
@@ -178,7 +178,7 @@ public final class Cli {
         UsageErrors usage = new UsageErrors(grammar, nounName, streams, json);
         Invocation call = Invocation.of(grammar.root(), nounName, nounName == null ? null : grammar.nouns()
                 .get(nounName));
-        Failure misuse = misuse(grammar, call, literalWords(argv));
+        Failure.Validation misuse = misuse(grammar, call, literalWords(argv));
         if (misuse != null) {
             return usage.error(misuse);
         }
@@ -189,7 +189,7 @@ public final class Cli {
     }
 
     // What makes the command line itself unusable, before anything is fetched; null when it is well formed.
-    private static Failure misuse(Commands.Grammar grammar, Invocation call, int literal) {
+    private static Failure.Validation misuse(Commands.Grammar grammar, Invocation call, int literal) {
         if (call.version() != null) {
             return versionFlag(call);
         }
@@ -208,7 +208,7 @@ public final class Cli {
                     "For a package's overview, write " + Failure.quoted(Command.PREFIX + Command.PACKAGE + " "
                             + PLACEHOLDER_PACKAGE) + ".");
         }
-        Failure option = unknownOption(grammar, call, literal);
+        Failure.Validation option = unknownOption(grammar, call, literal);
         if (option != null) {
             return option;
         }
@@ -216,7 +216,7 @@ public final class Cli {
             return new Failure.Validation("Unknown option '" + call.owners().get(0).flag() + "'.",
                     UsageRenderer.knownFlags(grammar.spec(call.noun())));
         }
-        Failure output = rejectInvalidOutput(call.output());
+        Failure.Validation output = rejectInvalidOutput(call.output());
         if (output != null) {
             return output;
         }
@@ -226,7 +226,7 @@ public final class Cli {
         return Command.PACKAGE.equals(call.noun()) ? packageMisuse(call) : scopedMisuse(call);
     }
 
-    private static Failure packageMisuse(Invocation call) {
+    private static Failure.Validation packageMisuse(Invocation call) {
         if (call.pkg() != null) {
             String pkg = call.names().isEmpty() ? call.pkg() : call.names().get(0);
             String command = call.paged(Command.overview(new Command.Target(pkg, call.module()))
@@ -242,7 +242,7 @@ public final class Cli {
         return tooManyNames(call);
     }
 
-    private static Failure scopedMisuse(Invocation call) {
+    private static Failure.Validation scopedMisuse(Invocation call) {
         String misplaced = misplacedPackage(call);
         if (misplaced != null) {
             return packageAsName(call, misplaced);
@@ -284,7 +284,7 @@ public final class Cli {
         return null;
     }
 
-    private static Failure packageAsName(Invocation call, String pkg) {
+    private static Failure.Validation packageAsName(Invocation call, String pkg) {
         List<String> others = new ArrayList<>(call.names());
         others.remove(pkg);
         String target = call.pkg() == null ? pkg : call.pkg();
@@ -296,7 +296,7 @@ public final class Cli {
     }
 
     // Never a package the caller did not give: the search that finds one, or the command's shape.
-    private static Failure missingPackage(Invocation call) {
+    private static Failure.Validation missingPackage(Invocation call) {
         String message = call.noun() + " needs the package it reads: -p " + Commands.PACKAGE_LABEL + ".";
         Command shape = Command.of(call.noun(), call.echoed())
                 .in(new Command.Target(Command.placeholder(PLACEHOLDER_PACKAGE), call.module()));
@@ -313,7 +313,7 @@ public final class Cli {
                 search);
     }
 
-    private static Failure severalOwnerFlags(Invocation call) {
+    private static Failure.Validation severalOwnerFlags(Invocation call) {
         List<Failure.Match> rows = call.owners().stream()
                 .map(owner -> new Failure.Match(owner.flag() + " " + owner.name(),
                         call.paged(call.ownedBy(owner).command()).text()))
@@ -322,13 +322,13 @@ public final class Cli {
                 + String.join(", ", Command.OWNER_FLAGS) + ".", "Keep the one that declares it:", rows);
     }
 
-    private static Failure tooManyNames(Invocation call) {
+    private static Failure.Validation tooManyNames(Invocation call) {
         Integer max = MAX_NAMES.get(call.noun());
         List<String> names = call.names();
         if (max == null || names.size() <= max) {
             return null;
         }
-        Failure version = rejectVersionArguments(call);
+        Failure.Validation version = rejectVersionArguments(call);
         if (version != null) {
             return version;
         }
@@ -363,7 +363,7 @@ public final class Cli {
     }
 
     // `literal`: how many of the last names follow `--`, where a leading dash is part of the name.
-    private static Failure unknownOption(Commands.Grammar grammar, Invocation call, int literal) {
+    private static Failure.Validation unknownOption(Commands.Grammar grammar, Invocation call, int literal) {
         String unknown = call.names().subList(0, Math.max(0, call.names().size() - literal)).stream()
                 .filter(name -> name.startsWith(Command.FLAG_START) && name.length() > 1)
                 .findFirst()
@@ -375,7 +375,7 @@ public final class Cli {
     }
 
     // The package-first form this tool once took: the command to run now, with the old bucket mapped.
-    private static Failure oldForm(Invocation call) {
+    private static Failure.Validation oldForm(Invocation call) {
         List<String> words = new ArrayList<>(call.rest());
         if (call.noun() != null) {
             words.add(call.noun());
@@ -415,7 +415,7 @@ public final class Cli {
     }
 
     // A word where the noun goes is most often a name (`go doc` leaves the kind out too): the search finds it.
-    private static Failure unknownNoun(String token, Invocation call) {
+    private static Failure.Validation unknownNoun(String token, Invocation call) {
         String search = Command.of(Command.SEARCH, token)
                 .in(call.pkg() == null ? null : new Command.Target(call.pkg(), call.module())).text();
         return new Failure.Validation("'" + token + "' is not a noun. The nouns are " + String.join(", ",
@@ -425,7 +425,7 @@ public final class Cli {
 
     // An old bucket name or a plural typed as the noun: the same command with the noun it meant. Read off argv
     // before parsing, since the noun decides which flags parse.
-    private static Failure misnamedNoun(List<String> argv) {
+    private static Failure.Validation misnamedNoun(List<String> argv) {
         Commands.Grammar probe = Commands.Grammar.create();
         int at = firstWord(argv, valueOptions(probe));
         String noun = at < 0 ? null : NOUN_ALIASES.get(argv.get(at));
@@ -474,7 +474,7 @@ public final class Cli {
     private static int searchCentral(Invocation call, Streams streams, HttpOptions http, boolean json,
             UsageErrors usage) {
         List<String> keywords = call.names();
-        Failure invalid = SearchCentral.misuse(keywords, call.module(), call.filter());
+        Failure.Validation invalid = SearchCentral.misuse(keywords, call.module(), call.filter());
         if (invalid == null) {
             invalid = pageBeforeFirst(call.page(), SearchCentral.command(keywords));
         }
@@ -497,13 +497,15 @@ public final class Cli {
         Result<Coordinate> coordinate = Coordinate.parse(call.coordinate(),
                 corrected -> call.paged(call.command(new Command.Target(corrected, call.module()))).text());
         if (!coordinate.isOk()) {
-            return usage.error(coordinate.failure());
+            return coordinate.failure() instanceof Failure.Validation invalid
+                    ? usage.error(invalid)
+                    : fail(coordinate.failure(), streams, json);
         }
         QualifiedName qualified = coordinate.value().qualified();
         Version version = coordinate.value().version();
         Invocation pinned = call.at(coordinate.value());
 
-        Failure argumentError = validate(pinned);
+        Failure.Validation argumentError = validate(pinned);
         if (argumentError != null) {
             return usage.error(argumentError);
         }
@@ -517,9 +519,10 @@ public final class Cli {
             return fail(loaded.failure().retargeted(pinned::retargeted), streams, json);
         }
 
-        Failure meant = memberMeant(loaded.value(), call);
+        Failure.Validation meant = memberMeant(loaded.value(), call);
         if (meant != null) {
-            return usage.error(readAt(meant, loaded.value()));
+            LoadedPackage read = loaded.value();
+            return usage.error(meant.about(read.qualified().qualified(), read.version().text()));
         }
         Result<DiscoverResult> answer = answer(loaded.value(), call);
         if (!answer.isOk()) {
@@ -538,7 +541,7 @@ public final class Cli {
     }
 
     // More names than a method or a resource takes, read against the package: the member command they meant.
-    private static Failure memberMeant(LoadedPackage loaded, Invocation call) {
+    private static Failure.Validation memberMeant(LoadedPackage loaded, Invocation call) {
         if (!MEMBER_NOUNS.contains(call.noun()) || call.names().size() <= MAX_NAMES.get(call.noun())) {
             return null;
         }
@@ -607,7 +610,7 @@ public final class Cli {
                 : failure;
     }
 
-    private static Failure notPaged(Invocation call) {
+    private static Failure.Validation notPaged(Invocation call) {
         String command = call.command().text();
         return new Failure.Validation(
                 "This answer has only one page, so --page does not apply.",
@@ -649,16 +652,16 @@ public final class Cli {
         return !interactive;
     }
 
-    private static Failure validate(Invocation call) {
+    private static Failure.Validation validate(Invocation call) {
         if (call.filter() != null && call.filter().isBlank()) {
             return new Failure.Validation("The --filter option needs a keyword.",
                     "Write --filter <keyword>, or drop it to list everything.");
         }
-        Failure page = pageBeforeFirst(call.page(), call.command().text());
+        Failure.Validation page = pageBeforeFirst(call.page(), call.command().text());
         if (page != null) {
             return page;
         }
-        Failure version = rejectVersionArguments(call);
+        Failure.Validation version = rejectVersionArguments(call);
         if (version != null) {
             return version;
         }
@@ -672,7 +675,7 @@ public final class Cli {
         return null;
     }
 
-    private static Failure pageBeforeFirst(int page, String firstPage) {
+    private static Failure.Validation pageBeforeFirst(int page, String firstPage) {
         if (page >= Command.FIRST_PAGE) {
             return null;
         }
@@ -680,7 +683,7 @@ public final class Cli {
                 "Drop --page for the first page: " + Failure.quoted(firstPage) + ".", firstPage);
     }
 
-    private static Failure versionFlag(Invocation call) {
+    private static Failure.Validation versionFlag(Invocation call) {
         String message = "Unknown option '" + Commands.VERSION_FLAG + "'.";
         Result<Coordinate> coordinate = call.coordinate() == null ? null : Coordinate.parse(call.coordinate());
         if (coordinate == null || !coordinate.isOk() || call.noun() == null) {
@@ -690,7 +693,8 @@ public final class Cli {
         return writtenVersion(message, call, coordinate.value().qualified(), call.version());
     }
 
-    private static Failure writtenVersion(String message, Invocation call, QualifiedName qualified, String version) {
+    private static Failure.Validation writtenVersion(String message, Invocation call, QualifiedName qualified,
+            String version) {
         if (!Version.isComplete(version)) {
             return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
         }
@@ -699,7 +703,7 @@ public final class Cli {
         return new Failure.Validation(message, WRITE_VERSION + Failure.quoted(command) + ".", command);
     }
 
-    private static Failure rejectInvalidOutput(String output) {
+    private static Failure.Validation rejectInvalidOutput(String output) {
         if (output == null || Commands.JSON_OUTPUT.equals(output) || Commands.TEXT_OUTPUT.equals(output)) {
             return null;
         }
@@ -709,7 +713,7 @@ public final class Cli {
     }
 
     // A complete version typed as a name: it belongs after the package.
-    private static Failure rejectVersionArguments(Invocation call) {
+    private static Failure.Validation rejectVersionArguments(Invocation call) {
         if (Command.SEARCH.equals(call.noun()) || call.coordinate() == null) {
             return null;
         }
@@ -730,7 +734,7 @@ public final class Cli {
     }
 
     // The failure a parse error is, or null when picocli's own first line says it best.
-    private static Failure describeParseError(CommandLine.ParameterException cause) {
+    private static Failure.Validation describeParseError(CommandLine.ParameterException cause) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();
             return new Failure.Validation(
@@ -763,7 +767,7 @@ public final class Cli {
         return null;
     }
 
-    private static Failure missingValue(CommandLine.Model.OptionSpec option) {
+    private static Failure.Validation missingValue(CommandLine.Model.OptionSpec option) {
         String name = option.longestName();
         String label = option.paramLabel();
         return new Failure.Validation(
@@ -792,7 +796,7 @@ public final class Cli {
      */
     private record UsageErrors(Commands.Grammar grammar, String noun, Streams streams, boolean json) {
 
-        int error(Failure failure) {
+        int error(Failure.Validation failure) {
             return write(failure, true);
         }
 
@@ -804,7 +808,7 @@ public final class Cli {
             return Command.PREFIX + (noun == null ? "" : noun + " ") + Commands.HELP_FLAG;
         }
 
-        private int write(Failure failure, boolean pointToHelp) {
+        private int write(Failure.Validation failure, boolean pointToHelp) {
             String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar, noun)
                     + (pointToHelp ? "\nRun `" + help() + "` for details." : "");
             streams.errorOut().accept(failure.describe(json) + usage + "\n");

@@ -352,7 +352,7 @@ public class ClientTest {
         Result<CentralClient.ResolvedVersion> result =
                 CentralClient.resolveLatestVersion(GITHUB, fast(transport).maxAttempts(1).build());
         Assert.assertFalse(result.isOk());
-        Assert.assertTrue(result.failure() instanceof Failure.Validation);
+        Assert.assertTrue(result.failure() instanceof Failure.SchemaDrift, result.failure().describe());
     }
 
     // The coordinate is always one literal package name. A dotted name the registry has no row for is probed
@@ -529,7 +529,8 @@ public class ClientTest {
         Result<CentralClient.ResolvedVersion> result =
                 CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).maxAttempts(1).build());
         Assert.assertFalse(result.isOk());
-        Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
+        Failure.Upstream failure = (Failure.Upstream) result.failure();
+        Assert.assertEquals(failure.status(), Integer.valueOf(500), failure.describe());
         Assert.assertFalse(failure.suggestion().contains("tried"), failure.suggestion());
     }
 

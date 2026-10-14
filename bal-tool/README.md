@@ -830,7 +830,7 @@ and `suggestion` say the rest:
 | exit | means                                                                             | `kind`                                  |
 | ---- | --------------------------------------------------------------------------------- | --------------------------------------- |
 | 1    | not found: the package, version, module or name does not exist                    | `package-not-found`, `symbol-not-found` |
-| 2    | a usage error: the command is malformed, or asks for something it cannot combine | `validation`                            |
+| 2    | a usage error: the command is malformed, or asks for something it cannot combine — or the version the project's `Dependencies.toml` locks is malformed | `validation` |
 | 3    | ambiguous: the name matches more than one thing, each listed with its command     | `ambiguous`                             |
 | 4    | Central could not be reached: the connection, DNS or TLS failed, or it timed out; may work on a retry | `upstream` with `reached: false` and no `status`, `timeout` |
 | 5    | Central answered badly: an HTTP error status (Central's or the proxy's), or a body this tool cannot read | `upstream` with a `status` or `reached: true`, `schema-drift` |
@@ -876,7 +876,8 @@ its noun (`bal discover close -p ballerinax/kafka`). One is found once the packa
 `method` or `resource` takes, read against it (`method Producer send` is `method send --client Producer`,
 `resource gists public get` is `resource gists/public get`); it names the command to run, and in text ends with
 that noun's synopsis. A `validation` failure that depends on what the package holds — a page past the end of the
-listing — is exit 2 as well, without the synopsis.
+listing, a readme section asked with a `--filter` keyword it does not mention — is exit 2 as well, without the
+synopsis.
 
 A search that matches nothing is an answer, not a failure (exit 0). `upstream` and `timeout` at exit 4 are worth re-running unchanged once their cause has passed or been fixed, and an `upstream` at exit 5 once Central or the proxy is fixed; `validation`, `ambiguous`,
 `package-not-found` and `symbol-not-found` need a different command — `symbol-not-found` is a container, member,

@@ -94,7 +94,7 @@ public final class SearchCentral {
      * The failure for a search with no keyword, with {@code --module} or with {@code --filter}, or {@code null};
      * checked before Central is asked.
      */
-    public static Failure misuse(List<String> keywords, String module, String filter) {
+    public static Failure.Validation misuse(List<String> keywords, String module, String filter) {
         if (!keywords.isEmpty() && module != null) {
             String typed = command(keywords);
             return new Failure.Validation("--module reads one package's submodule, and a search covers all of "

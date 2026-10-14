@@ -288,7 +288,7 @@ public final class Readme {
         Section section = found.get(0);
         if (filter != null && !matches(section, filter)) {
             String unfiltered = command(loaded.target(), requested).text();
-            return Result.err(loaded.symbolNotFound(List.of(requested, filter),
+            return Result.err(new Failure.Validation(
                     "Section " + requested + " (\"" + section.title() + "\") does not mention \"" + filter + "\".",
                     "Drop --filter to read it anyway: " + Failure.quoted(unfiltered) + ".", unfiltered));
         }
