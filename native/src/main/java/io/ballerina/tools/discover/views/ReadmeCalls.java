@@ -53,7 +53,6 @@ import java.util.regex.Pattern;
  */
 final class ReadmeCalls {
 
-    private static final Pattern FENCE = Pattern.compile("^\\s*(```|~~~)");
     private static final String SEGMENT = "(?:\\[[^\\]]*]|(?:\\\\.|[\\w'])*)";
     private static final Pattern RESOURCE_CALL = Pattern.compile("([\\w.']+)\\s*->\\s*/(" + SEGMENT + "(?:/" + SEGMENT
             + ")*)(?:\\s*\\.\\s*([A-Za-z_]\\w*))?");
@@ -75,11 +74,11 @@ final class ReadmeCalls {
         }
         List<Readme.Section> sections = Readme.sectionsOf(loaded);
         StringBuilder readme = new StringBuilder();
-        sections.forEach(section -> readme.append(codeOf(section.markdown())));
+        sections.forEach(section -> readme.append(Readme.fencedCodeOf(section.markdown())));
         Owners owners = new Owners(loaded, container);
         List<Readme.Section> found = new ArrayList<>();
         for (Readme.Section section : sections) {
-            String code = codeOf(section.markdown());
+            String code = Readme.fencedCodeOf(section.markdown());
             boolean calls = callsIn(code, container, entry).stream()
                     .anyMatch(call -> owners.owns(call, code, readme.toString(), entry));
             if (calls) {
@@ -208,7 +207,7 @@ final class ReadmeCalls {
         }
     }
 
-    private static String prefixOf(LoadedPackage loaded) {
+    static String prefixOf(LoadedPackage loaded) {
         return Identifiers.plain(loaded.moduleRef().prefix());
     }
 
@@ -251,10 +250,10 @@ final class ReadmeCalls {
                 && Surface.of(loaded.library(), Surface.Scope.SERVICE).size() == 1;
         List<Readme.Section> sections = Readme.sectionsOf(loaded);
         StringBuilder readme = new StringBuilder();
-        sections.forEach(section -> readme.append(codeOf(section.markdown())));
+        sections.forEach(section -> readme.append(Readme.fencedCodeOf(section.markdown())));
         List<Readme.Section> found = new ArrayList<>();
         for (Readme.Section section : sections) {
-            String code = codeOf(section.markdown());
+            String code = Readme.fencedCodeOf(section.markdown());
             Matcher declared = SERVICE_ON.matcher(code);
             boolean declares = typed.matcher(code).find();
             while (!declares && declared.find()) {
@@ -287,21 +286,5 @@ final class ReadmeCalls {
                         && !normal.params().isEmpty())
                 .anyMatch(attach -> Identifiers.plain(attach.params().get(0).type().name().trim())
                         .equals(container.plainName()));
-    }
-
-    // Every fenced block of `markdown`, joined; prose is never read.
-    private static String codeOf(String markdown) {
-        StringBuilder code = new StringBuilder();
-        boolean inside = false;
-        for (String line : markdown.split("\\R", -1)) {
-            if (FENCE.matcher(line).find()) {
-                inside = !inside;
-                continue;
-            }
-            if (inside) {
-                code.append(line).append('\n');
-            }
-        }
-        return code.toString();
     }
 }

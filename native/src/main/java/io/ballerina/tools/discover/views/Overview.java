@@ -44,6 +44,9 @@ import java.util.Set;
  * bucket on a tie) until it fits. A section showing fewer rows than its bucket holds says so and carries the command
  * that lists the bucket whole.
  *
+ * <p><b>THE README PICKS THE ROWS.</b> A section's rows go most used by the module's readme first, so the rows a
+ * cut keeps are the ones a reader meets first; ties, and names it never uses, stay alphabetical.
+ *
  * <p><b>ONE CLIENT IS OPENED IN PLACE.</b> A package with exactly one client is most often used through it, so its
  * listing is inlined under its row: page 1 of {@code client <name>}, grouped and paged by that answer's own rules,
  * so it never holds more than {@value Containers#MAX_ENTRIES} entries and, when the client has more, carries that
@@ -70,8 +73,9 @@ public final class Overview {
 
     public static DiscoverResult.Overview of(LoadedPackage loaded) {
         Map<Surface.Scope, List<DiscoverResult.Overview.Row>> rows = new LinkedHashMap<>();
+        Map<String, Integer> uses = ReadmeUsage.counts(loaded);
         for (Surface.Scope scope : Surface.Scope.values()) {
-            List<DiscoverResult.Overview.Row> all = rowsOf(loaded, scope);
+            List<DiscoverResult.Overview.Row> all = ReadmeUsage.ranked(rowsOf(loaded, scope), uses);
             if (!all.isEmpty()) {
                 rows.put(scope, all);
             }
