@@ -61,12 +61,9 @@ import java.util.stream.Stream;
  *   <li>stderr — on failure, one {@link Failure} and nothing else, in the run's output mode: one JSON object,
  *       or {@code error: <message>} with the suggestion indented below it
  *   <li>exit 0 — success, and stdout is COMPLETE
- *   <li>exit 2 — a usage error: the command line itself is malformed, so nothing was looked up; or, once the
- *       package is read, it is incomplete — more names than the noun takes, or a member several containers declare
- *       with no container flag — while everything it names exists. In text mode the failure is followed by the
- *       synopsis and a pointer to {@code --help}
- *   <li>exit 1 — every other failure. What to do next is {@code kind} and {@code suggestion} in the failure,
- *       never the code
+ *   <li>any other exit — a failure, one code per action the caller takes next ({@link Failure#exitCode()}). A usage
+ *       error — the command line is malformed, or, once the package is read, names more than the noun takes — is
+ *       followed, in text mode, by the synopsis and a pointer to {@code --help}
  * </ul>
  *
  * <p>{@code bal discover <noun> [name ...] -p <org>/<name>[:<version>]} is one picocli subcommand per noun; see
@@ -79,10 +76,6 @@ import java.util.stream.Stream;
  * @since 0.1.0
  */
 public final class Cli {
-
-    static final int FAILED = 1;
-
-    private static final int USAGE_ERROR = 2;
 
     private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
 
@@ -149,7 +142,7 @@ public final class Cli {
             List<String> argv, Streams streams, HttpOptions http, String projectDir, boolean interactive) {
         if (argv.isEmpty()) {
             streams.out().accept(Usage.root());
-            return 0;
+            return Failure.ANSWERED;
         }
 
         Commands.Grammar grammar = Commands.Grammar.create();
@@ -180,7 +173,7 @@ public final class Cli {
         // complete" is what a redirecting caller relies on.
         if (parsed.isUsageHelpRequested() || sub != null && sub.isUsageHelpRequested()) {
             streams.out().accept(nounName == null ? Usage.root() : Usage.noun(nounName));
-            return 0;
+            return Failure.ANSWERED;
         }
         UsageErrors usage = new UsageErrors(grammar, nounName, streams, json);
         Invocation call = Invocation.of(grammar.root(), nounName, nounName == null ? null : grammar.nouns()
@@ -321,8 +314,8 @@ public final class Cli {
     }
 
     private static Failure severalOwnerFlags(Invocation call) {
-        List<Failure.Owner> rows = call.owners().stream()
-                .map(owner -> new Failure.Owner(owner.flag() + " " + owner.name(),
+        List<Failure.Match> rows = call.owners().stream()
+                .map(owner -> new Failure.Match(owner.flag() + " " + owner.name(),
                         call.paged(call.ownedBy(owner).command()).text()))
                 .toList();
         return new Failure.Validation("A " + call.noun() + " has one container; pass one of "
@@ -496,7 +489,7 @@ public final class Cli {
                 List.of(Command.SEARCH, String.join(" ", keywords)), null, null, null);
         streams.out().accept((json ? JsonRenderer.render(found.value())
                 : TextRenderer.render(found.value(), where)) + "\n");
-        return 0;
+        return Failure.ANSWERED;
     }
 
     private static int lookup(Invocation call, Streams streams, HttpOptions http, String projectDir, boolean json,
@@ -530,10 +523,7 @@ public final class Cli {
         }
         Result<DiscoverResult> answer = answer(loaded.value(), call);
         if (!answer.isOk()) {
-            Failure failure = readAt(answer.failure(), loaded.value());
-            return failure instanceof Failure.Validation validation && validation.asksToChoose()
-                    ? usage.error(failure)
-                    : fail(failure, streams, json);
+            return fail(readAt(answer.failure(), loaded.value()), streams, json);
         }
         if (call.page() != Command.FIRST_PAGE && answer.value().paging() == null) {
             return fail(readAt(notPaged(pinned), loaded.value()), streams, json);
@@ -544,7 +534,7 @@ public final class Cli {
         JsonRenderer.Where about = new JsonRenderer.Where(qualified.qualified(), read, call.module());
         streams.out().accept((json ? JsonRenderer.render(answer.value(), about)
                 : TextRenderer.render(answer.value(), where)) + "\n");
-        return 0;
+        return Failure.ANSWERED;
     }
 
     // More names than a method or a resource takes, read against the package: the member command they meant.
@@ -788,7 +778,7 @@ public final class Cli {
 
     private static int fail(Failure failure, Streams streams, boolean json) {
         streams.errorOut().accept(failure.describe(json) + "\n");
-        return FAILED;
+        return failure.exitCode();
     }
 
     /**
@@ -818,7 +808,7 @@ public final class Cli {
             String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar, noun)
                     + (pointToHelp ? "\nRun `" + help() + "` for details." : "");
             streams.errorOut().accept(failure.describe(json) + usage + "\n");
-            return USAGE_ERROR;
+            return failure.exitCode();
         }
     }
 }

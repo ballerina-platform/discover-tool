@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.cli;
 
+import io.ballerina.tools.discover.Failure;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -46,7 +47,7 @@ public class GuardedRunTest {
         String err = stderrOf(() -> {
             throw new OutOfMemoryError("Java heap space");
         }, List.of("package", "ballerina/http"), code);
-        Assert.assertEquals(code[0], Cli.FAILED);
+        Assert.assertEquals(code[0], Failure.INTERNAL_ERROR);
         Assert.assertTrue(err.contains("\"kind\":\"internal\""), err);
         Assert.assertTrue(err.contains("Java heap space"), err);
         Assert.assertEquals(err.lines().count(), 1L, err);
@@ -58,7 +59,7 @@ public class GuardedRunTest {
         String err = stderrOf(() -> {
             throw new IllegalStateException("broken");
         }, List.of("package", "ballerina/http", "--output", "text"), code);
-        Assert.assertEquals(code[0], Cli.FAILED);
+        Assert.assertEquals(code[0], Failure.INTERNAL_ERROR);
         Assert.assertTrue(err.startsWith("error: Unexpected internal failure: broken."), err);
     }
 

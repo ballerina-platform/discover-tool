@@ -147,7 +147,7 @@ public class DiscoverTool implements BLauncherCmd {
             // the run's own mode.
             Failure failure = new Failure.Internal(messageOf(cause), Failure.INTERNAL_SUGGESTION);
             errStream.print(failure.describe(Cli.jsonOutput(argv, interactive)) + "\n");
-            return Cli.FAILED;
+            return failure.exitCode();
         }
     }
 

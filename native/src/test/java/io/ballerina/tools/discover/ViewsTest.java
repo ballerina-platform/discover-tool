@@ -417,25 +417,23 @@ public class ViewsTest {
         // `commit` is a keyword, declared `'commit`: listed `commit`, and typed either way.
         for (String typed : List.of("commit", "'commit")) {
             Result<DiscoverResult> answer = Asked.of(kafka, "method", typed);
-            Failure.Validation failure = (Failure.Validation) answer.failure();
+            Failure.Ambiguous failure = (Failure.Ambiguous) answer.failure();
             Assert.assertEquals(failure.message(), "'commit' is declared by Caller and Consumer in "
                     + kafka.label() + ".");
-            Assert.assertNull(failure.command());
-            Assert.assertTrue(failure.asksToChoose());
-            Assert.assertEquals(failure.owners(), List.of(
-                    new Failure.Owner("Caller", "bal discover method commit -p ballerinax/kafka --client Caller"),
-                    new Failure.Owner("Consumer", "bal discover method commit -p ballerinax/kafka --client Consumer")));
+            Assert.assertEquals(failure.matchesKey(), Failure.OWNERS);
+            Assert.assertEquals(failure.matches(), List.of(
+                    new Failure.Match("Caller", "bal discover method commit -p ballerinax/kafka --client Caller"),
+                    new Failure.Match("Consumer", "bal discover method commit -p ballerinax/kafka --client Consumer")));
         }
     }
 
     @Test
     public void aMemberOfSeveralContainersAskedInAnotherBucketListsEachOwnerAndQuotesNoOneCommand() {
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
-        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) Asked.of(kafka, "class", "close").failure();
+        Failure.Ambiguous failure = (Failure.Ambiguous) Asked.of(kafka, "class", "close").failure();
         Assert.assertEquals(failure.message(), "'close' is not a class in " + kafka.label()
                 + "; it is a method of Consumer and Producer.");
-        Assert.assertNull(failure.command());
-        Assert.assertEquals(failure.owners().stream().map(Failure.Owner::name).toList(),
+        Assert.assertEquals(failure.matches().stream().map(Failure.Match::name).toList(),
                 List.of("Consumer", "Producer"));
         Assert.assertEquals(failure.describeText(), "error: " + failure.message() + "\n  Name the one you mean:\n"
                 + "    Consumer  bal discover method close -p ballerinax/kafka --client Consumer\n"
@@ -677,8 +675,8 @@ public class ViewsTest {
     @Test
     public void aPathSeveralContainersHoldNamesEachContainer() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        Failure.Validation several = (Failure.Validation) Asked.of(http, "resource", ":...path", "get").failure();
-        Assert.assertEquals(several.owners().size(), 6, several.owners().toString());
+        Failure.Ambiguous several = (Failure.Ambiguous) Asked.of(http, "resource", ":...path", "get").failure();
+        Assert.assertEquals(several.matches().size(), 6, several.matches().toString());
         Assert.assertTrue(ownerCommands(several).contains(
                 "bal discover resource :...path get -p ballerina/http --client Client"));
     }
@@ -805,7 +803,7 @@ public class ViewsTest {
         Result<DiscoverResult> view = Readme.render(
                 sheets, new Readme.Options("1", "zzz_no_such_keyword_anywhere", 1));
         Assert.assertFalse(view.isOk());
-        Assert.assertTrue(view.failure() instanceof Failure.Validation, view.failure().describe());
+        Assert.assertTrue(view.failure() instanceof Failure.SymbolNotFound, view.failure().describe());
         Assert.assertTrue(view.failure().describe().contains("does not mention"), view.failure().describe());
     }
 
@@ -1314,7 +1312,7 @@ public class ViewsTest {
                 "bal discover method receive -p test/pkg --client Client",
                 "bal discover method send -p test/pkg --client Client"));
 
-        Failure.Validation both = (Failure.Validation) Asked.of(loaded, "method", "send").failure();
+        Failure.Ambiguous both = (Failure.Ambiguous) Asked.of(loaded, "method", "send").failure();
         Assert.assertEquals(ownerCommands(both), List.of("bal discover method send -p test/pkg --client Client",
                 "bal discover method send -p test/pkg --client Other"));
         Assert.assertEquals(signature(loaded, "method", "receive").container(), "Client");
@@ -1344,8 +1342,8 @@ public class ViewsTest {
         Assert.assertEquals(signature(loaded, "resource", "foo", "get").container(), "Paths");
     }
 
-    private static List<String> ownerCommands(Failure.Validation failure) {
-        return failure.owners().stream().map(Failure.Owner::command).toList();
+    private static List<String> ownerCommands(Failure.Ambiguous failure) {
+        return failure.matches().stream().map(Failure.Match::command).toList();
     }
 
     /** Sanity: the corpus still has the path shapes these tests reason about. */

@@ -232,7 +232,7 @@ public class CentralSearchTest {
 
         CliTest.Capture beyond = new CliTest.Capture();
         Assert.assertEquals(Cli.run(List.of("search", "kafka", "--page", "9"), beyond.streams(),
-                CliTest.options(central())), 1);
+                CliTest.options(central())), Failure.USAGE);
         Assert.assertEquals(beyond.field("command"), "bal discover search kafka --page 3");
     }
 
@@ -250,11 +250,11 @@ public class CentralSearchTest {
     public void centralFailingIsAnUpstreamFailure() {
         CliTest.Capture capture = new CliTest.Capture();
         Assert.assertEquals(Cli.run(List.of("search", "kafka"), capture.streams(),
-                CliTest.options(FakeTransport.always(FakeTransport.status(400)))), 1);
+                CliTest.options(FakeTransport.always(FakeTransport.status(400)))), Failure.BAD_ANSWER);
         Assert.assertEquals(capture.field("kind"), "upstream", capture.stderr());
         CliTest.Capture shapeless = new CliTest.Capture();
         Assert.assertEquals(Cli.run(List.of("search", "kafka"), shapeless.streams(),
-                CliTest.options(FakeTransport.always(FakeTransport.ok("{\"items\":[]}")))), 1);
+                CliTest.options(FakeTransport.always(FakeTransport.ok("{\"items\":[]}")))), Failure.BAD_ANSWER);
         Assert.assertEquals(shapeless.field("kind"), "upstream", shapeless.stderr());
     }
 

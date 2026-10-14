@@ -105,11 +105,15 @@ public record LoadedPackage(
                 suggestion, command, List.of());
     }
 
-    /** A name several containers declare: the failure carries each one, with the command that opens it there. */
-    public Failure declaredBySeveral(List<String> requested, String message, String suggestion,
-            List<Failure.Owner> owners) {
-        return new Failure.SymbolNotFound(qualified.qualified(), version.text(), module, requested, message,
-                suggestion, null, List.of(), owners);
+    /**
+     * A name that matches several things: the failure carries each one, with the command that opens it.
+     *
+     * @param matchesKey {@link Failure#OWNERS} or {@link Failure#SECTIONS}
+     */
+    public Failure ambiguous(List<String> requested, String message, String suggestion, String matchesKey,
+            List<Failure.Match> matches) {
+        return new Failure.Ambiguous(qualified.qualified(), version.text(), module, requested, message, suggestion,
+                matchesKey, matches);
     }
 
     /** A miss in a listing no command prints, so the failure itself carries every entry of it. */
