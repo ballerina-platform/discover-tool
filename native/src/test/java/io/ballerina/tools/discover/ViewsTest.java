@@ -803,7 +803,7 @@ public class ViewsTest {
         Result<DiscoverResult> view = Readme.render(
                 sheets, new Readme.Options("1", "zzz_no_such_keyword_anywhere", 1));
         Assert.assertFalse(view.isOk());
-        Assert.assertTrue(view.failure() instanceof Failure.SymbolNotFound, view.failure().describe());
+        Assert.assertTrue(view.failure() instanceof Failure.Validation, view.failure().describe());
         Assert.assertTrue(view.failure().describe().contains("does not mention"), view.failure().describe());
     }
 

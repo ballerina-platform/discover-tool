@@ -116,7 +116,7 @@ public class CliTest {
                 .orElse(FakeTransport.status(404)));
     }
 
-    private static FakeTransport graphqlCentral() {
+    static FakeTransport graphqlCentral() {
         return graphqlCentral(Map.of(
                 "dataloader", FixtureCorpus.loadRawModulePage("ballerina__graphql.dataloader"),
                 "subgraph", FixtureCorpus.loadRawModulePage("ballerina__graphql.subgraph")));
@@ -1424,7 +1424,7 @@ public class CliTest {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("package", "ballerinax/kafka", "--module", "nope"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
-        Assert.assertEquals(exitCode, 1);
+        Assert.assertEquals(exitCode, Failure.NOT_FOUND);
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertTrue(capture.field("suggestion").contains("publishes no submodules"), capture.stderr());
     }
@@ -1830,7 +1830,7 @@ public class CliTest {
                 "symbol-not-found failure text");
     }
 
-    private static Path tempDir() {
+    static Path tempDir() {
         try {
             return Files.createTempDirectory("bal-discover-");
         } catch (IOException cause) {
@@ -1846,7 +1846,7 @@ public class CliTest {
         }
     }
 
-    private static void write(Path path, String contents) {
+    static void write(Path path, String contents) {
         try {
             Files.writeString(path, contents, StandardCharsets.UTF_8);
         } catch (IOException cause) {

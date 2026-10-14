@@ -66,6 +66,8 @@ public final class CentralClient {
     private static final String REGISTRY_PACKAGES_URL = CENTRAL_BASE_URL + "registry/packages/";
     private static final String DOCS_URL = CENTRAL_BASE_URL + "docs/";
 
+    private static final String REGISTRY_VERSIONS = "versions";
+
     /** The least the first attempt is given, so a budget spent to the millisecond still makes a real request. */
     private static final long MIN_ATTEMPT_TIMEOUT_MS = 1;
 
@@ -421,7 +423,7 @@ public final class CentralClient {
                 return moduleOf(qualified, parent, probed.value().version(), version, pin, options);
             }
             if (!(probed.failure() instanceof Failure.PackageNotFound)) {
-                return notFound(qualified);
+                return probed.failure();
             }
         }
         StringBuilder tried = new StringBuilder();
@@ -496,6 +498,9 @@ public final class CentralClient {
             return about(response, qualified, null);
         }
 
+        if (!response.value().isJsonArray()) {
+            return Result.err(registryDrift(qualified, "expected a list of versions"));
+        }
         String latest = Coordinates.newestVersion(response.value());
         if (latest == null) {
             return Result.err(notFound(qualified));
@@ -504,10 +509,15 @@ public final class CentralClient {
         // into a path segment.
         Result<Version> parsed = Version.parse(latest);
         if (!parsed.isOk()) {
-            return parsed.cast();
+            return Result.err(registryDrift(qualified, "expected a version, received '" + latest + "'"));
         }
         cache.writeLatest(key, new DocsCache.LatestEntry(parsed.value().text(), options.now()));
         return Result.ok(ResolvedVersion.latest(parsed.value(), false));
+    }
+
+    private static Failure registryDrift(QualifiedName qualified, String message) {
+        return new Failure.SchemaDrift(qualified.qualified(), null, null,
+                List.of(new Failure.SchemaIssue(REGISTRY_VERSIONS, message)), Failure.SCHEMA_DRIFT_SUGGESTION);
     }
 
     private static Version offlineVersion(DocsCache cache, DocsCache.PackageKey key, HttpOptions options) {
