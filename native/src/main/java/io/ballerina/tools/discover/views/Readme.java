@@ -18,11 +18,10 @@
 
 package io.ballerina.tools.discover.views;
 
-import io.ballerina.tools.discover.Coordinate;
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
-import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Filter;
 
@@ -67,8 +66,8 @@ public final class Readme {
     private Readme() {
     }
 
-    private static String command(String pkg) {
-        return Coordinate.COMMAND + pkg + " " + BUCKET;
+    private static Command command(Command.Target target, String... names) {
+        return Command.of(BUCKET, names).in(target);
     }
 
     /**
@@ -126,10 +125,9 @@ public final class Readme {
     }
 
     private static List<DiscoverResult.ReadmeSections.Section> rows(LoadedPackage loaded, List<Section> sections) {
-        String pkg = loaded.pkgArgument();
         return sections.stream()
-                .map(section -> new DiscoverResult.ReadmeSections.Section(
-                        section.number(), section.title(), section.lines(), command(pkg) + " " + section.number()))
+                .map(section -> new DiscoverResult.ReadmeSections.Section(section.number(), section.title(),
+                        section.lines(), command(loaded.target(), String.valueOf(section.number())).text()))
                 .toList();
     }
 
@@ -138,12 +136,12 @@ public final class Readme {
                 loaded.label() + " publishes no readme"
                         + (loaded.module() == null ? "." : " for module " + loaded.module() + "."),
                 loaded.module() != null
-                        ? "Read the default module's instead: `" + command(loaded.pkgArgument(null))
-                                + "`. Or find another module's: `bal discover " + loaded.pkgArgument(null)
+                        ? "Read the default module's instead: `" + command(loaded.target(null))
+                                + "`. Or find another module's: `" + Command.overview(loaded.target(null))
                                 + "` lists the default module's buckets and its submodules."
                         : loaded.submodules().isEmpty()
                                 ? "This package publishes no other module either."
-                                : "Check its other modules: `bal discover " + loaded.pkgArgument(null) + "`.");
+                                : "Check its other modules: `" + Command.overview(loaded.target(null)) + "`.");
     }
 
     /** Every addressable section of the resolved module's readme, in the readme's own order. */
@@ -275,7 +273,7 @@ public final class Readme {
             return Result.err(loaded.symbolNotFoundAmong(List.of(requested),
                     "No readme section of " + loaded.place() + " is numbered or titled '" + requested + "'.",
                     "Pass the number or title of one of the sections listed, or read the whole readme: `"
-                            + command(loaded.pkgArgument()) + "`.",
+                            + command(loaded.target()) + "`.",
                     sections.stream().map(section -> section.number() + ". " + section.title()).toList()));
         }
         if (found.size() > 1) {
@@ -286,8 +284,7 @@ public final class Readme {
             return Result.err(new Failure.Validation(
                     "Section " + requested + " (\"" + section.title() + "\") does not mention \""
                             + filter + "\".",
-                    "Drop --filter to read it anyway: `" + command(loaded.pkgArgument()) + " "
-                            + Texts.shellWord(requested) + "`."));
+                    "Drop --filter to read it anyway: `" + command(loaded.target(), requested) + "`."));
         }
         return Result.ok(toResult(section, sections.size(), loaded));
     }
@@ -330,14 +327,12 @@ public final class Readme {
 
     private static Result<DiscoverResult> filtered(LoadedPackage loaded, List<Section> sections, Options options) {
         List<Section> matched = sections.stream().filter(section -> matches(section, options.filter())).toList();
-        String pkg = loaded.pkgArgument();
-
         if (matched.size() == 1) {
             return Result.ok(toResult(matched.get(0), sections.size(), loaded));
         }
 
         List<DiscoverResult.ReadmeSections.Section> items = rows(loaded, matched);
-        String command = command(pkg) + " --filter " + Texts.shellWord(options.filter());
+        String command = command(loaded.target()).filtered(options.filter()).text();
         Result<Containers.Page> page = Containers.Page.of(options.page(), items.size(), command);
         if (!page.isOk()) {
             return page.cast();

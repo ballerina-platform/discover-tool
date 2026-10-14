@@ -18,20 +18,20 @@
 
 package io.ballerina.tools.discover.cli;
 
-import io.ballerina.tools.discover.Coordinate;
+import io.ballerina.tools.discover.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Model.OptionSpec;
-import picocli.CommandLine.Model.PositionalParamSpec;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 /**
  * The synopsis and the flag list, rendered from {@link Commands}' picocli model rather than hand-written.
  *
- * <p>A flag's name, label and description are declared once, on {@link Commands.Root}, and rendered rather than
- * repeated.
+ * <p>A flag's name, label and description are declared once, on {@link Commands}, and rendered rather than
+ * repeated. What a noun's names are called is {@link Usage}'s, since the grammar declares one list for every noun.
  *
  * @since 0.1.0
  */
@@ -42,32 +42,30 @@ final class UsageRenderer {
 
     private static final int GAP = 3;
 
-    private static final String USAGE = "Usage: " + Coordinate.COMMAND;
+    private static final String USAGE = "Usage: " + Command.PREFIX;
+
+    /** Flags rendered first, in this order: the package, then the container. */
+    private static final List<String> LEADING = List.of(Command.PACKAGE_FLAG, "--client", "--class", "--service");
 
     private UsageRenderer() {
     }
 
-    /** The {@code Usage:} line for {@code --help}, wrapped to {@link #WIDTH}. */
-    static String synopsis(Commands.Grammar grammar) {
-        return wrap(USAGE, slots(grammar), USAGE.length());
+    /** The {@code Usage:} line for {@code noun}'s {@code --help}, or the root's when null, wrapped. */
+    static String synopsis(Commands.Grammar grammar, String noun) {
+        return wrap(USAGE, slots(grammar, noun), USAGE.length());
     }
 
-    static String usageLine(Commands.Grammar grammar) {
-        return USAGE + String.join(" ", slots(grammar));
+    static String usageLine(Commands.Grammar grammar, String noun) {
+        return USAGE + String.join(" ", slots(grammar, noun));
     }
 
-    /** The synopsis on one unwrapped line, {@code --help} included, for the launcher's one-line usage. */
+    /** The root synopsis on one unwrapped line, {@code --help} included, for the launcher's one-line usage. */
     static String synopsisLine(Commands.Grammar grammar) {
-        List<String> slots = new ArrayList<>(slots(grammar));
-        grammar.line().getCommandSpec().options().stream()
+        List<String> slots = new ArrayList<>(slots(grammar, null));
+        grammar.spec(null).options().stream()
                 .filter(OptionSpec::usageHelp)
                 .forEach(help -> slots.add("[" + String.join("|", help.names()) + "]"));
-        return Coordinate.COMMAND + String.join(" ", slots);
-    }
-
-    /** Every flag the grammar accepts, {@code --help} last, as one sentence for an unknown-option failure. */
-    static String knownFlags(Commands.Grammar grammar) {
-        return knownFlags(grammar.line().getCommandSpec());
+        return Command.PREFIX + String.join(" ", slots);
     }
 
     static String knownFlags(CommandSpec spec) {
@@ -89,41 +87,25 @@ final class UsageRenderer {
                 + " and " + names.get(names.size() - 1) + ".";
     }
 
-    private static List<String> slots(Commands.Grammar grammar) {
-        CommandSpec spec = grammar.line().getCommandSpec();
+    private static List<String> slots(Commands.Grammar grammar, String noun) {
         List<String> slots = new ArrayList<>();
-        for (PositionalParamSpec positional : spec.positionalParameters()) {
-            slots.add(slot(positional));
-        }
-        for (OptionSpec option : orderedOptions(spec)) {
-            slots.add(slot(option));
+        slots.add(noun == null ? Usage.ROOT_LABEL : noun + Usage.label(noun));
+        Set<String> required = Usage.requiredFlags(noun);
+        for (OptionSpec option : orderedOptions(grammar.spec(noun))) {
+            slots.add(slot(option, required.contains(option.shortestName())));
         }
         return slots;
     }
 
-    // Labels carry their own brackets: the package is optional to picocli only so a bare `bal discover` is help.
-    private static String slot(PositionalParamSpec positional) {
-        return positional.paramLabel();
+    private static String slot(OptionSpec option, boolean required) {
+        String name = option.shortestName();
+        String spelled = option.arity().max() == 0 ? name : name + " " + option.paramLabel();
+        return required ? spelled : "[" + spelled + "]";
     }
 
-    private static String slot(OptionSpec option) {
-        String name = shortestName(option);
-        return "[" + (option.arity().max() == 0 ? name : name + " " + option.paramLabel()) + "]";
-    }
-
-    private static String shortestName(OptionSpec option) {
-        String shortest = option.longestName();
-        for (String name : option.names()) {
-            if (name.length() < shortest.length()) {
-                shortest = name;
-            }
-        }
-        return shortest;
-    }
-
-    /** Every flag this grammar accepts, minus {@code --help} — a row saying "this is help" is not worth one. */
-    static String flagList(Commands.Grammar grammar) {
-        List<Row> rows = orderedOptions(grammar.line().getCommandSpec()).stream()
+    /** Every flag {@code noun} accepts, minus {@code --help} — a row saying "this is help" is not worth one. */
+    static String flagList(Commands.Grammar grammar, String noun) {
+        List<Row> rows = orderedOptions(grammar.spec(noun)).stream()
                 .map(option -> new Row(label(option), description(option)))
                 .toList();
         return rows.isEmpty() ? "" : table(rows);
@@ -132,7 +114,13 @@ final class UsageRenderer {
     private static List<OptionSpec> orderedOptions(CommandSpec spec) {
         return spec.options().stream()
                 .filter(option -> !option.usageHelp() && !option.hidden())
+                .sorted(Comparator.comparingInt(UsageRenderer::rank))
                 .toList();
+    }
+
+    private static int rank(OptionSpec option) {
+        int leading = LEADING.indexOf(option.shortestName());
+        return leading < 0 ? LEADING.size() : leading;
     }
 
     private static String label(OptionSpec option) {
@@ -146,9 +134,15 @@ final class UsageRenderer {
         return String.join(" ", option.description());
     }
 
-    private record Row(String label, String text) { }
+    /**
+     * One row of a two-column table.
+     *
+     * @param label the left column
+     * @param text the right column, wrapped beside it
+     */
+    record Row(String label, String text) { }
 
-    private static String table(List<Row> rows) {
+    static String table(List<Row> rows) {
         int labelWidth = rows.stream().mapToInt(row -> row.label().length()).max().orElse(0);
         int indent = 2 + labelWidth + GAP;
         StringBuilder text = new StringBuilder();

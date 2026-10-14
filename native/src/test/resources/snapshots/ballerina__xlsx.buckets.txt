@@ -3,17 +3,17 @@ ballerina/xlsx · client
 ballerina/xlsx has no clients.
 
 Other buckets
-  class   3  bal discover ballerina/xlsx class
-  funcs   6  bal discover ballerina/xlsx funcs
-  type   41  bal discover ballerina/xlsx type
+  class      3  bal discover class -p ballerina/xlsx
+  function   6  bal discover function -p ballerina/xlsx
+  type      41  bal discover type -p ballerina/xlsx
 == service ==
 ballerina/xlsx · service
 ballerina/xlsx has no service types.
 
 Other buckets
-  class   3  bal discover ballerina/xlsx class
-  funcs   6  bal discover ballerina/xlsx funcs
-  type   41  bal discover ballerina/xlsx type
+  class      3  bal discover class -p ballerina/xlsx
+  function   6  bal discover function -p ballerina/xlsx
+  type      41  bal discover type -p ballerina/xlsx
 == class ==
 ballerina/xlsx · class
 3 classes
@@ -22,9 +22,9 @@ ballerina/xlsx · class
   Table     18 methods
   Workbook  12 methods
 
-Next: bal discover ballerina/xlsx class <name>
-== funcs ==
-ballerina/xlsx · funcs
+Next: bal discover class <name> -p ballerina/xlsx
+== function ==
+ballerina/xlsx · function
 6 functions
 
   fromBytes
@@ -34,7 +34,7 @@ ballerina/xlsx · funcs
   writeSheet
   writeTable
 
-Next: bal discover ballerina/xlsx funcs <name>
+Next: bal discover function <name> -p ballerina/xlsx
 == type ==
 ballerina/xlsx · type
 19 records, 5 enums, 11 errors, 2 aliases, 1 annotation, 3 classes
@@ -92,6 +92,6 @@ Classes
   Table
 
 ... 1 more (page 1 of 2)
-Next: bal discover ballerina/xlsx type <name>
-Next: bal discover ballerina/xlsx type --page 2
-Next: bal discover ballerina/xlsx type --filter <keyword>
+Next: bal discover type <name> -p ballerina/xlsx
+Next: bal discover type -p ballerina/xlsx --page 2
+Next: bal discover type -p ballerina/xlsx --filter <keyword>

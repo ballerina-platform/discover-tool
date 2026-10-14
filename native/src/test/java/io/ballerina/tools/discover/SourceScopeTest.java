@@ -82,8 +82,8 @@ public class SourceScopeTest {
     @DataProvider(name = "otherAnswers")
     public Object[][] otherAnswers() {
         return new Object[][] {
-                {List.of("ballerina/http")},
-                {List.of("ballerina/http", "readme")},
+                {List.of("package", "ballerina/http")},
+                {List.of("readme", "-p", "ballerina/http")},
         };
     }
 
@@ -95,12 +95,12 @@ public class SourceScopeTest {
     @DataProvider(name = "answersWithoutInlineRecords")
     public Object[][] answersWithoutInlineRecords() {
         return new Object[][] {
-                {List.of("ballerina/http", "client")},
-                {List.of("ballerina/http", "client", "Client")},
-                {List.of("ballerina/http", "class")},
-                {List.of("ballerina/http", "funcs")},
-                {List.of("ballerina/http", "type", "CredentialsConfig")},
-                {List.of("ballerina/http", "type", "ClientAuthConfig")},
+                {List.of("client", "-p", "ballerina/http")},
+                {List.of("client", "Client", "-p", "ballerina/http")},
+                {List.of("class", "-p", "ballerina/http")},
+                {List.of("function", "-p", "ballerina/http")},
+                {List.of("type", "CredentialsConfig", "-p", "ballerina/http")},
+                {List.of("type", "ClientAuthConfig", "-p", "ballerina/http")},
         };
     }
 
@@ -118,24 +118,24 @@ public class SourceScopeTest {
             module.getAsJsonObject().addProperty("description",
                     "```ballerina\nrecord {| int a; |} value = {a: 1};\n```");
         }
-        List<String> argv = List.of("ballerina/http", "readme");
+        List<String> argv = List.of("readme", "-p", "ballerina/http");
         Assert.assertEquals(sourceRequestsOf(argv, docs.toString()), List.of(), argv + " asked for the source");
     }
 
     /** Optionality and defaults of an inline record's members are only in the source. */
     @Test
     public void anAnswerPrintingAnInlineRecordReadsTheSource() {
-        List<String> argv = List.of("ballerina/http", "client", "Client", "new");
+        List<String> argv = List.of("method", "init", "-p", "ballerina/http", "--client", "Client");
         Assert.assertFalse(sourceRequestsOf(argv).isEmpty(), argv + " never asked for the package source");
     }
 
     @DataProvider(name = "serviceAnswers")
     public Object[][] serviceAnswers() {
         return new Object[][] {
-                {List.of("ballerina/http", "service")},
-                {List.of("ballerina/http", "service", "Service")},
-                {List.of("ballerina/http", "type", "InterceptableService")},
-                {List.of("ballerina/http", "type", "RequestInterceptor")},
+                {List.of("service", "-p", "ballerina/http")},
+                {List.of("service", "Service", "-p", "ballerina/http")},
+                {List.of("type", "InterceptableService", "-p", "ballerina/http")},
+                {List.of("type", "RequestInterceptor", "-p", "ballerina/http")},
         };
     }
 

@@ -17,6 +17,7 @@
  */
 package io.ballerina.tools.discover.views;
 
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
@@ -98,9 +99,8 @@ public final class Types {
 
     /** Every declaration the bucket lists, in the package's own order. */
     public static List<Declared> declared(LoadedPackage loaded) {
-        String base = baseCommand(loaded);
         return entries(loaded.library()).stream()
-                .map(entry -> new Declared(entry.kind(), entry.name(), base + " " + Texts.shellWord(entry.name())))
+                .map(entry -> new Declared(entry.kind(), entry.name(), loaded.command(BUCKET, entry.name()).text()))
                 .toList();
     }
 
@@ -211,7 +211,7 @@ public final class Types {
     }
 
     private static String baseCommand(LoadedPackage loaded) {
-        return Coordinate.COMMAND + loaded.pkgArgument() + " " + BUCKET;
+        return loaded.command(BUCKET).text();
     }
 
     private static Result<DiscoverResult> roster(LoadedPackage loaded, Options options) {
@@ -219,8 +219,7 @@ public final class Types {
         if (all.isEmpty()) {
             return Result.ok(Containers.emptyBucket(loaded, BUCKET));
         }
-        String base = baseCommand(loaded);
-        String command = base + (options.filtered() ? " --filter " + Texts.shellWord(options.filter()) : "");
+        String command = loaded.command(BUCKET).filtered(options.filtered() ? options.filter() : null).text();
 
         List<Entry> surface = all;
         List<DiscoverResult.Documented.Entry> documented = List.of();
@@ -229,7 +228,7 @@ public final class Types {
             surface = split.surface();
             documented = split.documented().stream().map(Entry::name).sorted(Texts.LOCALE_ORDER)
                     .<DiscoverResult.Documented.Entry>map(name ->
-                            new DiscoverResult.Method(name, base + " " + Texts.shellWord(name)))
+                            new DiscoverResult.Method(name, loaded.command(BUCKET, name).text()))
                     .toList();
         }
 
@@ -240,7 +239,7 @@ public final class Types {
                     .filter(entry -> entry.kind().equals(kind))
                     .map(Entry::name)
                     .sorted(Texts.LOCALE_ORDER)
-                    .map(name -> new DiscoverResult.Method(name, base + " " + Texts.shellWord(name)))
+                    .map(name -> new DiscoverResult.Method(name, loaded.command(BUCKET, name).text()))
                     .toList();
             byKind.put(kind, methods);
             counts.put(kind, methods.size());
@@ -287,8 +286,7 @@ public final class Types {
             return Result.ok(annotationLeaf(loaded, index, name));
         }
         if (typeDef instanceof TypeDef.ObjectDef object && !isListener(library, name)) {
-            return Containers.render(loaded, Surface.scopeOf(object),
-                    new Containers.Options(List.of(name), null, page));
+            return Containers.render(loaded, Surface.scopeOf(object), Containers.Options.container(name, null, page));
         }
         return declaration(loaded, index, name, null);
     }
@@ -309,7 +307,7 @@ public final class Types {
         List<String> enums = owners.stream().map(TypeDef.Enumeration::name).toList();
         return Result.err(loaded.symbolNotFound(List.of(requested),
                 "'" + requested + "' is a member of the enums " + Texts.and(enums) + " in " + loaded.place() + ".",
-                "Open the enum you mean, e.g. " + Failure.quoted(listing + " " + Texts.shellWord(enums.get(0))) + ".",
+                "Open the enum you mean, e.g. " + Failure.quoted(loaded.command(BUCKET, enums.get(0)).text()) + ".",
                 null));
     }
 
@@ -361,10 +359,10 @@ public final class Types {
     private static String commandFor(LoadedPackage loaded, String name) {
         for (Surface.Scope scope : Surface.Scope.values()) {
             if (Surface.byName(Surface.of(loaded.library(), scope), name).isPresent()) {
-                return Coordinate.COMMAND + loaded.pkgArgument() + " " + scope.verb() + " " + Texts.shellWord(name);
+                return loaded.command(scope.verb(), name).text();
             }
         }
-        return baseCommand(loaded) + " " + Texts.shellWord(name);
+        return loaded.command(BUCKET, name).text();
     }
 
     /**
@@ -386,10 +384,10 @@ public final class Types {
                     foreign.computeIfAbsent(module.coordinate() + ":" + external.recordName(), key ->
                             new DiscoverResult.Foreign(external.recordName(), module.coordinate(),
                                     module.pinnedVersion().orElse(null),
-                                    loaded.argumentFor(module)
+                                    loaded.targetFor(module)
                                             .map(target -> pinnedTo(loaded, module, target))
-                                            .map(target -> Coordinate.COMMAND + target + " " + BUCKET + " "
-                                                    + Texts.shellWord(Identifiers.plain(external.recordName())))
+                                            .map(target -> Command.of(BUCKET,
+                                                    Identifiers.plain(external.recordName())).in(target).text())
                                             .orElse(null)));
                 }
             }
@@ -397,9 +395,11 @@ public final class Types {
         return List.copyOf(foreign.values());
     }
 
-    private static String pinnedTo(LoadedPackage loaded, ModuleRef module, String target) {
-        return target.equals(module.coordinate()) && !module.coordinate().equals(loaded.qualified().qualified())
-                ? Coordinate.argument(target, module.pinnedVersion().orElse(null), null)
+    private static Command.Target pinnedTo(LoadedPackage loaded, ModuleRef module, Command.Target target) {
+        boolean another = target.module() == null && target.pkg().equals(module.coordinate())
+                && !module.coordinate().equals(loaded.qualified().qualified());
+        return another
+                ? new Command.Target(Coordinate.text(target.pkg(), module.pinnedVersion().orElse(null)), null)
                 : target;
     }
 }

@@ -92,7 +92,7 @@ public class CentralSearchTest {
         Assert.assertEquals(packages.get("shown").getAsInt(), 2);
         Assert.assertEquals(packages.get("total").getAsInt(), 12);
         JsonObject kafka = packages.getAsJsonArray("entries").get(0).getAsJsonObject();
-        Assert.assertEquals(kafka.get("command").getAsString(), "bal discover ballerinax/kafka:4.6.6");
+        Assert.assertEquals(kafka.get("command").getAsString(), "bal discover package ballerinax/kafka:4.6.6");
         Assert.assertEquals(kafka.get("summary").getAsString(), "Apache Kafka is a distributed event streaming "
                 + "platform.");
         Assert.assertEquals(packages.getAsJsonArray("entries").get(1).getAsJsonObject().get("summary").getAsString(),
@@ -103,13 +103,13 @@ public class CentralSearchTest {
                 .map(row -> row.getAsJsonObject().get("command").getAsString())
                 .toList();
         Assert.assertEquals(commands, List.of(
-                "bal discover ballerinax/kafka:1.0.0 client Producer send",
-                "bal discover ballerinax/github:1.0.0 client Client repos/:owner/:repo/import get",
-                "bal discover ballerinax/kafka:1.0.0 client Producer init",
-                "bal discover ballerina/graphql:1.0.0 --module subgraph type FederatedEntity",
-                "bal discover ballerina/io:1.0.0 funcs println",
-                "bal discover ballerina/http:1.0.0 service InterceptableService createInterceptors",
-                "bal discover ballerina/websub:1.0.0 type Listener"));
+                "bal discover method send -p ballerinax/kafka:1.0.0 --client Producer",
+                "bal discover resource repos/:owner/:repo/import get -p ballerinax/github:1.0.0 --client Client",
+                "bal discover method init -p ballerinax/kafka:1.0.0 --client Producer",
+                "bal discover type FederatedEntity -p ballerina/graphql:1.0.0 --module subgraph",
+                "bal discover function println -p ballerina/io:1.0.0",
+                "bal discover method createInterceptors -p ballerina/http:1.0.0 --service InterceptableService",
+                "bal discover type Listener -p ballerina/websub:1.0.0"));
         Assert.assertEquals(symbols.asList().stream()
                         .map(row -> row.getAsJsonObject().get("kind").getAsString()).toList(),
                 List.of("remote method", "resource method", "constructor", "record", "function", "method",
@@ -134,40 +134,40 @@ public class CentralSearchTest {
 
     private static Map<String, String> commandsByKind() {
         Map<String, String> commands = new LinkedHashMap<>();
-        commands.put("annotation", "sabtharm/http:2.12.3 type CallerInfo");
-        commands.put("any data type", "ballerinax/squareup:1.3.2 type Status");
-        commands.put("array type", "ballerinax/openai.text:1.0.6 type PromptItemsArray");
-        commands.put("class", "ballerinax/trigger.asb:1.2.0 class Caller");
-        commands.put("method", "ballerina/workflow:1.0.0 class DurableAgent getStatus");
-        commands.put("client", "ballerina/smpp:1.0.0 client Caller");
-        commands.put("remote method", "ballerinax/twilio:5.0.2 client Client fetchOutgoingCallerId");
-        commands.put("resource method", "luheerathantheva/newcon:0.1.0 client Client status get");
-        commands.put("configurable", "ballerina/etl:0.8.1");
-        commands.put("constant", "ballerinax/health.dicom:0.1.0 type TAG_ANCHOR_POINT_ANNOTATION_UNITS");
-        commands.put("decimal type", "ballerinax/smartsheet:1.0.2 type Id");
-        commands.put("enum", "ballerina/ldap:1.4.2 type Status");
-        commands.put("error", "ballerina/test:2201.10.4 type FunctionCallError");
-        commands.put("function", "commons/service_commons:0.1.0 --module auth funcs callerOf");
-        commands.put("function type", "tharmigan/reliable.messaging:0.4.0 type Transformer");
-        commands.put("intersection type", "tharmigan/reliable.messaging:0.4.0 type ExecutionError");
-        commands.put("listener", "ballerina/mcp:1.3.0 type Listener");
-        commands.put("listener method", "ballerina/websub:2.15.2 type Listener");
-        commands.put("map type", "ballerina/workflow:1.0.0 type JsonObject");
-        commands.put("object type", "sabtharm/http:2.12.3 type Status");
-        commands.put("object type method", "ballerina/sql:1.19.0 type SchemaClient");
-        commands.put("remote method/object", "ballerina/sql:1.19.0 client Client query");
-        commands.put("record", "ballerinax/twilio:5.0.2 type ListOutgoingCallerIdResponse");
-        commands.put("service type", "ballerina/messaging:1.0.1 service StoreService");
-        commands.put("method/service", "ballerinax/trigger.slack:0.9.0 service GroupService onGroupClose");
-        commands.put("simple name reference type", "ballerinax/discord:2.0.1 type "
-                + "InlineArrayItemsSkuIdsSkuIdsOneOf12");
-        commands.put("string type", "ballerinax/gotomeeting:1.5.2 type Status");
-        commands.put("tuple type", "tharmigan/reliable.messaging:0.4.0 type DestinationWithProcessors");
-        commands.put("type", "ballerinax/client.config:1.0.1 type AuthConfig");
-        commands.put("type descriptor type", "ballerina/protobuf:1.8.0 --module types.any type ValueTypeDesc");
-        commands.put("union type", "ballerinax/microsoft.sharepoint.sites:1.0.2 type Status");
-        commands.put("variable", "ballerinax/health.dicom:0.1.0 type VARIABLE_LENGTH_VALUE_BYTES");
-        commands.put("xml type", "ballerina/lang.xml:2201.13.2 type XmlType");
+        commands.put("annotation", "type CallerInfo -p sabtharm/http:2.12.3");
+        commands.put("any data type", "type Status -p ballerinax/squareup:1.3.2");
+        commands.put("array type", "type PromptItemsArray -p ballerinax/openai.text:1.0.6");
+        commands.put("class", "class Caller -p ballerinax/trigger.asb:1.2.0");
+        commands.put("method", "method getStatus -p ballerina/workflow:1.0.0 --class DurableAgent");
+        commands.put("client", "client Caller -p ballerina/smpp:1.0.0");
+        commands.put("remote method", "method fetchOutgoingCallerId -p ballerinax/twilio:5.0.2 --client Client");
+        commands.put("resource method", "resource status get -p luheerathantheva/newcon:0.1.0 --client Client");
+        commands.put("configurable", "package ballerina/etl:0.8.1");
+        commands.put("constant", "type TAG_ANCHOR_POINT_ANNOTATION_UNITS -p ballerinax/health.dicom:0.1.0");
+        commands.put("decimal type", "type Id -p ballerinax/smartsheet:1.0.2");
+        commands.put("enum", "type Status -p ballerina/ldap:1.4.2");
+        commands.put("error", "type FunctionCallError -p ballerina/test:2201.10.4");
+        commands.put("function", "function callerOf -p commons/service_commons:0.1.0 --module auth");
+        commands.put("function type", "type Transformer -p tharmigan/reliable.messaging:0.4.0");
+        commands.put("intersection type", "type ExecutionError -p tharmigan/reliable.messaging:0.4.0");
+        commands.put("listener", "type Listener -p ballerina/mcp:1.3.0");
+        commands.put("listener method", "type Listener -p ballerina/websub:2.15.2");
+        commands.put("map type", "type JsonObject -p ballerina/workflow:1.0.0");
+        commands.put("object type", "type Status -p sabtharm/http:2.12.3");
+        commands.put("object type method", "type SchemaClient -p ballerina/sql:1.19.0");
+        commands.put("remote method/object", "method query -p ballerina/sql:1.19.0 --client Client");
+        commands.put("record", "type ListOutgoingCallerIdResponse -p ballerinax/twilio:5.0.2");
+        commands.put("service type", "service StoreService -p ballerina/messaging:1.0.1");
+        commands.put("method/service", "method onGroupClose -p ballerinax/trigger.slack:0.9.0 --service GroupService");
+        commands.put("simple name reference type",
+                "type InlineArrayItemsSkuIdsSkuIdsOneOf12 -p ballerinax/discord:2.0.1");
+        commands.put("string type", "type Status -p ballerinax/gotomeeting:1.5.2");
+        commands.put("tuple type", "type DestinationWithProcessors -p tharmigan/reliable.messaging:0.4.0");
+        commands.put("type", "type AuthConfig -p ballerinax/client.config:1.0.1");
+        commands.put("type descriptor type", "type ValueTypeDesc -p ballerina/protobuf:1.8.0 --module types.any");
+        commands.put("union type", "type Status -p ballerinax/microsoft.sharepoint.sites:1.0.2");
+        commands.put("variable", "type VARIABLE_LENGTH_VALUE_BYTES -p ballerinax/health.dicom:0.1.0");
+        commands.put("xml type", "type XmlType -p ballerina/lang.xml:2201.13.2");
         return commands;
     }
 
@@ -201,9 +201,10 @@ public class CentralSearchTest {
         List<String> commands = entries.asList().stream()
                 .map(row -> row.getAsJsonObject().get("command").getAsString())
                 .toList();
-        Assert.assertEquals(commands, List.of("bal discover acme/pkg:1.0.0", "bal discover acme/pkg:1.0.0",
-                "bal discover acme/pkg:1.0.0", "bal discover acme/pkg:1.0.0",
-                "bal discover acme/pkg:1.0.0 client Client :...path get"));
+        Assert.assertEquals(commands, List.of("bal discover package acme/pkg:1.0.0",
+                "bal discover package acme/pkg:1.0.0",
+                "bal discover package acme/pkg:1.0.0", "bal discover package acme/pkg:1.0.0",
+                "bal discover resource :...path get -p acme/pkg:1.0.0 --client Client"));
     }
 
     @Test
@@ -264,7 +265,8 @@ public class CentralSearchTest {
                 null, true), 0, capture.stderr());
         String text = capture.stdout();
         Assert.assertTrue(text.startsWith("search · kafka\n12 packages, 60 symbols\n"), text);
-        Assert.assertTrue(text.contains("\n  remote method    ballerinax/kafka:1.0.0 client Producer send\n"), text);
+        Assert.assertTrue(text.contains("\n  remote method    method send -p ballerinax/kafka:1.0.0 --client "
+                + "Producer\n"), text);
         Assert.assertTrue(text.contains("\nNext: bal discover <row>\nNext: bal discover search kafka --page 2\n"),
                 text);
     }

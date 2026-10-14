@@ -45,7 +45,7 @@ public class GuardedRunTest {
         int[] code = new int[1];
         String err = stderrOf(() -> {
             throw new OutOfMemoryError("Java heap space");
-        }, List.of("ballerina/http"), code);
+        }, List.of("package", "ballerina/http"), code);
         Assert.assertEquals(code[0], Cli.FAILED);
         Assert.assertTrue(err.contains("\"kind\":\"internal\""), err);
         Assert.assertTrue(err.contains("Java heap space"), err);
@@ -57,7 +57,7 @@ public class GuardedRunTest {
         int[] code = new int[1];
         String err = stderrOf(() -> {
             throw new IllegalStateException("broken");
-        }, List.of("ballerina/http", "--output", "text"), code);
+        }, List.of("package", "ballerina/http", "--output", "text"), code);
         Assert.assertEquals(code[0], Cli.FAILED);
         Assert.assertTrue(err.startsWith("error: Unexpected internal failure: broken."), err);
     }

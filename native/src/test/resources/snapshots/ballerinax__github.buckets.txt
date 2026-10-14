@@ -40,28 +40,28 @@ Path groups (resource methods in each)
   versions               1
   zen                    1
 
-Next: bal discover ballerinax/github client Client <group>
+Next: bal discover resource <group> -p ballerinax/github --client Client
 == service ==
 ballerinax/github · service
 ballerinax/github has no service types.
 
 Other buckets
-  client     1  bal discover ballerinax/github client
-  type    1228  bal discover ballerinax/github type
+  client     1  bal discover client -p ballerinax/github
+  type    1228  bal discover type -p ballerinax/github
 == class ==
 ballerinax/github · class
 ballerinax/github has no classes.
 
 Other buckets
-  client     1  bal discover ballerinax/github client
-  type    1228  bal discover ballerinax/github type
-== funcs ==
-ballerinax/github · funcs
+  client     1  bal discover client -p ballerinax/github
+  type    1228  bal discover type -p ballerinax/github
+== function ==
+ballerinax/github · function
 ballerinax/github has no functions.
 
 Other buckets
-  client     1  bal discover ballerinax/github client
-  type    1228  bal discover ballerinax/github type
+  client     1  bal discover client -p ballerinax/github
+  type    1228  bal discover type -p ballerinax/github
 == type ==
 ballerinax/github · type
 1101 records, 126 aliases, 1 client
@@ -109,6 +109,6 @@ Records
   ActionsPublicKey
 
 ... 1188 more (page 1 of 31)
-Next: bal discover ballerinax/github type <name>
-Next: bal discover ballerinax/github type --page 2
-Next: bal discover ballerinax/github type --filter <keyword>
+Next: bal discover type <name> -p ballerinax/github
+Next: bal discover type -p ballerinax/github --page 2
+Next: bal discover type -p ballerinax/github --filter <keyword>

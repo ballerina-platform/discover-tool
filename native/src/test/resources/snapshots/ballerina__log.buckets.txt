@@ -3,17 +3,17 @@ ballerina/log · client
 ballerina/log has no clients.
 
 Other buckets
-  class   3  bal discover ballerina/log class
-  funcs  11  bal discover ballerina/log funcs
-  type   25  bal discover ballerina/log type
+  class      3  bal discover class -p ballerina/log
+  function  11  bal discover function -p ballerina/log
+  type      25  bal discover type -p ballerina/log
 == service ==
 ballerina/log · service
 ballerina/log has no service types.
 
 Other buckets
-  class   3  bal discover ballerina/log class
-  funcs  11  bal discover ballerina/log funcs
-  type   25  bal discover ballerina/log type
+  class      3  bal discover class -p ballerina/log
+  function  11  bal discover function -p ballerina/log
+  type      25  bal discover type -p ballerina/log
 == class ==
 ballerina/log · class
 3 classes
@@ -22,9 +22,9 @@ ballerina/log · class
   LoggerRegistry        2 methods
   PrintableRawTemplate
 
-Next: bal discover ballerina/log class <name>
-== funcs ==
-ballerina/log · funcs
+Next: bal discover class <name> -p ballerina/log
+== function ==
+ballerina/log · function
 11 functions
 
   evaluateTemplate
@@ -39,7 +39,7 @@ ballerina/log · funcs
   setOutputFile
   toMaskedString
 
-Next: bal discover ballerina/log funcs <name>
+Next: bal discover function <name> -p ballerina/log
 == type ==
 ballerina/log · type
 8 records, 6 enums, 1 error, 5 aliases, 1 constant, 1 annotation, 3 classes
@@ -83,4 +83,4 @@ Classes
   LoggerRegistry
   PrintableRawTemplate
 
-Next: bal discover ballerina/log type <name>
+Next: bal discover type <name> -p ballerina/log

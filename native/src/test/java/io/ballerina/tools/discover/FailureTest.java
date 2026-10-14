@@ -66,15 +66,15 @@ public class FailureTest {
     public void aMissCarriesTheCommandItsSuggestionQuotesAndNoCandidates() {
         Failure miss = new Failure.SymbolNotFound("ballerina/graphql", "1.17.0", "subgraph", List.of("Nope"),
                 "'Nope' is not a class in ballerina/graphql:1.17.0, module subgraph.",
-                "List the classes: `bal discover ballerina/graphql --module subgraph class`.",
-                "bal discover ballerina/graphql --module subgraph class", List.of());
+                "List the classes: `bal discover class -p ballerina/graphql --module subgraph`.",
+                "bal discover class -p ballerina/graphql --module subgraph", List.of());
         Assert.assertEquals(miss.describeText(), "error: 'Nope' is not a class in ballerina/graphql:1.17.0, "
-                + "module subgraph.\n  List the classes: `bal discover ballerina/graphql --module subgraph class`.");
+                + "module subgraph.\n  List the classes: `bal discover class -p ballerina/graphql --module subgraph`.");
         Assert.assertEquals(miss.describe(), "{\"kind\":\"symbol-not-found\",\"message\":\"'Nope' is not a class "
                 + "in ballerina/graphql:1.17.0, module subgraph.\",\"qualified\":\"ballerina/graphql\","
                 + "\"version\":\"1.17.0\",\"module\":\"subgraph\",\"requested\":[\"Nope\"],"
-                + "\"suggestion\":\"List the classes: `bal discover ballerina/graphql --module subgraph class`.\","
-                + "\"command\":\"bal discover ballerina/graphql --module subgraph class\"}");
+                + "\"suggestion\":\"List the classes: `bal discover class -p ballerina/graphql --module subgraph`.\","
+                + "\"command\":\"bal discover class -p ballerina/graphql --module subgraph\"}");
     }
 
     @Test

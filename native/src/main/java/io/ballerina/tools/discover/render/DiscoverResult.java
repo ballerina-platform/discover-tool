@@ -18,7 +18,7 @@
 
 package io.ballerina.tools.discover.render;
 
-import io.ballerina.tools.discover.Coordinate;
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.model.ServiceHandlers;
 
 import java.util.Collections;
@@ -672,7 +672,7 @@ public sealed interface DiscoverResult {
         public record PackageHit(String qualified, String version, String summary, String arguments) {
 
             public String command() {
-                return Coordinate.COMMAND + arguments;
+                return Command.PREFIX + arguments;
             }
         }
 
@@ -691,7 +691,7 @@ public sealed interface DiscoverResult {
                 String name, String path, String accessor, String arguments) {
 
             public String command() {
-                return Coordinate.COMMAND + arguments;
+                return Command.PREFIX + arguments;
             }
         }
     }
@@ -707,7 +707,7 @@ public sealed interface DiscoverResult {
 
         /**
          * @param bucket the bucket's name
-         * @param count containers in it — functions, for {@code funcs}
+         * @param count containers in it — functions, for {@code function}
          * @param command the command that opens it
          */
         public record Elsewhere(String bucket, int count, String command) { }

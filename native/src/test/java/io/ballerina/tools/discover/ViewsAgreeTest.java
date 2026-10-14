@@ -25,7 +25,6 @@ import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Closure;
-import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -118,14 +117,18 @@ public class ViewsAgreeTest {
 
         for (Surface.Scope scope : Surface.Scope.values()) {
             for (Surface.Container container : Surface.of(context.library(), scope)) {
-                List<String> owner = container.isModule() ? List.of() : List.of(container.name());
+                List<String> owner = container.isModule()
+                        ? List.of()
+                        : List.of("--" + scope.verb(), container.name());
+                String noun = container.isModule() ? scope.verb() : "method";
                 List<List<String>> selectors = new ArrayList<>();
-                container.memberNames().forEach(name -> selectors.add(with(owner, name)));
+                container.memberNames().forEach(name -> selectors.add(with(List.of(noun, name), owner)));
                 container.operations().stream().limit(OPERATIONS_PER_CONTAINER).forEach(operation ->
-                        selectors.add(with(owner, operation.fn().accessor(), String.join("/", operation.segments()))));
+                        selectors.add(with(List.of("resource", String.join("/", operation.segments()),
+                                operation.fn().accessor()), owner)));
                 for (List<String> selector : selectors) {
-                    DiscoverResult answer = expectAnswer(Containers.render(context, scope,
-                            new Containers.Options(selector)), scope.verb() + " " + selector);
+                    DiscoverResult answer = expectAnswer(Asked.of(context, selector.toArray(String[]::new)),
+                            String.join(" ", selector));
                     // An exact member name or an exact path plus its accessor names ONE callable; anything else
                     // here is the selector grammar failing to reach something the package declares.
                     Assert.assertTrue(answer instanceof DiscoverResult.Signature, slug + " " + scope.verb() + " "
@@ -148,9 +151,9 @@ public class ViewsAgreeTest {
         }
     }
 
-    private static List<String> with(List<String> prefix, String... more) {
+    private static List<String> with(List<String> prefix, List<String> more) {
         List<String> selector = new ArrayList<>(prefix);
-        selector.addAll(List.of(more));
+        selector.addAll(more);
         return selector;
     }
 
@@ -214,8 +217,8 @@ public class ViewsAgreeTest {
             Assert.assertFalse(view.isOk(), typed);
             Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
             Assert.assertEquals(failure.message(), "'" + typed + "' is not a type in " + http.label() + ".");
-            Assert.assertEquals(failure.command(), "bal discover ballerina/http type");
-            Assert.assertEquals(failure.suggestion(), "List the types: `bal discover ballerina/http type`.");
+            Assert.assertEquals(failure.command(), "bal discover type -p ballerina/http");
+            Assert.assertEquals(failure.suggestion(), "List the types: `bal discover type -p ballerina/http`.");
             Assert.assertTrue(failure.candidates().isEmpty(), failure.candidates().toString());
         }
     }
@@ -233,8 +236,7 @@ public class ViewsAgreeTest {
             for (List<String> path : allPaths(tree, List.of())) {
                 Assert.assertTrue(PathTree.resolve(tree, path) instanceof PathTree.Resolution.Found,
                         container.name() + ": " + String.join("/", path) + " is offered but unreachable");
-                expectAnswer(Containers.render(context, Surface.Scope.CLIENT, new Containers.Options(
-                                List.of(container.name(), PathTree.join(path)))),
+                expectAnswer(Asked.of(context, "resource", PathTree.join(path), "--client", container.name()),
                         container.name() + " " + PathTree.join(path));
             }
         }
@@ -312,9 +314,8 @@ public class ViewsAgreeTest {
         // FIELDS are the call's named arguments — and no signature line spells those out, so the answer must
         // carry the record.
         LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__github");
-        DiscoverResult view = expectAnswer(Containers.render(context, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client", "delete", "repos/:owner/:repo/actions/caches"))),
-                "caches delete");
+        DiscoverResult view = expectAnswer(Asked.of(context, "resource", "repos/:owner/:repo/actions/caches", "delete",
+                "--client", "Client"), "caches delete");
         Assert.assertTrue(view instanceof DiscoverResult.Signature, view.toString());
         DiscoverResult.Signature signature = (DiscoverResult.Signature) view;
         Assert.assertTrue(signature.declaration().contains(

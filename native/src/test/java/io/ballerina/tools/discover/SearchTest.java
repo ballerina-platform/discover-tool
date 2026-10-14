@@ -57,7 +57,7 @@ public class SearchTest {
         Assert.assertEquals(names(send, DiscoverResult.Search.Kind.REMOTE),
                 List.of("Producer send", "Producer sendWithMetadata"));
         Assert.assertEquals(send.groups().get(0).hits().get(0).command(),
-                "bal discover ballerinax/kafka client Producer send");
+                "bal discover method send -p ballerinax/kafka --client Producer");
         Assert.assertNull(send.paging());
     }
 
@@ -70,7 +70,7 @@ public class SearchTest {
         Assert.assertEquals(first.name(), "repos/:owner/:repo/issues");
         Assert.assertEquals(first.detail(), "post");
         Assert.assertEquals(first.command(),
-                "bal discover ballerinax/github client Client repos/:owner/:repo/issues post");
+                "bal discover resource repos/:owner/:repo/issues post -p ballerinax/github --client Client");
     }
 
     @Test
@@ -94,7 +94,8 @@ public class SearchTest {
         DiscoverResult.Search readme = search("ballerinax__kafka", 1, "serial");
         Assert.assertFalse(names(readme, DiscoverResult.Search.Kind.README).isEmpty(), readme.toString());
         Assert.assertTrue(readme.groups().stream().filter(group -> group.kind() == DiscoverResult.Search.Kind.README)
-                .findFirst().orElseThrow().hits().get(0).command().startsWith("bal discover ballerinax/kafka readme "));
+                .findFirst().orElseThrow().hits().get(0).command().matches("bal discover readme \\d+ -p "
+                        + "ballerinax/kafka"));
     }
 
     @Test
@@ -102,7 +103,7 @@ public class SearchTest {
         DiscoverResult.Search first = search("ballerinax__github", 1, "issue");
         Assert.assertEquals(first.shown(), 40);
         Assert.assertEquals(first.paging().page(), 1);
-        Assert.assertEquals(first.next(), "bal discover ballerinax/github search issue --page 2");
+        Assert.assertEquals(first.next(), "bal discover search issue -p ballerinax/github --page 2");
         Assert.assertEquals(first.groups().get(0).kind(), DiscoverResult.Search.Kind.RESOURCES);
         DiscoverResult.Search last = search("ballerinax__github", first.paging().pages(), "issue");
         Assert.assertNull(last.next());
@@ -115,31 +116,32 @@ public class SearchTest {
         Assert.assertEquals(none.total(), 0);
         String text = TextRenderer.render(none, new TextRenderer.Context("ballerinax/kafka", null,
                 List.of("search", "zzz"), null, null, null));
-        Assert.assertTrue(text.endsWith("No name in this package holds 'zzz'.\n\nNext: bal discover ballerinax/kafka"),
+        Assert.assertTrue(text.endsWith("No name in this package holds 'zzz'.\n\nNext: bal discover package "
+                + "ballerinax/kafka"),
                 text);
         JsonObject json = JsonParser.parseString(JsonRenderer.render(none)).getAsJsonObject();
-        Assert.assertEquals(json.get("overview").getAsString(), "bal discover ballerinax/kafka");
+        Assert.assertEquals(json.get("overview").getAsString(), "bal discover package ballerinax/kafka");
         Assert.assertEquals(json.get("total").getAsInt(), 0);
     }
 
     @Test
     public void aSearchNeedsAKeywordAndTakesNoFilter() {
         CliTest.Capture none = new CliTest.Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "search"), none.streams(), CliTest.never()), 2);
+        Assert.assertEquals(Cli.run(List.of("search", "-p", "ballerinax/kafka"), none.streams(), CliTest.never()), 2);
         Assert.assertEquals(none.field("kind"), "validation");
         CliTest.Capture filtered = new CliTest.Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "search", "send", "--filter", "x"),
+        Assert.assertEquals(Cli.run(List.of("search", "send", "-p", "ballerinax/kafka", "--filter", "x"),
                 filtered.streams(), CliTest.never()), 2);
-        Assert.assertEquals(filtered.field("command"), "bal discover ballerinax/kafka search send x");
+        Assert.assertEquals(filtered.field("command"), "bal discover search send x -p ballerinax/kafka");
     }
 
     @Test
     public void aFilterOnThePackageItselfSearchesIt() {
         CliTest.Capture filtered = new CliTest.Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--filter", "send"), filtered.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka", "--filter", "send"), filtered.streams(),
                 CliTest.centralFor("ballerinax__kafka", "4.6.5")), 0, filtered.stderr());
         CliTest.Capture searched = new CliTest.Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "search", "send"), searched.streams(),
+        Assert.assertEquals(Cli.run(List.of("search", "send", "-p", "ballerinax/kafka"), searched.streams(),
                 CliTest.centralFor("ballerinax__kafka", "4.6.5")), 0, searched.stderr());
         Assert.assertEquals(filtered.stdout(), searched.stdout());
     }

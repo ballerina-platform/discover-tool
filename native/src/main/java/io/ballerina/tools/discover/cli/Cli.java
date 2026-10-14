@@ -18,13 +18,13 @@
 
 package io.ballerina.tools.discover.cli;
 
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Loader;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
-import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.central.CentralRepository;
 import io.ballerina.tools.discover.central.HttpOptions;
@@ -44,9 +44,11 @@ import picocli.CommandLine;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * {@code bal discover} — argv in, exit code out.
@@ -65,9 +67,8 @@ import java.util.stream.Collectors;
  *       never the code
  * </ul>
  *
- * <p>{@code bal discover <org>/<name>[:<version>] [bucket] [name ...]} is one picocli command, and {@code bucket} a
- * plain positional value rather than a subcommand: package, then bucket, then member is one drill-down, not a mode
- * switch.
+ * <p>{@code bal discover <noun> [name ...] -p <org>/<name>[:<version>]} is one picocli subcommand per noun; see
+ * {@link Commands}.
  *
  * <p>No {@link System#exit} here, and no environment read: the cache, the transport and the project directory
  * arrive as arguments, so a test drives the real command against a recorded payload and a temporary directory.
@@ -79,9 +80,7 @@ public final class Cli {
 
     private static final String OUTPUT_FLAG = "--output";
 
-    private static final String HELP = Coordinate.COMMAND + "--help";
-
-    private static final String RUN_HELP = "Run `" + HELP + "` for usage.";
+    private static final String HELP_FLAG = "--help";
 
     static final int FAILED = 1;
 
@@ -94,6 +93,23 @@ public final class Cli {
     private static final String PLACEHOLDER_VERSION = "<version>";
 
     private static final String WRITE_VERSION = "To read a specific version, write it after the package: ";
+
+    /** The old grammar's word for the module's functions, mapped when an old command is rewritten. */
+    private static final String OLD_FUNCTIONS = "funcs";
+
+    private static final String PATH_SEPARATOR = "/";
+
+    private static final String FLAG_START = "-";
+
+    /** How many names each noun takes; {@code search} takes any number of keywords. */
+    private static final Map<String, Integer> MAX_NAMES = Map.of(
+            Command.PACKAGE, 1, Command.CLIENT, 1, Command.SERVICE, 1, Command.CLASS, 1, Command.FUNCTION, 1,
+            Command.TYPE, 1, Command.METHOD, 1, Command.RESOURCE, 2, Command.README, 1);
+
+    /** The nouns that answer with containers, and the scope each lists. */
+    private static final Map<String, Surface.Scope> CONTAINER_NOUNS = Map.of(
+            Command.CLIENT, Surface.Scope.CLIENT, Command.SERVICE, Surface.Scope.SERVICE,
+            Command.CLASS, Surface.Scope.CLASS, Command.FUNCTION, Surface.Scope.MODULE);
 
     private Cli() {
     }
@@ -132,105 +148,188 @@ public final class Cli {
 
         Commands.Grammar grammar = Commands.Grammar.create();
         boolean json = jsonOutput(argv, interactive, grammar);
-        UsageErrors usage = new UsageErrors(grammar, streams, json);
         CommandLine.ParseResult parsed;
         try {
             parsed = grammar.line().parseArgs(argv.toArray(new String[0]));
         } catch (CommandLine.ParameterException cause) {
             // picocli's own error printing is deliberately never used: stderr has to hold exactly one `Failure`
             // object, and picocli would write a usage block beside it.
-            Failure specific = describeParseError(cause, grammar);
+            String noun = cause.getCommandLine() == grammar.line()
+                    ? null
+                    : cause.getCommandLine().getCommandSpec().name();
+            UsageErrors usage = new UsageErrors(grammar, noun, streams, json);
+            Failure specific = describeParseError(cause);
             return specific == null
                     ? usage.helpError(firstLine(cause.getMessage()))
                     : usage.error(specific);
         }
 
+        CommandLine.ParseResult sub = parsed.hasSubcommand() ? parsed.subcommand() : null;
+        String nounName = sub == null ? null : sub.commandSpec().name();
         // A usage request is answered, not failed: it goes to stdout at exit 0, because "exit 0 means stdout is
         // complete" is what a redirecting caller relies on.
-        if (parsed.isUsageHelpRequested()) {
-            streams.out().accept(Usage.root());
+        if (parsed.isUsageHelpRequested() || sub != null && sub.isUsageHelpRequested()) {
+            streams.out().accept(nounName == null ? Usage.root() : Usage.noun(nounName));
             return 0;
         }
-
-        Commands.Root root = grammar.root();
-        if (root.version != null) {
-            return usage.error(versionFlag(root));
+        UsageErrors usage = new UsageErrors(grammar, nounName, streams, json);
+        Invocation call = Invocation.of(grammar.root(), nounName, nounName == null ? null : grammar.nouns()
+                .get(nounName));
+        Failure misuse = misuse(grammar, call);
+        if (misuse != null) {
+            return usage.error(misuse);
         }
-        if (SearchCentral.VERB.equals(root.pkg)) {
-            return searchCentral(root, streams, http, json, usage);
+        if (Command.SEARCH.equals(nounName) && call.pkg() == null) {
+            return searchCentral(call, streams, http, json, usage);
         }
-        if (root.pkg == null) {
-            return usage.error(new Failure.Validation(
-                    "A package is required.",
-                    "Pass '<org>/<name>', e.g. bal discover ballerinax/github."));
-        }
-
-        Result<Coordinate> coordinate = Coordinate.parse(root.pkg, Coordinate.moduleArgument(root.module) + tail(root));
-        if (!coordinate.isOk()) {
-            return usage.error(coordinate.failure());
-        }
-        QualifiedName qualified = coordinate.value().qualified();
-
-        Failure argumentError = validate(root, coordinate.value());
-        if (argumentError != null) {
-            return usage.error(argumentError);
-        }
-        Version version = coordinate.value().version();
-
-        // Checked before the package is ever fetched: a mistyped bucket is a fact about the argument list, not
-        // about the package, and costs a round trip to Central if left until after the load.
-        List<String> rest = rest(root);
-        String bucket = rest.isEmpty() ? null : rest.get(0);
-        if (bucket != null && !Commands.BUCKETS.contains(bucket)) {
-            return usage.error(unknownBucket(bucket, coordinate.value().command(root.module)));
-        }
-
-        String filter = root.filter;
-        Failure extra = extraNames(bucket, rest, filter, root, qualified, version);
-        if (extra != null) {
-            return usage.error(extra);
-        }
-
-        // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
-        HttpOptions resolved = http.withRefresh(root.refresh);
-        Loader.LoadOptions options = new Loader.LoadOptions(
-                resolved, projectDir, List.of(CentralRepository.INSTANCE), root.module, version);
-        Result<LoadedPackage> loaded = Loader.loadPackage(qualified, options);
-        if (!loaded.isOk()) {
-            return fail(loaded.failure().lengthened(tail(root)), streams, json);
-        }
-
-        Result<DiscoverResult> answer = answer(loaded.value(), bucket, rest, filter, root.page);
-        if (!answer.isOk()) {
-            return fail(readAt(answer.failure(), loaded.value()), streams, json);
-        }
-        if (root.page != FIRST_PAGE && answer.value().paging() == null) {
-            return fail(readAt(notPaged(root, coordinate.value(), filter), loaded.value()), streams, json);
-        }
-        String read = loaded.value().version().text();
-        List<String> shown = echoed(rest);
-        TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), root.module, shown,
-                filter, Version.textOf(version), read);
-        JsonRenderer.Where about = new JsonRenderer.Where(qualified.qualified(), read, root.module);
-        streams.out().accept((json ? JsonRenderer.render(answer.value(), about)
-                : TextRenderer.render(answer.value(), where)) + "\n");
-        return 0;
+        return lookup(call, streams, http, projectDir, json, usage);
     }
 
-    private static int searchCentral(Commands.Root root, Streams streams, HttpOptions http, boolean json,
-            UsageErrors usage) {
-        List<String> keywords = rest(root);
-        Failure invalid = rejectInvalidOutput(root);
-        if (invalid == null) {
-            invalid = SearchCentral.misuse(keywords, root.module, root.filter);
+    // What makes the command line itself unusable, before anything is fetched; null when it is well formed.
+    private static Failure misuse(Commands.Grammar grammar, Invocation call) {
+        if (call.version() != null) {
+            return versionFlag(call);
         }
+        if (!call.rest().isEmpty()) {
+            String first = call.rest().get(0);
+            return first.contains(PATH_SEPARATOR) ? oldForm(call) : unknownNoun(first, call);
+        }
+        if (call.noun() == null) {
+            return new Failure.Validation("Name what to read: " + String.join(", ", Command.NOUNS) + ".",
+                    "For a package's overview, write " + Failure.quoted(Command.PREFIX + Command.PACKAGE + " "
+                            + PLACEHOLDER_PACKAGE) + ".");
+        }
+        Failure option = unknownOption(grammar, call);
+        if (option != null) {
+            return option;
+        }
+        Failure output = rejectInvalidOutput(call.output());
+        if (output != null) {
+            return output;
+        }
+        if (Command.SEARCH.equals(call.noun()) && call.pkg() == null) {
+            return null;
+        }
+        return Command.PACKAGE.equals(call.noun()) ? packageMisuse(call) : scopedMisuse(call);
+    }
+
+    private static Failure packageMisuse(Invocation call) {
+        if (call.pkg() != null && call.names().isEmpty()) {
+            String command = Command.overview(new Command.Target(call.pkg(), call.module())).filtered(call.filter())
+                    .text() + call.pageArgument();
+            return new Failure.Validation("package takes the package as its name, not after -p.",
+                    "Run " + Failure.quoted(command) + ".", command);
+        }
+        if (call.names().isEmpty()) {
+            return new Failure.Validation("package needs the package to read.",
+                    "Write " + Failure.quoted(Command.PREFIX + Command.PACKAGE + " " + PLACEHOLDER_PACKAGE)
+                            + ", e.g. bal discover package ballerinax/github.");
+        }
+        return tooManyNames(call);
+    }
+
+    private static Failure scopedMisuse(Invocation call) {
+        if (call.pkg() == null) {
+            return new Failure.Validation(call.noun() + " needs the package it reads: -p " + Commands.PACKAGE_LABEL
+                    + ".", "Add it, e.g. " + Failure.quoted(Command.of(call.noun(), call.echoed())
+                    .in(new Command.Target("ballerinax/github", call.module())).text()) + ".");
+        }
+        if (call.owners() > 1) {
+            return new Failure.Validation("A " + call.noun() + " has one container; pass one of --client, --class "
+                    + "and --service.", "Keep the one that declares it.");
+        }
+        return tooManyNames(call);
+    }
+
+    private static Failure tooManyNames(Invocation call) {
+        Integer max = MAX_NAMES.get(call.noun());
+        List<String> names = call.names();
+        if (max == null || names.size() <= max) {
+            return null;
+        }
+        Failure version = rejectVersionArguments(call);
+        if (version != null) {
+            return version;
+        }
+        String command = CONTAINER_NOUNS.containsKey(call.noun()) && !Command.FUNCTION.equals(call.noun())
+                ? call.retarget(memberOf(call.noun(), call.echoed())).text() + call.pageArgument()
+                : call.withNames(names.subList(0, max)).command().text() + call.pageArgument();
+        String takes = max == 1 ? "one name" : "a path and its accessor";
+        return new Failure.Validation(call.noun() + " takes " + takes + "; got " + names.size() + ".",
+                "Run " + Failure.quoted(command) + ".", command);
+    }
+
+    // `client C m` read as the member it names: a method, or a resource when a path or an accessor follows.
+    private static Command memberOf(String noun, List<String> names) {
+        List<String> member = names.subList(1, names.size());
+        boolean resource = member.size() > 1 || member.get(0).contains(PATH_SEPARATOR);
+        return Command.of(resource ? Command.RESOURCE : Command.METHOD, member).ownedBy(noun, names.get(0));
+    }
+
+    private static Failure unknownOption(Commands.Grammar grammar, Invocation call) {
+        String unknown = call.names().stream()
+                .filter(name -> name.startsWith(FLAG_START) && name.length() > 1)
+                .findFirst()
+                .orElse(null);
+        return unknown == null
+                ? null
+                : new Failure.Validation("Unknown option '" + unknown + "'.",
+                        UsageRenderer.knownFlags(grammar.spec(call.noun())));
+    }
+
+    // The package-first form this tool once took: the command to run now, with the old bucket mapped.
+    private static Failure oldForm(Invocation call) {
+        List<String> words = new ArrayList<>(call.rest());
+        if (call.noun() != null) {
+            words.add(call.noun());
+            words.addAll(call.names());
+        }
+        String pkg = words.get(0);
+        String bucket = words.size() > 1 ? words.get(1) : null;
+        List<String> selectors = words.size() > 2
+                ? words.subList(2, words.size()).stream().map(PathTree::plainSelector).toList()
+                : List.of();
+        Command mapped = oldBucket(bucket, selectors);
+        String command = mapped.in(new Command.Target(pkg, call.module())).filtered(call.filter()).text()
+                + call.pageArgument();
+        return new Failure.Validation("The package goes after -p now, and what to read comes first.",
+                "Run " + Failure.quoted(command) + ".", command);
+    }
+
+    private static Command oldBucket(String bucket, List<String> selectors) {
+        if (bucket == null) {
+            return Command.of(Command.PACKAGE);
+        }
+        String noun = OLD_FUNCTIONS.equals(bucket) ? Command.FUNCTION : bucket;
+        if (CONTAINER_NOUNS.containsKey(noun) && !Command.FUNCTION.equals(noun) && selectors.size() > 1) {
+            return memberOf(noun, selectors);
+        }
+        if (Command.README.equals(noun) && !selectors.isEmpty()) {
+            return Command.of(noun, String.join(" ", selectors));
+        }
+        return Command.NOUNS.contains(noun) ? Command.of(noun, selectors) : Command.of(Command.PACKAGE);
+    }
+
+    // A word where the noun goes is most often a name (`go doc` leaves the kind out too): the search finds it.
+    private static Failure unknownNoun(String token, Invocation call) {
+        String search = Command.of(Command.SEARCH, token)
+                .in(call.pkg() == null ? null : new Command.Target(call.pkg(), call.module())).text();
+        return new Failure.Validation("'" + token + "' is not a noun. The nouns are " + String.join(", ",
+                Command.NOUNS) + ".", "To find what is named '" + token + "': " + Failure.quoted(search) + ".",
+                search);
+    }
+
+    private static int searchCentral(Invocation call, Streams streams, HttpOptions http, boolean json,
+            UsageErrors usage) {
+        List<String> keywords = call.names();
+        Failure invalid = SearchCentral.misuse(keywords, call.module(), call.filter());
         if (invalid == null) {
-            invalid = pageBeforeFirst(root.page, SearchCentral.command(keywords));
+            invalid = pageBeforeFirst(call.page(), SearchCentral.command(keywords));
         }
         if (invalid != null) {
             return usage.error(invalid);
         }
-        Result<DiscoverResult> found = SearchCentral.render(keywords, root.page, http.withRefresh(root.refresh));
+        Result<DiscoverResult> found = SearchCentral.render(keywords, call.page(), http.withRefresh(call.refresh()));
         if (!found.isOk()) {
             return fail(found.failure(), streams, json);
         }
@@ -241,86 +340,76 @@ public final class Cli {
         return 0;
     }
 
-    private static Result<DiscoverResult> answer(
-            LoadedPackage loaded, String bucket, List<String> rest, String filter, int page) {
-        Result<DiscoverResult> plain = answerFrom(loaded, bucket, rest, filter, page);
+    private static int lookup(Invocation call, Streams streams, HttpOptions http, String projectDir, boolean json,
+            UsageErrors usage) {
+        Result<Coordinate> coordinate = Coordinate.parse(call.coordinate(),
+                corrected -> call.command(new Command.Target(corrected, call.module())).text() + call.pageArgument());
+        if (!coordinate.isOk()) {
+            return usage.error(coordinate.failure());
+        }
+        QualifiedName qualified = coordinate.value().qualified();
+        Version version = coordinate.value().version();
+        Invocation pinned = call.at(coordinate.value());
+
+        Failure argumentError = validate(pinned);
+        if (argumentError != null) {
+            return usage.error(argumentError);
+        }
+
+        // `--refresh` is only known once arguments are parsed, so the injected options are rebuilt here.
+        HttpOptions resolved = http.withRefresh(call.refresh());
+        Loader.LoadOptions options = new Loader.LoadOptions(
+                resolved, projectDir, List.of(CentralRepository.INSTANCE), call.module(), version);
+        Result<LoadedPackage> loaded = Loader.loadPackage(qualified, options);
+        if (!loaded.isOk()) {
+            return fail(loaded.failure().retargeted(pinned::retargeted), streams, json);
+        }
+
+        Result<DiscoverResult> answer = answer(loaded.value(), call);
+        if (!answer.isOk()) {
+            return fail(readAt(answer.failure(), loaded.value()), streams, json);
+        }
+        if (call.page() != FIRST_PAGE && answer.value().paging() == null) {
+            return fail(readAt(notPaged(pinned), loaded.value()), streams, json);
+        }
+        String read = loaded.value().version().text();
+        TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), call.module(), call.trail(),
+                call.filter(), Version.textOf(version), read);
+        JsonRenderer.Where about = new JsonRenderer.Where(qualified.qualified(), read, call.module());
+        streams.out().accept((json ? JsonRenderer.render(answer.value(), about)
+                : TextRenderer.render(answer.value(), where)) + "\n");
+        return 0;
+    }
+
+    private static Result<DiscoverResult> answer(LoadedPackage loaded, Invocation call) {
+        Result<DiscoverResult> plain = answerFrom(loaded, call);
         if (!plain.isOk() || !loaded.bound().settles(() -> JsonRenderer.render(plain.value()))) {
             return plain;
         }
         LoadedPackage settled = loaded.withSource();
-        return settled.library() == loaded.library() ? plain : answerFrom(settled, bucket, rest, filter, page);
+        return settled.library() == loaded.library() ? plain : answerFrom(settled, call);
     }
 
-    private static Result<DiscoverResult> answerFrom(
-            LoadedPackage loaded, String bucket, List<String> rest, String filter, int page) {
-        if (bucket == null) {
-            return filter == null
+    private static Result<DiscoverResult> answerFrom(LoadedPackage loaded, Invocation call) {
+        String name = call.names().isEmpty() ? null : call.names().get(0);
+        String filter = call.filter();
+        int page = call.page();
+        return switch (call.noun()) {
+            case Command.PACKAGE -> filter == null
                     ? Result.ok(Overview.of(loaded))
                     : Search.render(loaded, new Search.Options(List.of(filter), page));
-        }
-        List<String> selectors = rest.subList(1, rest.size());
-        if (Search.BUCKET.equals(bucket)) {
-            return Search.render(loaded, new Search.Options(selectors, page));
-        }
-        if (Readme.BUCKET.equals(bucket)) {
-            return Readme.render(loaded, new Readme.Options(
-                    selectors.isEmpty() ? null : String.join(" ", selectors), filter, page));
-        }
-        if (Types.BUCKET.equals(bucket)) {
-            return Types.render(loaded, new Types.Options(selectors, filter, page));
-        }
-        Surface.Scope scope = Surface.Scope.ofVerb(bucket)
-                .orElseThrow(() -> new IllegalStateException("unreachable: validated above"));
-        return Containers.render(loaded, scope, new Containers.Options(selectors, filter, page));
-    }
-
-    private static Failure extraNames(String bucket, List<String> rest, String filter, Commands.Root root,
-            QualifiedName qualified, Version version) {
-        if (bucket == null) {
-            return null;
-        }
-        List<String> selectors = rest.subList(1, rest.size());
-        String command = new Coordinate(qualified, version).command(root.module) + " " + bucket;
-        if (Types.BUCKET.equals(bucket)) {
-            return Types.misuse(command, new Types.Options(selectors, filter, root.page));
-        }
-        if (Search.BUCKET.equals(bucket)) {
-            return Search.misuse(new Coordinate(qualified, version).command(root.module) + " " + Search.BUCKET,
-                    selectors, filter);
-        }
-        if (Surface.Scope.MODULE.verb().equals(bucket)) {
-            return Containers.extraFunctionNames(command, new Containers.Options(selectors, filter, root.page));
-        }
-        return null;
-    }
-
-    private static String tail(List<String> rest, String filter, int page) {
-        StringBuilder words = new StringBuilder();
-        echoed(rest).forEach(word -> words.append(' ').append(Texts.shellWord(word)));
-        if (filter != null) {
-            words.append(" --filter ").append(Texts.shellWord(filter));
-        }
-        if (page != FIRST_PAGE) {
-            words.append(" --page ").append(page);
-        }
-        return words.toString();
-    }
-
-    // The typed words as this tool prints them: a name or path spelled without Ballerina's escapes, as every answer
-    // prints it. A readme title and a search keyword are text, not identifiers, so they are echoed as typed.
-    private static List<String> echoed(List<String> rest) {
-        if (rest.isEmpty() || Readme.BUCKET.equals(rest.get(0)) || Search.BUCKET.equals(rest.get(0))) {
-            return rest;
-        }
-        return rest.stream().map(PathTree::plainSelector).toList();
-    }
-
-    private static String tail(Commands.Root root) {
-        return tail(rest(root), root.filter, root.page);
-    }
-
-    private static List<String> rest(Commands.Root root) {
-        return root.rest == null ? List.of() : root.rest;
+            case Command.SEARCH -> Search.render(loaded, new Search.Options(call.names(), page));
+            case Command.README -> Readme.render(loaded, new Readme.Options(name, filter, page));
+            case Command.TYPE -> Types.render(loaded, new Types.Options(call.names(), filter, page));
+            case Command.FUNCTION -> Containers.render(loaded, Surface.Scope.MODULE,
+                    Containers.Options.function(name, filter, page));
+            case Command.METHOD -> Containers.render(loaded, call.ownerScope(),
+                    Containers.Options.method(call.ownerName(), name, filter, page));
+            case Command.RESOURCE -> Containers.render(loaded, call.ownerScope(),
+                    Containers.Options.resource(call.ownerName(), call.names(), filter, page));
+            default -> Containers.render(loaded, CONTAINER_NOUNS.get(call.noun()),
+                    Containers.Options.container(name, filter, page));
+        };
     }
 
     private static Failure readAt(Failure failure, LoadedPackage loaded) {
@@ -329,21 +418,11 @@ public final class Cli {
                 : failure;
     }
 
-    private static Failure notPaged(Commands.Root root, Coordinate coordinate, String filter) {
-        String command = coordinate.command(root.module) + tail(rest(root), filter, FIRST_PAGE);
+    private static Failure notPaged(Invocation call) {
+        String command = call.command().text();
         return new Failure.Validation(
                 "This answer has only one page, so --page does not apply.",
                 "Drop --page: " + Failure.quoted(command) + ".", command);
-    }
-
-    // A name typed where the bucket goes is most often a member's (`go doc` leaves the bucket out too): the search
-    // finds whichever container declares it.
-    private static Failure unknownBucket(String token, String pkg) {
-        String search = pkg + " " + Search.BUCKET + " " + Texts.shellWord(token);
-        return new Failure.Validation(
-                "'" + token + "' is not a bucket.",
-                "The buckets are " + String.join(", ", Commands.BUCKETS) + ". To find what is named '" + token
-                        + "': " + Failure.quoted(search) + ".", search);
     }
 
     /**
@@ -355,7 +434,9 @@ public final class Cli {
     }
 
     private static boolean jsonOutput(List<String> argv, boolean interactive, Commands.Grammar grammar) {
-        Set<String> takesValue = grammar.line().getCommandSpec().options().stream()
+        Set<String> takesValue = Stream.concat(Stream.of(grammar.line()), grammar.line().getSubcommands().values()
+                        .stream())
+                .flatMap(line -> line.getCommandSpec().options().stream())
                 .filter(option -> option.arity().min() > 0)
                 .flatMap(option -> Arrays.stream(option.names()))
                 .collect(Collectors.toSet());
@@ -375,18 +456,27 @@ public final class Cli {
         return !interactive;
     }
 
-    private static Failure validate(Commands.Root root, Coordinate coordinate) {
-        Failure output = rejectInvalidOutput(root);
-        if (output != null) {
-            return output;
-        }
-        if (root.filter != null && root.filter.isBlank()) {
+    private static Failure validate(Invocation call) {
+        if (call.filter() != null && call.filter().isBlank()) {
             return new Failure.Validation("The --filter option needs a keyword.",
                     "Write --filter <keyword>, or drop it to list everything.");
         }
-        Failure page = pageBeforeFirst(root.page, coordinate.command(root.module) + tail(rest(root), root.filter,
-                FIRST_PAGE));
-        return page != null ? page : rejectVersionArguments(root, coordinate.qualified());
+        Failure page = pageBeforeFirst(call.page(), call.command().text());
+        if (page != null) {
+            return page;
+        }
+        Failure version = rejectVersionArguments(call);
+        if (version != null) {
+            return version;
+        }
+        if (Command.TYPE.equals(call.noun())) {
+            return Types.misuse(call.command(Command.TYPE).text(),
+                    new Types.Options(call.names(), call.filter(), call.page()));
+        }
+        if (Command.SEARCH.equals(call.noun())) {
+            return Search.misuse(call.command(Command.SEARCH), call.names(), call.filter());
+        }
+        return null;
     }
 
     private static Failure pageBeforeFirst(int page, String firstPage) {
@@ -397,61 +487,62 @@ public final class Cli {
                 "Drop --page for the first page: " + Failure.quoted(firstPage) + ".", firstPage);
     }
 
-    private static Failure versionFlag(Commands.Root root) {
+    private static Failure versionFlag(Invocation call) {
         String message = "Unknown option '" + Commands.VERSION_FLAG + "'.";
-        Result<Coordinate> coordinate = root.pkg == null ? null : Coordinate.parse(root.pkg);
-        if (coordinate == null || !coordinate.isOk()) {
+        Result<Coordinate> coordinate = call.coordinate() == null ? null : Coordinate.parse(call.coordinate());
+        if (coordinate == null || !coordinate.isOk() || call.noun() == null) {
             return new Failure.Validation(message, "To read a specific version, write " + PLACEHOLDER_PACKAGE + ":"
                     + PLACEHOLDER_VERSION);
         }
-        return writtenVersion(message, root, coordinate.value().qualified(), root.version, tail(root));
+        return writtenVersion(message, call, coordinate.value().qualified(), call.version());
     }
 
-    private static Failure writtenVersion(String message, Commands.Root root, QualifiedName qualified,
-            String version, String tail) {
+    private static Failure writtenVersion(String message, Invocation call, QualifiedName qualified, String version) {
         if (!Version.isComplete(version)) {
             return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
         }
-        String command = new Coordinate(qualified, Version.parse(version).value()).command(root.module) + tail;
+        String command = call.at(new Coordinate(qualified, Version.parse(version).value())).command().text()
+                + call.pageArgument();
         return new Failure.Validation(message, WRITE_VERSION + Failure.quoted(command) + ".", command);
     }
 
-    private static Failure rejectInvalidOutput(Commands.Root root) {
-        if (root.output == null || Commands.JSON_OUTPUT.equals(root.output)
-                || Commands.TEXT_OUTPUT.equals(root.output)) {
+    private static Failure rejectInvalidOutput(String output) {
+        if (output == null || Commands.JSON_OUTPUT.equals(output) || Commands.TEXT_OUTPUT.equals(output)) {
             return null;
         }
         return new Failure.Validation(
-                "'" + root.output + "' is not a valid --output value.",
+                "'" + output + "' is not a valid --output value.",
                 "Pass --output " + Commands.JSON_OUTPUT + " or --output " + Commands.TEXT_OUTPUT + ".");
     }
 
-    private static Failure rejectVersionArguments(Commands.Root root, QualifiedName qualified) {
-        List<String> tokens = root.rest;
-        if (tokens == null) {
+    // A complete version typed as a name: it belongs after the package.
+    private static Failure rejectVersionArguments(Invocation call) {
+        if (Command.SEARCH.equals(call.noun()) || call.coordinate() == null) {
             return null;
         }
-        String misplaced = tokens.stream()
+        List<String> names = call.names();
+        int from = Command.PACKAGE.equals(call.noun()) ? 1 : 0;
+        String misplaced = names.subList(Math.min(from, names.size()), names.size()).stream()
                 .filter(Version::isComplete)
                 .findFirst()
                 .orElse(null);
-        if (misplaced == null) {
+        Result<Coordinate> coordinate = Coordinate.parse(call.coordinate());
+        if (misplaced == null || !coordinate.isOk()) {
             return null;
         }
-        List<String> others = new ArrayList<>(tokens);
+        List<String> others = new ArrayList<>(names);
         others.remove(misplaced);
-        return writtenVersion("'" + misplaced + "' looks like a version.", root, qualified, misplaced,
-                tail(others, root.filter, root.page));
+        return writtenVersion("'" + misplaced + "' looks like a version.", call.withNames(others),
+                coordinate.value().qualified(), misplaced);
     }
 
     // The failure a parse error is, or null when picocli's own first line says it best.
-    private static Failure describeParseError(CommandLine.ParameterException cause, Commands.Grammar grammar) {
+    private static Failure describeParseError(CommandLine.ParameterException cause) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();
-            // Every positional fits `[bucket] [name ...]`, so only an option is ever left unmatched.
             return new Failure.Validation(
                     "Unknown option '" + (tokens.isEmpty() ? "" : tokens.get(0)) + "'.",
-                    UsageRenderer.knownFlags(grammar));
+                    UsageRenderer.knownFlags(cause.getCommandLine().getCommandSpec()));
         }
         if (cause instanceof CommandLine.OverwrittenOptionException overwritten
                 && overwritten.getOverwritten() instanceof CommandLine.Model.OptionSpec option) {
@@ -497,19 +588,32 @@ public final class Cli {
         return FAILED;
     }
 
-    private record UsageErrors(Commands.Grammar grammar, Streams streams, boolean json) {
+    /**
+     * Writes a usage error: the failure, then in text mode the synopsis of the noun it is about and where its help
+     * is.
+     *
+     * @param grammar the grammar the synopsis is rendered from
+     * @param noun the noun the command line named, or {@code null} for the root
+     * @param streams where the failure goes
+     * @param json whether the run's output mode is JSON
+     */
+    private record UsageErrors(Commands.Grammar grammar, String noun, Streams streams, boolean json) {
 
         int error(Failure failure) {
             return write(failure, true);
         }
 
         int helpError(String message) {
-            return write(new Failure.Validation(message, RUN_HELP), false);
+            return write(new Failure.Validation(message, "Run `" + help() + "` for usage."), false);
+        }
+
+        private String help() {
+            return Command.PREFIX + (noun == null ? "" : noun + " ") + HELP_FLAG;
         }
 
         private int write(Failure failure, boolean pointToHelp) {
-            String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar)
-                    + (pointToHelp ? "\nRun `" + HELP + "` for details." : "");
+            String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar, noun)
+                    + (pointToHelp ? "\nRun `" + help() + "` for details." : "");
             streams.errorOut().accept(failure.describe(json) + usage + "\n");
             return USAGE_ERROR;
         }

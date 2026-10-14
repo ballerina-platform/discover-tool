@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
  */
 public class SelectionCarryTest {
 
-    private static final String GITHUB = "bal discover ballerinax/github client Client";
+    private static final String GITHUB = "bal discover client Client -p ballerinax/github";
 
     private record Run(int code, String out, String err) {
 
@@ -62,6 +62,11 @@ public class SelectionCarryTest {
                     // No test here asserts wall-clock behaviour.
                 })
                 .build();
+    }
+
+    // `resource <words>` asked of github's Client.
+    private static String resource(String words) {
+        return "bal discover resource " + words + " -p ballerinax/github --client Client";
     }
 
     private static Run run(String slug, String command) {
@@ -94,7 +99,7 @@ public class SelectionCarryTest {
 
     @Test
     public void turningThePageOfAFilteredMethodListKeepsTheFilter() {
-        String command = "bal discover ballerinax/twilio client Client --filter list";
+        String command = "bal discover client Client -p ballerinax/twilio --filter list";
         JsonObject first = answer("ballerinax__twilio", command);
         int total = first.get("total").getAsInt();
         Assert.assertTrue(total > 80, first.toString());
@@ -106,23 +111,23 @@ public class SelectionCarryTest {
 
     @Test
     public void aLaterPageCountsWhatIsLeftNotWhatWasShownInText() {
-        Run text = run("ballerinax__twilio", "bal discover ballerinax/twilio client Client --page 2 --output text");
+        Run text = run("ballerinax__twilio", "bal discover client Client -p ballerinax/twilio --page 2 --output text");
         Assert.assertTrue(text.out().contains("\n... 119 more (page 2 of 5)\n"
-                + "Next: bal discover ballerinax/twilio client Client <name>\n"
-                + "Next: bal discover ballerinax/twilio client Client --page 3\n"), text.out());
+                + "Next: bal discover method <name> -p ballerinax/twilio --client Client\n"
+                + "Next: bal discover client Client -p ballerinax/twilio --page 3\n"), text.out());
     }
 
     @Test
     public void aPageOutsideTheListingIsAUsageFailureNamingTheRange() {
-        Run run = run("ballerinax__twilio", "bal discover ballerinax/twilio client Client --page 6");
+        Run run = run("ballerinax__twilio", "bal discover client Client -p ballerinax/twilio --page 6");
         Assert.assertEquals(run.code(), 1, run.out());
         Assert.assertEquals(run.out(), "");
         JsonObject failure = JsonParser.parseString(run.err()).getAsJsonObject();
         Assert.assertEquals(failure.get("kind").getAsString(), "validation");
         Assert.assertTrue(failure.get("message").getAsString().contains("5 pages"), run.err());
         Assert.assertTrue(failure.get("suggestion").getAsString()
-                .contains("bal discover ballerinax/twilio client Client --page 5"), run.err());
-        Run readme = run("ballerinax__kafka", "bal discover ballerinax/kafka readme --filter kafka --page 9");
+                .contains("bal discover client Client -p ballerinax/twilio --page 5"), run.err());
+        Run readme = run("ballerinax__kafka", "bal discover readme -p ballerinax/kafka --filter kafka --page 9");
         Assert.assertEquals(readme.code(), 1, readme.out());
         Assert.assertEquals(JsonParser.parseString(readme.err()).getAsJsonObject().get("kind").getAsString(),
                 "validation");
@@ -130,23 +135,24 @@ public class SelectionCarryTest {
 
     @Test
     public void anAutoSelectedContainerIsNamedInBothRenderings() {
-        JsonObject service = answer("ballerinax__kafka", "bal discover ballerinax/kafka service");
+        JsonObject service = answer("ballerinax__kafka", "bal discover service -p ballerinax/kafka");
         Assert.assertEquals(service.get("container").getAsString(), "Service", service.toString());
-        Run text = run("ballerinax__kafka", "bal discover ballerinax/kafka service --output text");
+        Run text = run("ballerinax__kafka", "bal discover service -p ballerinax/kafka --output text");
         Assert.assertTrue(text.out().startsWith("ballerinax/kafka:0.0.0-fixture · service · Service\n"), text.out());
 
-        JsonObject groups = answer("ballerinax__github", "bal discover ballerinax/github client");
+        JsonObject groups = answer("ballerinax__github", "bal discover client -p ballerinax/github");
         Assert.assertEquals(groups.get("container").getAsString(), "Client", groups.toString());
     }
 
     @Test
     public void aWrongBucketFailureNamesTheWholeCommandRunnably() {
-        Run asked = run("ballerinax__github", "bal discover ballerinax/github class Client \"gists/'public\" get");
+        Run asked = run("ballerinax__github",
+                "bal discover resource \"gists/'public\" get -p ballerinax/github --class Client");
         Assert.assertEquals(asked.code(), 1, asked.out());
         JsonObject failure = JsonParser.parseString(asked.err()).getAsJsonObject();
-        String canonical = GITHUB + " gists/public get";
+        String canonical = resource("gists/public get");
         Assert.assertEquals(failure.get("command").getAsString(), canonical);
-        Assert.assertEquals(failure.get("suggestion").getAsString(), "It is a client: `" + canonical + "`.");
+        Assert.assertEquals(failure.get("suggestion").getAsString(), "Run `" + canonical + "`.");
         JsonObject followed = answer("ballerinax__github", canonical);
         Assert.assertEquals(followed.get("path").getAsString(), "gists/public");
         Assert.assertEquals(followed.get("accessor").getAsString(), "get");
@@ -154,7 +160,7 @@ public class SelectionCarryTest {
 
     @Test
     public void aRosterEntryOpensItsContainerUnderTheSameFilter() {
-        JsonObject roster = answer("ballerinax__kafka", "bal discover ballerinax/kafka client --filter commit");
+        JsonObject roster = answer("ballerinax__kafka", "bal discover client -p ballerinax/kafka --filter commit");
         for (JsonElement element : roster.getAsJsonArray("containers")) {
             Assert.assertTrue(element.getAsJsonObject().get("command").getAsString().endsWith(" --filter commit"),
                     element.toString());
@@ -170,18 +176,18 @@ public class SelectionCarryTest {
 
     @Test
     public void anAccessorAloneIsNotAMemberOfAContainerWithOnlyPaths() {
-        Run run = run("ballerinax__github", GITHUB + " get");
+        Run run = run("ballerinax__github", "bal discover method get -p ballerinax/github --client Client");
         Assert.assertEquals(run.code(), 1, run.out());
         Assert.assertEquals(JsonParser.parseString(run.err()).getAsJsonObject().get("command").getAsString(), GITHUB);
     }
 
     @Test
     public void groupsUnderAnAccessorCountOnlyThatAccessorAndCarryItIntoTheirCommands() {
-        JsonObject groups = answer("ballerinax__github", GITHUB + " repos get");
+        JsonObject groups = answer("ballerinax__github", resource("repos get"));
         JsonObject actions = groupNamed(groups.getAsJsonArray("groups"), "repos/:owner/:repo/actions");
         int count = actions.get("count").getAsInt();
         Assert.assertTrue(count < 72, "repos/:owner/:repo/actions counted every accessor: " + count);
-        Assert.assertEquals(actions.get("command").getAsString(), GITHUB + " repos/:owner/:repo/actions get");
+        Assert.assertEquals(actions.get("command").getAsString(), resource("repos/:owner/:repo/actions get"));
 
         JsonObject opened = answer("ballerinax__github", actions.get("command").getAsString());
         Assert.assertEquals(opened.get("total").getAsInt(), count, opened.toString());
@@ -192,7 +198,7 @@ public class SelectionCarryTest {
 
     @Test
     public void operationsEndingAtTheGroupedPrefixAreReachableRatherThanAGroupThatLoops() {
-        String command = GITHUB + " repos";
+        String command = resource("repos");
         JsonObject groups = answer("ballerinax__github", command);
         for (JsonElement element : groups.getAsJsonArray("groups")) {
             Assert.assertNotEquals(element.getAsJsonObject().get("command").getAsString(), command, element.toString());
@@ -203,7 +209,7 @@ public class SelectionCarryTest {
         Assert.assertEquals(commands.size(), here.getAsJsonArray("accessors").size(), here.toString());
         for (JsonElement accessor : here.getAsJsonArray("accessors")) {
             String opens = commands.get(accessor.getAsString()).getAsString();
-            Assert.assertEquals(opens, GITHUB + " repos/:owner/:repo " + accessor.getAsString());
+            Assert.assertEquals(opens, resource("repos/:owner/:repo " + accessor.getAsString()));
             JsonObject signature = answer("ballerinax__github", opens);
             Assert.assertEquals(signature.get("path").getAsString(), "repos/:owner/:repo");
             Assert.assertEquals(signature.get("accessor").getAsString(), accessor.getAsString());
@@ -239,22 +245,22 @@ public class SelectionCarryTest {
         }
         HttpOptions http = centralFor(docs.toString());
 
-        Run four = run(http, GITHUB + " a/b/c/d");
+        Run four = run(http, resource("a/b/c/d"));
         Assert.assertEquals(four.code(), 0, four.err());
         Assert.assertTrue(four.json().has("groups"), "four literal levels still group: " + four.out());
 
-        Run five = run(http, GITHUB + " a/b/c/d/repos");
+        Run five = run(http, resource("a/b/c/d/repos"));
         Assert.assertEquals(five.code(), 0, five.err());
         Assert.assertFalse(five.json().has("groups"), "a fifth literal level grouped again: " + five.out());
         Assert.assertTrue(five.json().get("total").getAsInt() > 40, "not over the ceiling at all: " + five.out());
-        Assert.assertEquals(five.json().get("next").getAsString(), GITHUB + " a/b/c/d/repos --page 2");
+        Assert.assertEquals(five.json().get("next").getAsString(), resource("a/b/c/d/repos") + " --page 2");
 
-        Run parameters = run(http, GITHUB + " a/b/c/d/repos/:owner/:repo");
+        Run parameters = run(http, resource("a/b/c/d/repos/:owner/:repo"));
         Assert.assertEquals(parameters.code(), 0, parameters.err());
         Assert.assertFalse(parameters.json().has("groups"), "parameters counted toward depth: " + parameters.out());
     }
 
-    private static final String HTTP = "bal discover ballerina/http client Client";
+    private static final String HTTP = "bal discover client Client -p ballerina/http";
 
     private static HttpOptions bulkyHttp() {
         JsonObject docs = FixtureCorpus.loadRawFixture("ballerina__http").deepCopy().getAsJsonObject();
@@ -344,8 +350,8 @@ public class SelectionCarryTest {
         Run text = run(http, HTTP + " --page 2 --output text");
         Assert.assertTrue(text.out().contains("\n\nRemote methods (->)\n  "), text.out());
         Assert.assertTrue(text.out().contains("\n\nMethods (.)\n  "), text.out());
-        Assert.assertTrue(text.out().contains("\n... 11 more (page 2 of 3)\nNext: " + HTTP + " <name>\nNext: " + HTTP
-                + " --page 3"), text.out());
+        Assert.assertTrue(text.out().contains("\n... 11 more (page 2 of 3)\nNext: bal discover method <name> -p "
+                + "ballerina/http --client Client\nNext: " + HTTP + " --page 3"), text.out());
     }
 
     @Test
@@ -373,7 +379,7 @@ public class SelectionCarryTest {
     /** The recorded redis {@code Client}: 111 remote methods and {@code close}, 112 entries on pages of 40/40/32. */
     @Test
     public void theRecordedRedisClientPagesThroughBothFormsWithoutRepeatingOrSkipping() {
-        String command = "bal discover ballerinax/redis client Client";
+        String command = "bal discover client Client -p ballerinax/redis";
         List<String> remote = new ArrayList<>();
         List<String> normal = new ArrayList<>();
         JsonObject page = answer("ballerinax__redis", command);
@@ -407,7 +413,7 @@ public class SelectionCarryTest {
      */
     @Test
     public void documentationOnlyMatchesStayUnderTheCeilingAndPageToTheRest() {
-        String command = "bal discover ballerinax/redis client Client --filter the";
+        String command = "bal discover client Client -p ballerinax/redis --filter the";
         JsonObject miss = answer("ballerinax__redis", command);
         Assert.assertEquals(miss.getAsJsonArray("documented").size(), 40, miss.toString());
         Assert.assertEquals(miss.get("documentedTotal").getAsInt(), 102, miss.toString());
@@ -425,8 +431,8 @@ public class SelectionCarryTest {
         }
         Assert.assertEquals(page.get("page").getAsInt(), 3, page.toString());
         Assert.assertEquals(page.getAsJsonArray("documented").get(0).getAsJsonObject().get("command").getAsString(),
-                "bal discover ballerinax/redis client Client "
-                        + page.getAsJsonArray("documented").get(0).getAsJsonObject().get("name").getAsString());
+                "bal discover method " + page.getAsJsonArray("documented").get(0).getAsJsonObject().get("name")
+                        .getAsString() + " -p ballerinax/redis --client Client");
         Assert.assertEquals(documented.size(), 102);
         Assert.assertEquals(documented.stream().distinct().count(), 102L, "a page repeated or skipped a name");
 
@@ -434,7 +440,8 @@ public class SelectionCarryTest {
         Assert.assertTrue(text.out().contains("\nMentioned only in their documentation (40 of 102)\n"), text.out());
         Assert.assertTrue(text.out().endsWith(
                 "\n... 62 more that mention it only in their documentation (page 1 of 3)\n"
-                + "Next: bal discover ballerinax/redis client Client <name>\nNext: " + command + " --page 2\n"),
+                + "Next: bal discover method <name> -p ballerinax/redis --client Client\nNext: " + command + " "
+                        + "--page 2\n"),
                 text.out());
     }
 
@@ -445,7 +452,7 @@ public class SelectionCarryTest {
      */
     @Test
     public void documentationOnlyMatchesBesideAListingPageAfterIt() {
-        String command = "bal discover ballerinax/redis client Client --filter key";
+        String command = "bal discover client Client -p ballerinax/redis --filter key";
         JsonObject page = answer("ballerinax__redis", command);
         int documentedTotal = page.get("documentedTotal").getAsInt();
         Assert.assertTrue(documentedTotal > 0, page.toString());
@@ -473,7 +480,7 @@ public class SelectionCarryTest {
     /** postgresql's 125 classes, 82 of them declaring no method at all — every one reachable by turning pages. */
     @Test
     public void aRosterOverTheCeilingPagesAndEveryContainerOnItIsReachable() {
-        String command = "bal discover ballerinax/postgresql class";
+        String command = "bal discover class -p ballerinax/postgresql";
         List<String> names = new ArrayList<>();
         JsonObject page = answer("ballerinax__postgresql", command);
         for (int number = 1; ; number++) {
@@ -499,7 +506,7 @@ public class SelectionCarryTest {
     @Test
     public void aRosterFilterKeepsAContainerByItsOwnNameAndOpensItWhole() {
         JsonObject roster = answer("ballerinax__postgresql",
-                "bal discover ballerinax/postgresql class --filter TsQuery");
+                "bal discover class -p ballerinax/postgresql --filter TsQuery");
         Assert.assertFalse(roster.has("candidates"), "a container named by the filter was not kept: " + roster);
         List<String> names = strings(roster, "containers");
         Assert.assertTrue(names.containsAll(List.of("TsQueryValue", "TsQueryArrayValue", "TsQueryOutParameter")),
@@ -513,7 +520,7 @@ public class SelectionCarryTest {
 
     @Test
     public void aFilteredRostersPageKeepsTheFilter() {
-        String command = "bal discover ballerinax/postgresql class --filter Value";
+        String command = "bal discover class -p ballerinax/postgresql --filter Value";
         JsonObject first = answer("ballerinax__postgresql", command);
         Assert.assertTrue(first.get("total").getAsInt() > 40, first.toString());
         Assert.assertEquals(first.get("next").getAsString(), command + " --page 2");
@@ -525,7 +532,7 @@ public class SelectionCarryTest {
     /** A roster counts resource methods, one per path and accessor, as the listing it opens does. */
     @Test
     public void aRosterCountsResourceMethodsAsTheListingItOpensDoes() {
-        JsonObject roster = answer("ballerina__http", "bal discover ballerina/http client");
+        JsonObject roster = answer("ballerina__http", "bal discover client -p ballerina/http");
         for (JsonElement element : roster.getAsJsonArray("containers")) {
             JsonObject container = element.getAsJsonObject();
             if (!container.has("resources")) {
@@ -540,7 +547,7 @@ public class SelectionCarryTest {
 
     @Test
     public void aGroupedLevelOverTheCeilingPagesWithoutRepeatingOrSkipping() {
-        String command = GITHUB + " repos";
+        String command = resource("repos");
         JsonObject first = answer("ballerinax__github", command);
         Assert.assertEquals(first.get("page").getAsInt(), 1, first.toString());
         Assert.assertEquals(first.get("next").getAsString(), command + " --page 2");

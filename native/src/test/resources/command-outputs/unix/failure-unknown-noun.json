@@ -1,0 +1,1 @@
+{"kind":"validation","message":"'nosuchnoun' is not a noun. The nouns are package, search, client, service, class, function, type, method, resource, readme.","suggestion":"To find what is named 'nosuchnoun': `bal discover search nosuchnoun -p ballerinax/kafka`.","command":"bal discover search nosuchnoun -p ballerinax/kafka"}

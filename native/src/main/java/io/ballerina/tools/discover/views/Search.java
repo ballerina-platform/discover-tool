@@ -18,7 +18,7 @@
 
 package io.ballerina.tools.discover.views;
 
-import io.ballerina.tools.discover.Coordinate;
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
@@ -36,7 +36,6 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * {@code search} inside one package — every name it declares and every readme section title, matched locally
@@ -79,15 +78,15 @@ public final class Search {
      * The failure for a search with no keyword, or with {@code --filter}, or {@code null}; checked before anything is
      * fetched. Shared by this search and Central's.
      *
-     * @param search the command that searches, without keywords: {@code bal discover ballerinax/kafka search}
+     * @param search the command that searches, without keywords: {@code bal discover search -p ballerinax/kafka}
      */
-    public static Failure misuse(String search, List<String> keywords, String filter) {
+    public static Failure misuse(Command search, List<String> keywords, String filter) {
         if (keywords.isEmpty()) {
             return new Failure.Validation("The search needs at least one keyword.",
-                    "Write " + Failure.quoted(search + " <keyword>") + ".");
+                    "Write " + Failure.quoted(search.with("<keyword>").text()) + ".");
         }
         if (filter != null) {
-            String fixed = search + words(keywords) + " " + Texts.shellWord(filter);
+            String fixed = search.with(keywords).with(filter).text();
             return new Failure.Validation("The --filter option narrows a listing, and a search is not one.",
                     "Add its keyword to the search instead: " + Failure.quoted(fixed) + ".", fixed);
         }
@@ -110,7 +109,7 @@ public final class Search {
         collectSubmodules(loaded, keywords, found);
 
         List<DiscoverResult.Search.Hit> all = found.values().stream().flatMap(List::stream).toList();
-        String command = loaded.command() + " " + BUCKET + words(options.keywords());
+        String command = loaded.command(BUCKET).with(options.keywords()).text();
         Result<Containers.Page> page = Containers.Page.of(options.page(), all.size(), command);
         if (!page.isOk()) {
             return page.cast();
@@ -131,7 +130,7 @@ public final class Search {
         }
         int shown = groups.stream().mapToInt(group -> group.hits().size()).sum();
         return Result.ok(new DiscoverResult.Search(options.keywords(), List.copyOf(groups), counts, shown,
-                all.size(), window.paging(), window.next(command), loaded.command(), loaded.warning()));
+                all.size(), window.paging(), window.next(command), loaded.overview().text(), loaded.warning()));
     }
 
     // A hit and the group it lists under.
@@ -144,7 +143,7 @@ public final class Search {
             for (Surface.Container container : Surface.of(loaded.library(), scope)) {
                 if (!container.isModule() && matches(container.plainName(), keywords)) {
                     found.get(CONTAINER_KINDS.get(scope)).add(new DiscoverResult.Search.Hit(container.plainName(),
-                            null, null, Containers.openCommand(loaded, scope, container)));
+                            null, null, Containers.openCommand(loaded, container)));
                 }
                 for (Containers.Entry entry : Containers.members(container)) {
                     if (matches(nameOf(entry), keywords)) {
@@ -209,7 +208,8 @@ public final class Search {
         for (Readme.Section section : Readme.sectionsOf(loaded)) {
             if (matches(section.title(), keywords)) {
                 found.get(DiscoverResult.Search.Kind.README).add(new DiscoverResult.Search.Hit(section.title(), null,
-                        null, section.number(), loaded.command() + " " + Readme.BUCKET + " " + section.number()));
+                        null, section.number(),
+                        loaded.command(Readme.BUCKET, String.valueOf(section.number())).text()));
             }
         }
     }
@@ -220,16 +220,12 @@ public final class Search {
         for (LoadedPackage.Submodule submodule : loaded.submodules()) {
             if (matches(submodule.name(), keywords)) {
                 found.get(DiscoverResult.Search.Kind.SUBMODULES).add(new DiscoverResult.Search.Hit(submodule.name(),
-                        null, null, Coordinate.COMMAND + loaded.pkgArgument(submodule.name())));
+                        null, null, Command.overview(loaded.target(submodule.name())).text()));
             }
         }
     }
 
     private static boolean matches(String name, List<String> keywords) {
         return keywords.stream().allMatch(keyword -> Filter.matches(keyword, name));
-    }
-
-    private static String words(List<String> words) {
-        return words.stream().map(word -> " " + Texts.shellWord(word)).collect(Collectors.joining());
     }
 }

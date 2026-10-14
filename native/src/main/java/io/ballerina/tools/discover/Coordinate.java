@@ -23,6 +23,7 @@ import io.ballerina.tools.discover.views.SearchCentral;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -43,38 +44,37 @@ public record Coordinate(QualifiedName qualified, Version version) {
     private static final char QUOTE = '\'';
     private static final String VERSION_PREFIX = "v";
     private static final String ORG_PLACEHOLDER = "org";
-    /** What every command this tool prints starts with. */
-    public static final String COMMAND = "bal discover ";
     private static final String COMPLETE_FORM = ":<major>.<minor>.<patch>";
     private static final String LOCKED_OR_LATEST = " to read the version your project locks or Central's latest: ";
     private static final Pattern THREE_NUMBERS = Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)$");
 
     public static Result<Coordinate> parse(String input) {
-        return parse(input, "");
+        return parse(input, pkg -> Command.overview(new Command.Target(pkg, null)).text());
     }
 
     /**
-     * @param tail the rest of the caller's command, after the package — appended to a corrected coordinate's
-     *     command, so the fix it offers is the caller's whole command
+     * @param commandFor the caller's whole command for a corrected coordinate, so the fix it offers is the command the
+     *     caller ran with only the coordinate changed
      */
-    public static Result<Coordinate> parse(String input, String tail) {
+    public static Result<Coordinate> parse(String input, UnaryOperator<String> commandFor) {
         int colon = input.indexOf(VERSION_SEPARATOR);
         String pkg = colon < 0 ? input : input.substring(0, colon);
         if (pkg.indexOf(QUOTE) >= 0) {
             return fix("A package name is written unescaped, but " + input + " quotes part of it the way an "
-                    + "import does.", input.replace(String.valueOf(QUOTE), ""), tail);
+                    + "import does.", input.replace(String.valueOf(QUOTE), ""), commandFor);
         }
         Result<QualifiedName> qualified = QualifiedName.parse(pkg);
         if (!qualified.isOk()) {
-            return invalidName(input, qualified, tail);
+            return invalidName(input, qualified, commandFor);
         }
         if (colon < 0) {
             return Result.ok(new Coordinate(qualified.value(), null));
         }
-        return version(qualified.value(), input, input.substring(colon + 1), tail);
+        return version(qualified.value(), input, input.substring(colon + 1), commandFor);
     }
 
-    private static Result<Coordinate> version(QualifiedName qualified, String input, String version, String tail) {
+    private static Result<Coordinate> version(
+            QualifiedName qualified, String input, String version, UnaryOperator<String> commandFor) {
         if (Version.isComplete(version)) {
             return Result.ok(new Coordinate(qualified, Version.parse(version).value()));
         }
@@ -86,14 +86,14 @@ public record Coordinate(QualifiedName qualified, Version version) {
         String unprefixed = version.substring(VERSION_PREFIX.length());
         if (version.toLowerCase(Locale.ROOT).startsWith(VERSION_PREFIX) && Version.isComplete(unprefixed)) {
             return fix(quoted(version, input) + " is not a version: a version has no leading v.",
-                    pkg + VERSION_SEPARATOR + unprefixed, tail);
+                    pkg + VERSION_SEPARATOR + unprefixed, commandFor);
         }
         Matcher numbers = THREE_NUMBERS.matcher(version);
         if (numbers.matches()) {
             String stripped = new BigInteger(numbers.group(1)) + "." + new BigInteger(numbers.group(2)) + "."
                     + new BigInteger(numbers.group(3));
             return fix(quoted(version, input) + " is not a version: a number in a version has no leading zero.",
-                    pkg + VERSION_SEPARATOR + stripped, tail);
+                    pkg + VERSION_SEPARATOR + stripped, commandFor);
         }
         return Result.err(new Failure.Validation(quoted(version, input) + " is not a complete version.",
                 "Write it in full, " + pkg + COMPLETE_FORM + ", or drop it" + LOCKED_OR_LATEST + pkg));
@@ -103,13 +103,14 @@ public record Coordinate(QualifiedName qualified, Version version) {
         return "'" + version + "' in '" + input + "'";
     }
 
-    private static Result<Coordinate> invalidName(String input, Result<QualifiedName> invalid, String tail) {
+    private static Result<Coordinate> invalidName(
+            String input, Result<QualifiedName> invalid, UnaryOperator<String> commandFor) {
         int at = input.lastIndexOf(NPM_SEPARATOR);
         if (at > 0) {
             String rewritten = input.substring(0, at) + VERSION_SEPARATOR + input.substring(at + 1);
             if (parse(rewritten).isOk()) {
                 return fix("Invalid package name '" + input + "': a version follows a ':', not an '@'.",
-                        rewritten, tail);
+                        rewritten, commandFor);
             }
         }
         if (input.indexOf('/') < 0 && QualifiedName.parse(ORG_PLACEHOLDER + "/" + input).isOk()) {
@@ -122,27 +123,23 @@ public record Coordinate(QualifiedName qualified, Version version) {
         return invalid.cast();
     }
 
-    private static Result<Coordinate> fix(String message, String corrected, String tail) {
-        String command = COMMAND + Texts.shellWord(corrected) + tail;
+    private static Result<Coordinate> fix(String message, String corrected, UnaryOperator<String> commandFor) {
+        String command = commandFor.apply(corrected);
         return Result.err(new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command));
     }
 
-    /** This coordinate as shell-quoted command words, with {@code --module} when {@code module} is not null. */
-    public String argument(String module) {
-        return argument(qualified.qualified(), version == null ? null : version.text(), module);
+    /** This coordinate in {@code module}, as a command names it. */
+    public Command.Target target(String module) {
+        return new Command.Target(text(qualified.qualified(), version == null ? null : version.text()), module);
     }
 
+    /** The overview of this coordinate's {@code module}. */
     public String command(String module) {
-        return COMMAND + argument(module);
+        return Command.overview(target(module)).text();
     }
 
-    public static String argument(String qualified, String version, String module) {
-        return Texts.shellWord(version == null ? qualified : qualified + VERSION_SEPARATOR + version)
-                + moduleArgument(module);
-    }
-
-    /** {@code --module} and its value with a leading space, or empty for the default module. */
-    public static String moduleArgument(String module) {
-        return module == null ? "" : " --module " + Texts.shellWord(module);
+    /** {@code org/name}, with {@code :version} when {@code version} is not null. */
+    public static String text(String qualified, String version) {
+        return version == null ? qualified : qualified + VERSION_SEPARATOR + version;
     }
 }

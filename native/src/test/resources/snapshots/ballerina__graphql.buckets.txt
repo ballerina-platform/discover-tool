@@ -5,7 +5,7 @@ ballerina/graphql · client · Client
   execute
   executeWithType
 
-Next: bal discover ballerina/graphql client Client <name>
+Next: bal discover method <name> -p ballerina/graphql --client Client
 == service ==
 ballerina/graphql · service
 2 service types
@@ -16,7 +16,7 @@ graphql:Listener
 Not attachable to a listener
   Interceptor
 
-Next: bal discover ballerina/graphql service <name>
+Next: bal discover service <name> -p ballerina/graphql
 == class ==
 ballerina/graphql · class
 2 classes
@@ -24,15 +24,15 @@ ballerina/graphql · class
   Context  8 methods
   Field    7 methods
 
-Next: bal discover ballerina/graphql class <name>
-== funcs ==
-ballerina/graphql · funcs
+Next: bal discover class <name> -p ballerina/graphql
+== function ==
+ballerina/graphql · function
 2 functions
 
   __addError
   getSdlString
 
-Next: bal discover ballerina/graphql funcs <name>
+Next: bal discover function <name> -p ballerina/graphql
 == type ==
 ballerina/graphql · type
 47 records, 1 enum, 9 errors, 6 aliases, 5 constants, 3 variables, 4 annotations, 1 listener, 2 classes, 1 client, 2 service types
@@ -80,6 +80,6 @@ Records
   PoolConfiguration
 
 ... 41 more (page 1 of 3)
-Next: bal discover ballerina/graphql type <name>
-Next: bal discover ballerina/graphql type --page 2
-Next: bal discover ballerina/graphql type --filter <keyword>
+Next: bal discover type <name> -p ballerina/graphql
+Next: bal discover type -p ballerina/graphql --page 2
+Next: bal discover type -p ballerina/graphql --filter <keyword>

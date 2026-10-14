@@ -67,10 +67,10 @@ public class CacheTest {
      * include it silently.
      */
     private static final List<List<String>> PACKAGE_VERBS = List.of(
-            List.of(PKG),
-            List.of(PKG, "client"),
-            List.of(PKG, "class"),
-            List.of(PKG, "funcs"));
+            List.of("package", PKG),
+            List.of("client", "-p", PKG),
+            List.of("class", "-p", PKG),
+            List.of("function", "-p", PKG));
 
     /** Central, replayed, counting how many times each endpoint was hit. */
     private static final class CountingCentral {
@@ -149,11 +149,11 @@ public class CacheTest {
         HttpOptions http = options(central.transport(), cache).build();
 
         Capture cold = new Capture();
-        Assert.assertEquals(Cli.run(List.of(PKG), cold.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of("package", PKG), cold.streams(), http), 0);
         Assert.assertEquals(central.docs, 1);
 
         Capture warm = new Capture();
-        Assert.assertEquals(Cli.run(List.of(PKG), warm.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of("package", PKG), warm.streams(), http), 0);
         Assert.assertEquals(central.docs, 1, "the second run must not fetch the docs again");
         Assert.assertEquals(central.versions, 1, "nor re-resolve the version inside the TTL");
 
@@ -244,7 +244,7 @@ public class CacheTest {
             CountingCentral central = new CountingCentral();
             Capture capture = new Capture();
             int exitCode = Cli.run(
-                    List.of(PKG), capture.streams(), options(central.transport(), cache).build());
+                    List.of("package", PKG), capture.streams(), options(central.transport(), cache).build());
 
             Assert.assertEquals(exitCode, 0, label + ": must still succeed");
             Assert.assertEquals(capture.stderr(), "", label + ": must say nothing");
@@ -263,7 +263,7 @@ public class CacheTest {
         HttpTransport transport = FakeTransport.routing(url -> url.contains("/docs/")
                 ? FakeTransport.ok("{\"docsData\":{\"modules\":[]}}")
                 : FakeTransport.ok("[\"" + VERSION + "\"]"));
-        int exitCode = Cli.run(List.of(PKG), capture.streams(), options(transport, cache).build());
+        int exitCode = Cli.run(List.of("package", PKG), capture.streams(), options(transport, cache).build());
         Assert.assertEquals(exitCode, 1);
         Assert.assertFalse(Files.exists(docsEntry(root).getParent()), "no directory, let alone an entry");
     }
@@ -280,11 +280,11 @@ public class CacheTest {
         HttpOptions http = options(central.transport(), cache).build();
 
         Capture first = new Capture();
-        Assert.assertEquals(Cli.run(List.of(PKG), first.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of("package", PKG), first.streams(), http), 0);
         Assert.assertEquals(first.stderr(), "");
 
         Capture again = new Capture();
-        Assert.assertEquals(Cli.run(List.of(PKG), again.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of("package", PKG), again.streams(), http), 0);
         Assert.assertEquals(central.docs, 2, "nothing was cached, so the second run fetches too");
     }
 
@@ -344,15 +344,15 @@ public class CacheTest {
         long[] now = {1_000_000};
 
         HttpOptions http = options(central.transport(), cache).clock(() -> now[0]).build();
-        Cli.run(List.of(PKG), new Capture().streams(), http);
+        Cli.run(List.of("package", PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 1);
 
         now[0] += CentralClient.LATEST_TTL_MS - 1;
-        Cli.run(List.of(PKG), new Capture().streams(), http);
+        Cli.run(List.of("package", PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 1, "one millisecond inside the TTL is still inside it");
 
         now[0] += 1;
-        Cli.run(List.of(PKG), new Capture().streams(), http);
+        Cli.run(List.of("package", PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 2, "at the boundary it is re-asked");
     }
 
@@ -364,10 +364,10 @@ public class CacheTest {
         long[] now = {5_000_000};
         HttpOptions http = options(central.transport(), cache).clock(() -> now[0]).build();
 
-        Cli.run(List.of(PKG), new Capture().streams(), http);
+        Cli.run(List.of("package", PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 1);
         now[0] = 1_000;
-        Cli.run(List.of(PKG), new Capture().streams(), http);
+        Cli.run(List.of("package", PKG), new Capture().streams(), http);
         Assert.assertEquals(central.versions, 2, "an entry stamped in the future is not fresh, it is wrong");
     }
 
@@ -381,17 +381,17 @@ public class CacheTest {
         // wiring — which is how `--refresh` came to parse and then be silently dropped.
         HttpOptions http = options(central.transport(), cache).build();
 
-        Cli.run(List.of(PKG), new Capture().streams(), http);
+        Cli.run(List.of("package", PKG), new Capture().streams(), http);
         Assert.assertEquals(central.docs, 1);
 
         Capture warm = new Capture();
-        Cli.run(List.of(PKG), warm.streams(), http);
+        Cli.run(List.of("package", PKG), warm.streams(), http);
         Assert.assertEquals(central.docs, 1, "without the flag the second run is a hit");
 
         Capture refreshed = new Capture();
         // Unconditional on purpose: a re-download conditional on the version having changed would make the flag
         // a no-op in exactly the case its own error message recommends it for.
-        Assert.assertEquals(Cli.run(List.of(PKG, "--refresh"), refreshed.streams(), http), 0);
+        Assert.assertEquals(Cli.run(List.of("package", PKG, "--refresh"), refreshed.streams(), http), 0);
         Assert.assertEquals(central.docs, 2, "--refresh must re-download");
         Assert.assertEquals(central.versions, 2, "and re-resolve");
     }
@@ -427,7 +427,7 @@ public class CacheTest {
         // A bucket, not the bare package: kafka's client bucket is a roster (3 clients), and off a TTY the warning
         // travels as that answer's own `warning` field. See aBarePackageWarningFlowsThroughBothRenderers below for
         // the bare-package path.
-        Cli.run(List.of(PKG, "client"), new Capture().streams(),
+        Cli.run(List.of("client", "-p", PKG), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
         now[0] += CentralClient.LATEST_TTL_MS * 2;
@@ -436,7 +436,7 @@ public class CacheTest {
             Assert.assertFalse(url.contains("/docs/"), "the docs must come off disk, not the network");
             return FakeTransport.status(503);
         });
-        int exitCode = Cli.run(List.of(PKG, "client"), offline.streams(),
+        int exitCode = Cli.run(List.of("client", "-p", PKG), offline.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
@@ -455,7 +455,7 @@ public class CacheTest {
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
         // A bucket, not the bare package — see the sibling test above for why.
-        Cli.run(List.of(PKG, "client"), new Capture().streams(),
+        Cli.run(List.of("client", "-p", PKG), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
         // Expire the versions entry, then drop the docs entry so the payload MUST be fetched while the registry
@@ -467,7 +467,7 @@ public class CacheTest {
         Capture capture = new Capture();
         HttpTransport transport = FakeTransport.routing(url ->
                 url.contains("/docs/") ? FakeTransport.ok(payload) : FakeTransport.status(503));
-        int exitCode = Cli.run(List.of(PKG, "client"), capture.streams(),
+        int exitCode = Cli.run(List.of("client", "-p", PKG), capture.streams(),
                 options(transport, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
@@ -485,7 +485,7 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
-        Cli.run(List.of(PKG), new Capture().streams(),
+        Cli.run(List.of("package", PKG), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
         now[0] += CentralClient.LATEST_TTL_MS * 2;
@@ -495,7 +495,7 @@ public class CacheTest {
         });
 
         Capture json = new Capture();
-        int jsonExit = Cli.run(List.of(PKG), json.streams(),
+        int jsonExit = Cli.run(List.of("package", PKG), json.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
         Assert.assertEquals(jsonExit, 0);
         Assert.assertTrue(json.stdout().contains(
@@ -504,7 +504,7 @@ public class CacheTest {
                 json.stdout());
 
         Capture text = new Capture();
-        int textExit = Cli.run(List.of(PKG, "--output", "text"), text.streams(),
+        int textExit = Cli.run(List.of("package", PKG, "--output", "text"), text.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
         Assert.assertEquals(textExit, 0);
         Assert.assertTrue(text.stdout().contains("\n\nWarning: Central could not be reached"), text.stdout());
@@ -514,7 +514,7 @@ public class CacheTest {
     public void withTheRegistryUnreachableAndNothingOnDiskTheFailureIsHonest() {
         DocsCache cache = cacheAt(freshRoot());
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of(PKG), capture.streams(),
+        int exitCode = Cli.run(List.of("package", PKG), capture.streams(),
                 options(FakeTransport.always(FakeTransport.status(503)), cache).maxAttempts(1).build());
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");
@@ -672,12 +672,12 @@ public class CacheTest {
         HttpOptions http = options(transport, cache).clock(() -> 2_000).build();
 
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/aws.auth"), capture.streams(), http), 1);
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/aws.auth"), capture.streams(), http), 1);
         Assert.assertEquals(capture.stdout(), "");
         JsonObject failure = JsonParser.parseString(capture.stderr()).getAsJsonObject();
         Assert.assertEquals(failure.get("kind").getAsString(), "package-not-found");
         Assert.assertTrue(failure.get("suggestion").getAsString()
-                .contains("`bal discover ballerinax/aws --module auth`"), capture.stderr());
+                .contains("`bal discover package ballerinax/aws --module auth`"), capture.stderr());
         Assert.assertNull(cache.readDocs(AWS_AUTH_DOCS), "a module page must not be cached as a package's");
     }
 
@@ -690,7 +690,7 @@ public class CacheTest {
         HttpOptions http = options(transport, cache).clock(() -> 2_000).maxAttempts(1).build();
 
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/aws.auth"), capture.streams(), http), 1);
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/aws.auth"), capture.streams(), http), 1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(transport.urls(),
                 List.of(CentralClient.CENTRAL_BASE_URL + "docs/ballerinax/aws.auth/1.0.2"));
@@ -713,7 +713,7 @@ public class CacheTest {
                     : FakeTransport.status(404);
         });
         HttpOptions http = options(transport, cache).build();
-        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+        List<String> argv = List.of("package", "ballerina/graphql", "--module", "subgraph");
 
         Capture cold = new Capture();
         Assert.assertEquals(Cli.run(argv, cold.streams(), http), 0, cold.stderr());
@@ -744,9 +744,9 @@ public class CacheTest {
         HttpOptions http = options(transport, cacheAt(freshRoot())).build();
 
         Capture cold = new Capture();
-        Assert.assertEquals(Cli.run(List.of(PKG), cold.streams(), http), 0, cold.stderr());
+        Assert.assertEquals(Cli.run(List.of("package", PKG), cold.streams(), http), 0, cold.stderr());
         Capture warm = new Capture();
-        Assert.assertEquals(Cli.run(List.of(PKG), warm.streams(), http), 0, warm.stderr());
+        Assert.assertEquals(Cli.run(List.of("package", PKG), warm.streams(), http), 0, warm.stderr());
         Assert.assertEquals(docs[0], 1, "Central is asked once");
         Assert.assertEquals(warm.stdout(), cold.stdout());
     }
@@ -765,7 +765,7 @@ public class CacheTest {
                     : FakeTransport.status(404);
         });
         HttpOptions http = options(transport, cacheAt(freshRoot())).build();
-        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+        List<String> argv = List.of("package", "ballerina/graphql", "--module", "subgraph");
 
         Capture cold = new Capture();
         Assert.assertEquals(Cli.run(argv, cold.streams(), http), 0, cold.stderr());
@@ -790,14 +790,14 @@ public class CacheTest {
                     : FakeTransport.status(404);
         });
         HttpOptions http = options(transport, cache).build();
-        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+        List<String> argv = List.of("package", "ballerina/graphql", "--module", "subgraph");
 
         DocsCache.ModuleKey key = new DocsCache.ModuleKey(
                 CentralClient.REPOSITORY_ID, "ballerina", "graphql", "subgraph", "1.17.0");
 
         Assert.assertEquals(Cli.run(argv, new Capture().streams(), http), 0);
         Assert.assertNotNull(cache.readModuleDocs(key), "the first run caches the module page");
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "--refresh"),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph", "--refresh"),
                 new Capture().streams(), http), 0);
         Assert.assertEquals(docs[0], 2, "--refresh must not answer from the cached module page");
         Assert.assertEquals(Cli.run(argv, new Capture().streams(), http), 0);
@@ -808,18 +808,18 @@ public class CacheTest {
     public void aRefreshThatCannotReachCentralKeepsTheCachedPayload() {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
-        Cli.run(List.of(PKG, "client"), new Capture().streams(), options(new CountingCentral().transport(), cache)
+        Cli.run(List.of("client", "-p", PKG), new Capture().streams(), options(new CountingCentral().transport(), cache)
                 .build());
         JsonElement before = readEntry(root);
 
         HttpOptions down = options(FakeTransport.always(FakeTransport.status(503)), cache).maxAttempts(1).build();
         Capture refreshed = new Capture();
-        Assert.assertEquals(Cli.run(List.of(PKG, "client", "--refresh"), refreshed.streams(), down), 1);
+        Assert.assertEquals(Cli.run(List.of("client", "-p", PKG, "--refresh"), refreshed.streams(), down), 1);
         Assert.assertTrue(refreshed.stderr().contains("\"kind\":\"upstream\""), refreshed.stderr());
         Assert.assertEquals(readEntry(root), before, "a failed refresh must leave the cached payload in place");
 
         Capture offline = new Capture();
-        Assert.assertEquals(Cli.run(List.of(PKG, "client"), offline.streams(), down), 0, offline.stderr());
+        Assert.assertEquals(Cli.run(List.of("client", "-p", PKG), offline.streams(), down), 0, offline.stderr());
     }
 
     @Test
@@ -839,7 +839,7 @@ public class CacheTest {
                     : FakeTransport.status(404);
         });
         HttpOptions http = options(transport, cache).maxAttempts(1).build();
-        List<String> argv = List.of("ballerina/graphql", "--module", "subgraph");
+        List<String> argv = List.of("package", "ballerina/graphql", "--module", "subgraph");
         DocsCache.ModuleKey key = new DocsCache.ModuleKey(
                 CentralClient.REPOSITORY_ID, "ballerina", "graphql", "subgraph", "1.17.0");
 

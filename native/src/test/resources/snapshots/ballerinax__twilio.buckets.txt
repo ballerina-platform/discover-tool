@@ -44,30 +44,30 @@ ballerinax/twilio · client · Client
   deleteCallRecording
 
 ... 159 more (page 1 of 5)
-Next: bal discover ballerinax/twilio client Client <name>
-Next: bal discover ballerinax/twilio client Client --page 2
-Next: bal discover ballerinax/twilio client Client --filter <keyword>
+Next: bal discover method <name> -p ballerinax/twilio --client Client
+Next: bal discover client Client -p ballerinax/twilio --page 2
+Next: bal discover client Client -p ballerinax/twilio --filter <keyword>
 == service ==
 ballerinax/twilio · service
 ballerinax/twilio has no service types.
 
 Other buckets
-  client    1  bal discover ballerinax/twilio client
-  type    279  bal discover ballerinax/twilio type
+  client    1  bal discover client -p ballerinax/twilio
+  type    279  bal discover type -p ballerinax/twilio
 == class ==
 ballerinax/twilio · class
 ballerinax/twilio has no classes.
 
 Other buckets
-  client    1  bal discover ballerinax/twilio client
-  type    279  bal discover ballerinax/twilio type
-== funcs ==
-ballerinax/twilio · funcs
+  client    1  bal discover client -p ballerinax/twilio
+  type    279  bal discover type -p ballerinax/twilio
+== function ==
+ballerinax/twilio · function
 ballerinax/twilio has no functions.
 
 Other buckets
-  client    1  bal discover ballerinax/twilio client
-  type    279  bal discover ballerinax/twilio type
+  client    1  bal discover client -p ballerinax/twilio
+  type    279  bal discover type -p ballerinax/twilio
 == type ==
 ballerinax/twilio · type
 212 records, 66 aliases, 1 client
@@ -115,6 +115,6 @@ Records
   CreateCallRecordingRequest
 
 ... 239 more (page 1 of 7)
-Next: bal discover ballerinax/twilio type <name>
-Next: bal discover ballerinax/twilio type --page 2
-Next: bal discover ballerinax/twilio type --filter <keyword>
+Next: bal discover type <name> -p ballerinax/twilio
+Next: bal discover type -p ballerinax/twilio --page 2
+Next: bal discover type -p ballerinax/twilio --filter <keyword>

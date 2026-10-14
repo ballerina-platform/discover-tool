@@ -25,28 +25,28 @@ ballerinax/googleapis.gmail · client · Client
   users/:userId/threads/:id/trash                    post
   users/:userId/threads/:id/untrash                  post
 
-Next: bal discover ballerinax/googleapis.gmail client Client <path> <accessor>
+Next: bal discover resource <path> <accessor> -p ballerinax/googleapis.gmail --client Client
 == service ==
 ballerinax/googleapis.gmail · service
 ballerinax/googleapis.gmail has no service types.
 
 Other buckets
-  client   1  bal discover ballerinax/googleapis.gmail client
-  type    39  bal discover ballerinax/googleapis.gmail type
+  client   1  bal discover client -p ballerinax/googleapis.gmail
+  type    39  bal discover type -p ballerinax/googleapis.gmail
 == class ==
 ballerinax/googleapis.gmail · class
 ballerinax/googleapis.gmail has no classes.
 
 Other buckets
-  client   1  bal discover ballerinax/googleapis.gmail client
-  type    39  bal discover ballerinax/googleapis.gmail type
-== funcs ==
-ballerinax/googleapis.gmail · funcs
+  client   1  bal discover client -p ballerinax/googleapis.gmail
+  type    39  bal discover type -p ballerinax/googleapis.gmail
+== function ==
+ballerinax/googleapis.gmail · function
 ballerinax/googleapis.gmail has no functions.
 
 Other buckets
-  client   1  bal discover ballerinax/googleapis.gmail client
-  type    39  bal discover ballerinax/googleapis.gmail type
+  client   1  bal discover client -p ballerinax/googleapis.gmail
+  type    39  bal discover type -p ballerinax/googleapis.gmail
 == type ==
 ballerinax/googleapis.gmail · type
 31 records, 3 errors, 2 aliases, 2 constants, 1 client
@@ -100,4 +100,4 @@ Constants
 Clients
   Client
 
-Next: bal discover ballerinax/googleapis.gmail type <name>
+Next: bal discover type <name> -p ballerinax/googleapis.gmail

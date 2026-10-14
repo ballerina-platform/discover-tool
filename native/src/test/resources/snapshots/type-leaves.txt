@@ -257,25 +257,25 @@ Types it uses (16)
   |};
 
 Other types it uses, not printed (15)
-  CertKey                  bal discover ballerina/http type CertKey
-  Protocol                 bal discover ballerina/http type Protocol
-  CertValidationType       bal discover ballerina/http type CertValidationType
-  KeepAlive                bal discover ballerina/http type KeepAlive
-  Chunking                 bal discover ballerina/http type Chunking
-  CachingPolicy            bal discover ballerina/http type CachingPolicy
-  COMPRESSION_AUTO         bal discover ballerina/http type COMPRESSION_AUTO
-  COMPRESSION_ALWAYS       bal discover ballerina/http type COMPRESSION_ALWAYS
-  COMPRESSION_NEVER        bal discover ballerina/http type COMPRESSION_NEVER
-  CredentialsConfig        bal discover ballerina/http type CredentialsConfig
-  BearerTokenConfig        bal discover ballerina/http type BearerTokenConfig
-  JwtIssuerConfig          bal discover ballerina/http type JwtIssuerConfig
-  OAuth2GrantConfig        bal discover ballerina/http type OAuth2GrantConfig
-  RollingWindow            bal discover ballerina/http type RollingWindow
-  PersistentCookieHandler  bal discover ballerina/http class PersistentCookieHandler
+  CertKey                  bal discover type CertKey -p ballerina/http
+  Protocol                 bal discover type Protocol -p ballerina/http
+  CertValidationType       bal discover type CertValidationType -p ballerina/http
+  KeepAlive                bal discover type KeepAlive -p ballerina/http
+  Chunking                 bal discover type Chunking -p ballerina/http
+  CachingPolicy            bal discover type CachingPolicy -p ballerina/http
+  COMPRESSION_AUTO         bal discover type COMPRESSION_AUTO -p ballerina/http
+  COMPRESSION_ALWAYS       bal discover type COMPRESSION_ALWAYS -p ballerina/http
+  COMPRESSION_NEVER        bal discover type COMPRESSION_NEVER -p ballerina/http
+  CredentialsConfig        bal discover type CredentialsConfig -p ballerina/http
+  BearerTokenConfig        bal discover type BearerTokenConfig -p ballerina/http
+  JwtIssuerConfig          bal discover type JwtIssuerConfig -p ballerina/http
+  OAuth2GrantConfig        bal discover type OAuth2GrantConfig -p ballerina/http
+  RollingWindow            bal discover type RollingWindow -p ballerina/http
+  PersistentCookieHandler  bal discover class PersistentCookieHandler -p ballerina/http
 
 From other packages (2)
-  TrustStore  ballerina/crypto 2.9.3  bal discover ballerina/crypto:2.9.3 type TrustStore
-  KeyStore    ballerina/crypto 2.9.3  bal discover ballerina/crypto:2.9.3 type KeyStore
+  TrustStore  ballerina/crypto 2.9.3  bal discover type TrustStore -p ballerina/crypto:2.9.3
+  KeyStore    ballerina/crypto 2.9.3  bal discover type KeyStore -p ballerina/crypto:2.9.3
 == ballerina__http type ClientError ==
 ballerina/http · type · ClientError
 
@@ -728,69 +728,69 @@ Types it uses (62)
   |};
 
 Other types it uses, not printed (63)
-  CommonResponse                       bal discover ballerina/http type CommonResponse
-  StatusContinue                       bal discover ballerina/http class StatusContinue
-  StatusSwitchingProtocols             bal discover ballerina/http class StatusSwitchingProtocols
-  StatusProcessing                     bal discover ballerina/http class StatusProcessing
-  StatusEarlyHints                     bal discover ballerina/http class StatusEarlyHints
-  StatusOK                             bal discover ballerina/http class StatusOK
-  StatusCreated                        bal discover ballerina/http class StatusCreated
-  StatusAccepted                       bal discover ballerina/http class StatusAccepted
-  StatusNonAuthoritativeInformation    bal discover ballerina/http class StatusNonAuthoritativeInformation
-  StatusNoContent                      bal discover ballerina/http class StatusNoContent
-  StatusResetContent                   bal discover ballerina/http class StatusResetContent
-  StatusPartialContent                 bal discover ballerina/http class StatusPartialContent
-  StatusMultiStatus                    bal discover ballerina/http class StatusMultiStatus
-  StatusAlreadyReported                bal discover ballerina/http class StatusAlreadyReported
-  StatusIMUsed                         bal discover ballerina/http class StatusIMUsed
-  StatusMultipleChoices                bal discover ballerina/http class StatusMultipleChoices
-  StatusMovedPermanently               bal discover ballerina/http class StatusMovedPermanently
-  StatusFound                          bal discover ballerina/http class StatusFound
-  StatusSeeOther                       bal discover ballerina/http class StatusSeeOther
-  StatusNotModified                    bal discover ballerina/http class StatusNotModified
-  StatusUseProxy                       bal discover ballerina/http class StatusUseProxy
-  StatusTemporaryRedirect              bal discover ballerina/http class StatusTemporaryRedirect
-  StatusPermanentRedirect              bal discover ballerina/http class StatusPermanentRedirect
-  StatusBadRequest                     bal discover ballerina/http class StatusBadRequest
-  StatusUnauthorized                   bal discover ballerina/http class StatusUnauthorized
-  StatusPaymentRequired                bal discover ballerina/http class StatusPaymentRequired
-  StatusForbidden                      bal discover ballerina/http class StatusForbidden
-  StatusNotFound                       bal discover ballerina/http class StatusNotFound
-  StatusMethodNotAllowed               bal discover ballerina/http class StatusMethodNotAllowed
-  StatusNotAcceptable                  bal discover ballerina/http class StatusNotAcceptable
-  StatusProxyAuthenticationRequired    bal discover ballerina/http class StatusProxyAuthenticationRequired
-  StatusRequestTimeout                 bal discover ballerina/http class StatusRequestTimeout
-  StatusConflict                       bal discover ballerina/http class StatusConflict
-  StatusGone                           bal discover ballerina/http class StatusGone
-  StatusLengthRequired                 bal discover ballerina/http class StatusLengthRequired
-  StatusPreconditionFailed             bal discover ballerina/http class StatusPreconditionFailed
-  StatusPayloadTooLarge                bal discover ballerina/http class StatusPayloadTooLarge
-  StatusUriTooLong                     bal discover ballerina/http class StatusUriTooLong
-  StatusUnsupportedMediaType           bal discover ballerina/http class StatusUnsupportedMediaType
-  StatusRangeNotSatisfiable            bal discover ballerina/http class StatusRangeNotSatisfiable
-  StatusExpectationFailed              bal discover ballerina/http class StatusExpectationFailed
-  StatusMisdirectedRequest             bal discover ballerina/http class StatusMisdirectedRequest
-  StatusUnprocessableEntity            bal discover ballerina/http class StatusUnprocessableEntity
-  StatusLocked                         bal discover ballerina/http class StatusLocked
-  StatusFailedDependency               bal discover ballerina/http class StatusFailedDependency
-  StatusTooEarly                       bal discover ballerina/http class StatusTooEarly
-  StatusPreconditionRequired           bal discover ballerina/http class StatusPreconditionRequired
-  StatusUnavailableDueToLegalReasons   bal discover ballerina/http class StatusUnavailableDueToLegalReasons
-  StatusUpgradeRequired                bal discover ballerina/http class StatusUpgradeRequired
-  StatusTooManyRequests                bal discover ballerina/http class StatusTooManyRequests
-  StatusRequestHeaderFieldsTooLarge    bal discover ballerina/http class StatusRequestHeaderFieldsTooLarge
-  StatusInternalServerError            bal discover ballerina/http class StatusInternalServerError
-  StatusNotImplemented                 bal discover ballerina/http class StatusNotImplemented
-  StatusBadGateway                     bal discover ballerina/http class StatusBadGateway
-  StatusServiceUnavailable             bal discover ballerina/http class StatusServiceUnavailable
-  StatusGatewayTimeout                 bal discover ballerina/http class StatusGatewayTimeout
-  StatusHttpVersionNotSupported        bal discover ballerina/http class StatusHttpVersionNotSupported
-  StatusVariantAlsoNegotiates          bal discover ballerina/http class StatusVariantAlsoNegotiates
-  StatusInsufficientStorage            bal discover ballerina/http class StatusInsufficientStorage
-  StatusLoopDetected                   bal discover ballerina/http class StatusLoopDetected
-  StatusNotExtended                    bal discover ballerina/http class StatusNotExtended
-  StatusNetworkAuthenticationRequired  bal discover ballerina/http class StatusNetworkAuthenticationRequired
-  DefaultStatus                        bal discover ballerina/http class DefaultStatus
+  CommonResponse                       bal discover type CommonResponse -p ballerina/http
+  StatusContinue                       bal discover class StatusContinue -p ballerina/http
+  StatusSwitchingProtocols             bal discover class StatusSwitchingProtocols -p ballerina/http
+  StatusProcessing                     bal discover class StatusProcessing -p ballerina/http
+  StatusEarlyHints                     bal discover class StatusEarlyHints -p ballerina/http
+  StatusOK                             bal discover class StatusOK -p ballerina/http
+  StatusCreated                        bal discover class StatusCreated -p ballerina/http
+  StatusAccepted                       bal discover class StatusAccepted -p ballerina/http
+  StatusNonAuthoritativeInformation    bal discover class StatusNonAuthoritativeInformation -p ballerina/http
+  StatusNoContent                      bal discover class StatusNoContent -p ballerina/http
+  StatusResetContent                   bal discover class StatusResetContent -p ballerina/http
+  StatusPartialContent                 bal discover class StatusPartialContent -p ballerina/http
+  StatusMultiStatus                    bal discover class StatusMultiStatus -p ballerina/http
+  StatusAlreadyReported                bal discover class StatusAlreadyReported -p ballerina/http
+  StatusIMUsed                         bal discover class StatusIMUsed -p ballerina/http
+  StatusMultipleChoices                bal discover class StatusMultipleChoices -p ballerina/http
+  StatusMovedPermanently               bal discover class StatusMovedPermanently -p ballerina/http
+  StatusFound                          bal discover class StatusFound -p ballerina/http
+  StatusSeeOther                       bal discover class StatusSeeOther -p ballerina/http
+  StatusNotModified                    bal discover class StatusNotModified -p ballerina/http
+  StatusUseProxy                       bal discover class StatusUseProxy -p ballerina/http
+  StatusTemporaryRedirect              bal discover class StatusTemporaryRedirect -p ballerina/http
+  StatusPermanentRedirect              bal discover class StatusPermanentRedirect -p ballerina/http
+  StatusBadRequest                     bal discover class StatusBadRequest -p ballerina/http
+  StatusUnauthorized                   bal discover class StatusUnauthorized -p ballerina/http
+  StatusPaymentRequired                bal discover class StatusPaymentRequired -p ballerina/http
+  StatusForbidden                      bal discover class StatusForbidden -p ballerina/http
+  StatusNotFound                       bal discover class StatusNotFound -p ballerina/http
+  StatusMethodNotAllowed               bal discover class StatusMethodNotAllowed -p ballerina/http
+  StatusNotAcceptable                  bal discover class StatusNotAcceptable -p ballerina/http
+  StatusProxyAuthenticationRequired    bal discover class StatusProxyAuthenticationRequired -p ballerina/http
+  StatusRequestTimeout                 bal discover class StatusRequestTimeout -p ballerina/http
+  StatusConflict                       bal discover class StatusConflict -p ballerina/http
+  StatusGone                           bal discover class StatusGone -p ballerina/http
+  StatusLengthRequired                 bal discover class StatusLengthRequired -p ballerina/http
+  StatusPreconditionFailed             bal discover class StatusPreconditionFailed -p ballerina/http
+  StatusPayloadTooLarge                bal discover class StatusPayloadTooLarge -p ballerina/http
+  StatusUriTooLong                     bal discover class StatusUriTooLong -p ballerina/http
+  StatusUnsupportedMediaType           bal discover class StatusUnsupportedMediaType -p ballerina/http
+  StatusRangeNotSatisfiable            bal discover class StatusRangeNotSatisfiable -p ballerina/http
+  StatusExpectationFailed              bal discover class StatusExpectationFailed -p ballerina/http
+  StatusMisdirectedRequest             bal discover class StatusMisdirectedRequest -p ballerina/http
+  StatusUnprocessableEntity            bal discover class StatusUnprocessableEntity -p ballerina/http
+  StatusLocked                         bal discover class StatusLocked -p ballerina/http
+  StatusFailedDependency               bal discover class StatusFailedDependency -p ballerina/http
+  StatusTooEarly                       bal discover class StatusTooEarly -p ballerina/http
+  StatusPreconditionRequired           bal discover class StatusPreconditionRequired -p ballerina/http
+  StatusUnavailableDueToLegalReasons   bal discover class StatusUnavailableDueToLegalReasons -p ballerina/http
+  StatusUpgradeRequired                bal discover class StatusUpgradeRequired -p ballerina/http
+  StatusTooManyRequests                bal discover class StatusTooManyRequests -p ballerina/http
+  StatusRequestHeaderFieldsTooLarge    bal discover class StatusRequestHeaderFieldsTooLarge -p ballerina/http
+  StatusInternalServerError            bal discover class StatusInternalServerError -p ballerina/http
+  StatusNotImplemented                 bal discover class StatusNotImplemented -p ballerina/http
+  StatusBadGateway                     bal discover class StatusBadGateway -p ballerina/http
+  StatusServiceUnavailable             bal discover class StatusServiceUnavailable -p ballerina/http
+  StatusGatewayTimeout                 bal discover class StatusGatewayTimeout -p ballerina/http
+  StatusHttpVersionNotSupported        bal discover class StatusHttpVersionNotSupported -p ballerina/http
+  StatusVariantAlsoNegotiates          bal discover class StatusVariantAlsoNegotiates -p ballerina/http
+  StatusInsufficientStorage            bal discover class StatusInsufficientStorage -p ballerina/http
+  StatusLoopDetected                   bal discover class StatusLoopDetected -p ballerina/http
+  StatusNotExtended                    bal discover class StatusNotExtended -p ballerina/http
+  StatusNetworkAuthenticationRequired  bal discover class StatusNetworkAuthenticationRequired -p ballerina/http
+  DefaultStatus                        bal discover class DefaultStatus -p ballerina/http
 == ballerina__http type ResourceConfig ==
 ballerina/http · type · ResourceConfig
 
@@ -852,10 +852,10 @@ Types it uses (5)
   |};
 
 Other types it uses, not printed (4)
-  FileUserStoreConfigWithScopes        bal discover ballerina/http type FileUserStoreConfigWithScopes
-  LdapUserStoreConfigWithScopes        bal discover ballerina/http type LdapUserStoreConfigWithScopes
-  JwtValidatorConfigWithScopes         bal discover ballerina/http type JwtValidatorConfigWithScopes
-  OAuth2IntrospectionConfigWithScopes  bal discover ballerina/http type OAuth2IntrospectionConfigWithScopes
+  FileUserStoreConfigWithScopes        bal discover type FileUserStoreConfigWithScopes -p ballerina/http
+  LdapUserStoreConfigWithScopes        bal discover type LdapUserStoreConfigWithScopes -p ballerina/http
+  JwtValidatorConfigWithScopes         bal discover type JwtValidatorConfigWithScopes -p ballerina/http
+  OAuth2IntrospectionConfigWithScopes  bal discover type OAuth2IntrospectionConfigWithScopes -p ballerina/http
 == ballerina__http type Client ==
 ballerina/http · type · Client
 7 resource methods, 15 remote methods, 4 methods
@@ -886,8 +886,8 @@ Methods (.)
   getCircuitBreakerCurrentState
   getCookieStore
 
-Next: bal discover ballerina/http client Client <path> <accessor>
-Next: bal discover ballerina/http client Client <name>
+Next: bal discover resource <path> <accessor> -p ballerina/http --client Client
+Next: bal discover method <name> -p ballerina/http --client Client
 == ballerina__graphql type ID ==
 ballerina/graphql · type · ID
 
@@ -940,21 +940,21 @@ public type ConnectionConfig record {|
 |};
 
 From other packages (15)
-  BearerTokenConfig     ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type BearerTokenConfig
-  HttpVersion           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type HttpVersion
-  ClientHttp1Settings   ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ClientHttp1Settings
-  ClientHttp2Settings   ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ClientHttp2Settings
-  FollowRedirects       ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type FollowRedirects
-  PoolConfiguration     ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type PoolConfiguration
-  CacheConfig           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type CacheConfig
-  Compression           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type Compression
-  CircuitBreakerConfig  ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type CircuitBreakerConfig
-  RetryConfig           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type RetryConfig
-  CookieConfig          ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type CookieConfig
-  ResponseLimitConfigs  ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ResponseLimitConfigs
-  ClientSecureSocket    ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ClientSecureSocket
-  ProxyConfig           ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ProxyConfig
-  ClientSocketConfig    ballerina/http 2.15.5  bal discover ballerina/http:2.15.5 type ClientSocketConfig
+  BearerTokenConfig     ballerina/http 2.15.5  bal discover type BearerTokenConfig -p ballerina/http:2.15.5
+  HttpVersion           ballerina/http 2.15.5  bal discover type HttpVersion -p ballerina/http:2.15.5
+  ClientHttp1Settings   ballerina/http 2.15.5  bal discover type ClientHttp1Settings -p ballerina/http:2.15.5
+  ClientHttp2Settings   ballerina/http 2.15.5  bal discover type ClientHttp2Settings -p ballerina/http:2.15.5
+  FollowRedirects       ballerina/http 2.15.5  bal discover type FollowRedirects -p ballerina/http:2.15.5
+  PoolConfiguration     ballerina/http 2.15.5  bal discover type PoolConfiguration -p ballerina/http:2.15.5
+  CacheConfig           ballerina/http 2.15.5  bal discover type CacheConfig -p ballerina/http:2.15.5
+  Compression           ballerina/http 2.15.5  bal discover type Compression -p ballerina/http:2.15.5
+  CircuitBreakerConfig  ballerina/http 2.15.5  bal discover type CircuitBreakerConfig -p ballerina/http:2.15.5
+  RetryConfig           ballerina/http 2.15.5  bal discover type RetryConfig -p ballerina/http:2.15.5
+  CookieConfig          ballerina/http 2.15.5  bal discover type CookieConfig -p ballerina/http:2.15.5
+  ResponseLimitConfigs  ballerina/http 2.15.5  bal discover type ResponseLimitConfigs -p ballerina/http:2.15.5
+  ClientSecureSocket    ballerina/http 2.15.5  bal discover type ClientSecureSocket -p ballerina/http:2.15.5
+  ProxyConfig           ballerina/http 2.15.5  bal discover type ProxyConfig -p ballerina/http:2.15.5
+  ClientSocketConfig    ballerina/http 2.15.5  bal discover type ClientSocketConfig -p ballerina/http:2.15.5
 == ballerinax__googleapis.sheets type ConnectionConfig ==
 ballerinax/googleapis.sheets · type · ConnectionConfig
 
@@ -1011,23 +1011,23 @@ Types it uses (2)
   |};
 
 Other types it uses, not printed (1)
-  ProxyConfig  bal discover ballerinax/googleapis.sheets type ProxyConfig
+  ProxyConfig  bal discover type ProxyConfig -p ballerinax/googleapis.sheets
 
 From other packages (14)
-  BearerTokenConfig              ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type BearerTokenConfig
-  HttpVersion                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type HttpVersion
-  ClientHttp2Settings            ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type ClientHttp2Settings
-  PoolConfiguration              ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type PoolConfiguration
-  CacheConfig                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type CacheConfig
-  Compression                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type Compression
-  CircuitBreakerConfig           ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type CircuitBreakerConfig
-  RetryConfig                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type RetryConfig
-  ResponseLimitConfigs           ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type ResponseLimitConfigs
-  ClientSecureSocket             ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type ClientSecureSocket
-  ProxyConfig                    ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type ProxyConfig
-  OAuth2RefreshTokenGrantConfig  ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type OAuth2RefreshTokenGrantConfig
-  KeepAlive                      ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type KeepAlive
-  Chunking                       ballerina/http 2.14.10  bal discover ballerina/http:2.14.10 type Chunking
+  BearerTokenConfig              ballerina/http 2.14.10  bal discover type BearerTokenConfig -p ballerina/http:2.14.10
+  HttpVersion                    ballerina/http 2.14.10  bal discover type HttpVersion -p ballerina/http:2.14.10
+  ClientHttp2Settings            ballerina/http 2.14.10  bal discover type ClientHttp2Settings -p ballerina/http:2.14.10
+  PoolConfiguration              ballerina/http 2.14.10  bal discover type PoolConfiguration -p ballerina/http:2.14.10
+  CacheConfig                    ballerina/http 2.14.10  bal discover type CacheConfig -p ballerina/http:2.14.10
+  Compression                    ballerina/http 2.14.10  bal discover type Compression -p ballerina/http:2.14.10
+  CircuitBreakerConfig           ballerina/http 2.14.10  bal discover type CircuitBreakerConfig -p ballerina/http:2.14.10
+  RetryConfig                    ballerina/http 2.14.10  bal discover type RetryConfig -p ballerina/http:2.14.10
+  ResponseLimitConfigs           ballerina/http 2.14.10  bal discover type ResponseLimitConfigs -p ballerina/http:2.14.10
+  ClientSecureSocket             ballerina/http 2.14.10  bal discover type ClientSecureSocket -p ballerina/http:2.14.10
+  ProxyConfig                    ballerina/http 2.14.10  bal discover type ProxyConfig -p ballerina/http:2.14.10
+  OAuth2RefreshTokenGrantConfig  ballerina/http 2.14.10  bal discover type OAuth2RefreshTokenGrantConfig -p ballerina/http:2.14.10
+  KeepAlive                      ballerina/http 2.14.10  bal discover type KeepAlive -p ballerina/http:2.14.10
+  Chunking                       ballerina/http 2.14.10  bal discover type Chunking -p ballerina/http:2.14.10
 == ballerinax__kafka type TopicPartitionOffset ==
 ballerinax/kafka · type · TopicPartitionOffset
 
@@ -1054,4 +1054,4 @@ Types it uses (2)
   |};
 == ballerinax__kafka type NoSuchType ==
 error: 'NoSuchType' is not a type in ballerinax/kafka:0.0.0-fixture.
-  List the types: `bal discover ballerinax/kafka type`.
+  List the types: `bal discover type -p ballerinax/kafka`.

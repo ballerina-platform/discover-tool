@@ -18,7 +18,7 @@
 
 package io.ballerina.tools.discover.views;
 
-import io.ballerina.tools.discover.Coordinate;
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Texts;
@@ -84,15 +84,15 @@ public final class Overview {
         counts.keySet().removeAll(LISTED_AS_SECTIONS);
         DiscoverResult.Overview.TypeCounts types = counts.isEmpty()
                 ? null
-                : new DiscoverResult.Overview.TypeCounts(counts, loaded.command() + " " + Types.BUCKET);
+                : new DiscoverResult.Overview.TypeCounts(counts, loaded.command(Types.BUCKET).text());
         DiscoverResult.Overview.ReadmeSummary readme = loaded.readme().isEmpty()
                 ? null
                 : new DiscoverResult.Overview.ReadmeSummary(Readme.sectionsOf(loaded).size(),
-                        loaded.command() + " " + Readme.BUCKET);
+                        loaded.command(Readme.BUCKET).text());
         List<DiscoverResult.Overview.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.Overview.Submodule(submodule.name(),
                         Texts.firstSentence(submodule.summary()),
-                        Coordinate.COMMAND + loaded.pkgArgument(submodule.name())))
+                        Command.overview(loaded.target(submodule.name())).text()))
                 .toList();
         DiscoverResult members = onlyClientsListing(loaded).orElse(null);
 
@@ -106,7 +106,7 @@ public final class Overview {
         List<DiscoverResult.Overview.Section> sections = new ArrayList<>();
         rows.forEach((scope, all) -> sections.add(new DiscoverResult.Overview.Section(scope.verb(),
                 all.subList(0, shown.getOrDefault(scope, all.size())), all.size(),
-                loaded.command() + " " + scope.verb())));
+                loaded.command(scope.verb()).text())));
         return new DiscoverResult.Overview(List.copyOf(sections), types, readme, submodules, loaded.warning(),
                 members);
     }
@@ -129,7 +129,7 @@ public final class Overview {
             return Optional.empty();
         }
         Result<DiscoverResult> listing = Containers.render(loaded, Surface.Scope.CLIENT,
-                new Containers.Options(List.of(clients.get(0).name())));
+                Containers.Options.container(clients.get(0).name(), null, 1));
         return listing.isOk() && shownBy(listing.value()) > 0
                 ? Optional.of(listing.value())
                 : Optional.empty();
@@ -165,7 +165,7 @@ public final class Overview {
                         container.operations().size(),
                         (int) container.standalone().stream().filter(Fn.Remote.class::isInstance).count(),
                         (int) container.standalone().stream().filter(Fn.Normal.class::isInstance).count(),
-                        Containers.openCommand(loaded, scope, container)))
+                        Containers.openCommand(loaded, container)))
                 .toList();
     }
 }

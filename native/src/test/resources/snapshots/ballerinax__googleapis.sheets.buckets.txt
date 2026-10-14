@@ -44,30 +44,30 @@ ballerinax/googleapis.sheets · client · Client
   setCell
 
 ... 3 more (page 1 of 2)
-Next: bal discover ballerinax/googleapis.sheets client Client <name>
-Next: bal discover ballerinax/googleapis.sheets client Client --page 2
-Next: bal discover ballerinax/googleapis.sheets client Client --filter <keyword>
+Next: bal discover method <name> -p ballerinax/googleapis.sheets --client Client
+Next: bal discover client Client -p ballerinax/googleapis.sheets --page 2
+Next: bal discover client Client -p ballerinax/googleapis.sheets --filter <keyword>
 == service ==
 ballerinax/googleapis.sheets · service
 ballerinax/googleapis.sheets has no service types.
 
 Other buckets
-  client   1  bal discover ballerinax/googleapis.sheets client
-  type    32  bal discover ballerinax/googleapis.sheets type
+  client   1  bal discover client -p ballerinax/googleapis.sheets
+  type    32  bal discover type -p ballerinax/googleapis.sheets
 == class ==
 ballerinax/googleapis.sheets · class
 ballerinax/googleapis.sheets has no classes.
 
 Other buckets
-  client   1  bal discover ballerinax/googleapis.sheets client
-  type    32  bal discover ballerinax/googleapis.sheets type
-== funcs ==
-ballerinax/googleapis.sheets · funcs
+  client   1  bal discover client -p ballerinax/googleapis.sheets
+  type    32  bal discover type -p ballerinax/googleapis.sheets
+== function ==
+ballerinax/googleapis.sheets · function
 ballerinax/googleapis.sheets has no functions.
 
 Other buckets
-  client   1  bal discover ballerinax/googleapis.sheets client
-  type    32  bal discover ballerinax/googleapis.sheets type
+  client   1  bal discover client -p ballerinax/googleapis.sheets
+  type    32  bal discover type -p ballerinax/googleapis.sheets
 == type ==
 ballerinax/googleapis.sheets · type
 20 records, 6 enums, 3 errors, 1 alias, 1 constant, 1 client
@@ -116,4 +116,4 @@ Constants
 Clients
   Client
 
-Next: bal discover ballerinax/googleapis.sheets type <name>
+Next: bal discover type <name> -p ballerinax/googleapis.sheets
