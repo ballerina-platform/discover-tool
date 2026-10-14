@@ -36,6 +36,8 @@ public class ExitCodesTest {
 
     private static final String KAFKA = "ballerinax/kafka";
 
+    private static final String LATER = "again later";
+
     private static final String KAFKA_VERSION = "4.6.5";
 
     private static final String VERSIONS = "[\"" + KAFKA_VERSION + "\"]";
@@ -86,13 +88,15 @@ public class ExitCodesTest {
         HttpOptions kafka = CliTest.centralFor("ballerinax__kafka", KAFKA_VERSION);
         HttpOptions graphql = CliTest.options(CliTest.graphqlCentral());
         HttpOptions search = CliTest.options(CentralSearchTest.central());
+        HttpOptions twilio = CliTest.centralFor("ballerinax__twilio", FixtureCorpus.FIXTURE_VERSION.text());
+        List<String> overview = List.of("package", KAFKA);
         List<Case> cases = List.of(
-                new Case(null, Failure.ANSWERED, List.of("package", KAFKA), kafka),
+                new Case(null, Failure.ANSWERED, overview, kafka),
                 new Case(null, Failure.ANSWERED, List.of("client", "-p", KAFKA, "--filter", "zzznope"), kafka),
                 new Case(null, Failure.ANSWERED, List.of("search", "zzznope", "-p", KAFKA), kafka),
                 new Case("package-not-found", Failure.NOT_FOUND, List.of("package", "no-such-org/no-such-pkg"),
                         failing(FakeTransport.status(404))),
-                new Case("package-not-found", Failure.NOT_FOUND, List.of("package", KAFKA), registryAnswering("[]")),
+                new Case("package-not-found", Failure.NOT_FOUND, overview, registryAnswering("[]")),
                 new Case("package-not-found", Failure.NOT_FOUND,
                         List.of("package", "ballerina/graphql", "--module", "nosuch"), graphql),
                 new Case("symbol-not-found", Failure.NOT_FOUND,
@@ -112,33 +116,41 @@ public class ExitCodesTest {
                         List.of("method", "send", "-p", KAFKA, "--client", "A", "--class", "B"), CliTest.never()),
                 new Case("validation", Failure.USAGE,
                         List.of("method", "poll", "x", "-p", KAFKA, "--client", "Consumer"), kafka),
-                new Case("validation", Failure.USAGE, List.of("client", "-p", KAFKA, "--page", "2"), kafka),
-                new Case("validation", Failure.USAGE, List.of("search", "kafka", "--page", "9"), search),
+                new Case("page-not-found", Failure.NOT_FOUND, List.of("client", "-p", KAFKA, "--page", "2"), kafka),
+                new Case("page-not-found", Failure.NOT_FOUND, List.of("search", "kafka", "--page", "9"), search),
+                new Case("page-not-found", Failure.NOT_FOUND,
+                        List.of("client", "Client", "-p", "ballerinax/twilio", "--page", "99"), twilio),
+                new Case("validation", Failure.USAGE, List.of("client", "-p", KAFKA, "--page", "0"), CliTest.never()),
                 new Case("validation", Failure.USAGE, List.of("readme", "1", "-p", KAFKA, "--filter", "zzznope"),
                         kafka),
-                new Case("validation", Failure.USAGE, List.of("package", KAFKA), CliTest.never(), malformedLock()),
+                new Case("validation", Failure.USAGE, overview, CliTest.never(), malformedLock()),
                 new Case("ambiguous", Failure.AMBIGUOUS, List.of("method", "close", "-p", KAFKA), kafka),
                 new Case("ambiguous", Failure.AMBIGUOUS, List.of("class", "close", "-p", KAFKA), kafka),
                 new Case("ambiguous", Failure.AMBIGUOUS, List.of("readme", "Kafka", "-p", KAFKA), kafka),
-                new Case("upstream", Failure.UNAVAILABLE, List.of("package", KAFKA),
+                new Case("upstream", Failure.UNAVAILABLE, overview,
                         failed(HttpTransport.Reply.Problem.UNCONNECTED, null)),
-                new Case("upstream", Failure.UNAVAILABLE, List.of("package", KAFKA),
+                new Case("upstream", Failure.UNAVAILABLE, overview,
                         failed(HttpTransport.Reply.Problem.UNRESOLVED, null)),
                 new Case("upstream", Failure.UNAVAILABLE, List.of("package", KAFKA + ".sub"), parentUnreachable()),
-                new Case("timeout", Failure.UNAVAILABLE, List.of("package", KAFKA),
+                new Case("timeout", Failure.UNAVAILABLE, overview,
                         failing(new HttpTransport.Reply.TimedOut())),
-                new Case("upstream", Failure.BAD_ANSWER, List.of("package", KAFKA), failing(FakeTransport.status(500))),
-                new Case("upstream", Failure.BAD_ANSWER, List.of("package", KAFKA), failing(FakeTransport.status(407))),
-                new Case("upstream", Failure.BAD_ANSWER, List.of("package", KAFKA),
-                        failed(HttpTransport.Reply.Problem.PROXY_REJECTED, null)),
-                new Case("upstream", Failure.BAD_ANSWER, List.of("package", KAFKA), docsAnswering("{\"unterminated")),
-                new Case("upstream", Failure.BAD_ANSWER, List.of("package", KAFKA),
+                new Case("upstream", Failure.UNAVAILABLE, overview, failing(FakeTransport.status(429))),
+                new Case("upstream", Failure.UNAVAILABLE, overview, failing(FakeTransport.status(500))),
+                new Case("upstream", Failure.UNAVAILABLE, overview, failing(FakeTransport.status(503))),
+                new Case("upstream", Failure.UNAVAILABLE, overview,
                         failed(HttpTransport.Reply.Problem.TUNNEL, 502)),
-                new Case("schema-drift", Failure.BAD_ANSWER, List.of("package", KAFKA),
+                new Case("upstream", Failure.BAD_ANSWER, overview, failing(FakeTransport.status(403))),
+                new Case("upstream", Failure.BAD_ANSWER, overview, failing(FakeTransport.status(407))),
+                new Case("upstream", Failure.BAD_ANSWER, overview,
+                        failed(HttpTransport.Reply.Problem.TUNNEL, 403)),
+                new Case("upstream", Failure.BAD_ANSWER, overview,
+                        failed(HttpTransport.Reply.Problem.PROXY_REJECTED, null)),
+                new Case("upstream", Failure.BAD_ANSWER, overview, docsAnswering("{\"unterminated")),
+                new Case("schema-drift", Failure.BAD_ANSWER, overview,
                         docsAnswering("{\"docsData\":{\"modules\":[]}}")),
-                new Case("schema-drift", Failure.BAD_ANSWER, List.of("package", KAFKA),
+                new Case("schema-drift", Failure.BAD_ANSWER, overview,
                         registryAnswering("{\"versions\":[]}")),
-                new Case("schema-drift", Failure.BAD_ANSWER, List.of("package", KAFKA),
+                new Case("schema-drift", Failure.BAD_ANSWER, overview,
                         registryAnswering("[\"latest\"]")));
         for (Case run : cases) {
             assertJson(run);
@@ -158,6 +170,8 @@ public class ExitCodesTest {
         }
         Assert.assertEquals(capture.stdout(), "", label);
         Assert.assertEquals(capture.field("kind"), run.kind(), label);
+        Assert.assertFalse(capture.field("suggestion").contains(LATER) && run.code() != Failure.UNAVAILABLE,
+                "only a failure worth retrying says to: " + label + " -> " + capture.stderr());
     }
 
     private static void assertText(Case run) {
@@ -183,12 +197,17 @@ public class ExitCodesTest {
                 new Kind(new Failure.PackageNotFound("a/b", null, null, "s"), "package-not-found", 1),
                 new Kind(new Failure.SymbolNotFound("a/b", "1.0.0", null, List.of("x"), "m", "s", null, List.of()),
                         "symbol-not-found", 1),
+                new Kind(new Failure.PageNotFound("m", "s", "c", 9, 3), "page-not-found", 1),
                 new Kind(new Failure.Validation("m", "s"), "validation", 2),
                 new Kind(new Failure.Ambiguous("a/b", "1.0.0", null, List.of("x"), "m", "s", Failure.OWNERS,
                         List.of()), "ambiguous", 3),
                 new Kind(new Failure.Upstream("u", 1, "m", "s", null, false), "upstream", 4),
                 new Kind(new Failure.Timeout("u", 1, "s"), "timeout", 4),
-                new Kind(new Failure.Upstream("u", 1, "m", "s", 500, true), "upstream", 5),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", 500, true), "upstream", 4),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", 429, true), "upstream", 4),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", 502, false), "upstream", 4),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", 404, true), "upstream", 5),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", 403, false), "upstream", 5),
                 new Kind(new Failure.Upstream("u", 1, "m", "s", null, true), "upstream", 5),
                 new Kind(new Failure.Upstream("u", 1, "m", "s", 407, false), "upstream", 5),
                 new Kind(new Failure.SchemaDrift("a/b", "1.0.0", null, List.of(), "s"), "schema-drift", 5),

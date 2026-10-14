@@ -24,6 +24,7 @@ import com.google.gson.JsonObject;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 
 /**
@@ -80,6 +81,29 @@ public sealed interface Failure {
     }
 
     /**
+     * A page past the end of a paged listing: the request is well formed, and the listing has fewer pages.
+     *
+     * @param message which page was asked for and how many there are
+     * @param suggestion what to run instead
+     * @param command the last page's command, ready to run
+     * @param page the page that was asked for
+     * @param pages how many pages the listing has
+     * @param qualified the {@code org/name} the listing is of, or {@code null} for a search across Central
+     * @param version the version that was read, or {@code null}
+     */
+    record PageNotFound(String message, String suggestion, String command, int page, int pages, String qualified,
+            String version) implements Failure {
+
+        public PageNotFound(String message, String suggestion, String command, int page, int pages) {
+            this(message, suggestion, command, page, pages, null, null);
+        }
+
+        public PageNotFound about(String forPackage, String atVersion) {
+            return new PageNotFound(message, suggestion, command, page, pages, forPackage, atVersion);
+        }
+    }
+
+    /**
      * Central has no such package, no such version of it, or no such module at that version.
      *
      * @param qualified the {@code org/name} that was not found, or whose module was not
@@ -130,6 +154,18 @@ public sealed interface Failure {
 
         public Upstream suggesting(String replacement) {
             return new Upstream(url, attempts, message, replacement, status, reached, qualified, version);
+        }
+
+        /** Whether the same request may succeed later: no answer came back, or the answer was a passing one. */
+        public boolean isTransient() {
+            return status == null ? !reached : isTransientStatus(status, reached);
+        }
+
+        /**
+         * @param fromCentral whether Central sent the status, rather than a proxy answering its {@code CONNECT}
+         */
+        public static boolean isTransientStatus(int status, boolean fromCentral) {
+            return (fromCentral ? TRANSIENT_STATUSES : TRANSIENT_PROXY_STATUSES).contains(status);
         }
     }
 
@@ -215,7 +251,7 @@ public sealed interface Failure {
     /** The exit code of an answer. */
     int ANSWERED = 0;
 
-    /** The package, version, module or name does not exist; the request itself was well formed. */
+    /** The package, version, module, name or page does not exist; the request itself was well formed. */
     int NOT_FOUND = 1;
 
     /** The command line is malformed. */
@@ -262,6 +298,16 @@ public sealed interface Failure {
 
     String UPSTREAM_SUGGESTION = "Central returned an error; run the same command again later.";
 
+    /** For an answer from Central that running the same command again will not change. */
+    String UPSTREAM_REJECTED_SUGGESTION = "Running the same command again will not change Central's answer; "
+            + OFFLINE_FALLBACK;
+
+    /** Central's statuses that pass: throttling, and an overloaded or unreachable backend. */
+    Set<Integer> TRANSIENT_STATUSES = Set.of(429, 500, 502, 503, 504);
+
+    /** A proxy's answers to a {@code CONNECT} when it could not reach Central for now. */
+    Set<Integer> TRANSIENT_PROXY_STATUSES = Set.of(502, 503, 504);
+
     /**
      * Addressed to a human on purpose: no argument the agent can change will make a payload this
      * tool cannot parse. The fallback still applies — a package Central mis-serves is intact on
@@ -275,6 +321,7 @@ public sealed interface Failure {
         return switch (this) {
             case Validation ignored -> "validation";
             case PackageNotFound ignored -> "package-not-found";
+            case PageNotFound ignored -> "page-not-found";
             case Upstream ignored -> "upstream";
             case Timeout ignored -> "timeout";
             case SchemaDrift ignored -> "schema-drift";
@@ -285,18 +332,19 @@ public sealed interface Failure {
     }
 
     /**
-     * The process exit code: one per action the caller takes next. An {@link Upstream} that never got a status
-     * line back — the connection, DNS or TLS failed — is worth a retry like a {@link Timeout}; one with a status,
-     * or a body this tool cannot read, is Central's (or the proxy's) answer and is not.
+     * The process exit code: one per action the caller takes next. An {@link Upstream} that may pass
+     * ({@link Upstream#isTransient()}) is worth a retry like a {@link Timeout}; any other status, or a body this tool
+     * cannot read, is an answer that the same request will get again.
      */
     default int exitCode() {
         return switch (this) {
             case PackageNotFound ignored -> NOT_FOUND;
+            case PageNotFound ignored -> NOT_FOUND;
             case SymbolNotFound ignored -> NOT_FOUND;
             case Validation ignored -> USAGE;
             case Ambiguous ignored -> AMBIGUOUS;
             case Timeout ignored -> UNAVAILABLE;
-            case Upstream f -> !f.reached() && f.status() == null ? UNAVAILABLE : BAD_ANSWER;
+            case Upstream f -> f.isTransient() ? UNAVAILABLE : BAD_ANSWER;
             case SchemaDrift ignored -> BAD_ANSWER;
             case Internal ignored -> INTERNAL_ERROR;
         };
@@ -308,6 +356,7 @@ public sealed interface Failure {
     default String headline() {
         return switch (this) {
             case Validation f -> f.message();
+            case PageNotFound f -> f.message();
             case PackageNotFound f -> (f.module() == null ? "Package" : "Module") + " not found on Central: "
                     + coordinate(f.qualified(), f.version(), f.module()) + ".";
             case Upstream f -> f.message() + (f.attempts() > 1 ? " (" + f.attempts() + " attempts)." : ".");
@@ -370,6 +419,15 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
                 command(json, f.command());
                 matches(json, OWNERS, f.owners());
+            }
+            case PageNotFound f -> {
+                if (f.qualified() != null) {
+                    coordinates(json, f.qualified(), f.version(), null);
+                }
+                json.addProperty("suggestion", f.suggestion());
+                command(json, f.command());
+                json.addProperty("page", f.page());
+                json.addProperty("pages", f.pages());
             }
             case PackageNotFound f -> {
                 coordinates(json, f.qualified(), f.version(), f.module());

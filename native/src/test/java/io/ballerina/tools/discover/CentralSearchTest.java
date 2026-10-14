@@ -232,7 +232,7 @@ public class CentralSearchTest {
 
         CliTest.Capture beyond = new CliTest.Capture();
         Assert.assertEquals(Cli.run(List.of("search", "kafka", "--page", "9"), beyond.streams(),
-                CliTest.options(central())), Failure.USAGE);
+                CliTest.options(central())), Failure.NOT_FOUND);
         Assert.assertEquals(beyond.field("command"), "bal discover search kafka --page 3");
     }
 

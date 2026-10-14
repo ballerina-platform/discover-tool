@@ -108,7 +108,7 @@ public final class CentralSearch {
         if (rows == null || !rows.isJsonArray() || count == null || !count.isJsonPrimitive()
                 || !count.getAsJsonPrimitive().isNumber()) {
             return Result.err(new Failure.Upstream(url, ONE_ANSWER, "Central answered " + url + " without a '" + key
-                    + "' list and a '" + COUNT + "'", Failure.UPSTREAM_SUGGESTION, null, true));
+                    + "' list and a '" + COUNT + "'", Failure.UPSTREAM_REJECTED_SUGGESTION, null, true));
         }
         List<T> items = new ArrayList<>();
         for (JsonElement row : (JsonArray) rows) {

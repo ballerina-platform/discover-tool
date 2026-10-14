@@ -829,11 +829,11 @@ and `suggestion` say the rest:
 
 | exit | means                                                                             | `kind`                                  |
 | ---- | --------------------------------------------------------------------------------- | --------------------------------------- |
-| 1    | not found: the package, version, module or name does not exist                    | `package-not-found`, `symbol-not-found` |
+| 1    | not found: the package, version, module, name or page does not exist             | `package-not-found`, `symbol-not-found`, `page-not-found` |
 | 2    | a usage error: the command is malformed, or asks for something it cannot combine — or the version the project's `Dependencies.toml` locks is malformed | `validation` |
 | 3    | ambiguous: the name matches more than one thing, each listed with its command     | `ambiguous`                             |
-| 4    | Central could not be reached: the connection, DNS or TLS failed, or it timed out; may work on a retry | `upstream` with `reached: false` and no `status`, `timeout` |
-| 5    | Central answered badly: an HTTP error status (Central's or the proxy's), or a body this tool cannot read | `upstream` with a `status` or `reached: true`, `schema-drift` |
+| 4    | Central is unavailable for now, so the same command may work later: the connection, DNS or TLS failed, it timed out, Central answered 429, 500, 502, 503 or 504, or the proxy answered its `CONNECT` with 502, 503 or 504 | `upstream`, `timeout` |
+| 5    | Central answered with something a retry will not change: any other error status (Central's, or the proxy's, such as 407), or a body this tool cannot read | `upstream`, `schema-drift` |
 | 6    | an internal error: a defect in `bal discover`                                     | `internal`                              |
 
 A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
@@ -875,11 +875,14 @@ the noun it meant. An unknown noun's `command` searches for the word, since it i
 its noun (`bal discover close -p ballerinax/kafka`). One is found once the package is read: more names than a
 `method` or `resource` takes, read against it (`method Producer send` is `method send --client Producer`,
 `resource gists public get` is `resource gists/public get`); it names the command to run, and in text ends with
-that noun's synopsis. A `validation` failure that depends on what the package holds — a page past the end of the
-listing, a readme section asked with a `--filter` keyword it does not mention — is exit 2 as well, without the
+that noun's synopsis. A `validation` failure that depends on what the package holds — a readme section asked with a `--filter` keyword it does not mention — is exit 2 as well, without the
 synopsis.
 
-A search that matches nothing is an answer, not a failure (exit 0). `upstream` and `timeout` at exit 4 are worth re-running unchanged once their cause has passed or been fixed, and an `upstream` at exit 5 once Central or the proxy is fixed; `validation`, `ambiguous`,
+A search that matches nothing is an answer, not a failure (exit 0), and so is an empty `--filter`; a page past the
+end of a paged listing is `page-not-found` (exit 1), carrying `page`, `pages` and the last page's `command`, while
+`--page 0`, or `--page` on an answer that is never paged, is a usage error. `upstream` and `timeout` at exit 4 are
+worth re-running unchanged later, and only they say so; an `upstream` at exit 5 needs Central or the proxy fixed;
+`validation`, `ambiguous`,
 `package-not-found` and `symbol-not-found` need a different command — `symbol-not-found` is a container, member,
 path, type or readme section not named exactly as listed, or asked as a noun that does not hold it, or a container flag naming no container of its kind, or a readme a module does not publish (a `--module` the package does not publish
 is `package-not-found` with `module`, and lists the submodules it does in `candidates`; a name several containers
