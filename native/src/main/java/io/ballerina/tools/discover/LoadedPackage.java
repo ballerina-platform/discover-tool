@@ -120,25 +120,30 @@ public record LoadedPackage(
     }
 
     /**
-     * The argument a caller types to reach this SAME (package, module) pair again — what every "next command"
-     * this tool prints builds on, so drilling further never silently falls back to the default module.
+     * The package and module a command reaches this SAME lookup by — what every "next command" this tool prints
+     * names, so drilling further never silently falls back to the default module.
      */
-    public String pkgArgument() {
-        return pkgArgument(module);
+    public Command.Target target() {
+        return target(module);
     }
 
-    /** {@code bal discover} and {@link #pkgArgument()}: the command every next command this lookup prints extends. */
-    public String command() {
-        return new Coordinate(qualified, pinned).command(module);
+    /** {@link #target()} for another module of this package, or its default one when {@code other} is null. */
+    public Command.Target target(String other) {
+        return new Coordinate(qualified, pinned).target(other);
     }
 
-    /** {@link #pkgArgument()} for another module of this package, or its default one when {@code other} is null. */
-    public String pkgArgument(String other) {
-        return new Coordinate(qualified, pinned).argument(other);
+    /** {@code noun} and {@code names} asked of this lookup's package and module. */
+    public Command command(String noun, String... names) {
+        return Command.of(noun, names).in(target());
+    }
+
+    /** This lookup's overview: {@code bal discover package <pkg> [--module <m>]}. */
+    public Command overview() {
+        return Command.overview(target());
     }
 
     /**
-     * The argument that reaches another module in its own package, or empty when that package is not known.
+     * Where another module is reached, or empty when that package is not known.
      * A module of THIS package — its default module, or any submodule it publishes — is reached through
      * {@code --module} or none; a name that merely starts with this package's is not enough, since
      * {@code postgresql.driver} is a package of its own.
@@ -146,18 +151,20 @@ public record LoadedPackage(
      * Another package's dotted module path names no package boundary, and a command guessing one would not be
      * ready to run.
      */
-    public Optional<String> argumentFor(ModuleRef module) {
+    public Optional<Command.Target> targetFor(ModuleRef module) {
         boolean sameOrg = module.orgName().equals(qualified.org());
         String sibling = sameOrg && module.moduleName().startsWith(qualified.name() + ".")
                 ? module.moduleName().substring(qualified.name().length() + 1)
                 : null;
         if (sameOrg && module.moduleName().equals(qualified.name())) {
-            return Optional.of(pkgArgument(null));
+            return Optional.of(target(null));
         }
         if (sibling != null && modules.contains(sibling)) {
-            return Optional.of(pkgArgument(sibling));
+            return Optional.of(target(sibling));
         }
-        return module.moduleName().contains(".") ? Optional.empty() : Optional.of(module.coordinate());
+        return module.moduleName().contains(".")
+                ? Optional.empty()
+                : Optional.of(new Command.Target(module.coordinate(), null));
     }
 
     public LoadedPackage withLibrary(Library replacement) {

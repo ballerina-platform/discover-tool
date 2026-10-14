@@ -97,10 +97,10 @@ public class DiscoverToolTest {
     }
 
     @Test
-    public void theHelpTextNamesEveryBucketWiredSoFar() {
+    public void theHelpTextNamesEveryNoun() {
         String text = usage("--help");
-        for (String bucket : List.of("client", "service", "class", "funcs")) {
-            Assert.assertTrue(text.contains(bucket), bucket);
+        for (String noun : Command.NOUNS) {
+            Assert.assertTrue(text.contains("\n  " + noun + " "), noun);
         }
         Assert.assertFalse(text.contains("language server"), "no document mentions the language server");
     }
@@ -128,7 +128,7 @@ public class DiscoverToolTest {
     public void theOneLineUsageNamesEveryFlag() {
         StringBuilder sb = new StringBuilder();
         new DiscoverTool(System.out, System.err).printUsage(sb);
-        Assert.assertTrue(sb.toString().startsWith("  bal discover <org>/<name>[:<version>] [bucket] [name ...]"),
+        Assert.assertTrue(sb.toString().startsWith("  bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]]"),
                 sb.toString());
         for (String flag : List.of("--refresh", "--output", "--filter", "--page", "-m", "--help")) {
             Assert.assertTrue(sb.toString().contains(flag), flag + " missing from: " + sb);

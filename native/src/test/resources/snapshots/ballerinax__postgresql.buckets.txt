@@ -12,7 +12,7 @@ Remote methods (->)
 Methods (.)
   close
 
-Next: bal discover ballerinax/postgresql client Client <name>
+Next: bal discover method <name> -p ballerinax/postgresql --client Client
 == service ==
 ballerinax/postgresql · service · cdc:Service
 Methods to implement (6)
@@ -55,7 +55,7 @@ remote function onError(cdc:Error cdcError) returns error?
 Rules
   At least one of: onRead, onCreate, onUpdate, onDelete, onTruncate — A CDC service must declare at least one change handler. onError alone never receives a change event, so the service would do nothing.
 
-Note: attach it to postgresql:CdcListener; declared in ballerinax/cdc — bal discover ballerinax/cdc service Service
+Note: attach it to postgresql:CdcListener; declared in ballerinax/cdc — bal discover service Service -p ballerinax/cdc
 == class ==
 ballerinax/postgresql · class
 125 classes
@@ -102,18 +102,18 @@ ballerinax/postgresql · class
   LineOutParameter          1 method
 
 ... 85 more (page 1 of 4)
-Next: bal discover ballerinax/postgresql class <name>
-Next: bal discover ballerinax/postgresql class --page 2
-Next: bal discover ballerinax/postgresql class --filter <keyword>
-== funcs ==
-ballerinax/postgresql · funcs
+Next: bal discover class <name> -p ballerinax/postgresql
+Next: bal discover class -p ballerinax/postgresql --page 2
+Next: bal discover class -p ballerinax/postgresql --filter <keyword>
+== function ==
+ballerinax/postgresql · function
 ballerinax/postgresql has no functions.
 
 Other buckets
-  client     1  bal discover ballerinax/postgresql client
-  service    1  bal discover ballerinax/postgresql service
-  class    125  bal discover ballerinax/postgresql class
-  type     163  bal discover ballerinax/postgresql type
+  client     1  bal discover client -p ballerinax/postgresql
+  service    1  bal discover service -p ballerinax/postgresql
+  class    125  bal discover class -p ballerinax/postgresql
+  type     163  bal discover type -p ballerinax/postgresql
 == type ==
 ballerinax/postgresql · type
 32 records, 4 enums, 1 listener, 125 classes, 1 client
@@ -167,6 +167,6 @@ Classes
   BoxArrayValue
 
 ... 123 more (page 1 of 5)
-Next: bal discover ballerinax/postgresql type <name>
-Next: bal discover ballerinax/postgresql type --page 2
-Next: bal discover ballerinax/postgresql type --filter <keyword>
+Next: bal discover type <name> -p ballerinax/postgresql
+Next: bal discover type -p ballerinax/postgresql --page 2
+Next: bal discover type -p ballerinax/postgresql --filter <keyword>

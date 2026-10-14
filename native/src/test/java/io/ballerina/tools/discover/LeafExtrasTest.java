@@ -29,7 +29,6 @@ import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
-import io.ballerina.tools.discover.views.Containers;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -45,9 +44,9 @@ import java.util.Optional;
  */
 public class LeafExtrasTest {
 
-    private static DiscoverResult.Signature leaf(String slug, Surface.Scope scope, String... selectors) {
-        Result<DiscoverResult> answer = Containers.render(FixtureCorpus.loadedFixture(slug), scope,
-                new Containers.Options(List.of(selectors)));
+    private static DiscoverResult.Signature leaf(String slug, Surface.Scope scope, String container,
+            String... member) {
+        Result<DiscoverResult> answer = Asked.member(FixtureCorpus.loadedFixture(slug), scope, container, member);
         Assert.assertTrue(answer.isOk(), answer.isOk() ? "" : answer.failure().describe());
         return (DiscoverResult.Signature) answer.value();
     }
@@ -58,7 +57,7 @@ public class LeafExtrasTest {
         Assert.assertEquals(send.create().code(), "kafka:Producer producer = check new (bootstrapServers, config);");
         Assert.assertEquals(send.create().init(), "init(string|string[] bootstrapServers, "
                 + "*kafka:ProducerConfiguration config)");
-        Assert.assertEquals(send.create().command(), "bal discover ballerinax/kafka client Producer init");
+        Assert.assertEquals(send.create().command(), "bal discover method init -p ballerinax/kafka --client Producer");
     }
 
     @Test
@@ -77,11 +76,11 @@ public class LeafExtrasTest {
         Library library = Pipeline.build(payload.module());
         LoadedPackage acme = new LoadedPackage(QualifiedName.parse("acme/acme").value(), FixtureCorpus.FIXTURE_VERSION,
                 library, Optional.empty(), null, List.of(), List.of(), null, null, () -> library, Map::of);
-        DiscoverResult.Signature send = (DiscoverResult.Signature) Containers.render(acme, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("HTTPClient", "send"))).value();
+        DiscoverResult.Signature send = (DiscoverResult.Signature) Asked.of(acme, "method", "send", "--client",
+                "HTTPClient").value();
         Assert.assertEquals(send.create().code(), "acme:HTTPClient httpClient = new ();");
-        DiscoverResult.Signature go = (DiscoverResult.Signature) Containers.render(acme, Surface.Scope.CLASS,
-                new Containers.Options(List.of("Plain", "go"))).value();
+        DiscoverResult.Signature go = (DiscoverResult.Signature) Asked.of(acme, "method", "go", "--class", "Plain")
+                .value();
         Assert.assertEquals(go.create().code(), "acme:Plain plain = new ();");
         Assert.assertNull(go.create().init());
         Assert.assertNull(go.create().command());
@@ -99,10 +98,11 @@ public class LeafExtrasTest {
         String text = TextRenderer.render(send);
         Assert.assertTrue(text.contains(";\n\nCreate it\n  kafka:Producer producer = check new (bootstrapServers, "
                 + "config);\n  init(string|string[] bootstrapServers, *kafka:ProducerConfiguration config)\n  bal "
-                + "discover ballerinax/kafka client Producer init\n"), text);
+                + "discover method init -p ballerinax/kafka --client Producer\n"), text);
         JsonObject create = JsonParser.parseString(JsonRenderer.render(send)).getAsJsonObject()
                 .getAsJsonObject("create");
-        Assert.assertEquals(create.get("command").getAsString(), "bal discover ballerinax/kafka client Producer init");
+        Assert.assertEquals(create.get("command").getAsString(),
+                "bal discover method init -p ballerinax/kafka --client Producer");
     }
 
     private static final String PAIR = "## Two clients\n\n```ballerina\nacme:Client main = check new ();\n"
@@ -130,9 +130,8 @@ public class LeafExtrasTest {
                 Optional.of(PAIR), null, List.of(), List.of(), null, null, () -> library, Map::of);
     }
 
-    private static List<Integer> callers(LoadedPackage loaded, String... selectors) {
-        Result<DiscoverResult> answer = Containers.render(loaded, Surface.Scope.CLIENT,
-                new Containers.Options(List.of(selectors)));
+    private static List<Integer> callers(LoadedPackage loaded, String container, String... member) {
+        Result<DiscoverResult> answer = Asked.member(loaded, Surface.Scope.CLIENT, container, member);
         Assert.assertTrue(answer.isOk(), answer.isOk() ? "" : answer.failure().describe());
         return ((DiscoverResult.Signature) answer.value()).callers().stream()
                 .map(DiscoverResult.ReadmeSections.Section::number)
@@ -162,14 +161,13 @@ public class LeafExtrasTest {
 
     @Test
     public void readmeCallersRenderAsSectionRowsWithTheirCommands() {
-        Result<DiscoverResult> answer = Containers.render(acme(), Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client", "send")));
+        Result<DiscoverResult> answer = Asked.of(acme(), "method", "send", "--client", "Client");
         String text = TextRenderer.render(answer.value());
-        Assert.assertTrue(text.contains("\nReadme sections that call it\n  2  Main sends  bal discover acme/acme "
-                + "readme 2"), text);
+        Assert.assertTrue(text.contains("\nReadme sections that call it\n  2  Main sends  bal discover readme 2 -p "
+                + "acme/acme"), text);
         JsonObject row = JsonParser.parseString(JsonRenderer.render(answer.value())).getAsJsonObject()
                 .getAsJsonArray("callers").get(0).getAsJsonObject();
-        Assert.assertEquals(row.get("command").getAsString(), "bal discover acme/acme readme 2");
+        Assert.assertEquals(row.get("command").getAsString(), "bal discover readme 2 -p acme/acme");
     }
 
     @Test
@@ -214,8 +212,8 @@ public class LeafExtrasTest {
 
     @Test
     public void aServiceTypeWithNoMethodsAnswersWithItsDocumentationAndTheSectionsThatDeclareOne() {
-        Result<DiscoverResult> answer = Containers.render(FixtureCorpus.loadedFixture("ballerina__http"),
-                Surface.Scope.SERVICE, new Containers.Options(List.of("Service")));
+        Result<DiscoverResult> answer = Asked.of(FixtureCorpus.loadedFixture("ballerina__http"), "service",
+                "Service");
         DiscoverResult.ServiceExamples service = (DiscoverResult.ServiceExamples) answer.value();
         Assert.assertEquals(service.description().strip(), "The HTTP service type.");
         Assert.assertFalse(service.sections().isEmpty(), "the readme's `service ... on new http:Listener` section");
@@ -229,11 +227,11 @@ public class LeafExtrasTest {
     @Test
     public void anUntypedServiceIsTheListenersAttachTypesNotEveryServiceTypeTheListenerAccepts() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        DiscoverResult.ServiceExamples service = (DiscoverResult.ServiceExamples) Containers.render(http,
-                Surface.Scope.SERVICE, new Containers.Options(List.of("Service"))).value();
+        DiscoverResult.ServiceExamples service = (DiscoverResult.ServiceExamples) Asked.of(http, "service", "Service")
+                .value();
         Assert.assertFalse(service.sections().isEmpty());
-        DiscoverResult.ServiceExamples contract = (DiscoverResult.ServiceExamples) Containers.render(http,
-                Surface.Scope.SERVICE, new Containers.Options(List.of("ServiceContract"))).value();
+        DiscoverResult.ServiceExamples contract = (DiscoverResult.ServiceExamples) Asked.of(http, "service",
+                "ServiceContract").value();
         Assert.assertEquals(contract.sections(), List.of(),
                 "`service /x on new http:Listener(...)` is an http:Service, though the listener accepts both");
     }
@@ -251,8 +249,8 @@ public class LeafExtrasTest {
         LoadedPackage acme = new LoadedPackage(QualifiedName.parse("test/pkg").value(), FixtureCorpus.FIXTURE_VERSION,
                 library, Optional.of(readme), null, List.of(), List.of(), null, null, () -> library, Map::of);
         for (String type : List.of("Orders", "Events")) {
-            DiscoverResult.ServiceExamples answer = (DiscoverResult.ServiceExamples) Containers.render(acme,
-                    Surface.Scope.SERVICE, new Containers.Options(List.of(type))).value();
+            DiscoverResult.ServiceExamples answer = (DiscoverResult.ServiceExamples) Asked.of(acme, "service", type)
+                    .value();
             Assert.assertEquals(answer.sections().stream().map(DiscoverResult.ReadmeSections.Section::title).toList(),
                     type.equals("Events") ? List.of("Typed") : List.of(), type);
         }
@@ -267,8 +265,7 @@ public class LeafExtrasTest {
                 library, Optional.of("## Intro\n\nText.\n\n## Define it\n\n```ballerina\nlistener mysql:CdcListener l"
                         + " = new ();\nservice on l {\n}\n```\n"), null, List.of(), List.of(), null, null,
                 () -> library, Map::of);
-        DiscoverResult.ServiceExamples service = (DiscoverResult.ServiceExamples) Containers.render(cdc,
-                Surface.Scope.SERVICE, new Containers.Options(List.of())).value();
+        DiscoverResult.ServiceExamples service = (DiscoverResult.ServiceExamples) Asked.of(cdc, "service").value();
         Assert.assertEquals(service.sections().stream().map(DiscoverResult.ReadmeSections.Section::title).toList(),
                 List.of("Define it"));
         JsonObject json = JsonParser.parseString(JsonRenderer.render(service)).getAsJsonObject();
@@ -279,8 +276,7 @@ public class LeafExtrasTest {
 
         LoadedPackage bare = new LoadedPackage(cdc.qualified(), cdc.version(), library, Optional.of("## Intro\n\nNo "
                 + "code.\n"), null, List.of(), List.of(), null, null, () -> library, Map::of);
-        DiscoverResult.ServiceExamples none = (DiscoverResult.ServiceExamples) Containers.render(bare,
-                Surface.Scope.SERVICE, new Containers.Options(List.of())).value();
-        Assert.assertEquals(none.next(), "bal discover acme/cdc readme", "never a dead end");
+        DiscoverResult.ServiceExamples none = (DiscoverResult.ServiceExamples) Asked.of(bare, "service").value();
+        Assert.assertEquals(none.next(), "bal discover readme -p acme/cdc", "never a dead end");
     }
 }

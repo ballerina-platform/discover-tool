@@ -1,47 +1,68 @@
-Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...]
+Usage: bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]]
                     [--output json|text] [--filter <keyword>] [--page <n>]
                     [-m <module>] [--refresh]
 
 Read a Ballerina package off Central. A signature from here is the source for what
 compiles; a readme, a web search and a remembered API are not.
 
+Nouns:
+  package <org>/<name>[:<version>]   A package's overview.
+  search <keyword> ...               Central's packages and symbols, or with -p
+                                     every name in one package.
+  client [<name>]                    The clients, or one client's members.
+  service [<name>]                   The service types, or one with what a service
+                                     of it implements.
+  class [<name>]                     The classes, or one class's members.
+  function [<name>]                  The module's functions, or one function's
+                                     signature.
+  type [<name>]                      Every type, or one declaration.
+  method [<name>]                    A container's methods, or one method's
+                                     signature.
+  resource [<path> [<accessor>]]     A container's resource paths, or one resource
+                                     method's signature.
+  readme [<n>|"<title>"]             The readme, or one section of it.
+
+A name means one thing; no name, a listing. Every noun but package takes the package
+with -p; search takes it only to search one package.
+
 Typical session:
 
   1. Find a package or a symbol:  bal discover search kafka send
-  2. What a package offers:       bal discover ballerinax/kafka
-  3. Find a name inside it:       bal discover ballerinax/kafka search send
-  4. One call, fully addressed:   bal discover ballerinax/kafka client Producer send
-                                  bal discover ballerinax/github client Client gists/public get
-  5. Its container, left out:     bal discover ballerinax/kafka client send
-  6. A record, enum or error:     bal discover ballerinax/github type ConnectionConfig
-  7. One specific version:        bal discover ballerina/http:2.15.7 client Client
-
-Buckets (the word after the package): client, service, class, funcs, type, readme,
-search. Leave it out for the package's overview: its clients, service types, classes
-and functions, types and readme, each with the command that opens it. The container
-may be left out when exactly one in the bucket declares the member.
-
-bal discover search <keyword> ... asks Central for packages and the symbols that
-match every keyword, 10 and 25 a page, ranked by Central. bal discover <org>/<name>
-search <keyword> ... matches every name in one package, locally; each keyword is a
-case-insensitive part of the name.
+  2. What a package offers:       bal discover package ballerinax/kafka
+  3. Find a name inside it:       bal discover search send -p ballerinax/kafka
+  4. One call, fully addressed:   bal discover method send -p ballerinax/kafka --client Producer
+                                  bal discover resource gists/public get -p ballerinax/github \
+                                      --client Client
+  5. Its container, left out:     bal discover method send -p ballerinax/kafka
+  6. A record, enum or error:     bal discover type ConnectionConfig -p ballerinax/github
+  7. One specific version:        bal discover client Client -p ballerina/http:2.15.7
 
 With no version after the package, the one your project's Dependencies.toml locks is
 read (found from the current directory up), else Central's latest.
 Exit codes: 0 an answer, 1 a failure, 2 a usage error.
+Run `bal discover <noun> --help` for one noun's names, flags and examples.
 
-  --output json|text      Override the TTY-detected default: human text at an
-                          interactive terminal, JSON otherwise.
-  --filter <keyword>      Narrow an already-selected bucket to entries whose name,
-                          path, parameter or type matches this keyword. Filtering is
-                          local; nothing is sent to Central. On the bare package it
-                          searches the package's names, as search does.
-  --page <n>              Show page <n> (counting from 1) of a listing longer than
-                          40 entries. A page past the last one, or against an answer
-                          that has only one page, is an error.
-  -m, --module <module>   Target this submodule instead of the package's default
-                          module, the same everywhere including readme. The
-                          submodule's name only (for example httpscerr), not
-                          <org>/<name>.<submodule>.
-  --refresh               Ignore any cached copy and rewrite it. Worth passing only
-                          when a name should exist and does not.
+  -p, --package <org>/<name>[:<version>]   The package to read, as bal pull names
+                                           it. With no version, the one your
+                                           project's Dependencies.toml locks, else
+                                           Central's latest.
+  --output json|text                       Override the TTY-detected default: human
+                                           text at an interactive terminal, JSON
+                                           otherwise.
+  --filter <keyword>                       Narrow a listing to entries whose name,
+                                           path, parameter or type matches this
+                                           keyword. Filtering is local; nothing is
+                                           sent to Central. On package it searches
+                                           the package's names, as search does.
+  --page <n>                               Show page <n> (counting from 1) of a
+                                           listing longer than 40 entries. A page
+                                           past the last one, or against an answer
+                                           that has only one page, is an error.
+  -m, --module <module>                    Target this submodule instead of the
+                                           package's default module, the same
+                                           everywhere including readme. The
+                                           submodule's name only (for example
+                                           httpscerr), not <org>/<name>.<submodule>.
+  --refresh                                Ignore any cached copy and rewrite it.
+                                           Worth passing only when a name should
+                                           exist and does not.

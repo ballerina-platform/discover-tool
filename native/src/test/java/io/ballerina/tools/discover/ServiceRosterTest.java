@@ -24,7 +24,6 @@ import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.ObjectInclusions;
 import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.render.DiscoverResult;
-import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Containers;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -63,8 +62,7 @@ public class ServiceRosterTest {
     }
 
     private static DiscoverResult.ContainerRoster page(int number) {
-        Result<DiscoverResult> answer = Containers.render(manyServiceTypes(), Surface.Scope.SERVICE,
-                new Containers.Options(List.of(), null, number));
+        Result<DiscoverResult> answer = Asked.of(manyServiceTypes(), "service", "--page", String.valueOf(number));
         Assert.assertTrue(answer.isOk(), answer.isOk() ? "" : answer.failure().describe());
         return (DiscoverResult.ContainerRoster) answer.value();
     }
@@ -77,7 +75,7 @@ public class ServiceRosterTest {
         Assert.assertEquals(first.paging().pages(), 2);
         Assert.assertTrue(first.notAttachable().isEmpty());
         Assert.assertEquals(first.notAttachableTotal(), INTERCEPTORS);
-        Assert.assertEquals(first.next(), "bal discover test/pkg service --page 2");
+        Assert.assertEquals(first.next(), "bal discover service -p test/pkg --page 2");
 
         DiscoverResult.ContainerRoster second = page(2);
         Assert.assertEquals(second.containers().size(), BOUND - Containers.MAX_ENTRIES);
@@ -89,7 +87,6 @@ public class ServiceRosterTest {
 
     @Test
     public void aPagePastBothSectionsIsRejected() {
-        Assert.assertFalse(Containers.render(manyServiceTypes(), Surface.Scope.SERVICE,
-                new Containers.Options(List.of(), null, 3)).isOk());
+        Assert.assertFalse(Asked.of(manyServiceTypes(), "service", "--page", "3").isOk());
     }
 }

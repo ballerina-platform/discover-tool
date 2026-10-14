@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.views;
 
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.Result;
@@ -54,7 +55,7 @@ import java.util.stream.Collectors;
  *
  * <p><b>A ROW OPENS WHAT IT NAMES, OR THE PACKAGE.</b> Central's {@code symbolType} names the declaration's form,
  * and each form maps to the bucket this tool lists it under: a method to its container's bucket, a function to
- * {@code funcs}, and every declaration to {@code type}, which opens any of them. An object type's method is the
+ * {@code function}, and every declaration to {@code type}, which opens any of them. An object type's method is the
  * one form that does not say its bucket: a remote or resource method makes its object a {@code client}, but a plain
  * one can be a client's or a class's ({@code sql:SchemaClient}'s {@code close} is a client's), so its row opens the
  * object itself with {@code type}, whose answer lists the method with its command. A form this tool does not
@@ -101,7 +102,7 @@ public final class SearchCentral {
             return new Failure.Validation("--module reads one package's submodule, and a search covers all of "
                     + "Central.", "Drop --module: " + Failure.quoted(typed) + ".", typed);
         }
-        return Search.misuse(Coordinate.COMMAND + VERB, keywords, filter);
+        return Search.misuse(Command.of(VERB), keywords, filter);
     }
 
     public static Result<DiscoverResult> render(List<String> keywords, int page, HttpOptions http) {
@@ -131,8 +132,9 @@ public final class SearchCentral {
         }
         List<DiscoverResult.CentralSearch.PackageHit> packageHits = packages.value().items().stream()
                 .map(row -> new DiscoverResult.CentralSearch.PackageHit(row.org() + "/" + row.name(), row.version(),
-                        Texts.firstSentence(row.summary()), Coordinate.argument(row.org() + "/" + row.name(),
-                                row.version(), null)))
+                        Texts.firstSentence(row.summary()), arguments(Command.overview(
+                                new Command.Target(Coordinate.text(row.org() + "/" + row.name(), row.version()),
+                                        null)))))
                 .toList();
         List<DiscoverResult.CentralSearch.SymbolHit> symbolHits = symbols.value().items().stream()
                 .map(SearchCentral::symbolHit)
@@ -147,8 +149,12 @@ public final class SearchCentral {
 
     /** {@code bal discover search} with {@code keywords}, each a shell word. */
     public static String command(List<String> keywords) {
-        return Coordinate.COMMAND + VERB + keywords.stream().map(word -> " " + Texts.shellWord(word))
-                .collect(Collectors.joining());
+        return Command.of(VERB, keywords).text();
+    }
+
+    // What follows `bal discover` in `command`.
+    private static String arguments(Command command) {
+        return command.text().substring(Command.PREFIX.length());
     }
 
     private static int pagesOf(int total, int size) {
@@ -160,7 +166,7 @@ public final class SearchCentral {
         String module = row.module().startsWith(row.name() + MODULE_SEPARATOR)
                 ? row.module().substring(row.name().length() + 1)
                 : null;
-        String pkg = Coordinate.argument(qualified, row.version(), module);
+        Command.Target pkg = new Command.Target(Coordinate.text(qualified, row.version()), module);
         String parent = row.parent().isEmpty() ? null : Identifiers.plain(row.parent());
         String symbol = Identifiers.plain(row.symbol());
         String kind = WORD_SEPARATOR.matcher(row.type()).replaceAll(" ");
@@ -170,7 +176,6 @@ public final class SearchCentral {
             if (parent == null) {
                 return hit.overview(kind, null, symbol);
             }
-            String base = pkg + " " + bucket.get() + " " + Texts.shellWord(parent);
             if (row.resource()) {
                 String[] parts = row.symbol().split(" ", 2);
                 String path = parts.length < 2 ? "" : plainPath(parts[1]);
@@ -178,26 +183,23 @@ public final class SearchCentral {
                         ? hit.overview("resource method", parent, symbol)
                         : new DiscoverResult.CentralSearch.SymbolHit(qualified, row.version(), module,
                                 "resource method", parent, null, path, parts[0],
-                                base + " " + Texts.shellWord(path) + " " + parts[0]);
+                                hit.arguments(Command.of(Command.RESOURCE, path, parts[0])
+                                        .ownedBy(bucket.get(), parent)));
             }
             String method = row.remote() ? "remote method"
                     : Fn.Constructor.NAME.equals(symbol) ? "constructor" : "method";
-            return hit.of(method, parent, symbol, base + " " + Texts.shellWord(symbol));
+            return hit.of(method, parent, symbol, Command.of(Command.METHOD, symbol).ownedBy(bucket.get(), parent));
         }
         return switch (row.type()) {
             case LISTENER_METHOD, OBJECT_METHOD -> parent == null
                     ? hit.overview(kind, null, symbol)
-                    : hit.of(kind, parent, symbol, pkg + " " + Types.BUCKET + " " + Texts.shellWord(parent));
-            case FUNCTION -> hit.of(FUNCTION, null, symbol, pkg + " " + Surface.Scope.MODULE.verb() + " "
-                    + Texts.shellWord(symbol));
-            case CLIENT -> hit.of(kind, null, symbol, pkg + " " + Surface.Scope.CLIENT.verb() + " "
-                    + Texts.shellWord(symbol));
-            case CLASS -> hit.of(kind, null, symbol, pkg + " " + Surface.Scope.CLASS.verb() + " "
-                    + Texts.shellWord(symbol));
-            case SERVICE_TYPE -> hit.of(kind, null, symbol, pkg + " " + Surface.Scope.SERVICE.verb() + " "
-                    + Texts.shellWord(symbol));
+                    : hit.of(kind, parent, symbol, Command.of(Types.BUCKET, parent));
+            case FUNCTION -> hit.of(FUNCTION, null, symbol, Command.of(Surface.Scope.MODULE.verb(), symbol));
+            case CLIENT -> hit.of(kind, null, symbol, Command.of(Surface.Scope.CLIENT.verb(), symbol));
+            case CLASS -> hit.of(kind, null, symbol, Command.of(Surface.Scope.CLASS.verb(), symbol));
+            case SERVICE_TYPE -> hit.of(kind, null, symbol, Command.of(Surface.Scope.SERVICE.verb(), symbol));
             default -> DECLARATIONS.contains(row.type()) || row.type().endsWith(TYPE_FORM)
-                    ? hit.of(kind, null, symbol, pkg + " " + Types.BUCKET + " " + Texts.shellWord(symbol))
+                    ? hit.of(kind, null, symbol, Command.of(Types.BUCKET, symbol))
                     : hit.overview(kind, null, symbol);
         };
     }
@@ -215,16 +217,20 @@ public final class SearchCentral {
         };
     }
 
-    // What every row of one package version shares; `pkg` is the package argument, `--module` included.
-    private record Row(String qualified, String version, String module, String pkg) {
+    // What every row of one package version shares; `pkg` is where its commands point, `--module` included.
+    private record Row(String qualified, String version, String module, Command.Target pkg) {
 
-        DiscoverResult.CentralSearch.SymbolHit of(String kind, String container, String name, String arguments) {
+        DiscoverResult.CentralSearch.SymbolHit of(String kind, String container, String name, Command command) {
             return new DiscoverResult.CentralSearch.SymbolHit(qualified, version, module, kind, container, name, null,
-                    null, arguments);
+                    null, arguments(command));
+        }
+
+        String arguments(Command command) {
+            return SearchCentral.arguments(command.in(pkg));
         }
 
         DiscoverResult.CentralSearch.SymbolHit overview(String kind, String container, String name) {
-            return of(kind, container, name, pkg);
+            return of(kind, container, name, Command.overview(pkg));
         }
     }
 

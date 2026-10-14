@@ -108,7 +108,7 @@ public class ReadmeSectionsTest {
         Assert.assertNull(listing.paging());
         Assert.assertNull(listing.next());
         Assert.assertFalse(listing.matching());
-        Assert.assertEquals(listing.sections().get(59).command(), "bal discover ballerinax/kafka readme 60");
+        Assert.assertEquals(listing.sections().get(59).command(), "bal discover readme 60 -p ballerinax/kafka");
     }
 
     @Test
@@ -119,7 +119,8 @@ public class ReadmeSectionsTest {
         DiscoverResult.ReadmeSections listing = (DiscoverResult.ReadmeSections) view.value();
         Assert.assertEquals(listing.sections().stream().map(DiscoverResult.ReadmeSections.Section::number).toList(),
                 List.of(1, 3));
-        Assert.assertTrue(listing.sections().get(1).command().endsWith("readme 3"), listing.sections().toString());
+        Assert.assertTrue(listing.sections().get(1).command().startsWith("bal discover readme 3 "),
+                listing.sections().toString());
     }
 
     @Test

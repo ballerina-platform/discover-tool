@@ -150,7 +150,7 @@ public class FromCentralTest {
         Assert.assertEquals(failure.module(), "nosuch");
         Assert.assertEquals(failure.suggestion(), "ballerina/graphql publishes these submodules: dataloader, "
                 + "subgraph. Pass one of them to --module, or drop --module for the default module: "
-                + "`bal discover ballerina/graphql`.");
+                + "`bal discover package ballerina/graphql`.");
     }
 
     @Test

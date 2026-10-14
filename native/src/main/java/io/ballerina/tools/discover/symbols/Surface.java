@@ -56,7 +56,7 @@ import java.util.Set;
  * closure resolution both need to reach it by name — this class is the only place that excludes it.
  *
  * <p>{@link Scope#MODULE} is the odd one, deliberately shaped like the others: a module's functions have no
- * container to name, so they get an anonymous one, which lets {@code funcs} share every line of resolution,
+ * container to name, so they get an anonymous one, which lets {@code function} share every line of resolution,
  * filtering, paging and rendering with the other buckets.
  *
  * @since 0.1.0
@@ -83,7 +83,7 @@ public final class Surface {
         CLASS("class", "class", "classes"),
 
         /** Functions at module scope, which belong to no object. */
-        MODULE("funcs", "function", "functions");
+        MODULE("function", "function", "functions");
 
         private final String verb;
         private final String noun;

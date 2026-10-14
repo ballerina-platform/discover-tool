@@ -45,30 +45,30 @@ Remote methods (->)
   keys
 
 ... 72 more (page 1 of 3)
-Next: bal discover ballerinax/redis client Client <name>
-Next: bal discover ballerinax/redis client Client --page 2
-Next: bal discover ballerinax/redis client Client --filter <keyword>
+Next: bal discover method <name> -p ballerinax/redis --client Client
+Next: bal discover client Client -p ballerinax/redis --page 2
+Next: bal discover client Client -p ballerinax/redis --filter <keyword>
 == service ==
 ballerinax/redis · service
 ballerinax/redis has no service types.
 
 Other buckets
-  client   1  bal discover ballerinax/redis client
-  type    10  bal discover ballerinax/redis type
+  client   1  bal discover client -p ballerinax/redis
+  type    10  bal discover type -p ballerinax/redis
 == class ==
 ballerinax/redis · class
 ballerinax/redis has no classes.
 
 Other buckets
-  client   1  bal discover ballerinax/redis client
-  type    10  bal discover ballerinax/redis type
-== funcs ==
-ballerinax/redis · funcs
+  client   1  bal discover client -p ballerinax/redis
+  type    10  bal discover type -p ballerinax/redis
+== function ==
+ballerinax/redis · function
 ballerinax/redis has no functions.
 
 Other buckets
-  client   1  bal discover ballerinax/redis client
-  type    10  bal discover ballerinax/redis type
+  client   1  bal discover client -p ballerinax/redis
+  type    10  bal discover type -p ballerinax/redis
 == type ==
 ballerinax/redis · type
 6 records, 1 enum, 1 error, 1 alias, 1 client
@@ -93,4 +93,4 @@ Aliases
 Clients
   Client
 
-Next: bal discover ballerinax/redis type <name>
+Next: bal discover type <name> -p ballerinax/redis

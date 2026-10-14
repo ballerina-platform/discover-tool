@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.render;
 
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.ServiceHandlers;
@@ -59,15 +60,19 @@ public final class TextRenderer {
     private static final Pattern PAGE_ARGUMENT = Pattern.compile(" --page \\d+$");
 
     /** How a search group's rows read in the shared command shape its {@code Next:} line prints. */
-    private static final Map<DiscoverResult.Search.Kind, String> SEARCH_PLACEHOLDERS = Map.of(
-            DiscoverResult.Search.Kind.RESOURCES, "<container> <path> <accessor>",
-            DiscoverResult.Search.Kind.REMOTE, "<container> <name>",
-            DiscoverResult.Search.Kind.METHODS, "<container> <name>",
-            DiscoverResult.Search.Kind.README, "<n>");
+    private static final Map<DiscoverResult.Search.Kind, List<String>> SEARCH_PLACEHOLDERS = Map.of(
+            DiscoverResult.Search.Kind.RESOURCES, List.of("<container>", "<accessor>", "<path>"),
+            DiscoverResult.Search.Kind.REMOTE, List.of("<container>", "<name>"),
+            DiscoverResult.Search.Kind.METHODS, List.of("<container>", "<name>"),
+            DiscoverResult.Search.Kind.README, List.of("<n>"));
+
+    private static final List<String> NAME_PLACEHOLDER = List.of("<name>");
 
     private static final String SEARCH_PLACEHOLDER = "<keyword>";
 
-    private static final String BUCKET_PLACEHOLDER = "<bucket>";
+    private static final String ACCESSOR_PLACEHOLDER = "<accessor>";
+
+    private static final String BUCKET_PLACEHOLDER = "<noun>";
 
     private static final String NEXT = "Next: ";
 
@@ -211,10 +216,10 @@ public final class TextRenderer {
             layout.section("Submodules", submodules);
         }
         layout.warning(overview.warning());
-        String pkg = where.pkg() == null
+        Command.Target pkg = where.pkg() == null
                 ? null
-                : Coordinate.COMMAND + Coordinate.argument(where.pkg(), where.pin(), where.module());
-        String bucketPattern = pkg + " " + BUCKET_PLACEHOLDER + " <name>";
+                : new Command.Target(Coordinate.text(where.pkg(), where.pin()), where.module());
+        String bucketPattern = Command.of(BUCKET_PLACEHOLDER, NAME_PLACEHOLDER).in(pkg).text();
         boolean foldable = pkg != null && patterns.size() > 1 && patterns.stream().allMatch(pattern ->
                 overview.sections().stream().anyMatch(section ->
                         pattern.equals(bucketPattern.replace(BUCKET_PLACEHOLDER, section.bucket()))));
@@ -225,7 +230,7 @@ public final class TextRenderer {
         }
         layout.inlinedNext.forEach(layout::next);
         if (pkg != null && !overview.sections().isEmpty()) {
-            layout.next(pkg + " search " + SEARCH_PLACEHOLDER);
+            layout.next(Command.of(Command.SEARCH, SEARCH_PLACEHOLDER).in(pkg).text());
         }
     }
 
@@ -579,7 +584,7 @@ public final class TextRenderer {
         layout.top(String.join(", ", parts));
         for (DiscoverResult.Search.Group group : search.groups()) {
             List<DiscoverResult.Search.Hit> hits = group.hits();
-            List<String> literals = new ArrayList<>();
+            List<List<String>> literals = new ArrayList<>();
             TextTable table = switch (group.kind()) {
                 case RESOURCES -> new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT,
                         TextTable.Column.LEFT);
@@ -589,14 +594,14 @@ public final class TextRenderer {
             };
             for (DiscoverResult.Search.Hit hit : hits) {
                 literals.add(switch (group.kind()) {
-                    case RESOURCES -> hit.container() + " " + hit.name() + " " + hit.detail();
-                    case REMOTE, METHODS -> hit.container() + " " + hit.name();
-                    case README -> String.valueOf(hit.number());
-                    default -> hit.name();
+                    case RESOURCES -> List.of(hit.container(), hit.detail(), hit.name());
+                    case REMOTE, METHODS -> List.of(hit.container(), hit.name());
+                    case README -> List.of(String.valueOf(hit.number()));
+                    default -> List.of(hit.name());
                 });
             }
-            Drill drill = Drill.of(literals, hits.stream().map(DiscoverResult.Search.Hit::command).toList(),
-                    SEARCH_PLACEHOLDERS.getOrDefault(group.kind(), "<name>"));
+            Drill drill = Drill.ofParts(literals, hits.stream().map(DiscoverResult.Search.Hit::command).toList(),
+                    SEARCH_PLACEHOLDERS.getOrDefault(group.kind(), NAME_PLACEHOLDER));
             for (int i = 0; i < hits.size(); i++) {
                 DiscoverResult.Search.Hit hit = hits.get(i);
                 switch (group.kind()) {
@@ -716,7 +721,7 @@ public final class TextRenderer {
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
         for (int i = 0; i < resources.size(); i++) {
             DiscoverResult.ResourceList.Resource resource = resources.get(i);
-            table.row(resource.path(), String.join(", ", resource.accessors()), ownCommand(drill.unfit(i)));
+            table.row(resource.path(), String.join(", ", resource.accessors()), ownCommand(resource, drill.unfit(i)));
         }
         return table;
     }
@@ -732,12 +737,17 @@ public final class TextRenderer {
         return Drill.ofRows(literals, commands, "<path> <accessor>");
     }
 
-    private static String ownCommand(List<String> unfit) {
+    // A row's own command: its one unfit command, or with several, the first with its accessor as a placeholder.
+    private static String ownCommand(DiscoverResult.ResourceList.Resource resource, List<String> unfit) {
         if (unfit.size() < 2) {
             return unfit.isEmpty() ? null : unfit.get(0);
         }
         String first = unfit.get(0);
-        return first.substring(0, first.lastIndexOf(' ')) + " <accessor>";
+        return resource.commands().entrySet().stream()
+                .filter(command -> command.getValue().equals(first))
+                .map(command -> Drill.shapeOf(first, command.getKey(), ACCESSOR_PLACEHOLDER))
+                .findFirst()
+                .orElse(first);
     }
 
     private static Drill methodDrill(List<DiscoverResult.Method> methods) {
@@ -784,7 +794,8 @@ public final class TextRenderer {
         int resource = 0;
         for (DiscoverResult.Documented.Entry entry : entries) {
             if (entry instanceof DiscoverResult.ResourceList.Resource row) {
-                table.row(row.path(), String.join(", ", row.accessors()), ownCommand(resourceDrill.unfit(resource++)));
+                table.row(row.path(), String.join(", ", row.accessors()),
+                        ownCommand(row, resourceDrill.unfit(resource++)));
             } else {
                 table.row(entry.key(), null, methodDrill.explicit(method++));
             }
@@ -834,10 +845,25 @@ public final class TextRenderer {
 
         /** Each row with any number of commands, {@code literals} naming each one in the same order. */
         static Drill ofRows(List<List<String>> literals, List<List<String>> commands, String placeholder) {
+            return shaped(literals.stream().map(row -> row.stream().map(List::of).toList()).toList(), commands,
+                    List.of(placeholder));
+        }
+
+        /** Each row with one command naming several literals, each swapped for its own placeholder, in order. */
+        static Drill ofParts(List<List<String>> parts, List<String> commands, List<String> placeholders) {
+            return shaped(parts.stream().map(List::of).toList(),
+                    commands.stream()
+                            .map(command -> command == null ? List.<String>of() : List.of(command))
+                            .toList(),
+                    placeholders);
+        }
+
+        private static Drill shaped(List<List<List<String>>> literals, List<List<String>> commands,
+                List<String> placeholders) {
             Map<String, Integer> shapes = new LinkedHashMap<>();
             for (int row = 0; row < commands.size(); row++) {
                 for (int i = 0; i < commands.get(row).size(); i++) {
-                    String shape = shapeOf(commands.get(row).get(i), literals.get(row).get(i), placeholder);
+                    String shape = shapeOf(commands.get(row).get(i), literals.get(row).get(i), placeholders);
                     if (shape != null) {
                         shapes.merge(shape, 1, Integer::sum);
                     }
@@ -852,13 +878,21 @@ public final class TextRenderer {
                 List<String> own = new ArrayList<>();
                 for (int i = 0; i < commands.get(row).size(); i++) {
                     String command = commands.get(row).get(i);
-                    if (pattern == null || !command.equals(pattern.replace(placeholder, literals.get(row).get(i)))) {
+                    if (pattern == null || !command.equals(filled(pattern, literals.get(row).get(i), placeholders))) {
                         own.add(command);
                     }
                 }
                 unfit.add(List.copyOf(own));
             }
             return new Drill(pattern, List.copyOf(unfit));
+        }
+
+        private static String shapeOf(String command, List<String> literals, List<String> placeholders) {
+            String shape = command;
+            for (int part = 0; part < literals.size() && shape != null; part++) {
+                shape = shapeOf(shape, literals.get(part), placeholders.get(part));
+            }
+            return shape;
         }
 
         private static String shapeOf(String command, String literal, String placeholder) {
@@ -870,6 +904,14 @@ public final class TextRenderer {
                 }
             }
             return null;
+        }
+
+        private static String filled(String pattern, List<String> literals, List<String> placeholders) {
+            String command = pattern;
+            for (int part = 0; part < literals.size(); part++) {
+                command = command.replace(placeholders.get(part), literals.get(part));
+            }
+            return command;
         }
 
         List<String> unfit(int row) {

@@ -1,2 +1,2 @@
 error: 'NoSuchType' is not a type in ballerinax/kafka:4.6.5.
-  List the types: `bal discover ballerinax/kafka type`.
+  List the types: `bal discover type -p ballerinax/kafka`.

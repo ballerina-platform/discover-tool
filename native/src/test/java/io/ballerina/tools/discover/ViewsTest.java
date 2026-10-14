@@ -101,9 +101,8 @@ public class ViewsTest {
         return view.value();
     }
 
-    private static DiscoverResult render(LoadedPackage loaded, Surface.Scope scope, List<String> selectors) {
-        return result(Containers.render(loaded, scope, new Containers.Options(selectors)),
-                scope.verb() + " " + selectors);
+    private static DiscoverResult render(LoadedPackage loaded, String... words) {
+        return result(Asked.of(loaded, words), String.join(" ", words));
     }
 
     private static <T extends DiscoverResult> T as(Class<T> shape, DiscoverResult result) {
@@ -111,13 +110,13 @@ public class ViewsTest {
         return shape.cast(result);
     }
 
-    private static DiscoverResult.Signature signature(LoadedPackage loaded, Surface.Scope scope, String... selectors) {
-        return as(DiscoverResult.Signature.class, render(loaded, scope, List.of(selectors)));
+    private static DiscoverResult.Signature signature(LoadedPackage loaded, String... words) {
+        return as(DiscoverResult.Signature.class, render(loaded, words));
     }
 
-    private static Failure.SymbolNotFound miss(LoadedPackage loaded, Surface.Scope scope, String... selectors) {
-        Result<DiscoverResult> view = Containers.render(loaded, scope, new Containers.Options(List.of(selectors)));
-        Assert.assertFalse(view.isOk(), scope.verb() + " " + List.of(selectors) + " answered: "
+    private static Failure.SymbolNotFound miss(LoadedPackage loaded, String... words) {
+        Result<DiscoverResult> view = Asked.of(loaded, words);
+        Assert.assertFalse(view.isOk(), String.join(" ", words) + " answered: "
                 + (view.isOk() ? view.value() : ""));
         Assert.assertTrue(view.failure() instanceof Failure.SymbolNotFound, view.failure().describe());
         Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
@@ -143,7 +142,7 @@ public class ViewsTest {
         StringBuilder text = new StringBuilder();
         StringBuilder json = new StringBuilder();
         for (Surface.Scope scope : Surface.Scope.values()) {
-            DiscoverResult listing = render(loaded, scope, List.of());
+            DiscoverResult listing = render(loaded, scope.verb());
             TextRenderer.Context where = new TextRenderer.Context(
                     loaded.qualified().qualified(), null, List.of(scope.verb()), null, null, null);
             text.append("== ").append(scope.verb()).append(" ==\n").append(TextRenderer.render(listing, where))
@@ -191,14 +190,15 @@ public class ViewsTest {
         DiscoverResult.MethodList twilio = (DiscoverResult.MethodList) Overview.of(
                 FixtureCorpus.loadedFixture("ballerinax__twilio")).members();
         Assert.assertEquals(twilio.shown(), Containers.MAX_ENTRIES);
-        Assert.assertEquals(twilio.next(), "bal discover ballerinax/twilio client Client --page 2");
+        Assert.assertEquals(twilio.next(), "bal discover client Client -p ballerinax/twilio --page 2");
         Assert.assertNull(Overview.of(FixtureCorpus.loadedFixture("ballerinax__kafka")).members(),
                 "kafka has three clients");
         String text = TextRenderer.render(postgresql, new TextRenderer.Context("ballerinax/postgresql", null,
                 List.of(), null, null, null));
         Assert.assertTrue(text.contains("\nClients (1)\n  Client  5 remote methods  1 method\n    Remote methods (->)\n"
                 + "      batchExecute\n"), text);
-        Assert.assertTrue(text.contains("\nNext: bal discover ballerinax/postgresql client Client <name>\n"), text);
+        Assert.assertTrue(text.contains("\nNext: bal discover method <name> -p ballerinax/postgresql --client "
+                + "Client\n"), text);
         JsonObject json = JsonParser.parseString(JsonRenderer.render(postgresql)).getAsJsonObject();
         Assert.assertEquals(json.getAsJsonObject("clients").getAsJsonObject("members").get("container")
                 .getAsString(), "Client");
@@ -219,8 +219,8 @@ public class ViewsTest {
                 List.of(1, 1, 0), "one row left beside 38 inlined methods and the client's own row");
         String text = TextRenderer.render(overview, new TextRenderer.Context("test/pkg", null, List.of(), null, null,
                 null));
-        Assert.assertTrue(text.contains("\nFunctions (2)\n  ... 2 more: bal discover test/pkg funcs\n"), text);
-        Assert.assertTrue(text.contains("\nNext: bal discover test/pkg client Client <name>\n"), text);
+        Assert.assertTrue(text.contains("\nFunctions (2)\n  ... 2 more: bal discover function -p test/pkg\n"), text);
+        Assert.assertTrue(text.contains("\nNext: bal discover method <name> -p test/pkg --client Client\n"), text);
     }
 
     @Test
@@ -289,15 +289,20 @@ public class ViewsTest {
         LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
         int checked = 0;
         for (Surface.Scope scope : Surface.Scope.values()) {
-            List<DiscoverResult> answers = new java.util.ArrayList<>(List.of(render(loaded, scope, List.of())));
+            List<DiscoverResult> answers = new java.util.ArrayList<>(List.of(render(loaded, scope.verb())));
             for (Surface.Container container : Surface.of(loaded.library(), scope)) {
                 if (!container.isModule()) {
-                    answers.add(render(loaded, scope, List.of(container.name())));
-                    answers.add(result(Containers.render(loaded, scope,
-                            new Containers.Options(List.of(container.name()), "zzznosuchmember", 1)), "--filter"));
+                    answers.add(render(loaded, scope.verb(), container.name()));
+                    answers.add(render(loaded, scope.verb(), container.name(), "--filter", "zzznosuchmember"));
                     // A one-letter keyword is the widest search a caller can make short of none at all.
-                    answers.add(result(Containers.render(loaded, scope,
-                            new Containers.Options(List.of(container.name()), "e", 1)), "--filter e"));
+                    answers.add(render(loaded, scope.verb(), container.name(), "--filter", "e"));
+                    String flag = "--" + scope.verb();
+                    if (!container.standalone().isEmpty()) {
+                        answers.add(render(loaded, "method", flag, container.name()));
+                    }
+                    if (container.hasPaths()) {
+                        answers.add(render(loaded, "resource", flag, container.name()));
+                    }
                 }
             }
             for (DiscoverResult answer : answers) {
@@ -344,7 +349,7 @@ public class ViewsTest {
 
     @Test(dataProvider = "fixtures")
     public void clientListingsMatchTheSurveyedShape(String slug) {
-        DiscoverResult result = render(FixtureCorpus.loadedFixture(slug), Surface.Scope.CLIENT, List.of());
+        DiscoverResult result = render(FixtureCorpus.loadedFixture(slug), "client");
         Shape expected = CLIENT_SHAPE.get(slug);
         Assert.assertNotNull(expected, slug + " has no surveyed shape");
         Class<? extends DiscoverResult> shape = switch (expected) {
@@ -363,7 +368,7 @@ public class ViewsTest {
         // `send` is an EXACT member name, so it wins over the substring pass that would also match
         // `sendWithMetadata` — which is what makes "exactly one result" reachable at all.
         DiscoverResult.Signature send =
-                signature(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, "Producer", "send");
+                signature(FixtureCorpus.loadedFixture("ballerinax__kafka"), "method", "send", "--client", "Producer");
         Assert.assertEquals(send.container(), "Producer");
         Assert.assertEquals(send.kind(), "remote");
         Assert.assertEquals(send.name(), "send");
@@ -380,7 +385,7 @@ public class ViewsTest {
     @Test
     public void aResourceSignatureCarriesItsPathAndAccessorAndKeepsPathParametersOutOfParams() {
         DiscoverResult.Signature caches = signature(FixtureCorpus.loadedFixture("ballerinax__github"),
-                Surface.Scope.CLIENT, "Client", "delete", "repos/:owner/:repo/actions/caches");
+                "resource", "repos/:owner/:repo/actions/caches", "delete", "--client", "Client");
         Assert.assertEquals(caches.kind(), "resource");
         Assert.assertNull(caches.name());
         Assert.assertEquals(caches.accessor(), "delete");
@@ -392,17 +397,17 @@ public class ViewsTest {
     }
 
     @Test
-    public void aMemberNameTypedWhereTheContainerGoesFailsWithItsOwnersCommand() {
+    public void aMemberAskedWithoutItsContainerIsAnsweredByTheOneThatDeclaresIt() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        // Its one owner is in the bucket asked, so it is answered; the answer names the container.
-        Assert.assertEquals(signature(http, Surface.Scope.CLASS, "toStringValue").container(), "Cookie");
+        Assert.assertEquals(signature(http, "method", "toStringValue").container(), "Cookie");
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        Assert.assertEquals(signature(github, Surface.Scope.CLIENT, "gists/public", "get").path(), "gists/public");
-        // Its one owner is in another bucket, so the failure names that bucket and the container.
-        assertMiss(miss(http, Surface.Scope.CLIENT, "getStatusCodeRecord"),
+        Assert.assertEquals(signature(github, "resource", "gists/public", "get").path(), "gists/public");
+        // A method asked as a container fails with the method's own command.
+        assertMiss(miss(http, "client", "getStatusCodeRecord"),
                 "'getStatusCodeRecord' is not a client in " + http.label() + ".",
-                "It is a method of Response: `bal discover ballerina/http class Response getStatusCodeRecord`.",
-                "bal discover ballerina/http class Response getStatusCodeRecord");
+                "It is a method of Response: `bal discover method getStatusCodeRecord -p ballerina/http --class "
+                        + "Response`.",
+                "bal discover method getStatusCodeRecord -p ballerina/http --class Response");
     }
 
     @Test
@@ -410,131 +415,138 @@ public class ViewsTest {
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
         // `commit` is a keyword, declared `'commit`: listed `commit`, and typed either way.
         for (String typed : List.of("commit", "'commit")) {
-            Result<DiscoverResult> answer = Containers.render(kafka, Surface.Scope.CLIENT,
-                    new Containers.Options(List.of(typed)));
+            Result<DiscoverResult> answer = Asked.of(kafka, "method", typed);
             Failure.SymbolNotFound failure = (Failure.SymbolNotFound) answer.failure();
             Assert.assertEquals(failure.message(), "'commit' is declared by Caller and Consumer in "
                     + kafka.label() + ".");
             Assert.assertNull(failure.command());
             Assert.assertEquals(failure.candidates(), List.of());
             Assert.assertEquals(failure.owners(), List.of(
-                    new Failure.Owner("Caller", "bal discover ballerinax/kafka client Caller commit"),
-                    new Failure.Owner("Consumer", "bal discover ballerinax/kafka client Consumer commit")));
+                    new Failure.Owner("Caller", "bal discover method commit -p ballerinax/kafka --client Caller"),
+                    new Failure.Owner("Consumer", "bal discover method commit -p ballerinax/kafka --client Consumer")));
         }
     }
 
     @Test
     public void aMemberOfSeveralContainersAskedInAnotherBucketListsEachOwnerAndQuotesNoOneCommand() {
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
-        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) Containers.render(kafka, Surface.Scope.CLASS,
-                new Containers.Options(List.of("close"))).failure();
+        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) Asked.of(kafka, "class", "close").failure();
         Assert.assertEquals(failure.message(), "'close' is not a class in " + kafka.label()
                 + "; it is a method of Consumer and Producer.");
         Assert.assertNull(failure.command());
         Assert.assertEquals(failure.owners().stream().map(Failure.Owner::name).toList(),
                 List.of("Consumer", "Producer"));
         Assert.assertEquals(failure.describeText(), "error: " + failure.message() + "\n  Name the one you mean:\n"
-                + "    Consumer  bal discover ballerinax/kafka client Consumer close\n"
-                + "    Producer  bal discover ballerinax/kafka client Producer close");
+                + "    Consumer  bal discover method close -p ballerinax/kafka --client Consumer\n"
+                + "    Producer  bal discover method close -p ballerinax/kafka --client Producer");
     }
 
     @Test
     public void aNameAskedInTheWrongBucketFailsWithTheCommandOfTheBucketThatHoldsIt() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        assertMiss(miss(http, Surface.Scope.CLIENT, "Response"), "'Response' is not a client in " + http.label() + ".",
-                "It is a class: `bal discover ballerina/http class Response`.",
-                "bal discover ballerina/http class Response");
-        assertMiss(miss(http, Surface.Scope.CLIENT, "Cookie", "toStringValue"),
-                "'Cookie' is not a client in " + http.label() + ".",
-                "It is a class: `bal discover ballerina/http class Cookie toStringValue`.",
-                "bal discover ballerina/http class Cookie toStringValue");
-        assertMiss(miss(http, Surface.Scope.CLASS, "Client"), "'Client' is not a class in " + http.label() + ".",
-                "It is a client: `bal discover ballerina/http client Client`.",
-                "bal discover ballerina/http client Client");
-        assertMiss(miss(http, Surface.Scope.CLIENT, "ClientConfiguration"),
+        assertMiss(miss(http, "client", "Response"), "'Response' is not a client in " + http.label() + ".",
+                "It is a class: `bal discover class Response -p ballerina/http`.",
+                "bal discover class Response -p ballerina/http");
+        assertMiss(miss(http, "method", "toStringValue", "--client", "Cookie"),
+                "'Cookie' is a class, not a client, in " + http.label() + ".",
+                "Run `bal discover method toStringValue -p ballerina/http --class Cookie`.",
+                "bal discover method toStringValue -p ballerina/http --class Cookie");
+        assertMiss(miss(http, "class", "Client"), "'Client' is not a class in " + http.label() + ".",
+                "It is a client: `bal discover client Client -p ballerina/http`.",
+                "bal discover client Client -p ballerina/http");
+        assertMiss(miss(http, "client", "ClientConfiguration"),
                 "'ClientConfiguration' is not a client in " + http.label() + ".",
-                "It is a record: `bal discover ballerina/http type ClientConfiguration`.",
-                "bal discover ballerina/http type ClientConfiguration");
-        assertMiss(miss(http, Surface.Scope.CLASS, "Listener"), "'Listener' is not a class in " + http.label() + ".",
-                "It is a listener: `bal discover ballerina/http type Listener`.",
-                "bal discover ballerina/http type Listener");
-        assertMiss(miss(http, Surface.Scope.CLASS, "HTTP_1_1"), "'HTTP_1_1' is not a class in " + http.label() + ".",
-                "It is a member of the enum HttpVersion: `bal discover ballerina/http type HttpVersion`.",
-                "bal discover ballerina/http type HttpVersion");
-        assertMiss(miss(http, Surface.Scope.MODULE, "Client"), "'Client' is not a function in " + http.label() + ".",
-                "It is a client: `bal discover ballerina/http client Client`.",
-                "bal discover ballerina/http client Client");
+                "It is a record: `bal discover type ClientConfiguration -p ballerina/http`.",
+                "bal discover type ClientConfiguration -p ballerina/http");
+        assertMiss(miss(http, "class", "Listener"), "'Listener' is not a class in " + http.label() + ".",
+                "It is a listener: `bal discover type Listener -p ballerina/http`.",
+                "bal discover type Listener -p ballerina/http");
+        assertMiss(miss(http, "class", "HTTP_1_1"), "'HTTP_1_1' is not a class in " + http.label() + ".",
+                "It is a member of the enum HttpVersion: `bal discover type HttpVersion -p ballerina/http`.",
+                "bal discover type HttpVersion -p ballerina/http");
+        assertMiss(miss(http, "function", "Client"), "'Client' is not a function in " + http.label() + ".",
+                "It is a client: `bal discover client Client -p ballerina/http`.",
+                "bal discover client Client -p ballerina/http");
     }
 
     @Test
     public void aContainerThatIsNotThereFailsWithTheBucketsListing() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        assertMiss(miss(http, Surface.Scope.CLIENT, "client"), "'client' is not a client in " + http.label() + ".",
-                "List the clients: `bal discover ballerina/http client`.", "bal discover ballerina/http client");
-        assertMiss(miss(http, Surface.Scope.MODULE, "nosuch"), "'nosuch' is not a function in " + http.label() + ".",
-                "List the functions: `bal discover ballerina/http funcs`.", "bal discover ballerina/http funcs");
+        assertMiss(miss(http, "client", "client"), "'client' is not a client in " + http.label() + ".",
+                "List the clients: `bal discover client -p ballerina/http`.", "bal discover client -p ballerina/http");
+        assertMiss(miss(http, "function", "nosuch"), "'nosuch' is not a function in " + http.label() + ".",
+                "List the functions: `bal discover function -p ballerina/http`.",
+                        "bal discover function -p ballerina/http");
         // A name nothing in the bucket declares, whether as a container, a member or a path.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        assertMiss(miss(github, Surface.Scope.CLIENT, "gist"), "'gist' is not a client in " + github.label() + ".",
-                "List the clients: `bal discover ballerinax/github client`.", "bal discover ballerinax/github client");
+        assertMiss(miss(github, "client", "gist"), "'gist' is not a client in " + github.label() + ".",
+                "List the clients: `bal discover client -p ballerinax/github`.",
+                        "bal discover client -p ballerinax/github");
     }
 
     @Test
-    public void aMemberThatIsNotThereFailsWithItsContainersListing() {
+    public void aMethodThatIsNotThereFailsWithItsContainersMethods() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         for (String typed : new String[] {"gett", "GET"}) {
-            assertMiss(miss(http, Surface.Scope.CLIENT, "Client", typed),
-                    "'" + typed + "' is not a member of Client in " + http.label() + ".",
-                    "List its members: `bal discover ballerina/http client Client`.",
-                    "bal discover ballerina/http client Client");
+            assertMiss(miss(http, "method", typed, "--client", "Client"),
+                    "'" + typed + "' is not a method of Client in " + http.label() + ".",
+                    "List its methods: `bal discover method -p ballerina/http --client Client`.",
+                    "bal discover method -p ballerina/http --client Client");
         }
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
         for (String typed : new String[] {"sendd", "Send", "end"}) {
-            assertMiss(miss(kafka, Surface.Scope.CLIENT, "Producer", typed),
-                    "'" + typed + "' is not a member of Producer in " + kafka.label() + ".",
-                    "List its members: `bal discover ballerinax/kafka client Producer`.",
-                    "bal discover ballerinax/kafka client Producer");
+            assertMiss(miss(kafka, "method", typed, "--client", "Producer"),
+                    "'" + typed + "' is not a method of Producer in " + kafka.label() + ".",
+                    "List its methods: `bal discover method -p ballerinax/kafka --client Producer`.",
+                    "bal discover method -p ballerinax/kafka --client Producer");
         }
+        // Without a container, no container declares it: the package's search for it is the next command.
+        assertMiss(miss(kafka, "method", "sendd"), "'sendd' is not a method in " + kafka.label() + ".",
+                "Search the package for it: `bal discover search sendd -p ballerinax/kafka`.",
+                "bal discover search sendd -p ballerinax/kafka");
     }
 
     @Test
     public void aPathIsTypedWholeAndExactlyAsPrintedOrItFailsAtTheLevelItReached() {
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        String client = "bal discover ballerinax/github client Client";
-        assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "caches"),
-                "'caches' is not a member of Client in " + github.label() + ".",
-                "List its members: `" + client + "`.", client);
+        String resources = "bal discover resource -p ballerinax/github --client Client";
+        assertMiss(miss(github, "resource", "caches", "--client", "Client"),
+                "'caches' is not a resource path of Client in " + github.label() + ".",
+                "List its resource methods: `" + resources + "`.", resources);
+        String under = "bal discover resource %s -p ballerinax/github --client Client";
         for (String spelling : new String[] {"repos/actions", "repos/[owner]/[repo]", "repos/{owner}/{repo}",
                 "repos/owner/repo", "repos/*/*"}) {
-            assertMiss(miss(github, Surface.Scope.CLIENT, "Client", spelling),
+            assertMiss(miss(github, "resource", spelling, "--client", "Client"),
                     "'" + spelling + "' is not a resource path of Client in " + github.label() + ".",
-                    "List what is under repos: `" + client + " repos`.", client + " repos");
+                    "List what is under repos: `" + under.formatted("repos") + "`.", under.formatted("repos"));
         }
-        assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "repos/:owner/:repo/caches"),
+        assertMiss(miss(github, "resource", "repos/:owner/:repo/caches", "--client", "Client"),
                 "'repos/:owner/:repo/caches' is not a resource path of Client in " + github.label() + ".",
-                "List what is under repos/:owner/:repo: `" + client + " repos/:owner/:repo`.",
-                client + " repos/:owner/:repo");
-        assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "gists/public", "head"),
+                "List what is under repos/:owner/:repo: `" + under.formatted("repos/:owner/:repo") + "`.",
+                under.formatted("repos/:owner/:repo"));
+        assertMiss(miss(github, "resource", "gists/public", "head", "--client", "Client"),
                 "'gists/public head' is not a resource method of Client in " + github.label() + ".",
-                "List what is under gists/public: `" + client + " gists/public`.", client + " gists/public");
+                "List what is under gists/public: `" + under.formatted("gists/public") + "`.",
+                under.formatted("gists/public"));
         // Left out, the one container that declares the path is settled, and the miss is the same.
         for (List<String> typed : List.of(List.of("gists/public", "head"), List.of("head", "gists/public"))) {
-            Result<DiscoverResult> leftOut = Containers.render(github, Surface.Scope.CLIENT,
-                    new Containers.Options(typed));
+            List<String> words = new ArrayList<>(List.of("resource"));
+            words.addAll(typed);
+            Result<DiscoverResult> leftOut = Asked.of(github, words.toArray(String[]::new));
             Assert.assertFalse(leftOut.isOk(), typed.toString());
             Failure.SymbolNotFound failure = (Failure.SymbolNotFound) leftOut.failure();
             Assert.assertEquals(failure.message(), "'" + String.join(" ", typed) + "' is not a resource method of "
                     + "Client in " + github.label() + ".");
-            Assert.assertEquals(failure.command(), client + " gists/public", typed.toString());
+            Assert.assertEquals(failure.command(), under.formatted("gists/public"), typed.toString());
         }
-        // A path split across two positionals is read as a path and an accessor, and is neither.
-        assertMiss(miss(github, Surface.Scope.CLIENT, "Client", "repos/:owner/:repo", "issues"),
+        // A path split across two names is read as a path and an accessor, and is neither.
+        assertMiss(miss(github, "resource", "repos/:owner/:repo", "issues", "--client", "Client"),
                 "'repos/:owner/:repo issues' is not a resource method of Client in " + github.label() + ".",
-                "List what is under repos/:owner/:repo: `" + client + " repos/:owner/:repo`.",
-                client + " repos/:owner/:repo");
+                "List what is under repos/:owner/:repo: `" + under.formatted("repos/:owner/:repo") + "`.",
+                under.formatted("repos/:owner/:repo"));
         // A keyword segment is printed plain, and Ballerina's own spelling of it names the same segment.
         for (String typed : List.of("gists/public", "gists/'public")) {
-            Assert.assertEquals(signature(github, Surface.Scope.CLIENT, "Client", typed, "get").path(),
+            Assert.assertEquals(signature(github, "resource", typed, "get", "--client", "Client").path(),
                     "gists/public");
         }
     }
@@ -542,15 +554,14 @@ public class ViewsTest {
     @Test
     public void aRestParameterResourceIsACallShorthandNotAPathToMatch() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        DiscoverResult.Signature get = signature(http, Surface.Scope.CLIENT, "Client", ":...path", "get");
+        DiscoverResult.Signature get = signature(http, "resource", ":...path", "get", "--client", "Client");
         // Quoted from what the tool prints, not re-spelled from memory: the rest-parameter form is
         // `[PathParamType... path]`, the ellipsis on the type, however Central spaced it.
         Assert.assertTrue(get.declaration().contains("resource function get [PathParamType... path]"),
                 get.declaration());
-        // `get` is the remote method there, and nothing reads `foo`.
-        Result<DiscoverResult> unread = Containers.render(http, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client", "get", "foo")));
-        Assert.assertTrue(unread.failure() instanceof Failure.Validation, unread.toString());
+        // `get` the method is the remote one, and no path is called `foo`.
+        Assert.assertEquals(signature(http, "method", "get", "--client", "Client").kind(), "remote");
+        miss(http, "resource", "foo", "get", "--client", "Client");
     }
 
     @Test
@@ -558,7 +569,7 @@ public class ViewsTest {
         // `init` is the one method every caller has to write, so it is individually addressable even though
         // a listing never counts it.
         DiscoverResult.Signature init = signature(
-                FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"), Surface.Scope.CLIENT, "Client", "init");
+                FixtureCorpus.loadedFixture("ballerinax__googleapis.sheets"), "method", "init", "--client", "Client");
         Assert.assertEquals(init.kind(), "constructor");
         Assert.assertEquals(init.form(), "new");
         Assert.assertTrue(init.declaration().contains("function init("), init.declaration());
@@ -569,7 +580,7 @@ public class ViewsTest {
         // `ballerina/http`'s `Client` declares resource functions AND named ones (`execute`, `forward`, `submit`,
         // …); listing only the resources would leave the rest unreachable.
         DiscoverResult.MixedListing mixed = as(DiscoverResult.MixedListing.class,
-                render(FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLIENT, List.of("Client")));
+                render(FixtureCorpus.loadedFixture("ballerina__http"), "client", "Client"));
         Assert.assertFalse(mixed.resources().isEmpty(), mixed.toString());
         Assert.assertTrue(mixed.remote().stream().anyMatch(method -> method.name().equals("execute")),
                 mixed.remote().toString());
@@ -589,22 +600,22 @@ public class ViewsTest {
         // An honest empty answer rather than an implied absence: kafka declares no module-level function, and the
         // reply names the buckets that DO have something plus their counts.
         DiscoverResult.EmptyBucket empty = as(DiscoverResult.EmptyBucket.class,
-                render(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.MODULE, List.of()));
-        Assert.assertEquals(empty.bucket(), "funcs");
+                render(FixtureCorpus.loadedFixture("ballerinax__kafka"), "function"));
+        Assert.assertEquals(empty.bucket(), "function");
         List<String> commands = empty.elsewhere().stream().map(DiscoverResult.EmptyBucket.Elsewhere::command).toList();
-        Assert.assertTrue(commands.contains("bal discover ballerinax/kafka client"), commands.toString());
-        Assert.assertTrue(commands.contains("bal discover ballerinax/kafka class"), commands.toString());
+        Assert.assertTrue(commands.contains("bal discover client -p ballerinax/kafka"), commands.toString());
+        Assert.assertTrue(commands.contains("bal discover class -p ballerinax/kafka"), commands.toString());
     }
 
     @Test
     public void aModuleFunctionCarriesPublicAndAMemberDoesNot() {
         // The renderer is chosen by SCOPE rather than by shape.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        DiscoverResult.Signature funcs = signature(http, Surface.Scope.MODULE, "getDefaultListener");
+        DiscoverResult.Signature funcs = signature(http, "function", "getDefaultListener");
         Assert.assertNull(funcs.container());
         Assert.assertEquals(funcs.kind(), "function");
         Assert.assertTrue(funcs.declaration().contains("public isolated function "), funcs.declaration());
-        DiscoverResult.Signature cookie = signature(http, Surface.Scope.CLASS, "Cookie", "toStringValue");
+        DiscoverResult.Signature cookie = signature(http, "method", "toStringValue", "--class", "Cookie");
         Assert.assertFalse(cookie.declaration().contains("\npublic isolated function "),
                 "a member does not carry public");
     }
@@ -612,73 +623,64 @@ public class ViewsTest {
     @Test
     public void aSelectorResolvesOnlyInTheSpellingTheListingsPrint() {
         LoadedPackage slack = FixtureCorpus.loadedFixture("ballerinax__slack");
-        for (List<String> selectors : List.of(List.of("Client", "post", "chat.postMessage"),
-                List.of("Client", "chat.postMessage", "post"))) {
-            DiscoverResult.Signature post =
-                    as(DiscoverResult.Signature.class, render(slack, Surface.Scope.CLIENT, selectors));
+        for (List<String> selectors : List.of(List.of("chat.postMessage", "post"),
+                List.of("post", "chat.postMessage"))) {
+            List<String> words = new ArrayList<>(List.of("resource"));
+            words.addAll(selectors);
+            words.addAll(List.of("--client", "Client"));
+            DiscoverResult.Signature post = signature(slack, words.toArray(String[]::new));
             Assert.assertTrue(post.declaration().contains("resource function post chat\\.postMessage"),
                     selectors + " did not resolve:\n" + post.declaration());
         }
         // The declaration's own escaping spells the same segment; a path and its accessor are still two arguments.
-        Assert.assertEquals(signature(slack, Surface.Scope.CLIENT, "Client", "post", "chat\\.postMessage").path(),
-                "chat.postMessage");
-        miss(slack, Surface.Scope.CLIENT, "Client", "post chat.postMessage");
+        Assert.assertEquals(signature(slack, "resource", "chat\\.postMessage", "post", "--client", "Client")
+                .path(), "chat.postMessage");
+        miss(slack, "resource", "post chat.postMessage", "--client", "Client");
 
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        Assert.assertTrue(resourcePaths(render(github, Surface.Scope.CLIENT,
-                List.of("Client", "repos/:owner/:repo/code-scanning/alerts", "get"))).stream()
-                .anyMatch(path -> path.contains("code-scanning/alerts")));
-        Assert.assertFalse(resourcePaths(render(github, Surface.Scope.CLIENT,
-                List.of("Client", "repos/:owner/:repo/code\\-scanning/alerts", "get"))).isEmpty());
+        Assert.assertTrue(resourcePaths(render(github, "resource", "repos/:owner/:repo/code-scanning/alerts", "get",
+                "--client", "Client")).stream().anyMatch(path -> path.contains("code-scanning/alerts")));
+        Assert.assertFalse(resourcePaths(render(github, "resource", "repos/:owner/:repo/code\\-scanning/alerts",
+                "get", "--client", "Client")).isEmpty());
     }
 
     /**
-     * {@code new} addresses the constructor, which Ballerina spells {@code init}.
-     *
-     * <p>Agents ask for {@code client ballerinax/redis Client new}, the spelling of the call site.
-     *
-     * <p>An INPUT alias, not an output one — the answer still prints {@code init}, because it prints what the
-     * package declares.
+     * {@code init} addresses the constructor: {@code method} names it as Ballerina spells it, so a path segment
+     * called {@code new} is only ever a {@code resource}.
      */
     @Test
-    public void newAddressesTheConstructorUnlessAPathIsCalledNew() {
+    public void initAddressesTheConstructorAndAPathCalledNewIsAResource() {
         for (String slug : FixtureCorpus.listFixtures()) {
             LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
             for (Surface.Container container : Surface.of(loaded.library(), Surface.Scope.CLIENT)) {
                 if (container.constructor().isEmpty()) {
                     continue;
                 }
-                DiscoverResult.Signature init = as(DiscoverResult.Signature.class,
-                        render(loaded, Surface.Scope.CLIENT, List.of(container.name(), "new")));
+                DiscoverResult.Signature init = signature(loaded, "method", "init", "--client", container.name());
                 Assert.assertTrue(init.declaration().contains("function init("),
                         slug + "/" + container.name() + ": the real name is not printed:\n" + init.declaration());
             }
         }
 
-        // A path segment called `new` is a keyword, declared `'new`: printed `new`, and typed either way. The
-        // printed command reaches it, so the path outranks the `new` alias; the constructor stays `init`.
+        // A path segment called `new` is a keyword, declared `'new`: printed `new`, and typed either way.
         Payload payload = Payload.pkg();
         payload.with("clients", Decl.client("Items", Decl.method("init"),
                 Decl.method("get").on("isResource").with("accessor", "get").with("resourcePath", "'new")));
         LoadedPackage items = fromPayload(payload);
-        Assert.assertEquals(signature(items, Surface.Scope.CLIENT, "Items", "'new").path(), "new");
-        Assert.assertEquals(signature(items, Surface.Scope.CLIENT, "Items", "new").path(), "new");
-        Assert.assertEquals(signature(items, Surface.Scope.CLIENT, "Items", "init").kind(), "constructor");
+        Assert.assertEquals(signature(items, "resource", "'new", "--client", "Items").path(), "new");
+        Assert.assertEquals(signature(items, "resource", "new", "--client", "Items").path(), "new");
+        Assert.assertEquals(signature(items, "method", "init", "--client", "Items").kind(), "constructor");
+        miss(items, "method", "new", "--client", "Items");
     }
 
     @Test
     public void aPathSeveralContainersHoldNamesEachContainer() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        Failure.SymbolNotFound several = (Failure.SymbolNotFound) Containers.render(http, Surface.Scope.CLIENT,
-                new Containers.Options(List.of(":...path", "get", "extra"))).failure();
+        Failure.SymbolNotFound several = (Failure.SymbolNotFound) Asked.of(http, "resource", ":...path", "get")
+                .failure();
         Assert.assertEquals(several.owners().size(), 6, several.owners().toString());
-        Assert.assertTrue(ownerCommands(several).contains("bal discover ballerina/http client Client :...path get"));
-        Result<DiscoverResult> answer = Containers.render(http, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client", ":...path", "get", "extra")));
-        Failure.Validation unread = (Failure.Validation) answer.failure();
-        Assert.assertTrue(unread.message().contains("'extra' after ':...path get'"), unread.message());
-        Assert.assertTrue(unread.suggestion().contains("`bal discover ballerina/http client Client :...path get`"),
-                unread.suggestion());
+        Assert.assertTrue(ownerCommands(several).contains(
+                "bal discover resource :...path get -p ballerina/http --client Client"));
     }
 
     @Test
@@ -688,16 +690,16 @@ public class ViewsTest {
         for (String slug : FixtureCorpus.listFixtures()) {
             LoadedPackage loaded = FixtureCorpus.loadedFixture(slug);
             for (Surface.Container container : Surface.of(loaded.library(), Surface.Scope.CLIENT)) {
-                String listing = "bal discover " + loaded.pkgArgument() + " client " + container.name();
-                assertMiss(miss(loaded, Surface.Scope.CLIENT, container.name(), "zzznosuchthing"),
-                        "'zzznosuchthing' is not a member of " + container.name() + " in " + loaded.label() + ".",
-                        "List its members: `" + listing + "`.", listing);
+                String pkg = loaded.target().pkg();
+                boolean methods = !container.standalone().isEmpty();
+                String listing = methods
+                        ? "bal discover method -p " + pkg + " --client " + container.name()
+                        : "bal discover client " + container.name() + " -p " + pkg;
+                assertMiss(miss(loaded, "method", "zzznosuchthing", "--client", container.name()),
+                        "'zzznosuchthing' is not a method of " + container.name() + " in " + loaded.label() + ".",
+                        (methods ? "List its methods: `" : "List its members: `") + listing + "`.", listing);
             }
         }
-    }
-
-    private static DiscoverResult clientAnswer(LoadedPackage loaded, String path) {
-        return render(loaded, Surface.Scope.CLIENT, List.of("Client", path));
     }
 
     private static List<String> resourcePaths(DiscoverResult answer) {
@@ -715,9 +717,8 @@ public class ViewsTest {
     public void searchingAContainerFiltersOnParameterAndTypeNamesTooNotOnlyOnTheName() {
         // The reason `--filter` searches the signature rather than the name alone: an agent that knows it holds
         // an `ActionsCacheList` and wants the call returning one has no other way to ask.
-        DiscoverResult answer = result(Containers.render(
-                FixtureCorpus.loadedFixture("ballerinax__github"), Surface.Scope.CLIENT,
-                new Containers.Options(List.of(), "ActionsCacheList", 1)), "ActionsCacheList");
+        DiscoverResult answer = render(FixtureCorpus.loadedFixture("ballerinax__github"), "client", "--filter",
+                "ActionsCacheList");
         Assert.assertFalse(resourcePaths(answer).isEmpty(), "ActionsCacheList should match at least one path");
     }
 
@@ -728,13 +729,12 @@ public class ViewsTest {
     @Test
     public void filterIsASingleKeywordSubstringNotAPathMatcher() {
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        DiscoverResult answer = result(Containers.render(github, Surface.Scope.CLIENT,
-                new Containers.Options(List.of(), "caches", 1)), "caches");
+        DiscoverResult answer = render(github, "client", "--filter", "caches");
         Assert.assertFalse(resourcePaths(answer).isEmpty(), "caches should match at least one resource path");
 
         // A search that finds nothing is still its answer: an empty listing, not a failure.
-        DiscoverResult.ResourceList absent = as(DiscoverResult.ResourceList.class, result(Containers.render(github,
-                Surface.Scope.CLIENT, new Containers.Options(List.of(), "zzznopealsonope", 1)), "zzznopealsonope"));
+        DiscoverResult.ResourceList absent = as(DiscoverResult.ResourceList.class,
+                render(github, "client", "--filter", "zzznopealsonope"));
         Assert.assertEquals(absent.total(), 0);
         Assert.assertTrue(absent.resources().isEmpty());
         Assert.assertNull(absent.next());
@@ -742,9 +742,8 @@ public class ViewsTest {
 
     @Test
     public void aFilterThatMatchesNoContainerInABucketIsAnEmptyRoster() {
-        DiscoverResult.ContainerRoster roster = as(DiscoverResult.ContainerRoster.class, result(Containers.render(
-                FixtureCorpus.loadedFixture("ballerina__http"), Surface.Scope.CLIENT,
-                new Containers.Options(List.of(), "zzznopealsonope", 1)), "http client --filter"));
+        DiscoverResult.ContainerRoster roster = as(DiscoverResult.ContainerRoster.class,
+                render(FixtureCorpus.loadedFixture("ballerina__http"), "client", "--filter", "zzznopealsonope"));
         Assert.assertEquals(roster.total(), 0);
         Assert.assertTrue(roster.containers().isEmpty());
         Assert.assertEquals(TextRenderer.render(roster, new TextRenderer.Context("ballerina/http", null,
@@ -761,8 +760,7 @@ public class ViewsTest {
         // one entry and answers in full.
         LoadedPackage slack = FixtureCorpus.loadedFixture("ballerinax__slack");
         for (String query : List.of("chat\\.postMessage", "chat.postMessage")) {
-            DiscoverResult.Signature post = as(DiscoverResult.Signature.class, result(Containers.render(
-                    slack, Surface.Scope.CLIENT, new Containers.Options(List.of(), query, 1)), query));
+            DiscoverResult.Signature post = signature(slack, "client", "--filter", query);
             Assert.assertTrue(post.declaration().contains("chat\\.postMessage"), query + ": " + post.declaration());
         }
     }
@@ -772,12 +770,12 @@ public class ViewsTest {
         // Copying a line out of a declaration gives its source spelling, not the one this tool prints.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         for (String selector : List.of("get [PathParamType ...path]", "get :...path", "get [path]")) {
-            miss(http, Surface.Scope.CLIENT, "Client", selector);
+            miss(http, "resource", selector, "--client", "Client");
         }
         // A leading word that is NOT an accessor stays one member name, or `Producer send` would be parsed as
         // an accessor called `Producer`.
         DiscoverResult.Signature send =
-                signature(FixtureCorpus.loadedFixture("ballerinax__kafka"), Surface.Scope.CLIENT, "Producer", "send");
+                signature(FixtureCorpus.loadedFixture("ballerinax__kafka"), "method", "send", "--client", "Producer");
         Assert.assertTrue(send.declaration().contains("function send("), send.declaration());
     }
 
@@ -854,7 +852,7 @@ public class ViewsTest {
         Assert.assertEquals(wide.shown(), Containers.MAX_ENTRIES);
         Assert.assertTrue(wide.total() > Containers.MAX_ENTRIES, "github has far more than one page of repo types");
         Assert.assertNotNull(wide.paging());
-        Assert.assertEquals(wide.next(), "bal discover ballerinax/github type --filter repo --page 2");
+        Assert.assertEquals(wide.next(), "bal discover type -p ballerinax/github --filter repo --page 2");
     }
 
     @Test
@@ -909,14 +907,14 @@ public class ViewsTest {
                 .filter(each -> each.name().equals("ProxyConfig")).toList();
         Assert.assertEquals(foreignProxies, List.of(new DiscoverResult.Foreign(
                 "ProxyConfig", "ballerina/http", "2.14.10",
-                "bal discover ballerina/http:2.14.10 type ProxyConfig")));
+                "bal discover type ProxyConfig -p ballerina/http:2.14.10")));
 
         DiscoverResult.TypeRoster roster = as(DiscoverResult.TypeRoster.class, type(slug));
         List<DiscoverResult.Method> localRows = roster.sections().stream()
                 .flatMap(section -> section.entries().stream())
                 .filter(entry -> entry.name().equals("ProxyConfig")).toList();
         Assert.assertEquals(localRows, List.of(new DiscoverResult.Method(
-                "ProxyConfig", "bal discover ballerinax/googleapis.sheets type ProxyConfig")));
+                "ProxyConfig", "bal discover type ProxyConfig -p ballerinax/googleapis.sheets")));
         Assert.assertNotEquals(localRows.get(0).command(), foreignProxies.get(0).command());
     }
 
@@ -947,11 +945,11 @@ public class ViewsTest {
                 Types.render(loaded, new Types.Options(List.of("Holder"), null, 1)), "type Holder"));
         Assert.assertEquals(holder.foreign(), List.of(
                 new DiscoverResult.Foreign("Thing0", "ballerinax/kafka.other", "1.0.0",
-                        "bal discover ballerinax/kafka --module other type Thing0"),
+                        "bal discover type Thing0 -p ballerinax/kafka --module other"),
                 new DiscoverResult.Foreign("Thing1", "ballerinax/kafka", "4.6.5",
-                        "bal discover ballerinax/kafka type Thing1"),
+                        "bal discover type Thing1 -p ballerinax/kafka"),
                 new DiscoverResult.Foreign("Thing2", "ballerina/http", "2.1.0",
-                        "bal discover ballerina/http:2.1.0 type Thing2"),
+                        "bal discover type Thing2 -p ballerina/http:2.1.0"),
                 new DiscoverResult.Foreign("Thing3", "ballerinax/kafka.unlisted", "1.0.0", null)));
         String text = TextRenderer.render(holder, new TextRenderer.Context(
                 loaded.qualified().qualified(), "sub", List.of("type", "Holder"), null, null, null));
@@ -978,7 +976,7 @@ public class ViewsTest {
         Assert.assertEquals(failure.message(),
                 "'SHARED_MEMBER' is a member of the enums Alpha and Beta in " + loaded.label() + ".");
         Assert.assertEquals(failure.suggestion(),
-                "Open the enum you mean, e.g. `bal discover ballerinax/kafka type Alpha`.");
+                "Open the enum you mean, e.g. `bal discover type Alpha -p ballerinax/kafka`.");
         Assert.assertNull(failure.command(), "two fixes, so no one command");
         Assert.assertTrue(failure.candidates().isEmpty());
     }
@@ -1011,7 +1009,7 @@ public class ViewsTest {
                 .filter(each -> each.name().equals("BearerTokenConfig")).findFirst().orElseThrow();
         Assert.assertEquals(bearer.module(), "ballerina/http");
         Assert.assertEquals(bearer.version(), "2.15.5");
-        Assert.assertEquals(bearer.command(), "bal discover ballerina/http:2.15.5 type BearerTokenConfig");
+        Assert.assertEquals(bearer.command(), "bal discover type BearerTokenConfig -p ballerina/http:2.15.5");
     }
 
     @Test
@@ -1039,11 +1037,10 @@ public class ViewsTest {
     public void anObjectNamedToTypeGetsTheAnswerItsOwnBucketGives() {
         LoadedPackage sap = FixtureCorpus.loadedFixture("ballerinax__sap");
         Assert.assertEquals(type("ballerinax__sap", "Client"),
-                render(sap, Surface.Scope.CLIENT, List.of("Client")));
+                render(sap, "client", "Client"));
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         Assert.assertEquals(routedTo(type("ballerina__http", "Response")), new Routed("Response", null));
-        Assert.assertEquals(type("ballerina__http", "Response"), render(http, Surface.Scope.CLASS,
-                List.of("Response")));
+        Assert.assertEquals(type("ballerina__http", "Response"), render(http, "class", "Response"));
         Assert.assertEquals(routedTo(type("ballerinax__kafka", "Service")),
                 new Routed("Service", "attach it to kafka:Listener"));
     }
@@ -1100,8 +1097,8 @@ public class ViewsTest {
         Assert.assertFalse(page.isOk());
         Assert.assertEquals(page.failure(), new Failure.Validation(
                 "Page 9 is out of range: this listing has 67 entries on 2 pages.",
-                "Pass a page from 1 to 2, e.g. `bal discover ballerinax/kafka type --page 2`.",
-                "bal discover ballerinax/kafka type --page 2"));
+                "Pass a page from 1 to 2, e.g. `bal discover type -p ballerinax/kafka --page 2`.",
+                "bal discover type -p ballerinax/kafka --page 2"));
     }
 
     @Test
@@ -1119,10 +1116,10 @@ public class ViewsTest {
                 List.of("type"), "server", null, null));
         Assert.assertTrue(text.contains("No types.\n"), text);
         Assert.assertTrue(text.contains("\nMentioned only in their documentation\n  ClientHttp1Settings\n"), text);
-        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/googleapis.sheets type <name>"), text);
+        Assert.assertTrue(text.endsWith("\nNext: bal discover type <name> -p ballerinax/googleapis.sheets"), text);
         Assert.assertEquals(JsonParser.parseString(JsonRenderer.render(answer)).getAsJsonObject()
                 .getAsJsonArray("documented").get(0).toString(), "{\"name\":\"ClientHttp1Settings\","
-                + "\"command\":\"bal discover ballerinax/googleapis.sheets type ClientHttp1Settings\"}");
+                + "\"command\":\"bal discover type ClientHttp1Settings -p ballerinax/googleapis.sheets\"}");
     }
 
     @Test
@@ -1134,28 +1131,27 @@ public class ViewsTest {
         Assert.assertNull(last.next(), "a paged answer's next only ever turns the page");
         String text = TextRenderer.render(last, new TextRenderer.Context("ballerinax/twilio", null, List.of("type"),
                 "which", null, null));
-        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerinax/twilio type <name>"), text);
+        Assert.assertTrue(text.endsWith("\nNext: bal discover type <name> -p ballerinax/twilio"), text);
         JsonObject json = JsonParser.parseString(JsonRenderer.render(last)).getAsJsonObject();
         Assert.assertFalse(json.has("next"), json.toString());
         json.getAsJsonArray("documented").forEach(entry -> Assert.assertEquals(
                 entry.getAsJsonObject().get("command").getAsString(),
-                "bal discover ballerinax/twilio type " + entry.getAsJsonObject().get("name").getAsString()));
+                "bal discover type " + entry.getAsJsonObject().get("name").getAsString() + " -p ballerinax/twilio"));
     }
 
     @Test
     public void aBucketWithNothingInItStillFailsANameAnotherBucketHolds() {
         LoadedPackage twilio = FixtureCorpus.loadedFixture("ballerinax__twilio");
-        assertMiss(miss(twilio, Surface.Scope.CLASS, "Client"), "'Client' is not a class in " + twilio.label() + ".",
-                "It is a client: `bal discover ballerinax/twilio client Client`.",
-                "bal discover ballerinax/twilio client Client");
-        as(DiscoverResult.EmptyBucket.class, render(twilio, Surface.Scope.CLASS, List.of("nosuch")));
+        assertMiss(miss(twilio, "class", "Client"), "'Client' is not a class in " + twilio.label() + ".",
+                "It is a client: `bal discover client Client -p ballerinax/twilio`.",
+                "bal discover client Client -p ballerinax/twilio");
+        as(DiscoverResult.EmptyBucket.class, render(twilio, "class", "nosuch"));
     }
 
     @Test
     public void aDocumentedResourceIsOnePathRowWithACommandPerAccessor() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        DiscoverResult rest = result(Containers.render(http, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client"), "entity", 1)), "client Client --filter entity");
+        DiscoverResult rest = render(http, "client", "Client", "--filter", "entity");
         DiscoverResult.MethodList miss = as(DiscoverResult.MethodList.class, rest);
         List<String> names = miss.documented().names();
         Assert.assertEquals(names, names.stream().sorted(io.ballerina.tools.discover.Texts.LOCALE_ORDER).toList());
@@ -1163,31 +1159,31 @@ public class ViewsTest {
                 miss.documented().entries().get(0);
         Assert.assertEquals(row.path(), ":...path");
         Assert.assertTrue(row.accessors().containsAll(List.of("get", "post")), row.toString());
-        Assert.assertEquals(row.commands().get("get"), "bal discover ballerina/http client Client :...path get");
+        Assert.assertEquals(row.commands().get("get"),
+                "bal discover resource :...path get -p ballerina/http --client Client");
         JsonObject entry = JsonParser.parseString(JsonRenderer.render(rest)).getAsJsonObject()
                 .getAsJsonArray("documented").get(0).getAsJsonObject();
         Assert.assertEquals(entry.get("path").getAsString(), ":...path");
         Assert.assertFalse(entry.has("name"), entry.toString());
         Assert.assertEquals(entry.getAsJsonObject("commands").get("post").getAsString(),
-                "bal discover ballerina/http client Client :...path post");
+                "bal discover resource :...path post -p ballerina/http --client Client");
         String text = TextRenderer.render(rest, new TextRenderer.Context("ballerina/http", null,
                 List.of("client", "Client"), "entity", null, null));
         Assert.assertTrue(text.contains("\nMentioned only in their documentation\n  :...path  get, post"), text);
-        Assert.assertTrue(text.endsWith("\nNext: bal discover ballerina/http client Client <path> <accessor>\n"
-                + "Next: bal discover ballerina/http client Client <name>"), text);
+        Assert.assertTrue(text.endsWith("\nNext: bal discover resource <path> <accessor> -p ballerina/http --client "
+                + "Client\n"
+                + "Next: bal discover method <name> -p ballerina/http --client Client"), text);
 
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        DiscoverResult.ResourceList escaped = as(DiscoverResult.ResourceList.class, result(Containers.render(github,
-                Surface.Scope.CLIENT, new Containers.Options(List.of("Client", "repos/:owner/:repo/'import"),
-                        "start", 1)), "client Client repos/:owner/:repo/'import --filter start"));
+        DiscoverResult.ResourceList escaped = as(DiscoverResult.ResourceList.class, render(github, "resource",
+                "repos/:owner/:repo/'import", "--client", "Client", "--filter", "start"));
         DiscoverResult.ResourceList.Resource importRow = (DiscoverResult.ResourceList.Resource)
                 escaped.documented().entries().get(0);
         Assert.assertEquals(importRow.path(), "repos/:owner/:repo/import");
         Assert.assertEquals(importRow.commands().get("put"),
-                "bal discover ballerinax/github client Client repos/:owner/:repo/import put");
+                "bal discover resource repos/:owner/:repo/import put -p ballerinax/github --client Client");
 
-        DiscoverResult limits = result(Containers.render(github, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("Client"), "public", 1)), "client Client --filter public");
+        DiscoverResult limits = render(github, "client", "Client", "--filter", "public");
         DiscoverResult.Documented documented = switch (limits) {
             case DiscoverResult.MethodList methods -> methods.documented();
             case DiscoverResult.PathGroups ignored -> DiscoverResult.Documented.NONE;
@@ -1209,25 +1205,25 @@ public class ViewsTest {
                     .with("resourcePath", "items/n" + index).with("description", "Not a zebra."));
         }
         payload.with("clients", Decl.client("Client", methods.toArray(new Decl[0])));
-        DiscoverResult.Signature signature = as(DiscoverResult.Signature.class, result(
-                Containers.render(fromPayload(payload), Surface.Scope.CLIENT,
-                        new Containers.Options(List.of("Client", "items"), "zebra", 1)),
-                "client Client items --filter zebra"));
+        DiscoverResult.Signature signature = signature(fromPayload(payload), "resource", "items", "--client",
+                "Client", "--filter", "zebra");
         Assert.assertEquals(signature.paging().pages(), 2);
-        Assert.assertEquals(signature.next(), "bal discover test/pkg client Client items --filter zebra --page 2");
+        Assert.assertEquals(signature.next(),
+                "bal discover resource items -p test/pkg --client Client --filter zebra --page 2");
     }
 
     @Test
     public void aNameTypedInAnotherCaseIsNotTheName() {
         LoadedPackage twilio = FixtureCorpus.loadedFixture("ballerinax__twilio");
-        assertMiss(miss(twilio, Surface.Scope.CLIENT, "Client", "createaccount"),
-                "'createaccount' is not a member of Client in " + twilio.label() + ".",
-                "List its members: `bal discover ballerinax/twilio client Client`.",
-                "bal discover ballerinax/twilio client Client");
+        assertMiss(miss(twilio, "method", "createaccount", "--client", "Client"),
+                "'createaccount' is not a method of Client in " + twilio.label() + ".",
+                "List its methods: `bal discover method -p ballerinax/twilio --client Client`.",
+                "bal discover method -p ballerinax/twilio --client Client");
         LoadedPackage log = FixtureCorpus.loadedFixture("ballerina__log");
-        assertMiss(miss(log, Surface.Scope.MODULE, "printinfo"),
+        assertMiss(miss(log, "function", "printinfo"),
                 "'printinfo' is not a function in " + log.label() + ".",
-                "List the functions: `bal discover ballerina/log funcs`.", "bal discover ballerina/log funcs");
+                "List the functions: `bal discover function -p ballerina/log`.",
+                        "bal discover function -p ballerina/log");
     }
 
     @Test
@@ -1288,9 +1284,8 @@ public class ViewsTest {
             methods.add(Decl.method("other" + index).on("isRemote").with("description", "Can send it."));
         }
         payload.with("clients", Decl.client("Client", methods.toArray(new Decl[0])));
-        DiscoverResult.MethodList first = as(DiscoverResult.MethodList.class, result(
-                Containers.render(fromPayload(payload), Surface.Scope.CLIENT,
-                        new Containers.Options(List.of("Client"), "send", 1)), "client Client --filter send"));
+        DiscoverResult.MethodList first = as(DiscoverResult.MethodList.class,
+                render(fromPayload(payload), "client", "Client", "--filter", "send"));
         Assert.assertEquals(first.shown(), 30);
         Assert.assertEquals(first.total(), 30);
         Assert.assertEquals(first.documented().names().size(), 10);
@@ -1301,11 +1296,10 @@ public class ViewsTest {
         Assert.assertEquals(json.get("remaining").getAsInt(), 5, "so the documentation-only rest is counted here");
         Assert.assertEquals(json.get("pages").getAsInt(), 2);
         Assert.assertEquals(json.get("next").getAsString(),
-                "bal discover test/pkg client Client --filter send --page 2");
+                "bal discover client Client -p test/pkg --filter send --page 2");
 
-        DiscoverResult.MethodList second = as(DiscoverResult.MethodList.class, result(
-                Containers.render(fromPayload(payload), Surface.Scope.CLIENT,
-                        new Containers.Options(List.of("Client"), "send", 2)), "client Client --filter send --page 2"));
+        DiscoverResult.MethodList second = as(DiscoverResult.MethodList.class,
+                render(fromPayload(payload), "client", "Client", "--filter", "send", "--page", "2"));
         Assert.assertEquals(JsonParser.parseString(JsonRenderer.render(second)).getAsJsonObject()
                 .get("remaining").getAsInt(), 0);
     }
@@ -1318,19 +1312,15 @@ public class ViewsTest {
                 Decl.client("'Other", Decl.method("send").on("isRemote")));
         LoadedPackage loaded = fromPayload(payload);
 
-        DiscoverResult.MethodList methods = as(DiscoverResult.MethodList.class, result(Containers.render(loaded,
-                Surface.Scope.CLIENT, new Containers.Options(List.of("'Client"))), "client 'Client"));
+        DiscoverResult.MethodList methods = as(DiscoverResult.MethodList.class, render(loaded, "client", "'Client"));
         Assert.assertEquals(methods.methods().stream().map(DiscoverResult.Method::command).toList(), List.of(
-                "bal discover test/pkg client Client receive",
-                "bal discover test/pkg client Client send"));
+                "bal discover method receive -p test/pkg --client Client",
+                "bal discover method send -p test/pkg --client Client"));
 
-        Result<DiscoverResult> send = Containers.render(loaded, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("send")));
-        Failure.SymbolNotFound both = (Failure.SymbolNotFound) send.failure();
-        Assert.assertEquals(ownerCommands(both), List.of("bal discover test/pkg client Client send",
-                "bal discover test/pkg client Other send"));
-        Assert.assertEquals(as(DiscoverResult.Signature.class, render(loaded, Surface.Scope.CLIENT,
-                List.of("receive"))).container(), "Client");
+        Failure.SymbolNotFound both = (Failure.SymbolNotFound) Asked.of(loaded, "method", "send").failure();
+        Assert.assertEquals(ownerCommands(both), List.of("bal discover method send -p test/pkg --client Client",
+                "bal discover method send -p test/pkg --client Other"));
+        Assert.assertEquals(signature(loaded, "method", "receive").container(), "Client");
     }
 
     @Test
@@ -1338,27 +1328,23 @@ public class ViewsTest {
         Payload payload = Payload.pkg();
         payload.with("clients", Decl.client("Items", Decl.method("get").on("isResource").with("accessor", "get")
                 .with("resourcePath", "items/[string type]")));
-        DiscoverResult.Signature get = as(DiscoverResult.Signature.class, result(Containers.render(
-                fromPayload(payload), Surface.Scope.CLIENT, new Containers.Options(List.of("Items", "items/:type",
-                        "get"))), "client Items items/:type get"));
+        DiscoverResult.Signature get = signature(fromPayload(payload), "resource", "items/:type", "get", "--client",
+                "Items");
         Assert.assertTrue(get.declaration().contains("resource function get items/[string 'type]()"),
                 get.declaration());
     }
 
     @Test
-    public void aNameTwoContainersReadDifferentlyOffersEachItsOwnCommand() {
+    public void aMethodAndAPathOfOneNameAreAskedApart() {
         Payload payload = Payload.pkg();
         payload.with("clients",
                 Decl.client("Paths", Decl.method("get").on("isResource").with("accessor", "get")
                         .with("resourcePath", "foo")),
                 Decl.client("Methods", Decl.method("foo").on("isRemote")));
         LoadedPackage loaded = fromPayload(payload);
-        // `foo get` is a path and its accessor on Paths, and `foo` a remote method of Methods: each owner's
-        // command carries what that owner reads, so each runs.
-        Failure.SymbolNotFound both = (Failure.SymbolNotFound) Containers.render(loaded, Surface.Scope.CLIENT,
-                new Containers.Options(List.of("foo", "get", "extra"))).failure();
-        Assert.assertEquals(ownerCommands(both), List.of("bal discover test/pkg client Methods foo",
-                "bal discover test/pkg client Paths foo get"));
+        // The noun says which is meant, so neither is an ambiguity.
+        Assert.assertEquals(signature(loaded, "method", "foo").container(), "Methods");
+        Assert.assertEquals(signature(loaded, "resource", "foo", "get").container(), "Paths");
     }
 
     private static List<String> ownerCommands(Failure.SymbolNotFound failure) {

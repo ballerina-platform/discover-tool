@@ -219,13 +219,13 @@ public class ClientTest {
         Assert.assertEquals(withPin.qualified(), "ballerina/graphql");
         Assert.assertEquals(withPin.version(), "1.17.0");
         Assert.assertEquals(withPin.module(), "nosuch");
-        Assert.assertTrue(withPin.suggestion().endsWith("module: `bal discover ballerina/graphql:1.17.0`."),
+        Assert.assertTrue(withPin.suggestion().endsWith("module: `bal discover package ballerina/graphql:1.17.0`."),
                 withPin.suggestion());
 
         for (CentralClient.ResolvedVersion unpinned : List.of(locked, resolved("1.17.0"))) {
             Failure.PackageNotFound without = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
                     graphql, "nosuch", unpinned, fast(transport).build()).failure();
-            Assert.assertTrue(without.suggestion().endsWith("module: `bal discover ballerina/graphql`."),
+            Assert.assertTrue(without.suggestion().endsWith("module: `bal discover package ballerina/graphql`."),
                     without.suggestion());
             Assert.assertFalse(without.suggestion().contains("1.17.0"), without.suggestion());
         }
@@ -257,7 +257,8 @@ public class ClientTest {
         Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
         Assert.assertEquals(failure.version(), "9.9.9");
         Assert.assertEquals(failure.suggestion(), "'ballerinax/aws.auth' is not a package: it is the 'auth' module "
-                + "of the ballerinax/aws package. Read it with `bal discover ballerinax/aws:9.9.9 --module auth`.");
+                + "of the ballerinax/aws package. Read it with `bal discover package ballerinax/aws:9.9.9 --module "
+                        + "auth`.");
     }
 
     @Test
@@ -407,7 +408,7 @@ public class ClientTest {
         Assert.assertEquals(((Failure.PackageNotFound) result.failure()).qualified(), "ballerinax/aws.auth");
         String suggestion = suggestion(result);
         Assert.assertTrue(suggestion.contains("the 'auth' module of the ballerinax/aws package"), suggestion);
-        Assert.assertTrue(suggestion.contains("`bal discover ballerinax/aws --module auth`"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal discover package ballerinax/aws --module auth`"), suggestion);
         // The module's own row, the package's, then the package version's module list — never its docs.
         Assert.assertEquals(transport.calls(), 3);
         Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/docs/")),
@@ -423,7 +424,7 @@ public class ClientTest {
                 "ballerina/one", "[\"3.1.0\"]",
                 "ballerina/one/3.1.0", modules("one", "one.two.three")));
         String suggestion = suggestion(CentralClient.resolveLatestVersion(deep, fast(transport).build()));
-        Assert.assertTrue(suggestion.contains("`bal discover ballerina/one --module two.three`"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal discover package ballerina/one --module two.three`"), suggestion);
         Assert.assertEquals(transport.calls(), 4);
     }
 
@@ -436,7 +437,8 @@ public class ClientTest {
                 "ballerina/graphql/1.17.0", row));
         String suggestion = suggestion(CentralClient.resolveLatestVersion(subgraph, fast(transport).build()));
         Assert.assertEquals(suggestion, "'ballerina/graphql.subgraph' is not a package: it is the 'subgraph' module "
-                + "of the ballerina/graphql package. Read it with `bal discover ballerina/graphql --module subgraph`.");
+                + "of the ballerina/graphql package. Read it with `bal discover package ballerina/graphql --module "
+                        + "subgraph`.");
     }
 
     @Test
@@ -458,7 +460,7 @@ public class ClientTest {
         String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
         Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes. If 'auth' is one "
                 + "of them"), suggestion);
-        Assert.assertTrue(suggestion.contains("`bal discover ballerinax/aws --module auth`"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal discover package ballerinax/aws --module auth`"), suggestion);
     }
 
     @Test
@@ -473,7 +475,7 @@ public class ClientTest {
         });
         String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
         Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
-        Assert.assertTrue(suggestion.contains("`bal discover ballerinax/aws --module auth`"), suggestion);
+        Assert.assertTrue(suggestion.contains("`bal discover package ballerinax/aws --module auth`"), suggestion);
         // The row is retried like any other registry call before it is given up on.
         Assert.assertEquals(transport.urls().stream().filter(url -> url.endsWith("/aws/1.0.1")).count(), 3);
     }

@@ -97,7 +97,7 @@ public class CliTest {
 
     private static final String SUBGRAPH_UNCONFIRMED = "Central's page for 'subgraph' at " + GRAPHQL_VERSION
             + " cannot be confirmed as a submodule of this package. Pass another of its submodules (dataloader, "
-            + "subgraph), or drop --module for the default module: `bal discover ballerina/graphql`.";
+            + "subgraph), or drop --module for the default module: `bal discover package ballerina/graphql`.";
 
     private static FakeTransport graphqlCentral(Map<String, JsonElement> modulePages) {
         return graphqlCentral(FixtureCorpus.loadRawFixture("ballerina__graphql"), modulePages);
@@ -158,19 +158,20 @@ public class CliTest {
     public void helpBypassesAMissingPackage() {
         Capture capture = new Capture();
         Assert.assertEquals(
-                Cli.run(List.of("ballerinax/github", "--help"), capture.streams(), never()), 0);
+                Cli.run(List.of("package", "ballerinax/github", "--help"), capture.streams(), never()), 0);
         Assert.assertTrue(capture.stdout().startsWith("Usage: bal discover"));
     }
 
     @Test
-    public void flagsWithNoPackageIsAValidationFailureNotUsage() {
-        // Distinct from truly empty argv: a caller who passed a flag clearly attempted something, so "needs a
-        // package" is more useful than the whole usage block.
+    public void flagsWithNoNounIsAUsageErrorNamingTheNouns() {
+        // Distinct from truly empty argv: a caller who passed a flag clearly attempted something, so "name what to
+        // read" is more useful than the whole usage block.
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("--refresh"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "validation");
-        Assert.assertTrue(capture.field("message").contains("package is required"), capture.stderr());
+        Assert.assertTrue(capture.field("message").startsWith("Name what to read: package, search, client"),
+                capture.stderr());
     }
 
     @Test
@@ -179,7 +180,8 @@ public class CliTest {
                 ? FakeTransport.status(404)
                 : FakeTransport.status(500));
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github:6.0.0"), capture.streams(), options(transport)), 1);
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/github:6.0.0"), capture.streams(),
+                options(transport)), 1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertTrue(transport.urls().get(0).endsWith("/docs/ballerinax/github/6.0.0"),
@@ -194,175 +196,124 @@ public class CliTest {
         // command can never succeed.
         Capture capture = new Capture();
         Assert.assertEquals(
-                Cli.run(List.of("ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
+                Cli.run(List.of("package", "ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("--nonesuch"), capture.stderr());
     }
 
     @Test
-    public void anUnknownBucketNamesTheOnesThatExist() {
+    public void anUnknownNounNamesTheOnesThatExistAndSearchesForTheWord() {
         Capture capture = new Capture();
-        Assert.assertEquals(
-                Cli.run(List.of("ballerinax/kafka", "nosuchbucket"), capture.streams(),
-                        centralFor("ballerinax__kafka", "4.6.5")), 2);
+        Assert.assertEquals(Cli.run(List.of("nosuchnoun", "-p", "ballerinax/kafka"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "validation");
-        Assert.assertTrue(capture.field("message").contains("nosuchbucket"), capture.stderr());
-        Assert.assertTrue(capture.field("suggestion").contains("client, service, class, funcs"), capture.stderr());
-        Assert.assertEquals(capture.field("command"), "bal discover ballerinax/kafka search nosuchbucket",
-                "a member typed without its bucket is found by the search");
+        Assert.assertTrue(capture.field("message").contains("nosuchnoun"), capture.stderr());
+        Assert.assertTrue(capture.field("message").contains("client, service, class, function, type, method"),
+                capture.stderr());
+        Assert.assertEquals(capture.field("command"), "bal discover search nosuchnoun -p ballerinax/kafka",
+                "a name typed where the noun goes is found by the search");
     }
 
     // A selector the container does not read, with the command that drops it.
     private record Unread(String slug, List<String> argv, String unread, String command) { }
 
     @Test
-    public void aSelectorNothingReadsIsAValidationFailureNamingTheCommandWithoutIt() {
-        String twilio = "bal discover ballerinax/twilio client Client createAccount";
-        String gists = "bal discover ballerinax/github client Client";
-        for (Unread unread : List.of(
-                new Unread("ballerinax__twilio", List.of("ballerinax/twilio", "client", "Client", "createAccount",
-                        "extra"), "extra", twilio),
-                new Unread("ballerina__http", List.of("ballerina/http", "class", "Cookie", "isValid", "junk"),
-                        "junk", "bal discover ballerina/http class Cookie isValid"),
-                new Unread("ballerina__http", List.of("ballerina/http", "service", "InterceptableService",
-                        "createInterceptors", "junk"), "junk",
-                        "bal discover ballerina/http service InterceptableService createInterceptors"),
-                new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "gists/'public",
-                        "get", "extra"), "extra", gists + " gists/public get"),
-                new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "get",
-                        "gists/'public", "extra"), "extra", gists + " get gists/public"),
-                new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "get", "repos",
-                        ":owner", ":repo"), ":owner", gists + " get repos"))) {
-            String label = String.join(" ", unread.argv());
+    public void moreNamesThanANounTakesIsAUsageErrorWithTheCommandThatReadsThem() {
+        record Case(List<String> argv, String command) { }
+        for (Case each : List.of(
+                new Case(List.of("client", "Producer", "send", "-p", "ballerinax/kafka"),
+                        "bal discover method send -p ballerinax/kafka --client Producer"),
+                new Case(List.of("client", "Client", "gists/public", "get", "-p", "ballerinax/github"),
+                        "bal discover resource gists/public get -p ballerinax/github --client Client"),
+                new Case(List.of("class", "Cookie", "isValid", "-p", "ballerina/http", "--filter", "x"),
+                        "bal discover method isValid -p ballerina/http --class Cookie --filter x"),
+                new Case(List.of("type", "Error", "Response", "-p", "ballerina/http"),
+                        "bal discover type Error -p ballerina/http"),
+                new Case(List.of("function", "a", "b", "-p", "ballerina/log"),
+                        "bal discover function a -p ballerina/log"),
+                new Case(List.of("method", "send", "extra", "-p", "ballerinax/kafka", "--client", "Producer"),
+                        "bal discover method send -p ballerinax/kafka --client Producer"),
+                new Case(List.of("resource", "gists/public", "get", "extra", "-p", "ballerinax/github", "--client",
+                        "Client"), "bal discover resource gists/public get -p ballerinax/github --client Client"),
+                new Case(List.of("readme", "Data", "serialization", "-p", "ballerinax/kafka"),
+                        "bal discover readme Data -p ballerinax/kafka"),
+                new Case(List.of("package", "ballerinax/kafka", "client"), "bal discover package ballerinax/kafka"))) {
+            String label = String.join(" ", each.argv());
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(unread.argv(), capture.streams(),
-                    centralFor(unread.slug(), FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
+            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, label);
             Assert.assertEquals(capture.stdout(), "", label);
             Assert.assertEquals(capture.field("kind"), "validation", label);
-            Assert.assertTrue(capture.field("message").contains("'" + unread.unread() + "'"), capture.stderr());
-            Assert.assertTrue(capture.field("suggestion").contains("`" + unread.command() + "`"), capture.stderr());
-            Assert.assertEquals(capture.field("command"), unread.command(), label);
-        }
-    }
-
-    @Test
-    public void aMissIsReportedBeforeTheSelectorsAfterIt() {
-        String http = "bal discover ballerina/http client";
-        for (Unread miss : List.of(
-                new Unread("ballerinax__twilio", List.of("ballerinax/twilio", "client", "createaccount", "extra"),
-                        "createaccount", "bal discover ballerinax/twilio client"),
-                new Unread("ballerina__http", List.of("ballerina/http", "client", "Cookie", "isValid", "junk"),
-                        "Cookie", "bal discover ballerina/http class Cookie isValid junk"),
-                new Unread("ballerina__http", List.of("ballerina/http", "client", "forwar", "extra"), "forwar",
-                        http),
-                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "forwar", "extra"),
-                        "forwar extra", http + " Client"),
-                new Unread("ballerinax__github", List.of("ballerinax/github", "client", "Client", "repos", ":owner",
-                        ":repo"), "repos :owner", "bal discover ballerinax/github client Client repos"))) {
-            String label = String.join(" ", miss.argv());
-            Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(miss.argv(), capture.streams(),
-                    centralFor(miss.slug(), FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
-            Assert.assertEquals(capture.field("kind"), "symbol-not-found", label);
-            Assert.assertTrue(capture.field("message").startsWith("'" + miss.unread() + "' is not "),
-                    capture.stderr());
-            Assert.assertEquals(capture.field("command"), miss.command(), label);
+            Assert.assertEquals(capture.field("command"), each.command(), label);
+            Assert.assertTrue(capture.field("suggestion").contains("`" + each.command() + "`"), capture.stderr());
         }
     }
 
     @Test
     public void theHeaderSpellsATypedEscapedPathAsItIsPrinted() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "gists/'public", "get"),
+        Assert.assertEquals(Cli.run(List.of("resource", "gists/'public", "get", "-p", "ballerinax/github", "--client",
+                "Client"),
                 capture.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text()), null,
                 true), 0, capture.stderr());
         Assert.assertTrue(capture.stdout().startsWith("ballerinax/github:" + FixtureCorpus.FIXTURE_VERSION.text()
-                + " · client · Client · gists/public · get\n"), capture.stdout());
+                + " · resource · Client · gists/public · get\n"), capture.stdout());
     }
 
     @Test
     public void aMemberItsOneContainerDeclaresIsAnsweredWithoutTheContainer() {
-        String producer = "bal discover ballerinax/kafka client Producer";
         Capture send = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "send"), send.streams(),
+        Assert.assertEquals(Cli.run(List.of("method", "send", "-p", "ballerinax/kafka"), send.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true), 0, send.stderr());
-        Assert.assertTrue(send.stdout().startsWith("ballerinax/kafka:4.6.5 · client · Producer · send\n"),
+        Assert.assertTrue(send.stdout().startsWith("ballerinax/kafka:4.6.5 · method · Producer · send\n"),
                 send.stdout());
 
-        Capture extra = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "send", "extra"), extra.streams(),
-                centralFor("ballerinax__kafka", "4.6.5")), 1, extra.stderr());
-        Assert.assertEquals(extra.field("kind"), "validation", extra.stderr());
-        Assert.assertEquals(extra.field("command"), producer + " send", "a printed command names the container");
-
         Capture close = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "close", "extra"), close.streams(),
+        Assert.assertEquals(Cli.run(List.of("method", "close", "-p", "ballerinax/kafka"), close.streams(),
                 centralFor("ballerinax__kafka", "4.6.5")), 1, close.stderr());
         Assert.assertEquals(close.field("kind"), "symbol-not-found", close.stderr());
         Assert.assertFalse(close.failure().has("command"), "no one owner is preferred: " + close.stderr());
         Assert.assertFalse(close.failure().has("candidates"), close.stderr());
         JsonArray owners = close.failure().getAsJsonArray("owners");
         Assert.assertEquals(owners.size(), 2, close.stderr());
-        Assert.assertEquals(owners.get(0).toString(), "{\"name\":\"Consumer\",\"command\":\"bal discover "
-                + "ballerinax/kafka client Consumer close\"}");
-        Assert.assertEquals(owners.get(1).getAsJsonObject().get("command").getAsString(), producer + " close");
+        Assert.assertEquals(owners.get(0).toString(), "{\"name\":\"Consumer\",\"command\":\"bal discover method "
+                + "close -p ballerinax/kafka --client Consumer\"}");
+        Assert.assertEquals(owners.get(1).getAsJsonObject().get("command").getAsString(),
+                "bal discover method close -p ballerinax/kafka --client Producer");
+
+        Capture asContainer = new Capture();
+        Assert.assertEquals(Cli.run(List.of("client", "send", "-p", "ballerinax/kafka"), asContainer.streams(),
+                centralFor("ballerinax__kafka", "4.6.5")), 1, asContainer.stderr());
+        Assert.assertEquals(asContainer.field("command"), "bal discover method send -p ballerinax/kafka --client "
+                + "Producer", "a method asked as a container is pointed at its method");
     }
 
     @Test
-    public void onAContainerWithPathsAndMethodsAMemberNameReadsOneSelectorAndRejectsTheRest() {
-        String client = "bal discover ballerina/http client Client";
-        for (Unread unread : List.of(
-                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "forward", "extra"),
-                        "extra", client + " forward"),
-                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "getCookieStore",
-                        "extra"), "extra", client + " getCookieStore"),
-                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", "new", "extra"),
-                        "extra", client + " new"),
-                new Unread("ballerina__http", List.of("ballerina/http", "client", "Client", ":...path", "get",
-                        "extra"), "extra", client + " :...path get"))) {
-            String label = String.join(" ", unread.argv());
-            Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(unread.argv(), capture.streams(),
-                    centralFor(unread.slug(), FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
-            Assert.assertEquals(capture.stdout(), "", label);
-            Assert.assertEquals(capture.field("kind"), "validation", label);
-            Assert.assertTrue(capture.field("message").contains("'" + unread.unread() + "'"), capture.stderr());
-            Assert.assertTrue(capture.field("suggestion").contains("`" + unread.command() + "`"), capture.stderr());
-        }
-    }
-
-    @Test
-    public void aPairThatResolvesAsAPathAndAccessorOutranksAMemberOfTheSameName() {
+    public void aResourceAndAMethodOfOneNameAreAskedApartByTheirNouns() {
         for (List<String> selectors : List.of(List.of(":...path", "get"), List.of("get", ":...path"))) {
-            List<String> argv = new ArrayList<>(List.of("ballerina/http", "client", "Client"));
+            List<String> argv = new ArrayList<>(List.of("resource"));
             argv.addAll(selectors);
+            argv.addAll(List.of("-p", "ballerina/http", "--client", "Client"));
             JsonObject json = JsonParser.parseString(
                     run(argv, "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
                     .getAsJsonObject();
             Assert.assertEquals(json.get("kind").getAsString(), "resource", String.join(" ", argv));
             Assert.assertEquals(json.get("accessor").getAsString(), "get", String.join(" ", argv));
         }
+        JsonObject method = JsonParser.parseString(run(List.of("method", "get", "-p", "ballerina/http", "--client",
+                "Client"), "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout()).getAsJsonObject();
+        Assert.assertEquals(method.get("kind").getAsString(), "remote");
     }
 
     @Test
-    public void newIsTheConstructorWhereNoPathStartsWithIt() {
-        Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "new", "extra"),
-                capture.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1);
-        Assert.assertEquals(capture.field("kind"), "validation", capture.stderr());
-        Assert.assertEquals(capture.field("command"), "bal discover ballerinax/github client Client new");
-    }
-
-    @Test
-    public void twoSelectorsOnAPathContainerThatResolveNothingFailAtThePathTheyReached() {
-        String client = "bal discover ballerinax/github client Client";
+    public void aPathAndAccessorThatResolveNothingFailAtThePathTheyReached() {
+        String under = "bal discover resource %s -p ballerinax/github --client Client";
         for (List<String> selectors : List.of(List.of("gists/'public", "head"), List.of("gists/'public", "GET"),
                 List.of("head", "gists/'public"), List.of("gists", "gett"), List.of("gists", "zzz"),
                 List.of("gists", "starred"), List.of("gists", ":gistId"), List.of("gists", "public"))) {
-            List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
+            List<String> argv = new ArrayList<>(List.of("resource"));
             argv.addAll(selectors);
+            argv.addAll(List.of("-p", "ballerinax/github", "--client", "Client"));
             String label = String.join(" ", argv);
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(),
@@ -371,34 +322,36 @@ public class CliTest {
             Assert.assertEquals(capture.field("kind"), "symbol-not-found", label);
             Assert.assertFalse(capture.failure().has("candidates"), capture.stderr());
             String reached = selectors.contains("gists") ? "gists" : "gists/public";
-            Assert.assertEquals(capture.field("command"), client + " " + reached, label);
+            Assert.assertEquals(capture.field("command"), under.formatted(reached), label);
         }
         Capture split = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "repos", ":owner"),
-                split.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1);
+        Assert.assertEquals(Cli.run(List.of("resource", "repos", ":owner", "-p", "ballerinax/github", "--client",
+                "Client"), split.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())),
+                1);
         Assert.assertEquals(split.field("message"),
                 "'repos :owner' is not a resource method of Client in ballerinax/github:"
                         + FixtureCorpus.FIXTURE_VERSION.text() + ".");
-        Assert.assertEquals(split.field("command"), client + " repos");
+        Assert.assertEquals(split.field("command"), under.formatted("repos"));
     }
 
     @Test
     public void aPathWithAnAccessorItDoesNotDeclareFailsWithThatPathsListing() {
         for (List<String> selectors : List.of(List.of("user/keys/:keyId", "post"),
                 List.of("post", "user/keys/:keyId"))) {
-            List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
+            List<String> argv = new ArrayList<>(List.of("resource"));
             argv.addAll(selectors);
+            argv.addAll(List.of("-p", "ballerinax/github", "--client", "Client"));
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(),
                     centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1);
             Assert.assertEquals(capture.field("suggestion"), "List what is under user/keys/:keyId: "
-                    + "`bal discover ballerinax/github client Client user/keys/:keyId`.");
+                    + "`bal discover resource user/keys/:keyId -p ballerinax/github --client Client`.");
         }
     }
 
     @Test
     public void aFilterMatchingOnlyDocumentationListsThoseMatchesAndNothingElse() {
-        List<String> argv = List.of("ballerina/http", "client", "Client", "--filter", "payload");
+        List<String> argv = List.of("client", "Client", "-p", "ballerina/http", "--filter", "payload");
         JsonObject json = JsonParser.parseString(
                 run(argv, "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
                 .getAsJsonObject();
@@ -414,8 +367,9 @@ public class CliTest {
     @Test
     public void aPathAndItsAccessorAreBothReadInEitherOrderButNeverAsOneArgument() {
         for (List<String> selectors : List.of(List.of("gists/'public", "get"), List.of("get", "gists/public"))) {
-            List<String> argv = new ArrayList<>(List.of("ballerinax/github", "client", "Client"));
+            List<String> argv = new ArrayList<>(List.of("resource"));
             argv.addAll(selectors);
+            argv.addAll(List.of("-p", "ballerinax/github", "--client", "Client"));
             JsonObject json = JsonParser.parseString(
                     run(argv, "ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
                     .getAsJsonObject();
@@ -423,15 +377,15 @@ public class CliTest {
             Assert.assertEquals(json.get("accessor").getAsString(), "get", String.join(" ", argv));
         }
         Capture one = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "get gists/'public"),
-                one.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1);
+        Assert.assertEquals(Cli.run(List.of("resource", "get gists/'public", "-p", "ballerinax/github", "--client",
+                "Client"), one.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1);
         Assert.assertEquals(one.field("kind"), "symbol-not-found", one.stderr());
     }
 
     @Test
     public void anUnknownFlagListsEveryFlagTheGrammarAccepts() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
+        Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
         String suggestion = capture.field("suggestion");
         for (String flag : List.of("--refresh", "--output", "--filter", "--page", "--module/-m", "--help/-h")) {
             Assert.assertTrue(suggestion.contains(flag), flag + " missing from: " + suggestion);
@@ -443,11 +397,13 @@ public class CliTest {
     public void theVersionFlagIsUnknownAndPointsAtTheCoordinate() {
         record Case(List<String> argv, String suggestion) { }
         for (Case each : List.of(
-                new Case(List.of("ballerina/http", "--version", "2.15.7"), "To read a specific version, write it "
-                        + "after the package: `bal discover ballerina/http:2.15.7`."),
-                new Case(List.of("ballerina/http", "client", "--version=2.15.7"), "To read a specific version, write "
-                        + "it after the package: `bal discover ballerina/http:2.15.7 client`."),
-                new Case(List.of("ballerina/http:2.15.6", "--version"),
+                new Case(List.of("package", "ballerina/http", "--version", "2.15.7"),
+                        "To read a specific version, write it "
+                        + "after the package: `bal discover package ballerina/http:2.15.7`."),
+                new Case(List.of("client", "-p", "ballerina/http", "--version=2.15.7"),
+                        "To read a specific version, write "
+                        + "it after the package: `bal discover client -p ballerina/http:2.15.7`."),
+                new Case(List.of("package", "ballerina/http:2.15.6", "--version"),
                         "To read a specific version, write it after the package: ballerina/http:<version>"),
                 new Case(List.of("--version"), "To read a specific version, write <org>/<name>:<version>"))) {
             Capture capture = new Capture();
@@ -462,7 +418,7 @@ public class CliTest {
     @Test
     public void aFlagWithoutItsValueIsNamedWithBothSpellings() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--module"), capture.streams(), never()), 2);
+        Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--module"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.field("message"), "The --module option needs a value.");
         Assert.assertEquals(capture.field("suggestion"), "Write --module <module> or --module=<module>.");
     }
@@ -470,7 +426,8 @@ public class CliTest {
     @Test
     public void aFlagWithAValueOfTheWrongTypeIsAUsageError() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http", "--page", "x"), capture.streams(), never()), 2);
+        Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--page", "x"), capture.streams(), never()),
+                2);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertEquals(capture.field("message"), "'x' is not a valid --page value.");
@@ -481,7 +438,8 @@ public class CliTest {
     public void anIncompleteVersionIsAValidationFailureThatFetchesNothing() {
         for (String coordinate : List.of("ballerina/http:2.15", "ballerina/http:latest")) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(List.of(coordinate, "client"), capture.streams(), never()), 2, coordinate);
+            Assert.assertEquals(Cli.run(List.of("client", "-p", coordinate), capture.streams(), never()), 2,
+                    coordinate);
             Assert.assertEquals(capture.stdout(), "");
             Assert.assertEquals(capture.field("kind"), "validation", coordinate);
             Assert.assertTrue(capture.field("message").contains("is not a complete version"), capture.stderr());
@@ -493,32 +451,35 @@ public class CliTest {
     @Test
     public void aVersionShapedArgumentIsRejectedWithTheRuleThatReplacedIt() {
         for (List<String> argv : List.of(
-                List.of("ballerinax/kafka", "client", "4.6.5"),
-                List.of("ballerinax/kafka", "service", "4.6.5"),
-                List.of("ballerinax/kafka", "class", "4.6.5"),
-                List.of("ballerinax/kafka", "funcs", "4.6.5"))) {
+                List.of("client", "4.6.5", "-p", "ballerinax/kafka"),
+                List.of("service", "4.6.5", "-p", "ballerinax/kafka"),
+                List.of("class", "4.6.5", "-p", "ballerinax/kafka"),
+                List.of("function", "4.6.5", "-p", "ballerinax/kafka"))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(), never()), 2, String.join(" ", argv));
             Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
             Assert.assertEquals(capture.field("kind"), "validation", String.join(" ", argv));
             Assert.assertEquals(capture.field("message"), "'4.6.5' looks like a version.", capture.stderr());
-            String command = "bal discover ballerinax/kafka:4.6.5 " + argv.get(1);
+            String command = "bal discover " + argv.get(0) + " -p ballerinax/kafka:4.6.5";
             Assert.assertEquals(capture.field("suggestion"),
                     "To read a specific version, write it after the package: `" + command + "`.", capture.stderr());
             Assert.assertEquals(capture.field("command"), command, capture.stderr());
         }
+        Capture pkg = new Capture();
+        Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "2.15.0"), pkg.streams(), never()), 2);
+        Assert.assertEquals(pkg.field("command"), "bal discover package ballerina/http:2.15.0", pkg.stderr());
     }
 
     @Test
     public void aFixIsTheCallersWholeCommandWithItApplied() {
         record Case(List<String> argv, String command) { }
         for (Case each : List.of(
-                new Case(List.of("ballerinax/kafka", "client", "--version", "4.6.5", "Producer"),
-                        "bal discover ballerinax/kafka:4.6.5 client Producer"),
-                new Case(List.of("ballerinax/kafka", "client", "4.6.5", "Producer", "--filter", "send"),
-                        "bal discover ballerinax/kafka:4.6.5 client Producer --filter send"),
-                new Case(List.of("ballerinax/kafka@4.6.5", "-m", "sub", "client", "--page", "2"),
-                        "bal discover ballerinax/kafka:4.6.5 --module sub client --page 2"))) {
+                new Case(List.of("client", "Producer", "-p", "ballerinax/kafka", "--version", "4.6.5"),
+                        "bal discover client Producer -p ballerinax/kafka:4.6.5"),
+                new Case(List.of("method", "4.6.5", "-p", "ballerinax/kafka", "--client", "Producer", "--filter",
+                        "send"), "bal discover method -p ballerinax/kafka:4.6.5 --client Producer --filter send"),
+                new Case(List.of("client", "-p", "ballerinax/kafka@4.6.5", "--module", "sub", "--page", "2"),
+                        "bal discover client -p ballerinax/kafka:4.6.5 --module sub --page 2"))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, each.argv().toString());
             Assert.assertEquals(capture.field("command"), each.command(), capture.stderr());
@@ -529,12 +490,12 @@ public class CliTest {
     @Test
     public void aModuleThePackageDoesNotPublishOffersTheWholeCommandOnItsDefaultModule() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "nosuch", "type", "--filter", "x"),
+        Assert.assertEquals(Cli.run(List.of("type", "-p", "ballerina/graphql", "--module", "nosuch", "--filter", "x"),
                 capture.streams(), options(graphqlCentral())), 1, capture.stderr());
-        Assert.assertEquals(capture.field("command"), "bal discover ballerina/graphql type --filter x");
+        Assert.assertEquals(capture.field("command"), "bal discover type -p ballerina/graphql --filter x");
         Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
                 + "subgraph. Pass one of them to --module, or drop --module for the default module: "
-                + "`bal discover ballerina/graphql type --filter x`.");
+                + "`bal discover type -p ballerina/graphql --filter x`.");
         Assert.assertEquals(capture.failure().get("candidates").toString(), "[\"dataloader\",\"subgraph\"]");
     }
 
@@ -549,11 +510,13 @@ public class CliTest {
                     : FakeTransport.status(404);
         });
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/aws.auth"), capture.streams(), options(transport)), 1);
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/aws.auth"), capture.streams(), options(transport)),
+                1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertEquals(capture.field("suggestion"), "'ballerinax/aws.auth' is not a package: it is the 'auth' "
-                + "module of the ballerinax/aws package. Read it with `bal discover ballerinax/aws --module auth`.");
+                + "module of the ballerinax/aws package. Read it with `bal discover package ballerinax/aws --module "
+                        + "auth`.");
         Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/docs/")),
                 transport.urls().toString());
     }
@@ -562,8 +525,8 @@ public class CliTest {
     public void shortHelpWorksWhereverItAppears() {
         for (List<String> argv : List.of(
                 List.of("-h"),
-                List.of("ballerinax/github", "-h"),
-                List.of("ballerinax/github", "client", "-h"))) {
+                List.of("package", "ballerinax/github", "-h"),
+                List.of("client", "-p", "ballerinax/github", "-h"))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(), never()), 0, String.join(" ", argv));
             Assert.assertTrue(capture.stdout().startsWith("Usage: bal discover"), String.join(" ", argv));
@@ -578,11 +541,11 @@ public class CliTest {
                 "[[package]]\norg = \"ballerinax\"\nname = \"kafka\"\nversion = \"4.6.5\"\n");
 
         for (List<String> argv : List.of(
-                List.of("ballerinax/kafka"),
-                List.of("ballerinax/kafka", "client"),
-                List.of("ballerinax/kafka", "service"),
-                List.of("ballerinax/kafka", "class"),
-                List.of("ballerinax/kafka", "funcs"))) {
+                List.of("package", "ballerinax/kafka"),
+                List.of("client", "-p", "ballerinax/kafka"),
+                List.of("service", "-p", "ballerinax/kafka"),
+                List.of("class", "-p", "ballerinax/kafka"),
+                List.of("function", "-p", "ballerinax/kafka"))) {
             Capture capture = new Capture();
             // The transport asserts the registry is never reached, which is what proves the lock was used.
             Assert.assertEquals(
@@ -604,13 +567,13 @@ public class CliTest {
                 : FakeTransport.status(404));
 
         Capture capture = new Capture();
-        List<String> argv = List.of("ballerinax/kafka:4.6.5", "client");
+        List<String> argv = List.of("client", "-p", "ballerinax/kafka:4.6.5");
         Assert.assertEquals(Cli.run(argv, capture.streams(), options(transport), projectDir.toString()), 0,
                 capture.stderr());
         List<String> urls = transport.urls();
         Assert.assertTrue(urls.stream().noneMatch(url -> url.contains("4.6.4")), urls.toString());
         Assert.assertTrue(urls.stream().anyMatch(url -> url.contains("4.6.5")), urls.toString());
-        String pinned = "\"bal discover ballerinax/kafka:4.6.5 client Producer\"";
+        String pinned = "\"bal discover client Producer -p ballerinax/kafka:4.6.5\"";
         Assert.assertTrue(capture.stdout().contains(pinned), capture.stdout());
     }
 
@@ -618,11 +581,11 @@ public class CliTest {
     public void aPinnedVersionAndAModuleAreBothCarriedIntoEveryPrintedCommand() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(
-                List.of("ballerina/graphql:" + GRAPHQL_VERSION, "--module", "subgraph", "type",
+                List.of("type", "-p", "ballerina/graphql:" + GRAPHQL_VERSION, "--module", "subgraph",
                         "--output", "json"),
                 capture.streams(), options(graphqlCentral())), 0, capture.stderr());
-        String carried = "bal discover ballerina/graphql:" + GRAPHQL_VERSION + " --module subgraph"
-                + " type FederatedEntity";
+        String carried = "bal discover type FederatedEntity -p ballerina/graphql:" + GRAPHQL_VERSION
+                + " --module subgraph";
         Assert.assertTrue(capture.stdout().contains(carried), capture.stdout());
         Assert.assertTrue(capture.stdout().startsWith("{\"qualified\":\"ballerina/graphql\",\"version\":\""
                 + GRAPHQL_VERSION + "\",\"module\":\"subgraph\","), capture.stdout());
@@ -636,7 +599,7 @@ public class CliTest {
                 "[[package]]\norg = \"ballerinax\"\nname = \"kafka\"\nversion = \"4.6.5\"\n");
         HttpOptions http = centralFor("ballerinax__kafka", "9.9.9");
         Capture json = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client"), json.streams(), http,
+        Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerinax/kafka"), json.streams(), http,
                 projectDir.toString()), 0, json.stderr());
         JsonObject answer = JsonParser.parseString(json.stdout()).getAsJsonObject();
         Assert.assertEquals(answer.get("version").getAsString(), "4.6.5");
@@ -644,9 +607,9 @@ public class CliTest {
                 "an answer names its package as a failure does: " + json.stdout());
         Assert.assertFalse(answer.has("module"), json.stdout());
         Capture text = new Capture();
-        Cli.run(List.of("ballerinax/kafka", "client"), text.streams(), http, projectDir.toString(), true);
+        Cli.run(List.of("client", "-p", "ballerinax/kafka"), text.streams(), http, projectDir.toString(), true);
         Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka:4.6.5 · client\n"), text.stdout());
-        Assert.assertFalse(text.stdout().contains("bal discover ballerinax/kafka:4.6.5"),
+        Assert.assertFalse(text.stdout().contains("bal discover package ballerinax/kafka:4.6.5"),
                 "a locked version is read again, not pinned: " + text.stdout());
     }
 
@@ -658,7 +621,7 @@ public class CliTest {
             write(projectDir.resolve("Dependencies.toml"),
                     "[[package]]\norg = \"ballerina\"\nname = \"http\"\nversion = \"" + locked + "\"\n");
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(List.of("ballerina/http"), capture.streams(), never(),
+            Assert.assertEquals(Cli.run(List.of("package", "ballerina/http"), capture.streams(), never(),
                     projectDir.toString()), 1, locked);
             Assert.assertEquals(capture.field("kind"), "validation", locked);
             Path lock = projectDir.resolve("Dependencies.toml");
@@ -678,7 +641,7 @@ public class CliTest {
                 "[[package]]\norg = \"ballerinax\"\nname = \"googleapis.gmail\"\nversion = \"4.0.0\"\n");
         FakeTransport transport = FakeTransport.always(FakeTransport.status(404));
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/googleapis.gmail:4.2.1"), capture.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/googleapis.gmail:4.2.1"), capture.streams(),
                 options(transport), projectDir.toString()), 1);
         Assert.assertTrue(transport.urls().stream().anyMatch(url -> url.endsWith("/googleapis.gmail/4.2.1")),
                 transport.urls().toString());
@@ -692,13 +655,13 @@ public class CliTest {
     @Test
     public void aFailureNamesThePackageAndTheVersionApartAndOmitsAVersionItNeverReached() {
         Capture missing = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "NoSuchContainer"),
+        Assert.assertEquals(Cli.run(List.of("client", "NoSuchContainer", "-p", "ballerinax/kafka"),
                 missing.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1);
         Assert.assertEquals(missing.field("qualified"), "ballerinax/kafka");
         Assert.assertEquals(missing.field("version"), "4.6.5");
 
         Capture unknown = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/htp"), unknown.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerina/htp"), unknown.streams(),
                 options(FakeTransport.always(FakeTransport.status(404)))), 1);
         Assert.assertEquals(unknown.field("kind"), "package-not-found");
         Assert.assertEquals(unknown.field("qualified"), "ballerina/htp");
@@ -708,7 +671,7 @@ public class CliTest {
     @Test
     public void aFailureUnderAModuleNamesThePackageAndTheModuleApart() {
         Capture json = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Nope"),
+        Assert.assertEquals(Cli.run(List.of("type", "Nope", "-p", "ballerina/graphql", "--module", "subgraph"),
                 json.streams(), options(graphqlCentral())), 1);
         Assert.assertEquals(json.field("kind"), "symbol-not-found");
         Assert.assertEquals(json.field("qualified"), "ballerina/graphql");
@@ -716,13 +679,13 @@ public class CliTest {
         Assert.assertEquals(json.field("module"), "subgraph");
 
         Capture text = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Nope", "--output",
-                "text"), text.streams(), options(graphqlCentral())), 1);
+        Assert.assertEquals(Cli.run(List.of("type", "Nope", "-p", "ballerina/graphql", "--module", "subgraph",
+                "--output", "text"), text.streams(), options(graphqlCentral())), 1);
         Assert.assertTrue(text.stderr().startsWith("error: 'Nope' is not a type in ballerina/graphql:"
                 + GRAPHQL_VERSION + ", module subgraph.\n"), text.stderr());
 
         Capture plain = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "type", "Nope"), plain.streams(),
+        Assert.assertEquals(Cli.run(List.of("type", "Nope", "-p", "ballerina/graphql"), plain.streams(),
                 options(graphqlCentral())), 1);
         Assert.assertFalse(plain.failure().has("module"), plain.stderr());
     }
@@ -738,13 +701,13 @@ public class CliTest {
                 ? FakeTransport.ok(docs)
                 : FakeTransport.status(404));
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client"), capture.streams(),
+        Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerinax/kafka"), capture.streams(),
                 options(transport), projectDir.toString()), 0, capture.stderr());
         Assert.assertTrue(transport.urls().stream().anyMatch(url -> url.endsWith("/docs/ballerinax/kafka/4.6.5")),
                 transport.urls().toString());
         Assert.assertTrue(transport.urls().stream()
                 .noneMatch(url -> url.endsWith("/registry/packages/ballerinax/kafka")), transport.urls().toString());
-        Assert.assertTrue(capture.stdout().contains("\"bal discover ballerinax/kafka client Producer\""),
+        Assert.assertTrue(capture.stdout().contains("\"bal discover client Producer -p ballerinax/kafka\""),
                 capture.stdout());
         Assert.assertFalse(capture.stdout().contains(":4.6.5"), capture.stdout());
     }
@@ -752,7 +715,7 @@ public class CliTest {
     @Test
     public void anEnumMemberIsAnsweredByItsEnumWithANoteSayingSo() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http", "type", "HTTP_1_1", "--output", "json"),
+        Assert.assertEquals(Cli.run(List.of("type", "HTTP_1_1", "-p", "ballerina/http", "--output", "json"),
                 capture.streams(), centralFor("ballerina__http", "2.16.6")), 0, capture.stderr());
         JsonObject answer = JsonParser.parseString(capture.stdout()).getAsJsonObject();
         Assert.assertEquals(answer.get("name").getAsString(), "HttpVersion");
@@ -764,10 +727,10 @@ public class CliTest {
     @Test
     public void aListingWithLaterPagesPointsAtFilterAndALastOrFilteredOneDoesNot() {
         HttpOptions kafka = centralFor("ballerinax__kafka", "4.6.5");
-        String hint = "Next: bal discover ballerinax/kafka type --filter <keyword>";
-        Assert.assertTrue(text(kafka, "ballerinax/kafka", "type").contains(hint));
-        Assert.assertFalse(text(kafka, "ballerinax/kafka", "type", "--page", "2").contains("--filter <keyword>"));
-        Assert.assertFalse(text(kafka, "ballerinax/kafka", "type", "--filter", "Config").contains("<keyword>"));
+        String hint = "Next: bal discover type -p ballerinax/kafka --filter <keyword>";
+        Assert.assertTrue(text(kafka, "type", "-p", "ballerinax/kafka").contains(hint));
+        Assert.assertFalse(text(kafka, "type", "-p", "ballerinax/kafka", "--page", "2").contains("--filter <keyword>"));
+        Assert.assertFalse(text(kafka, "type", "-p", "ballerinax/kafka", "--filter", "Config").contains("<keyword>"));
     }
 
     private static String text(HttpOptions http, String... argv) {
@@ -781,7 +744,7 @@ public class CliTest {
     @Test
     public void aRosterAndAResourceListingAreAlphabetical() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http", "client", "--output", "json"), capture.streams(),
+        Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerina/http", "--output", "json"), capture.streams(),
                 centralFor("ballerina__http", "2.16.6")), 0, capture.stderr());
         List<String> names = new java.util.ArrayList<>();
         JsonParser.parseString(capture.stdout()).getAsJsonObject().getAsJsonArray("containers")
@@ -813,7 +776,7 @@ public class CliTest {
     public void aContainerVerbNavigatesAClientsPathsAsStructuredJson() {
         // JSON is the default off a TTY.
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/googleapis.gmail", "client"), capture.streams(),
+        int exitCode = Cli.run(List.of("client", "-p", "ballerinax/googleapis.gmail"), capture.streams(),
                 centralFor("ballerinax__googleapis.gmail", "4.2.0"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\"resources\":["), capture.stdout());
@@ -823,13 +786,13 @@ public class CliTest {
     @Test
     public void aPackageWithSeveralClientsIsARosterRatherThanAFailure() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/http", "client"), capture.streams(),
+        int exitCode = Cli.run(List.of("client", "-p", "ballerina/http"), capture.streams(),
                 centralFor("ballerina__http", "2.16.6"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         for (String name : List.of("Client", "FailoverClient", "LoadBalanceClient", "StatusCodeClient")) {
             Assert.assertTrue(capture.stdout().contains("\"name\":\"" + name + "\""), name);
             Assert.assertTrue(
-                    capture.stdout().contains("\"command\":\"bal discover ballerina/http client " + name + "\""),
+                    capture.stdout().contains("\"command\":\"bal discover client " + name + " -p ballerina/http\""),
                     name);
         }
     }
@@ -837,7 +800,7 @@ public class CliTest {
     @Test
     public void namingAContainerResolvesIt() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/http", "client", "FailoverClient"),
+        int exitCode = Cli.run(List.of("client", "FailoverClient", "-p", "ballerina/http"),
                 capture.streams(), centralFor("ballerina__http", "2.16.6"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         JsonObject json = JsonParser.parseString(capture.stdout()).getAsJsonObject();
@@ -848,31 +811,31 @@ public class CliTest {
     @Test
     public void namingSomethingNoBucketHoldsFailsWithTheBucketsListingAndNoCandidates() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/http", "client", "FailoverClientt"), capture.streams(),
+        int exitCode = Cli.run(List.of("client", "FailoverClientt", "-p", "ballerina/http"), capture.streams(),
                 centralFor("ballerina__http", "2.16.6"));
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
         Assert.assertFalse(capture.failure().has("candidates"), capture.stderr());
-        Assert.assertEquals(capture.field("command"), "bal discover ballerina/http client");
+        Assert.assertEquals(capture.field("command"), "bal discover client -p ballerina/http");
         Assert.assertTrue(capture.failure().getAsJsonArray("requested").toString().contains("FailoverClientt"),
                 capture.stderr());
     }
 
     @Test
     public void aPackageWithNoModuleFunctionsGetsAnHonestEmptyAnswerAtExit0() {
-        Capture json = run(List.of("ballerinax/kafka", "funcs"), "ballerinax__kafka", "4.6.5", false);
+        Capture json = run(List.of("function", "-p", "ballerinax/kafka"), "ballerinax__kafka", "4.6.5", false);
         JsonObject empty = JsonParser.parseString(json.stdout()).getAsJsonObject();
-        Assert.assertEquals(empty.get("bucket").getAsString(), "funcs");
+        Assert.assertEquals(empty.get("bucket").getAsString(), "function");
         Assert.assertEquals(empty.get("total").getAsInt(), 0);
-        Assert.assertTrue(json.stdout().contains("\"command\":\"bal discover ballerinax/kafka client\""),
+        Assert.assertTrue(json.stdout().contains("\"command\":\"bal discover client -p ballerinax/kafka\""),
                 json.stdout());
 
-        Capture text = run(List.of("ballerinax/kafka", "funcs"), "ballerinax__kafka", "4.6.5", true);
-        Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka:4.6.5 · funcs\n"
+        Capture text = run(List.of("function", "-p", "ballerinax/kafka"), "ballerinax__kafka", "4.6.5", true);
+        Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka:4.6.5 · function\n"
                         + "ballerinax/kafka has no functions.\n\n"
                         + "Other buckets\n"
-                        + "  client    3  bal discover ballerinax/kafka client\n"),
+                        + "  client    3  bal discover client -p ballerinax/kafka\n"),
                 text.stdout());
     }
 
@@ -887,7 +850,7 @@ public class CliTest {
 
     @Test
     public void aSingleSignatureIsStructuredJsonOffATerminalAndTheBareDeclarationAtOne() {
-        List<String> argv = List.of("ballerinax/kafka", "client", "Producer", "send");
+        List<String> argv = List.of("method", "send", "-p", "ballerinax/kafka", "--client", "Producer");
         JsonObject json = JsonParser.parseString(run(argv, "ballerinax__kafka", "4.6.5", false).stdout())
                 .getAsJsonObject();
         Assert.assertEquals(json.get("container").getAsString(), "Producer");
@@ -900,7 +863,7 @@ public class CliTest {
         Assert.assertFalse(json.getAsJsonArray("types").isEmpty(), json.toString());
 
         String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
-        Assert.assertTrue(text.startsWith("ballerinax/kafka:4.6.5 · client · Producer · send\n\n# "),
+        Assert.assertTrue(text.startsWith("ballerinax/kafka:4.6.5 · method · Producer · send\n\n# "),
                 "the header, then the declaration's own doc comment: " + text);
         Assert.assertTrue(text.contains("remote function send("), text);
         Assert.assertTrue(text.contains("\n\nTypes it uses (2)\n  # "), text);
@@ -908,8 +871,8 @@ public class CliTest {
 
     @Test
     public void aResourceSignatureNamesItsPathAndAccessorInJson() {
-        List<String> argv = List.of("ballerinax/github", "client", "Client", "repos/:owner/:repo/actions/caches",
-                "delete");
+        List<String> argv = List.of("resource", "repos/:owner/:repo/actions/caches", "delete", "-p",
+                "ballerinax/github", "--client", "Client");
         JsonObject json = JsonParser.parseString(run(argv, "ballerinax__github", "6.0.0", false).stdout())
                 .getAsJsonObject();
         Assert.assertTrue(json.has("kind"), json.toString());
@@ -927,12 +890,11 @@ public class CliTest {
     @Test
     public void everyResourceCommandOpensExactlyThatSignature() {
         for (String[] listing : new String[][] {
-                {"ballerinax/github", "ballerinax__github", "Client gists"},
+                {"ballerinax/github", "ballerinax__github", "gists"},
                 {"ballerinax/googleapis.gmail", "ballerinax__googleapis.gmail", null}}) {
-            List<String> argv = new ArrayList<>(List.of(listing[0], "client"));
-            if (listing[2] != null) {
-                argv.addAll(List.of(listing[2].split(" ")));
-            }
+            List<String> argv = new ArrayList<>(listing[2] == null
+                    ? List.of("client", "-p", listing[0])
+                    : List.of("resource", listing[2], "-p", listing[0], "--client", "Client"));
             JsonArray resources = JsonParser.parseString(run(argv, listing[1], "1.0.0", false).stdout())
                     .getAsJsonObject().getAsJsonArray("resources");
             int followed = 0;
@@ -972,7 +934,7 @@ public class CliTest {
 
     @Test
     public void aMixedContainerIsSplitByCallFormInBothRenderings() {
-        List<String> argv = List.of("ballerina/http", "client", "Client");
+        List<String> argv = List.of("client", "Client", "-p", "ballerina/http");
         JsonObject json = JsonParser.parseString(run(argv, "ballerina__http", "2.16.6", false).stdout())
                 .getAsJsonObject();
         Assert.assertFalse(json.getAsJsonArray("resources").isEmpty(), json.toString());
@@ -989,26 +951,26 @@ public class CliTest {
 
     @Test
     public void aSelectorThatMatchesNothingFailsInEitherRenderingWithTheListingToRunNext() {
-        List<String> argv = List.of("ballerinax/kafka", "client", "Producer", "sendd");
+        List<String> argv = List.of("method", "sendd", "-p", "ballerinax/kafka", "--client", "Producer");
         Capture json = new Capture();
         Assert.assertEquals(Cli.run(argv, json.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1);
         Assert.assertEquals(json.stdout(), "");
-        Assert.assertEquals(json.stderr(), "{\"kind\":\"symbol-not-found\",\"message\":\"'sendd' is not a member "
+        Assert.assertEquals(json.stderr(), "{\"kind\":\"symbol-not-found\",\"message\":\"'sendd' is not a method "
                 + "of Producer in ballerinax/kafka:4.6.5.\",\"qualified\":\"ballerinax/kafka\",\"version\":\"4.6.5\","
-                + "\"requested\":[\"sendd\"],\"suggestion\":\"List its members: "
-                + "`bal discover ballerinax/kafka client Producer`.\",\"command\":"
-                + "\"bal discover ballerinax/kafka client Producer\"}\n");
+                + "\"requested\":[\"sendd\"],\"suggestion\":\"List its methods: "
+                + "`bal discover method -p ballerinax/kafka --client Producer`.\",\"command\":"
+                + "\"bal discover method -p ballerinax/kafka --client Producer\"}\n");
 
         Capture text = new Capture();
         Assert.assertEquals(Cli.run(argv, text.streams(), centralFor("ballerinax__kafka", "4.6.5"), null, true), 1);
         Assert.assertEquals(text.stdout(), "");
-        Assert.assertEquals(text.stderr(), "error: 'sendd' is not a member of Producer in ballerinax/kafka:4.6.5.\n"
-                + "  List its members: `bal discover ballerinax/kafka client Producer`.\n");
+        Assert.assertEquals(text.stderr(), "error: 'sendd' is not a method of Producer in ballerinax/kafka:4.6.5.\n"
+                + "  List its methods: `bal discover method -p ballerinax/kafka --client Producer`.\n");
     }
 
     @Test
     public void aFilterThatMatchesNothingIsExitZeroWithAnEmptyListing() {
-        List<String> argv = List.of("ballerinax/github", "client", "--filter", "zzznopealsonope");
+        List<String> argv = List.of("client", "-p", "ballerinax/github", "--filter", "zzznopealsonope");
         JsonObject json = JsonParser.parseString(run(argv, "ballerinax__github", "6.0.0", false).stdout())
                 .getAsJsonObject();
         Assert.assertEquals(json.get("total").getAsInt(), 0, json.toString());
@@ -1018,21 +980,21 @@ public class CliTest {
     @Test
     public void aMemberOnSeveralContainersFailsWithTheBucketsListing() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "'commit"), capture.streams(),
+        Assert.assertEquals(Cli.run(List.of("method", "'commit", "-p", "ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true), 1);
         Assert.assertEquals(capture.stderr(), "error: 'commit' is declared by Caller and Consumer in "
                 + "ballerinax/kafka:4.6.5.\n"
                 + "  Name the one you mean:\n"
-                + "    Caller    bal discover ballerinax/kafka client Caller commit\n"
-                + "    Consumer  bal discover ballerinax/kafka client Consumer commit\n");
+                + "    Caller    bal discover method commit -p ballerinax/kafka --client Caller\n"
+                + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n");
     }
 
     @Test
     public void noContainerAnswerIsMarkdownInEitherRendering() {
         for (List<String> argv : List.of(
-                List.of("ballerinax/kafka", "client", "Producer", "send"),
-                List.of("ballerinax/kafka", "client", "Producer", "--filter", "nosuch"),
-                List.of("ballerinax/kafka", "funcs"))) {
+                List.of("method", "send", "-p", "ballerinax/kafka", "--client", "Producer"),
+                List.of("client", "Producer", "-p", "ballerinax/kafka", "--filter", "nosuch"),
+                List.of("function", "-p", "ballerinax/kafka"))) {
             for (boolean interactive : List.of(true, false)) {
                 String out = run(argv, "ballerinax__kafka", "4.6.5", interactive).stdout();
                 Assert.assertFalse(out.contains("| | |"), out);
@@ -1044,7 +1006,7 @@ public class CliTest {
     @Test
     public void theReadmeBucketIsTheWholeReadmeVerbatimAtATerminal() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme"), capture.streams(),
+        int exitCode = Cli.run(List.of("readme", "-p", "ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().length() > 500, capture.stdout());
@@ -1053,7 +1015,7 @@ public class CliTest {
     @Test
     public void theReadmeBucketIsJsonOffATerminal() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme"), capture.streams(),
+        int exitCode = Cli.run(List.of("readme", "-p", "ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\"readme\":"), capture.stdout());
@@ -1064,7 +1026,7 @@ public class CliTest {
     @Test
     public void aReadmeSectionSelectorNarrowsToOneSection() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme", "1"), capture.streams(),
+        int exitCode = Cli.run(List.of("readme", "1", "-p", "ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\"section\":1"), capture.stdout());
@@ -1074,7 +1036,7 @@ public class CliTest {
     @Test
     public void aReadmeSectionThatDoesNotExistFailsWithCandidates() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme", "999"), capture.streams(),
+        int exitCode = Cli.run(List.of("readme", "999", "-p", "ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");
@@ -1085,7 +1047,7 @@ public class CliTest {
     public void theModuleFlagReadsTheSubmodulesOwnPageAndNeverThePackages() {
         FakeTransport transport = graphqlCentral();
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "dataloader"), capture.streams(),
                 options(transport));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertEquals(transport.urls(), List.of(
@@ -1093,33 +1055,33 @@ public class CliTest {
                 CentralClient.CENTRAL_BASE_URL + "docs/ballerina/graphql.dataloader/" + GRAPHQL_VERSION));
         JsonObject overview = JsonParser.parseString(capture.stdout()).getAsJsonObject();
         Assert.assertEquals(overview.getAsJsonObject("classes").get("command").getAsString(),
-                "bal discover ballerina/graphql --module dataloader class", capture.stdout());
+                "bal discover class -p ballerina/graphql --module dataloader", capture.stdout());
         Assert.assertEquals(overview.getAsJsonObject("types").get("command").getAsString(),
-                "bal discover ballerina/graphql --module dataloader type", capture.stdout());
+                "bal discover type -p ballerina/graphql --module dataloader", capture.stdout());
         Assert.assertFalse(overview.has("clients"), capture.stdout());
     }
 
     @Test
     public void theTypeBucketCarriesTheModuleIntoEveryCommandItPrints() {
         Capture roster = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type"), roster.streams(),
+        int exitCode = Cli.run(List.of("type", "-p", "ballerina/graphql", "--module", "subgraph"), roster.streams(),
                 options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, roster.stderr());
         Assert.assertEquals(roster.stdout().strip(), "{\"qualified\":\"ballerina/graphql\",\"version\":\""
                 + GRAPHQL_VERSION + "\",\"module\":\"subgraph\","
                 + "\"sections\":{\"records\":[{\"name\":\"FederatedEntity\","
-                + "\"command\":\"bal discover ballerina/graphql --module subgraph type FederatedEntity\"},"
-                + "{\"name\":\"Representation\",\"command\":\"bal discover ballerina/graphql --module subgraph "
-                + "type Representation\"}],\"aliases\":[{\"name\":\"ReferenceResolver\",\"command\":"
-                + "\"bal discover ballerina/graphql --module subgraph type ReferenceResolver\"}],\"constants\":"
-                + "[{\"name\":\"ANY\",\"command\":\"bal discover ballerina/graphql --module subgraph type ANY\"}],"
-                + "\"annotations\":[{\"name\":\"Entity\",\"command\":\"bal discover ballerina/graphql --module "
-                + "subgraph type Entity\"},{\"name\":\"Subgraph\",\"command\":\"bal discover ballerina/graphql "
-                + "--module subgraph type Subgraph\"}]},\"counts\":{\"records\":2,\"aliases\":1,\"constants\":1,"
+                + "\"command\":\"bal discover type FederatedEntity -p ballerina/graphql --module subgraph\"},"
+                + "{\"name\":\"Representation\",\"command\":\"bal discover type Representation -p ballerina/graphql "
+                + "--module subgraph\"}],\"aliases\":[{\"name\":\"ReferenceResolver\",\"command\":"
+                + "\"bal discover type ReferenceResolver -p ballerina/graphql --module subgraph\"}],\"constants\":"
+                + "[{\"name\":\"ANY\",\"command\":\"bal discover type ANY -p ballerina/graphql --module subgraph\"}],"
+                + "\"annotations\":[{\"name\":\"Entity\",\"command\":\"bal discover type Entity -p ballerina/graphql "
+                + "--module subgraph\"},{\"name\":\"Subgraph\",\"command\":\"bal discover type Subgraph -p "
+                + "ballerina/graphql --module subgraph\"}]},\"counts\":{\"records\":2,\"aliases\":1,\"constants\":1,"
                 + "\"annotations\":2},\"shown\":6,\"total\":6}");
 
         Capture leaf = new Capture();
-        Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Entity"), leaf.streams(),
+        Cli.run(List.of("type", "Entity", "-p", "ballerina/graphql", "--module", "subgraph"), leaf.streams(),
                 options(graphqlCentral()));
         JsonObject answer = JsonParser.parseString(leaf.stdout()).getAsJsonObject();
         Assert.assertEquals(answer.get("kind").getAsString(), "annotation");
@@ -1140,13 +1102,13 @@ public class CliTest {
         typename.addProperty("moduleName", "graphql.dataloader");
         typename.addProperty("version", GRAPHQL_VERSION);
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "type", "Representation"),
+        int exitCode = Cli.run(List.of("type", "Representation", "-p", "ballerina/graphql", "--module", "subgraph"),
                 capture.streams(), options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         JsonObject foreign = JsonParser.parseString(capture.stdout()).getAsJsonObject().getAsJsonArray("foreign")
                 .get(0).getAsJsonObject();
         Assert.assertEquals(foreign.get("command").getAsString(),
-                "bal discover ballerina/graphql --module dataloader type DataLoader");
+                "bal discover type DataLoader -p ballerina/graphql --module dataloader");
     }
 
     @Test
@@ -1155,7 +1117,7 @@ public class CliTest {
         page.getAsJsonObject().getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject()
                 .addProperty("description", "This is graphql.dataloader's own readme.");
         Capture capture = new Capture();
-        Cli.run(List.of("ballerina/graphql", "--module", "dataloader", "readme"), capture.streams(),
+        Cli.run(List.of("readme", "-p", "ballerina/graphql", "--module", "dataloader"), capture.streams(),
                 options(graphqlCentral(Map.of("dataloader", page))), null, true);
         Assert.assertTrue(capture.stdout().contains("This is graphql.dataloader's own readme."), capture.stdout());
     }
@@ -1164,7 +1126,7 @@ public class CliTest {
     public void aValidModuleThatPublishesNoReadmeFailsLoudlyRatherThanAnEmptyBody() {
         // As Central really serves graphql's submodules: each page's readme is empty.
         for (List<String> narrowed : List.of(List.<String>of(), List.of("--filter", "kafka"), List.of("1"))) {
-            List<String> argv = new ArrayList<>(List.of("ballerina/graphql", "--module", "dataloader", "readme"));
+            List<String> argv = new ArrayList<>(List.of("readme", "-p", "ballerina/graphql", "--module", "dataloader"));
             argv.addAll(narrowed);
             Capture capture = new Capture();
             int exitCode = Cli.run(argv, capture.streams(), options(graphqlCentral()));
@@ -1176,9 +1138,9 @@ public class CliTest {
             // Under --module the loaded submodules are that module's children, never its siblings or the
             // default module, so their absence says nothing about what else the package publishes.
             Assert.assertFalse(capture.field("suggestion").contains("no other module"), capture.stderr());
-            Assert.assertTrue(capture.field("suggestion").contains("`bal discover ballerina/graphql`"),
+            Assert.assertTrue(capture.field("suggestion").contains("`bal discover package ballerina/graphql`"),
                     capture.stderr());
-            Assert.assertTrue(capture.field("suggestion").contains("`bal discover ballerina/graphql readme`"),
+            Assert.assertTrue(capture.field("suggestion").contains("`bal discover readme -p ballerina/graphql`"),
                     capture.stderr());
         }
     }
@@ -1186,7 +1148,7 @@ public class CliTest {
     @Test
     public void aReadmeFilterMatchingNoSectionIsAnEmptyListing() {
         Capture json = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "zzzz"), json.streams(),
+        int exitCode = Cli.run(List.of("readme", "-p", "ballerinax/kafka", "--filter", "zzzz"), json.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
         Assert.assertEquals(exitCode, 0, json.stderr());
         JsonObject answer = JsonParser.parseString(json.stdout()).getAsJsonObject();
@@ -1194,7 +1156,7 @@ public class CliTest {
         Assert.assertEquals(answer.getAsJsonArray("sections").size(), 0, answer.toString());
 
         Capture text = new Capture();
-        Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "zzzz"), text.streams(),
+        Cli.run(List.of("readme", "-p", "ballerinax/kafka", "--filter", "zzzz"), text.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()), null, true);
         Assert.assertTrue(text.stdout().endsWith("No matching sections.\n"), text.stdout());
     }
@@ -1202,13 +1164,13 @@ public class CliTest {
     @Test
     public void aReadmeSuggestionQuotesTheSelectorItRepeats() {
         Capture capture = new Capture();
-        Cli.run(List.of("ballerinax/kafka", "readme", "1", "--filter", "zzzz"), capture.streams(),
+        Cli.run(List.of("readme", "1", "-p", "ballerinax/kafka", "--filter", "zzzz"), capture.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
-        Assert.assertTrue(capture.field("suggestion").endsWith("`bal discover ballerinax/kafka readme 1`."),
+        Assert.assertTrue(capture.field("suggestion").endsWith("`bal discover readme 1 -p ballerinax/kafka`."),
                 capture.stderr());
 
         Capture sections = new Capture();
-        Cli.run(List.of("ballerinax/kafka", "readme", "--filter", "kafka"), sections.streams(),
+        Cli.run(List.of("readme", "-p", "ballerinax/kafka", "--filter", "kafka"), sections.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
         String title = null;
         for (JsonElement section : JsonParser.parseString(sections.stdout()).getAsJsonObject()
@@ -1221,26 +1183,27 @@ public class CliTest {
         }
         Assert.assertNotNull(title, sections.stdout());
         Capture titled = new Capture();
-        Cli.run(List.of("ballerinax/kafka", "readme", title, "--filter", "zzzz"), titled.streams(),
+        Cli.run(List.of("readme", title, "-p", "ballerinax/kafka", "--filter", "zzzz"), titled.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
-        Assert.assertTrue(titled.field("suggestion").endsWith(" readme " + Texts.shellWord(title) + "`."),
+        Assert.assertTrue(titled.field("suggestion").endsWith(" readme " + Texts.shellWord(title)
+                        + " -p ballerinax/kafka`."),
                 titled.stderr());
     }
 
     @Test
     public void aSearchUnderModuleSearchesThatModuleAndAFilteredBarePackagePages() {
         Capture subgraph = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "--module", "subgraph", "search", "entity"),
+        Assert.assertEquals(Cli.run(List.of("search", "entity", "-p", "ballerina/graphql", "--module", "subgraph"),
                 subgraph.streams(), options(graphqlCentral())), 0, subgraph.stderr());
         JsonObject found = JsonParser.parseString(subgraph.stdout()).getAsJsonObject();
         Assert.assertEquals(found.get("module").getAsString(), "subgraph");
         Assert.assertTrue(found.get("total").getAsInt() > 0, found.toString());
-        Assert.assertTrue(found.toString().contains("bal discover ballerina/graphql --module subgraph "),
+        Assert.assertTrue(found.toString().contains(" -p ballerina/graphql --module subgraph\""),
                 found.toString());
 
         String version = FixtureCorpus.FIXTURE_VERSION.text();
         Capture second = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "--filter", "issue", "--page", "2"),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/github", "--filter", "issue", "--page", "2"),
                 second.streams(), centralFor("ballerinax__github", version)), 0, second.stderr());
         JsonObject page = JsonParser.parseString(second.stdout()).getAsJsonObject();
         Assert.assertEquals(page.get("page").getAsInt(), 2, page.toString());
@@ -1250,30 +1213,31 @@ public class CliTest {
     @Test
     public void aSearchOfTheDefaultModuleListsASubmoduleNamedForTheKeyword() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "search", "loader"), capture.streams(),
+        Assert.assertEquals(Cli.run(List.of("search", "loader", "-p", "ballerina/graphql"), capture.streams(),
                 options(graphqlCentral())), 0, capture.stderr());
         JsonObject found = JsonParser.parseString(capture.stdout()).getAsJsonObject();
         Assert.assertEquals(found.getAsJsonArray("submodules").get(0).toString(),
-                "{\"name\":\"dataloader\",\"command\":\"bal discover ballerina/graphql --module dataloader\"}");
+                "{\"name\":\"dataloader\",\"command\":\"bal discover package ballerina/graphql --module dataloader\"}");
     }
 
     @Test
     public void aTypeAskedInAContainerBucketIsPointedAtWithItsPlainName() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "'ProducerConfiguration"),
+        Assert.assertEquals(Cli.run(List.of("client", "'ProducerConfiguration", "-p", "ballerinax/kafka"),
                 capture.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1, capture.stderr());
-        Assert.assertEquals(capture.field("command"), "bal discover ballerinax/kafka type ProducerConfiguration");
+        Assert.assertEquals(capture.field("command"), "bal discover type ProducerConfiguration -p ballerinax/kafka");
     }
 
     @Test
     public void aPageBelowOneIsRejectedBeforeAnythingIsFetched() {
         for (String page : List.of("0", "-1")) {
             Capture capture = new Capture();
-            int exitCode = Cli.run(List.of("ballerinax/github", "client", "--page", page), capture.streams(), never());
+            int exitCode = Cli.run(List.of("client", "-p", "ballerinax/github", "--page", page), capture.streams(),
+                    never());
             Assert.assertEquals(exitCode, 2);
             Assert.assertEquals(capture.field("kind"), "validation");
             Assert.assertTrue(capture.field("message").contains("numbered from 1"), capture.stderr());
-            Assert.assertEquals(capture.field("command"), "bal discover ballerinax/github client", capture.stderr());
+            Assert.assertEquals(capture.field("command"), "bal discover client -p ballerinax/github", capture.stderr());
         }
         Capture search = new Capture();
         Assert.assertEquals(Cli.run(List.of("search", "kafka send", "--page", "0"), search.streams(), never()), 2);
@@ -1284,9 +1248,10 @@ public class CliTest {
     public void aPageAgainstAnAnswerThatDoesNotPageIsRejectedRatherThanServedAsPageOne() {
         String github = "ballerinax__github";
         List<List<String>> unpaged = List.of(
-                List.of("ballerinax/github", "--page", "5"),
-                List.of("ballerinax/github", "readme", "--page", "5"),
-                List.of("ballerinax/github", "client", "Client", "gists/'public", "get", "--page", "2"));
+                List.of("package", "ballerinax/github", "--page", "5"),
+                List.of("readme", "-p", "ballerinax/github", "--page", "5"),
+                List.of("resource", "gists/'public", "get", "-p", "ballerinax/github", "--client", "Client", "--page",
+                        "2"));
         for (List<String> argv : unpaged) {
             Capture capture = new Capture();
             int exitCode = Cli.run(argv, capture.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
@@ -1300,16 +1265,16 @@ public class CliTest {
         Capture quoted = new Capture();
         Cli.run(unpaged.get(2), quoted.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
         Assert.assertEquals(quoted.field("suggestion"),
-                "Drop --page: `bal discover ballerinax/github client Client gists/public get`.");
+                "Drop --page: `bal discover resource gists/public get -p ballerinax/github --client Client`.");
 
         Capture oneGroupedPage = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "--page", "2"),
+        Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--page", "2"),
                 oneGroupedPage.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
         Assert.assertTrue(oneGroupedPage.field("message").contains("on 1 page"), oneGroupedPage.stderr());
 
         Capture emptySearch = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "--filter", "zzzq", "--page",
-                "2"), emptySearch.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
+        Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--filter", "zzzq",
+                "--page", "2"), emptySearch.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
         Assert.assertEquals(emptySearch.field("message"),
                 "Page 2 is out of range: this listing has 0 entries on 1 page.");
     }
@@ -1318,23 +1283,23 @@ public class CliTest {
     public void aPageOutOfRangeNamesThePackageVersionAndTheCommandThatWorks() {
         String github = "ballerinax__github";
         Capture beyond = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/twilio", "client", "Client", "--page", "99"),
+        Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/twilio", "--page", "99"),
                 beyond.streams(), centralFor("ballerinax__twilio", FixtureCorpus.FIXTURE_VERSION.text())), 1);
         Assert.assertEquals(beyond.field("qualified"), "ballerinax/twilio");
         Assert.assertEquals(beyond.field("version"), FixtureCorpus.FIXTURE_VERSION.text());
-        Assert.assertEquals(beyond.field("command"), "bal discover ballerinax/twilio client Client --page 5");
+        Assert.assertEquals(beyond.field("command"), "bal discover client Client -p ballerinax/twilio --page 5");
 
         Capture single = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/github", "client", "Client", "--filter", "zzzq", "--page",
-                "2"), single.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
+        Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--filter", "zzzq",
+                "--page", "2"), single.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
         Assert.assertTrue(single.field("suggestion").startsWith("This listing has only one page"),
                 single.stderr());
-        Assert.assertEquals(single.field("command"), "bal discover ballerinax/github client Client --filter zzzq");
+        Assert.assertEquals(single.field("command"), "bal discover client Client -p ballerinax/github --filter zzzq");
     }
 
     @Test
     public void aWholeReadmeInTextFollowsTheHeaderLineEveryAnswerHas() {
-        String text = text(centralFor("ballerinax__kafka", "4.6.5"), "ballerinax/kafka", "readme");
+        String text = text(centralFor("ballerinax__kafka", "4.6.5"), "readme", "-p", "ballerinax/kafka");
         Assert.assertTrue(text.startsWith("ballerinax/kafka:4.6.5 · readme\n\n"), text);
     }
 
@@ -1342,7 +1307,8 @@ public class CliTest {
     public void aBlankFilterIsAUsageError() {
         for (String argument : List.of("--filter=", "--filter= ")) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", argument), capture.streams(), never()),
+            Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerinax/kafka", argument), capture.streams(),
+                    never()),
                     2, argument);
             Assert.assertEquals(capture.field("message"), "The --filter option needs a keyword.");
         }
@@ -1352,26 +1318,26 @@ public class CliTest {
     @Test
     public void aNameAskedInTheWrongBucketFailsWithTheCommandInTheBucketThatHoldsIt() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/http", "client", "Response"), capture.streams(),
+        Assert.assertEquals(Cli.run(List.of("client", "Response", "-p", "ballerina/http"), capture.streams(),
                 centralFor("ballerina__http", "2.16.6"), null, true), 1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.stderr(), "error: 'Response' is not a client in ballerina/http:2.16.6.\n"
-                + "  It is a class: `bal discover ballerina/http class Response`.\n");
+                + "  It is a class: `bal discover class Response -p ballerina/http`.\n");
     }
 
     @Test
     public void theBarePackageListsItsSubmodulesAlongsideItsOwnBucketsInText() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql"), capture.streams(),
                 options(graphqlCentral()), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\n\nSubmodules\n"), capture.stdout());
         Assert.assertTrue(capture.stdout().contains(
-                "\n  dataloader  bal discover ballerina/graphql --module dataloader  "
+                "\n  dataloader  bal discover package ballerina/graphql --module dataloader  "
                         + "This module provides a way to load data from a data source with batching and caching"),
                 capture.stdout());
         Assert.assertTrue(capture.stdout().contains(
-                "\n  subgraph    bal discover ballerina/graphql --module subgraph    "
+                "\n  subgraph    bal discover package ballerina/graphql --module subgraph    "
                         + "This module provides a way to create a subgraphs for a federated GraphQL service"),
                 capture.stdout());
         // The default module addresses itself through its own buckets, never through the submodule list.
@@ -1381,21 +1347,21 @@ public class CliTest {
     @Test
     public void theBarePackageListsItsSubmodulesAsJsonOffATerminal() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql"), capture.streams(), options(graphqlCentral()));
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql"), capture.streams(), options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\"submodules\":["), capture.stdout());
         Assert.assertTrue(
-                capture.stdout().contains("\"command\":\"bal discover ballerina/graphql --module dataloader\""),
+                capture.stdout().contains("\"command\":\"bal discover package ballerina/graphql --module dataloader\""),
                 capture.stdout());
         Assert.assertTrue(
-                capture.stdout().contains("\"command\":\"bal discover ballerina/graphql --module subgraph\""),
+                capture.stdout().contains("\"command\":\"bal discover package ballerina/graphql --module subgraph\""),
                 capture.stdout());
     }
 
     @Test
     public void aSubmoduleViewNeverListsItselfOrItsSiblingsAmongItsOwnSubmodules() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "dataloader"), capture.streams(),
                 options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertFalse(capture.stdout().contains("\"name\":\"dataloader\""), capture.stdout());
@@ -1407,14 +1373,14 @@ public class CliTest {
     public void aModuleFlagThatNamesNoSubmoduleFailsWithCandidates() {
         FakeTransport transport = graphqlCentral();
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "nosuch"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "nosuch"), capture.streams(),
                 options(transport));
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
                 + "subgraph. Pass one of them to --module, or drop --module for the default module: "
-                + "`bal discover ballerina/graphql`.");
+                + "`bal discover package ballerina/graphql`.");
         // The submodule's own page first; the package's only once that is missing, to name what it does publish.
         Assert.assertEquals(transport.urls(), List.of(
                 CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
@@ -1425,7 +1391,7 @@ public class CliTest {
     @Test
     public void aModuleFlagOnAPackageWithNoSubmodulesSaysSo() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka", "--module", "nope"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerinax/kafka", "--module", "nope"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.field("kind"), "package-not-found");
@@ -1438,7 +1404,7 @@ public class CliTest {
                 ? FakeTransport.status(503)
                 : FakeTransport.ok("[\"" + GRAPHQL_VERSION + "\"]"));
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(transport));
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.field("kind"), "upstream", capture.stderr());
@@ -1452,7 +1418,7 @@ public class CliTest {
         page.getAsJsonObject("docsData").getAsJsonArray("modules").get(0).getAsJsonObject()
                 .addProperty("isDefaultModule", true);
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 1, capture.stdout());
         Assert.assertEquals(capture.field("kind"), "package-not-found");
@@ -1471,7 +1437,7 @@ public class CliTest {
         for (String related : List.of("\"not an array\"", "[]", "[{\"id\":1,\"orgName\":2}, null, 7]")) {
             JsonObject page = subgraphPageWithRelatedModules(JsonParser.parseString(related));
             Capture capture = new Capture();
-            int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+            int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                     options(graphqlCentral(Map.of("subgraph", page))));
             Assert.assertEquals(exitCode, 0, related + " -> " + capture.stderr());
         }
@@ -1482,7 +1448,7 @@ public class CliTest {
         JsonObject page = subgraphPageWithRelatedModules(JsonParser.parseString(
                 "[{\"id\":42}, {\"id\":\"graphql.other\",\"orgName\":\"ballerina\",\"isDefaultModule\":true}]"));
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 1, capture.stdout());
         Assert.assertEquals(capture.field("suggestion"), SUBGRAPH_UNCONFIRMED, capture.stderr());
@@ -1499,7 +1465,7 @@ public class CliTest {
             }
         }
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(graphqlCentral(Map.of("subgraph", page))));
         Assert.assertEquals(exitCode, 1, capture.stdout());
         Assert.assertEquals(capture.field("kind"), "package-not-found");
@@ -1518,11 +1484,11 @@ public class CliTest {
         }
 
         Capture client = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql", "client"), client.streams(),
+        Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerina/graphql"), client.streams(),
                 options(graphqlCentral(page, Map.of()))), 0, client.stderr());
 
         Capture bare = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/graphql"), bare.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerina/graphql"), bare.streams(),
                 options(graphqlCentral(page, Map.of()))), 0, bare.stderr());
         Assert.assertTrue(bare.stdout().contains("\"name\":\"subgraph\""), bare.stdout());
         Assert.assertFalse(bare.stdout().contains("dataloader"), bare.stdout());
@@ -1547,7 +1513,7 @@ public class CliTest {
                 .getAsJsonObject();
         Assert.assertFalse(module.has("isDefaultModule"));
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("kanishka/github:0.99.18", "--module", "webhook", "type", "Issue"),
+        Assert.assertEquals(Cli.run(List.of("type", "Issue", "-p", "kanishka/github:0.99.18", "--module", "webhook"),
                 capture.streams(), options(kanishkaCentral(page))), 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("\"name\":\"Issue\""), capture.stdout());
 
@@ -1561,7 +1527,8 @@ public class CliTest {
             }
         }
         Capture rejected = new Capture();
-        Assert.assertEquals(Cli.run(List.of("kanishka/github:0.99.18", "--module", "webhook"), rejected.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "kanishka/github:0.99.18", "--module", "webhook"),
+                rejected.streams(),
                 options(kanishkaCentral(foreign))), 1, rejected.stdout());
         Assert.assertEquals(rejected.field("kind"), "package-not-found", rejected.stderr());
     }
@@ -1581,7 +1548,7 @@ public class CliTest {
                     : FakeTransport.status(404);
         });
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "subgraph"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(transport));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().startsWith("{\"qualified\":\"ballerina/graphql\",\"version\":\"1.8.0\","
@@ -1593,7 +1560,7 @@ public class CliTest {
         // The whole point of LoadedPackage.pkgArgument(): a caller drilling further from here must not silently
         // fall back to the default module.
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerina/graphql", "--module", "dataloader", "class"),
+        int exitCode = Cli.run(List.of("class", "-p", "ballerina/graphql", "--module", "dataloader"),
                 capture.streams(), options(graphqlCentral()));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertTrue(capture.stdout().contains("--module dataloader"), capture.stdout());
@@ -1604,7 +1571,7 @@ public class CliTest {
         // Not interactive (the default for this overload), so JSON — the RFC's agent-facing default, no flag
         // required.
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
         Assert.assertEquals(exitCode, 0, capture.stderr());
         String out = capture.stdout();
@@ -1627,18 +1594,18 @@ public class CliTest {
             "  AvroSerializer    1 method",
             "  Deserializer      1 method",
             "  Serializer        1 method",
-            "Types   bal discover ballerinax/kafka type    14 records, 3 enums, 3 errors, 8 aliases, 29 constants, "
+            "Types   bal discover type -p ballerinax/kafka    14 records, 3 enums, 3 errors, 8 aliases, 29 constants, "
                     + "1 annotation, 1 listener",
-            "Readme  bal discover ballerinax/kafka readme  11 sections",
+            "Readme  bal discover readme -p ballerinax/kafka  11 sections",
             "",
-            "Next: bal discover ballerinax/kafka <bucket> <name>",
-            "Next: bal discover ballerinax/kafka search <keyword>",
+            "Next: bal discover <noun> <name> -p ballerinax/kafka",
+            "Next: bal discover search <keyword> -p ballerinax/kafka",
             "");
 
     @Test
     public void aBarePackageAnswersWithItsOverviewAsTextAtATerminal() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/kafka"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerinax/kafka"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true);
         Assert.assertEquals(exitCode, 0, capture.stderr());
         Assert.assertEquals(capture.stdout(), KAFKA_OVERVIEW);
@@ -1647,12 +1614,12 @@ public class CliTest {
     @Test
     public void outputOverridesTheTtyDefaultInEitherDirection() {
         Capture asText = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "text"), asText.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka", "--output", "text"), asText.streams(),
                 centralFor("ballerinax__kafka", "4.6.5")), 0, asText.stderr());
         Assert.assertEquals(asText.stdout(), KAFKA_OVERVIEW);
 
         Capture asJson = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "--output", "json"), asJson.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka", "--output", "json"), asJson.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true), 0, asJson.stderr());
         Assert.assertTrue(asJson.stdout().contains("\"clients\":{"), asJson.stdout());
     }
@@ -1661,7 +1628,7 @@ public class CliTest {
     public void anInvalidOutputValueIsAValidationFailure() {
         Capture capture = new Capture();
         Assert.assertEquals(
-                Cli.run(List.of("ballerinax/kafka", "--output", "xml"), capture.streams(), never()), 2);
+                Cli.run(List.of("package", "ballerinax/kafka", "--output", "xml"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("xml"), capture.stderr());
     }
@@ -1677,7 +1644,7 @@ public class CliTest {
     @Test
     public void anUnknownPackageExits1AndNamesItself() {
         Capture capture = new Capture();
-        int exitCode = Cli.run(List.of("ballerinax/nope"), capture.streams(),
+        int exitCode = Cli.run(List.of("package", "ballerinax/nope"), capture.streams(),
                 HttpOptions.builder()
                         .transport(FakeTransport.always(FakeTransport.ok("[]")))
                         .maxAttempts(1).baseDelayMs(1).sleeper(millis -> { }).build());
@@ -1690,7 +1657,8 @@ public class CliTest {
     public void aFailingRunLeavesStdoutEmptyAndStderrHoldingExactlyOneJsonObject() {
         List<List<String>> failures = List.of(
                 List.of("not-a-package"),
-                List.of("ballerinax/kafka", "nosuchbucket"),
+                List.of("nosuchnoun", "-p", "ballerinax/kafka"),
+                List.of("ballerinax/kafka", "client"),
                 List.of("--nonesuch"));
         for (List<String> argv : failures) {
             Capture capture = new Capture();
@@ -1713,21 +1681,24 @@ public class CliTest {
                 .maxAttempts(1).baseDelayMs(1).sleeper(millis -> { }).build();
         HttpOptions kafka = centralFor("ballerinax__kafka", "4.6.5");
 
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka"), new Capture().streams(), kafka), 0);
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka"), new Capture().streams(), kafka), 0);
         Assert.assertEquals(Cli.run(List.of("--help"), new Capture().streams(), never()), 0);
 
         List<Case> failures = List.of(
-                new Case("package-not-found", 1, List.of("no-such-org/no-such-pkg"), missing),
-                new Case("upstream", 1, List.of("ballerinax/kafka"), broken),
-                new Case("validation", 2, List.of("ballerina/http:2.16"), never()),
+                new Case("package-not-found", 1, List.of("package", "no-such-org/no-such-pkg"), missing),
+                new Case("upstream", 1, List.of("package", "ballerinax/kafka"), broken),
+                new Case("validation", 2, List.of("package", "ballerina/http:2.16"), never()),
                 new Case("validation", 2, List.of("nonsense"), never()),
-                new Case("validation", 1, List.of("ballerinax/kafka", "client", "--page", "2"), kafka),
-                new Case("validation", 2, List.of("ballerinax/kafka", "funcs", "a", "b"), never()),
-                new Case("validation", 2, List.of("ballerinax/kafka", "type", "A", "B"), never()),
-                new Case("validation", 2, List.of("ballerinax/kafka", "type", "A", "--filter", "x"), never()),
-                new Case("validation", 1, List.of("ballerinax/kafka", "client", "Consumer", "poll", "x"), kafka),
+                new Case("validation", 1, List.of("client", "-p", "ballerinax/kafka", "--page", "2"), kafka),
+                new Case("validation", 2, List.of("function", "a", "b", "-p", "ballerinax/kafka"), never()),
+                new Case("validation", 2, List.of("type", "A", "B", "-p", "ballerinax/kafka"), never()),
+                new Case("validation", 2, List.of("type", "A", "-p", "ballerinax/kafka", "--filter", "x"), never()),
+                new Case("validation", 2, List.of("method", "poll", "x", "-p", "ballerinax/kafka", "--client",
+                        "Consumer"), never()),
+                new Case("validation", 2, List.of("ballerinax/kafka", "client", "Consumer"), never()),
+                new Case("validation", 2, List.of("client", "Consumer"), never()),
                 new Case("symbol-not-found", 1,
-                        List.of("ballerinax/kafka", "client", "NoSuchContainer"), kafka));
+                        List.of("client", "NoSuchContainer", "-p", "ballerinax/kafka"), kafka));
         for (Case failure : failures) {
             Capture capture = new Capture();
             String label = String.join(" ", failure.argv());
@@ -1739,34 +1710,33 @@ public class CliTest {
     @Test
     public void extraNamesNoPackageCanReadAreAUsageErrorNamingTheCommandToRunInstead() {
         Capture funcs = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/io:1.8.2", "-m", "sub", "funcs", "println", "extra",
-                "--filter", "x"), funcs.streams(), never()), 2);
-        Assert.assertEquals(funcs.field("message"), "Unexpected argument 'extra' after 'println': funcs takes one "
-                + "function name.");
+        Assert.assertEquals(Cli.run(List.of("function", "println", "extra", "-p", "ballerina/io:1.8.2", "--module",
+                "sub", "--filter", "x"), funcs.streams(), never()), 2);
+        Assert.assertEquals(funcs.field("message"), "function takes one name; got 2.");
         Assert.assertEquals(funcs.field("suggestion"),
-                "Drop it: `bal discover ballerina/io:1.8.2 --module sub funcs println --filter x`.");
+                "Run `bal discover function println -p ballerina/io:1.8.2 --module sub --filter x`.");
 
         Capture types = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/io", "type", "A", "B"), types.streams(), never()), 2);
-        Assert.assertEquals(types.field("suggestion"), "Name one declaration, or list them all: "
-                + "`bal discover ballerina/io type`.");
+        Assert.assertEquals(Cli.run(List.of("type", "A", "B", "-p", "ballerina/io"), types.streams(), never()), 2);
+        Assert.assertEquals(types.field("suggestion"), "Run `bal discover type A -p ballerina/io`.");
 
         Capture filtered = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerina/io", "type", "Error", "--filter", "x"), filtered.streams(),
-                never()), 2);
+        Assert.assertEquals(Cli.run(List.of("type", "Error", "-p", "ballerina/io", "--filter", "x"),
+                filtered.streams(), never()), 2);
         Assert.assertEquals(filtered.field("suggestion"), "Drop --filter, or drop the name: "
-                + "`bal discover ballerina/io type --filter x`.");
+                + "`bal discover type -p ballerina/io --filter x`.");
     }
 
     @Test
     public void theFailureTextIsUnchanged() {
         record Case(String name, List<String> argv) { }
         List<Case> cases = List.of(
-                new Case("unknown-bucket", List.of("ballerinax/kafka", "nosuchbucket")),
-                new Case("partial-version", List.of("ballerinax/github:6.0")),
-                new Case("version-flag", List.of("ballerinax/github", "--version", "6.0.0")),
-                new Case("version-argument", List.of("ballerinax/github", "6.0.0")),
-                new Case("unknown-flag", List.of("ballerina/http", "--nonesuch")),
+                new Case("unknown-noun", List.of("nosuchnoun", "-p", "ballerinax/kafka")),
+                new Case("old-form", List.of("ballerinax/kafka", "client", "Producer", "send")),
+                new Case("partial-version", List.of("package", "ballerinax/github:6.0")),
+                new Case("version-flag", List.of("package", "ballerinax/github", "--version", "6.0.0")),
+                new Case("version-argument", List.of("client", "6.0.0", "-p", "ballerinax/github")),
+                new Case("unknown-flag", List.of("package", "ballerina/http", "--nonesuch")),
                 new Case("no-package", List.of("--refresh")));
 
         for (Case failure : cases) {
@@ -1786,16 +1756,16 @@ public class CliTest {
     public void aFailureIsWrittenInTheRunsOutputModeEvenWhenTheArgumentsDoNotParse() {
         record Case(List<String> argv, boolean interactive, boolean json) { }
         for (Case each : List.of(
-                new Case(List.of("ballerina/http", "nosuchbucket"), true, false),
-                new Case(List.of("ballerina/http", "nosuchbucket"), false, true),
-                new Case(List.of("ballerina/http", "nosuchbucket", "--output", "json"), true, true),
-                new Case(List.of("ballerina/http", "nosuchbucket", "--output", "text"), false, false),
-                new Case(List.of("ballerina/http", "--nonesuch", "--output", "text"), false, false),
-                new Case(List.of("ballerina/http", "--output=text", "--nonesuch"), false, false),
-                new Case(List.of("ballerina/http", "--nonesuch", "--output", "xml"), true, false),
-                new Case(List.of("ballerina/http", "--output", "xml"), false, true),
-                new Case(List.of("ballerina/http", "nosuchbucket", "--filter", "--output", "text"), false, true),
-                new Case(List.of("ballerina/http", "-m", "--output", "text"), false, true))) {
+                new Case(List.of("nosuchnoun", "-p", "ballerina/http"), true, false),
+                new Case(List.of("nosuchnoun", "-p", "ballerina/http"), false, true),
+                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--output", "json"), true, true),
+                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--output", "text"), false, false),
+                new Case(List.of("package", "ballerina/http", "--nonesuch", "--output", "text"), false, false),
+                new Case(List.of("package", "ballerina/http", "--output=text", "--nonesuch"), false, false),
+                new Case(List.of("package", "ballerina/http", "--nonesuch", "--output", "xml"), true, false),
+                new Case(List.of("package", "ballerina/http", "--output", "xml"), false, true),
+                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--filter", "--output", "text"), false, true),
+                new Case(List.of("package", "ballerina/http", "-m", "--output", "text"), false, true))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never(), null, each.interactive()), 2,
                     each.toString());
@@ -1807,10 +1777,9 @@ public class CliTest {
                 Assert.assertEquals(lines.length, 5, capture.stderr());
                 Assert.assertTrue(lines[0].startsWith("error: "), capture.stderr());
                 Assert.assertTrue(lines[1].startsWith("  ") && !lines[1].startsWith("   "), capture.stderr());
-                Assert.assertEquals(lines[2], "Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...] "
-                        + "[--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]",
+                Assert.assertTrue(lines[2].startsWith("Usage: bal discover "), capture.stderr());
+                Assert.assertTrue(lines[3].matches("Run `bal discover (\\w+ )?--help` for details\\."),
                         capture.stderr());
-                Assert.assertEquals(lines[3], "Run `bal discover --help` for details.", capture.stderr());
                 Assert.assertEquals(lines[4], "", capture.stderr());
             }
         }
@@ -1820,11 +1789,12 @@ public class CliTest {
     public void anOptionGivenTwiceOrAFlagGivenAValueIsAUsageErrorInTheToolsOwnWords() {
         record Case(List<String> argv, String message, String suggestion) { }
         for (Case each : List.of(
-                new Case(List.of("ballerina/io", "--output", "MODE", "--output", "MODE"),
+                new Case(List.of("package", "ballerina/io", "--output", "MODE", "--output", "MODE"),
                         "--output is given more than once.", "Pass --output once."),
-                new Case(List.of("ballerina/io", "--page", "1", "--page", "2"),
+                new Case(List.of("package", "ballerina/io", "--page", "1", "--page", "2"),
                         "--page is given more than once.", "Pass --page once."),
-                new Case(List.of("ballerina/io", "--refresh=yes"), "--refresh takes no value.", "Write --refresh."))) {
+                new Case(List.of("package", "ballerina/io", "--refresh=yes"), "--refresh takes no value.",
+                        "Write --refresh."))) {
             Capture json = new Capture();
             List<String> jsonArgv = each.argv().stream().map(word -> word.replace("MODE", "json")).toList();
             Assert.assertEquals(Cli.run(jsonArgv, json.streams(), never()), 2, jsonArgv.toString());
@@ -1835,16 +1805,16 @@ public class CliTest {
             List<String> textArgv = each.argv().stream().map(word -> word.replace("MODE", "text")).toList();
             Assert.assertEquals(Cli.run(textArgv, text.streams(), never(), null, true), 2, textArgv.toString());
             Assert.assertEquals(text.stderr(), "error: " + each.message() + "\n  " + each.suggestion() + "\n"
-                    + "Usage: bal discover <org>/<name>[:<version>] [bucket] [name ...] [--output json|text] "
+                    + "Usage: bal discover package <org>/<name>[:<version>] [--output json|text] "
                     + "[--filter <keyword>] [--page <n>] [-m <module>] [--refresh]\n"
-                    + "Run `bal discover --help` for details.\n");
+                    + "Run `bal discover package --help` for details.\n");
         }
     }
 
     @Test
     public void aTextFailureIndentsItsSuggestionUnderTheMessage() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "type", "NoSuchType", "--output", "text"),
+        Assert.assertEquals(Cli.run(List.of("type", "NoSuchType", "-p", "ballerinax/kafka", "--output", "text"),
                 capture.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1);
         Assert.assertEquals(capture.stdout(), "");
         FixtureCorpus.matchesSnapshot(
@@ -1856,7 +1826,7 @@ public class CliTest {
     @Test
     public void theSymbolNotFoundJsonIsUnchanged() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("ballerinax/kafka", "client", "NoSuchContainer"),
+        Assert.assertEquals(Cli.run(List.of("client", "NoSuchContainer", "-p", "ballerinax/kafka"),
                 capture.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1);
         Assert.assertEquals(capture.stdout(), "");
         FixtureCorpus.matchesSnapshot(

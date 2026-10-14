@@ -34,8 +34,6 @@ import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.source.TriggerMetadata;
-import io.ballerina.tools.discover.symbols.Surface;
-import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Overview;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -147,22 +145,24 @@ public class ServiceHandlersTest {
     public void aForeignServiceTypeIsAnsweredFromTheListenerPackagesOwnDescription() {
         LoadedPackage postgresql = FixtureCorpus.loadedFixture("ballerinax__postgresql");
         for (List<String> selectors : List.of(List.<String>of(), List.of("cdc:Service"))) {
-            DiscoverResult.ServiceHandlerList answer = (DiscoverResult.ServiceHandlerList) Containers.render(
-                    postgresql, Surface.Scope.SERVICE, new Containers.Options(selectors)).value();
+            List<String> words = new ArrayList<>(List.of("service"));
+            words.addAll(selectors);
+            DiscoverResult.ServiceHandlerList answer = (DiscoverResult.ServiceHandlerList) Asked.of(postgresql,
+                    words.toArray(String[]::new)).value();
             Assert.assertEquals(answer.container(), "cdc:Service");
             Assert.assertEquals(answer.handlers().size(), 6, selectors.toString());
             Assert.assertTrue(answer.note().startsWith("attach it to postgresql:CdcListener; declared in "
                     + "ballerinax/cdc"), answer.note());
         }
         for (String typed : List.of("onCreate", "'onCreate")) {
-            DiscoverResult.ServiceHandlerList one = (DiscoverResult.ServiceHandlerList) Containers.render(postgresql,
-                    Surface.Scope.SERVICE, new Containers.Options(List.of("cdc:Service", typed))).value();
+            DiscoverResult.ServiceHandlerList one = (DiscoverResult.ServiceHandlerList) Asked.of(postgresql,
+                    "method", typed, "--service", "cdc:Service").value();
             Assert.assertEquals(one.handlers().stream().map(ServiceHandlers.Handler::name).toList(),
                     List.of("onCreate"), typed);
         }
         Assert.assertEquals(Overview.of(postgresql).sections().stream()
                 .filter(section -> section.bucket().equals("service")).findFirst().orElseThrow().rows().get(0)
-                .command(), "bal discover ballerinax/postgresql service cdc:Service",
+                .command(), "bal discover service cdc:Service -p ballerinax/postgresql",
                 "opened in the listener's package, which describes it");
     }
 
@@ -171,8 +171,8 @@ public class ServiceHandlersTest {
         LoadedPackage described = FixtureCorpus.loadedFixture("ballerinax__postgresql");
         LoadedPackage postgresql = new LoadedPackage(described.qualified(), described.version(), described.library(),
                 described.readme(), null, List.of(), List.of(), null, null, described::library, Map::of);
-        DiscoverResult.ServiceExamples answer = (DiscoverResult.ServiceExamples) Containers.render(postgresql,
-                Surface.Scope.SERVICE, new Containers.Options(List.of("cdc:Service"))).value();
+        DiscoverResult.ServiceExamples answer = (DiscoverResult.ServiceExamples) Asked.of(postgresql, "service",
+                "cdc:Service").value();
         Assert.assertEquals(answer.container(), "cdc:Service");
         Assert.assertTrue(answer.note().contains("declared in ballerinax/cdc"), answer.note());
     }
@@ -246,7 +246,7 @@ public class ServiceHandlersTest {
     @Test
     public void bothRenderingsListTheHandlersFromThePublishedBala() {
         HttpOptions http = central(true);
-        String text = run(http, "ballerinax/kafka", "service", "--output", "text");
+        String text = run(http, "service", "-p", "ballerinax/kafka", "--output", "text");
         Assert.assertTrue(text.contains("Methods to implement (2)\n\nremote function onConsumerRecord("), text);
         Assert.assertTrue(text.contains("  required\n"), text);
         Assert.assertTrue(text.contains("remote function onError(kafka:Error kafkaError) returns error?\n  optional"),
@@ -254,7 +254,7 @@ public class ServiceHandlersTest {
         Assert.assertTrue(text.contains("Note: attach it to kafka:Listener"), text);
         Assert.assertFalse(text.contains("No methods"), text);
 
-        JsonObject answer = json(http, "ballerinax/kafka", "service", "Service");
+        JsonObject answer = json(http, "service", "Service", "-p", "ballerinax/kafka");
         JsonArray handlers = answer.getAsJsonArray("handlers");
         Assert.assertEquals(handlers.size(), 2);
         JsonObject consumer = handlers.get(0).getAsJsonObject();
@@ -280,32 +280,35 @@ public class ServiceHandlersTest {
     public void aHandlerNameThatMatchesNothingListsTheMethodsToImplement() {
         HttpOptions http = central(true);
         StringBuilder err = new StringBuilder();
-        int code = Cli.run(List.of("ballerinax/kafka", "service", "Service", "nosuch", "--output", "json"),
+        int code = Cli.run(List.of("method", "nosuch", "-p", "ballerinax/kafka", "--service", "Service", "--output",
+                "json"),
                 new Cli.Streams(out -> { }, err::append), http);
         Assert.assertEquals(code, 1, err.toString());
         JsonObject failure = JsonParser.parseString(err.toString()).getAsJsonObject();
         Assert.assertEquals(failure.get("kind").getAsString(), "symbol-not-found");
-        Assert.assertEquals(failure.get("command").getAsString(), "bal discover ballerinax/kafka service Service");
+        Assert.assertEquals(failure.get("command").getAsString(),
+                "bal discover method -p ballerinax/kafka --service Service");
     }
 
     @Test
     public void aHandlerNamedOnTheCommandLineIsShownAlone() {
         HttpOptions http = central(true);
-        JsonObject answer = json(http, "ballerinax/kafka", "service", "Service", "onError");
+        JsonObject answer = json(http, "method", "onError", "-p", "ballerinax/kafka", "--service", "Service");
         Assert.assertEquals(answer.getAsJsonArray("handlers").size(), 1);
-        String text = run(http, "ballerinax/kafka", "service", "Service", "onError", "--output", "text");
+        String text = run(http, "method", "onError", "-p", "ballerinax/kafka", "--service", "Service", "--output",
+                "text");
         Assert.assertTrue(text.contains("Methods to implement (1)"), text);
     }
 
     @Test
     public void aPackageWithoutTheFileAnswersAsBefore() {
         HttpOptions http = central(false);
-        String text = run(http, "ballerinax/kafka", "service", "--output", "text");
+        String text = run(http, "service", "-p", "ballerinax/kafka", "--output", "text");
         Assert.assertTrue(text.contains("Service declares no methods; a service of this type declares its own "
                 + "resource or remote methods."), text);
         Assert.assertTrue(text.contains("Readme sections that declare one"), text);
         Assert.assertFalse(text.contains("Methods to implement"), text);
-        Assert.assertFalse(json(http, "ballerinax/kafka", "service", "Service").has("handlers"));
+        Assert.assertFalse(json(http, "service", "Service", "-p", "ballerinax/kafka").has("handlers"));
     }
 
     @Test
@@ -315,7 +318,7 @@ public class ServiceHandlersTest {
                         : url.matches(".*/registry/packages/[^/]+/[^/]+") ? FakeTransport.ok("[\"4.6.6\"]")
                         : FakeTransport.status(404))).baseDelayMs(1).sleeper(millis -> {
         }).build();
-        Assert.assertTrue(run(http, "ballerinax/kafka", "service", "--output", "text")
+        Assert.assertTrue(run(http, "service", "-p", "ballerinax/kafka", "--output", "text")
                 .contains("Service declares no methods; a service of this type declares its own resource or "
                         + "remote methods."));
     }

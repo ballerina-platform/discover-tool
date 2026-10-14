@@ -6,7 +6,7 @@ ballerinax/kafka · client
   Consumer  24 remote methods
   Producer   5 remote methods
 
-Next: bal discover ballerinax/kafka client <name>
+Next: bal discover client <name> -p ballerinax/kafka
 == service ==
 ballerinax/kafka · service · Service
 Methods to implement (2)
@@ -32,16 +32,16 @@ ballerinax/kafka · class
   Deserializer      1 method
   Serializer        1 method
 
-Next: bal discover ballerinax/kafka class <name>
-== funcs ==
-ballerinax/kafka · funcs
+Next: bal discover class <name> -p ballerinax/kafka
+== function ==
+ballerinax/kafka · function
 ballerinax/kafka has no functions.
 
 Other buckets
-  client    3  bal discover ballerinax/kafka client
-  service   1  bal discover ballerinax/kafka service
-  class     4  bal discover ballerinax/kafka class
-  type     67  bal discover ballerinax/kafka type
+  client    3  bal discover client -p ballerinax/kafka
+  service   1  bal discover service -p ballerinax/kafka
+  class     4  bal discover class -p ballerinax/kafka
+  type     67  bal discover type -p ballerinax/kafka
 == type ==
 ballerinax/kafka · type
 14 records, 3 enums, 3 errors, 8 aliases, 29 constants, 1 annotation, 1 listener, 4 classes, 3 clients, 1 service type
@@ -97,6 +97,6 @@ Constants
   DEFAULT_URL
 
 ... 27 more (page 1 of 2)
-Next: bal discover ballerinax/kafka type <name>
-Next: bal discover ballerinax/kafka type --page 2
-Next: bal discover ballerinax/kafka type --filter <keyword>
+Next: bal discover type <name> -p ballerinax/kafka
+Next: bal discover type -p ballerinax/kafka --page 2
+Next: bal discover type -p ballerinax/kafka --filter <keyword>

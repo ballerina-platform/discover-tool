@@ -18,23 +18,27 @@
 
 package io.ballerina.tools.discover.cli;
 
-import io.ballerina.tools.discover.symbols.Surface;
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.views.Containers;
-import io.ballerina.tools.discover.views.Readme;
-import io.ballerina.tools.discover.views.Search;
-import io.ballerina.tools.discover.views.Types;
 import picocli.CommandLine;
 
-import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.Map;
 
 /**
- * The argument grammar, declared once: {@code bal discover <org>/<name>[:<version>] [bucket] [name ...] [flags]}.
+ * The argument grammar, declared once: {@code bal discover <noun> [name ...] -p <org>/<name>[:<version>] [flags]},
+ * one picocli subcommand per noun.
  *
- * <p>{@code --module}/{@code -m} applies uniformly across every bucket including {@code readme}: {@link Cli} reads
- * it once before any bucket is dispatched, since which module a coordinate resolves to is a fact about the package
- * lookup, not about any one bucket.
+ * <p>A noun says what comes back and its names say which one: a name means one thing, no name a listing. The
+ * package is a flag, not a position, so every noun takes its names the same way; {@code package} alone takes the
+ * coordinate as its name. {@code --module}/{@code -m} applies uniformly across every noun including
+ * {@code readme}: {@link Cli} reads it once before any noun is answered, since which module a coordinate resolves
+ * to is a fact about the package lookup, not about any one noun.
+ *
+ * <p>The root takes the same flags and a free positional list only so the old package-first form
+ * ({@code bal discover ballerinax/kafka client Producer}) and a mistyped noun parse, and {@link Cli} can answer
+ * them with the command to run instead.
  *
  * @since 0.1.0
  */
@@ -43,30 +47,44 @@ final class Commands {
     private Commands() {
     }
 
-    record Grammar(CommandLine line, Root root) {
-
-        static Grammar create() {
-            Root root = new Root();
-            CommandLine line = new CommandLine(root);
-            return new Grammar(line, root);
-        }
-    }
-
-    static final List<String> BUCKETS = Stream.concat(
-            Arrays.stream(Surface.Scope.values()).map(Surface.Scope::verb),
-            Stream.of(Types.BUCKET, Readme.BUCKET, Search.BUCKET)).toList();
-
     static final String VERSION_FLAG = "--version";
 
     static final String JSON_OUTPUT = "json";
     static final String TEXT_OUTPUT = "text";
 
+    static final String PACKAGE_LABEL = "<org>/<name>[:<version>]";
+
     /**
-     * The one command. {@code pkg} is optional at the grammar level — {@code bal discover} with nothing else is a
-     * usage request, not a missing-argument failure — and {@link Cli} tells the two apart.
+     * @param line the root command line, every noun registered under it
+     * @param root the root's values
+     * @param nouns each noun's values, by noun
      */
-    @CommandLine.Command(name = "discover")
-    static final class Root {
+    record Grammar(CommandLine line, Root root, Map<String, Noun> nouns) {
+
+        static Grammar create() {
+            Root root = new Root();
+            CommandLine line = new CommandLine(root);
+            Map<String, Noun> nouns = new LinkedHashMap<>();
+            for (String name : Command.NOUNS) {
+                Noun noun = switch (name) {
+                    case Command.PACKAGE -> new PackageNoun();
+                    case Command.METHOD, Command.RESOURCE -> new MemberNoun();
+                    default -> new ScopedNoun();
+                };
+                nouns.put(name, noun);
+                line.addSubcommand(name, noun);
+            }
+            return new Grammar(line, root, nouns);
+        }
+
+        /** The spec of {@code noun}, or the root's when {@code noun} is null. */
+        CommandLine.Model.CommandSpec spec(String noun) {
+            return noun == null ? line.getCommandSpec() : line.getSubcommands().get(noun).getCommandSpec();
+        }
+    }
+
+    /** The flags every noun takes. */
+    static final class Flags {
 
         @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "This text.")
         boolean help;
@@ -76,19 +94,19 @@ final class Commands {
                         + "otherwise.")
         String output;
 
-        @CommandLine.Option(names = "--filter", paramLabel = "<keyword>",
-                description = "Narrow an already-selected bucket to entries whose name, path, parameter or type "
-                        + "matches this keyword. Filtering is local; nothing is sent to Central. On the bare package "
-                        + "it searches the package's names, as search does.")
+        @CommandLine.Option(names = Command.FILTER_FLAG, paramLabel = "<keyword>",
+                description = "Narrow a listing to entries whose name, path, parameter or type matches this "
+                        + "keyword. Filtering is local; nothing is sent to Central. On package it searches the "
+                        + "package's names, as search does.")
         String filter;
 
-        @CommandLine.Option(names = "--page", paramLabel = "<n>", defaultValue = "1",
+        @CommandLine.Option(names = Command.PAGE_FLAG, paramLabel = "<n>", defaultValue = "1",
                 description = "Show page <n> (counting from 1) of a listing longer than " + Containers.MAX_ENTRIES
-                        + " entries. A page "
-                        + "past the last one, or against an answer that has only one page, is an error.")
+                        + " entries. A page past the last one, or against an answer that has only one page, is an "
+                        + "error.")
         int page;
 
-        @CommandLine.Option(names = {"--module", "-m"}, paramLabel = "<module>",
+        @CommandLine.Option(names = {Command.MODULE_FLAG, "-m"}, paramLabel = "<module>",
                 description = "Target this submodule instead of the package's default module, the same "
                         + "everywhere including readme. The submodule's name only (for example httpscerr), not "
                         + "<org>/<name>.<submodule>.")
@@ -102,17 +120,122 @@ final class Commands {
                 description = "Ignore any cached copy and rewrite it. Worth passing only when a name should "
                         + "exist and does not.")
         boolean refresh;
+    }
 
-        @CommandLine.Parameters(index = "0", arity = "0..1", paramLabel = "<org>/<name>[:<version>]")
+    /** The package a noun is asked of. */
+    static final class Package {
+
+        @CommandLine.Option(names = {Command.PACKAGE_FLAG, "--package"}, paramLabel = PACKAGE_LABEL,
+                description = "The package to read, as bal pull names it. With no version, the one your project's "
+                        + "Dependencies.toml locks, else Central's latest.")
+        String pkg;
+    }
+
+    /** The container a method or resource is declared by. */
+    static final class Owners {
+
+        @CommandLine.Option(names = "--client", paramLabel = "<name>",
+                description = "The client that declares it. Optional when exactly one container does.")
+        String client;
+
+        @CommandLine.Option(names = "--class", paramLabel = "<name>", description = "The class that declares it.")
+        String classOwner;
+
+        @CommandLine.Option(names = "--service", paramLabel = "<name>",
+                description = "The service type that declares it.")
+        String service;
+    }
+
+    /**
+     * What the caller typed before or instead of a noun. No minimum arity: picocli 4.0.1 lets a variable-arity
+     * positional with a minimum consume an unrecognised flag as its value.
+     */
+    @CommandLine.Command(name = "discover")
+    static final class Root {
+
+        @CommandLine.Mixin
+        Flags flags = new Flags();
+
+        @CommandLine.Mixin
+        Package pkg = new Package();
+
+        @CommandLine.Parameters(arity = "0..*", paramLabel = "<noun>")
+        List<String> rest;
+    }
+
+    /** One noun's values: its flags and its names. */
+    abstract static class Noun {
+
+        @CommandLine.Mixin
+        Flags flags = new Flags();
+
+        @CommandLine.Parameters(arity = "0..*", paramLabel = "[<name> ...]")
+        List<String> names;
+
+        List<String> names() {
+            return names == null ? List.of() : names;
+        }
+
+        /** The {@code -p} value, or {@code null} for a noun that takes none. */
+        abstract String pkg();
+
+        /** The container flag given, or {@code null}. */
+        Command.Owner owner() {
+            return null;
+        }
+
+        /** How many container flags were given. */
+        int owners() {
+            return 0;
+        }
+    }
+
+    @CommandLine.Command
+    static final class PackageNoun extends Noun {
+
+        // Hidden and never valid: declared only so the CLI can say the package is this noun's name.
+        @CommandLine.Option(names = {Command.PACKAGE_FLAG, "--package"}, hidden = true, paramLabel = PACKAGE_LABEL)
         String pkg;
 
-        /**
-         * The bucket, then whatever it takes: a container name, a member, an accessor and a path.
-         *
-         * <p>No minimum arity: picocli 4.0.1 lets a variable-arity positional with a minimum consume an
-         * unrecognised flag as its value, so {@link Cli} tells a bare package from a package with a bucket.
-         */
-        @CommandLine.Parameters(index = "1..*", paramLabel = "[bucket] [name ...]")
-        List<String> rest;
+        @Override
+        String pkg() {
+            return pkg;
+        }
+    }
+
+    @CommandLine.Command
+    static class ScopedNoun extends Noun {
+
+        @CommandLine.Mixin
+        Package pkg = new Package();
+
+        @Override
+        String pkg() {
+            return pkg.pkg;
+        }
+    }
+
+    @CommandLine.Command
+    static final class MemberNoun extends ScopedNoun {
+
+        @CommandLine.Mixin
+        Owners owners = new Owners();
+
+        @Override
+        Command.Owner owner() {
+            if (owners.client != null) {
+                return new Command.Owner(Command.CLIENT, owners.client);
+            }
+            if (owners.classOwner != null) {
+                return new Command.Owner(Command.CLASS, owners.classOwner);
+            }
+            return owners.service == null ? null : new Command.Owner(Command.SERVICE, owners.service);
+        }
+
+        @Override
+        int owners() {
+            return (owners.client == null ? 0 : 1) + (owners.classOwner == null ? 0 : 1)
+                    + (owners.service == null ? 0 : 1);
+        }
     }
 }

@@ -45,30 +45,30 @@ Path groups (resource methods in each)
   admin.teams.settings.setDiscoverability                   1
 
 ... 134 more (page 1 of 5)
-Next: bal discover ballerinax/slack client Client <group>
-Next: bal discover ballerinax/slack client Client --page 2
-Next: bal discover ballerinax/slack client Client --filter <keyword>
+Next: bal discover resource <group> -p ballerinax/slack --client Client
+Next: bal discover client Client -p ballerinax/slack --page 2
+Next: bal discover client Client -p ballerinax/slack --filter <keyword>
 == service ==
 ballerinax/slack · service
 ballerinax/slack has no service types.
 
 Other buckets
-  client    1  bal discover ballerinax/slack client
-  type    507  bal discover ballerinax/slack type
+  client    1  bal discover client -p ballerinax/slack
+  type    507  bal discover type -p ballerinax/slack
 == class ==
 ballerinax/slack · class
 ballerinax/slack has no classes.
 
 Other buckets
-  client    1  bal discover ballerinax/slack client
-  type    507  bal discover ballerinax/slack type
-== funcs ==
-ballerinax/slack · funcs
+  client    1  bal discover client -p ballerinax/slack
+  type    507  bal discover type -p ballerinax/slack
+== function ==
+ballerinax/slack · function
 ballerinax/slack has no functions.
 
 Other buckets
-  client    1  bal discover ballerinax/slack client
-  type    507  bal discover ballerinax/slack type
+  client    1  bal discover client -p ballerinax/slack
+  type    507  bal discover type -p ballerinax/slack
 == type ==
 ballerinax/slack · type
 436 records, 70 aliases, 1 client
@@ -116,6 +116,6 @@ Records
   AdminConversationsGetTeamsResponseResponseMetadata
 
 ... 467 more (page 1 of 13)
-Next: bal discover ballerinax/slack type <name>
-Next: bal discover ballerinax/slack type --page 2
-Next: bal discover ballerinax/slack type --filter <keyword>
+Next: bal discover type <name> -p ballerinax/slack
+Next: bal discover type -p ballerinax/slack --page 2
+Next: bal discover type -p ballerinax/slack --filter <keyword>

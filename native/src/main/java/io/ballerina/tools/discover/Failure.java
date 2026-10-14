@@ -24,6 +24,7 @@ import com.google.gson.JsonObject;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * Failures are values, not thrown classes.
@@ -376,22 +377,23 @@ public sealed interface Failure {
     }
 
     /**
-     * This failure with {@code tail} appended to its {@code command} and the suggestion's quote of it: a layer below
-     * the CLI knows only the start of the caller's command.
+     * This failure with its {@code command}, and the suggestion's quote of it, rewritten by {@code rewrite}: a layer
+     * below the CLI knows only the package a corrected command reaches, not the rest of the caller's command.
      */
-    default Failure lengthened(String tail) {
+    default Failure retargeted(UnaryOperator<String> rewrite) {
         return switch (this) {
-            case Validation f when f.command() != null && !tail.isEmpty() -> new Validation(f.message(),
-                    lengthened(f.suggestion(), f.command(), tail), f.command() + tail, f.qualified(), f.version());
-            case PackageNotFound f when f.command() != null && !tail.isEmpty() -> new PackageNotFound(f.qualified(),
-                    f.version(), f.module(), lengthened(f.suggestion(), f.command(), tail), f.command() + tail,
-                    f.candidates());
+            case Validation f when f.command() != null -> new Validation(f.message(),
+                    rewritten(f.suggestion(), f.command(), rewrite.apply(f.command())), rewrite.apply(f.command()),
+                    f.qualified(), f.version());
+            case PackageNotFound f when f.command() != null -> new PackageNotFound(f.qualified(),
+                    f.version(), f.module(), rewritten(f.suggestion(), f.command(), rewrite.apply(f.command())),
+                    rewrite.apply(f.command()), f.candidates());
             default -> this;
         };
     }
 
-    private static String lengthened(String suggestion, String command, String tail) {
-        return suggestion.replace(quoted(command), quoted(command + tail));
+    private static String rewritten(String suggestion, String command, String replacement) {
+        return suggestion.replace(quoted(command), quoted(replacement));
     }
 
     static String quoted(String command) {

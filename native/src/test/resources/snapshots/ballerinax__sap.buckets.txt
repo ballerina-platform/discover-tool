@@ -14,29 +14,29 @@ Remote methods (->)
   post
   put
 
-Next: bal discover ballerinax/sap client Client <path> <accessor>
-Next: bal discover ballerinax/sap client Client <name>
+Next: bal discover resource <path> <accessor> -p ballerinax/sap --client Client
+Next: bal discover method <name> -p ballerinax/sap --client Client
 == service ==
 ballerinax/sap · service
 ballerinax/sap has no service types.
 
 Other buckets
-  client  1  bal discover ballerinax/sap client
-  type    4  bal discover ballerinax/sap type
+  client  1  bal discover client -p ballerinax/sap
+  type    4  bal discover type -p ballerinax/sap
 == class ==
 ballerinax/sap · class
 ballerinax/sap has no classes.
 
 Other buckets
-  client  1  bal discover ballerinax/sap client
-  type    4  bal discover ballerinax/sap type
-== funcs ==
-ballerinax/sap · funcs
+  client  1  bal discover client -p ballerinax/sap
+  type    4  bal discover type -p ballerinax/sap
+== function ==
+ballerinax/sap · function
 ballerinax/sap has no functions.
 
 Other buckets
-  client  1  bal discover ballerinax/sap client
-  type    4  bal discover ballerinax/sap type
+  client  1  bal discover client -p ballerinax/sap
+  type    4  bal discover type -p ballerinax/sap
 == type ==
 ballerinax/sap · type
 3 aliases, 1 client
@@ -49,4 +49,4 @@ Aliases
 Clients
   Client
 
-Next: bal discover ballerinax/sap type <name>
+Next: bal discover type <name> -p ballerinax/sap

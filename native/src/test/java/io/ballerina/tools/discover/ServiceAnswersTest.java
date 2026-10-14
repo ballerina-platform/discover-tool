@@ -31,7 +31,6 @@ import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
-import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Overview;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -108,7 +107,7 @@ public class ServiceAnswersTest {
 
     @Test
     public void withoutTheSourceAnUnsettledPairingIsMarkedInBothRenderings() {
-        JsonObject roster = json(central("ballerina__http", false), "ballerina/http", "service");
+        JsonObject roster = json(central("ballerina__http", false), "service", "-p", "ballerina/http");
         for (JsonElement element : roster.getAsJsonArray("containers")) {
             JsonObject container = element.getAsJsonObject();
             boolean target = "Service".equals(container.get("name").getAsString());
@@ -120,7 +119,7 @@ public class ServiceAnswersTest {
                 Assert.assertFalse(container.has("unconfirmedReason"), container.toString());
             }
         }
-        String text = run(central("ballerina__http", false), "ballerina/http", "service", "--output", "text");
+        String text = run(central("ballerina__http", false), "service", "-p", "ballerina/http", "--output", "text");
         Assert.assertTrue(text.contains("http:Listener\n  Service"), text);
         Assert.assertTrue(text.contains("http:Listener — unverified (package source unavailable)\n"
                 + "  InterceptableService      1 method\n"
@@ -129,7 +128,7 @@ public class ServiceAnswersTest {
 
     @Test
     public void withTheSourceEveryPairingIsConfirmed() {
-        JsonObject roster = json(central("ballerina__http", true), "ballerina/http", "service");
+        JsonObject roster = json(central("ballerina__http", true), "service", "-p", "ballerina/http");
         for (JsonElement element : roster.getAsJsonArray("containers")) {
             Assert.assertFalse(element.getAsJsonObject().has("confirmed"), element.toString());
         }
@@ -139,16 +138,16 @@ public class ServiceAnswersTest {
     @Test
     public void aServiceTypeReachedThroughTypeSaysWhatTheServiceBucketSays() {
         HttpOptions http = central("ballerina__http", true);
-        String through = json(http, "ballerina/http", "type", "RequestInterceptor").get("note").getAsString();
+        String through = json(http, "type", "RequestInterceptor", "-p", "ballerina/http").get("note").getAsString();
         Assert.assertTrue(through.contains("no listener in this package accepts it directly"), through);
-        String bound = json(http, "ballerina/http", "type", "InterceptableService").get("note").getAsString();
+        String bound = json(http, "type", "InterceptableService", "-p", "ballerina/http").get("note").getAsString();
         Assert.assertTrue(bound.contains("attach it to http:Listener"), bound);
         Assert.assertFalse(bound.contains("unverified"), bound);
     }
 
     @Test
     public void withoutTheSourceTheNoteSaysTheSourceWasUnavailable() {
-        String note = json(central("ballerina__http", false), "ballerina/http", "service", "ServiceContract")
+        String note = json(central("ballerina__http", false), "service", "ServiceContract", "-p", "ballerina/http")
                 .get("note").getAsString();
         Assert.assertTrue(note.contains("probably attaches to http:Listener (unverified: the package source"), note);
     }
@@ -156,52 +155,52 @@ public class ServiceAnswersTest {
     @Test
     public void anotherPackagesServiceTypeOpensInTheListenersPackageAndNamesWhereItIsDeclared() {
         HttpOptions http = central("ballerinax__postgresql", false);
-        for (List<String> argv : List.of(List.of("ballerinax/postgresql", "service", "cdc:Service"),
-                List.of("ballerinax/postgresql", "service"))) {
+        for (List<String> argv : List.of(List.of("service", "cdc:Service", "-p", "ballerinax/postgresql"),
+                List.of("service", "-p", "ballerinax/postgresql"))) {
             JsonObject answer = json(http, argv.toArray(new String[0]));
             Assert.assertEquals(answer.get("container").getAsString(), "cdc:Service", argv.toString());
             Assert.assertTrue(answer.get("note").getAsString()
-                    .contains("declared in ballerinax/cdc — bal discover ballerinax/cdc service Service"));
+                    .contains("declared in ballerinax/cdc — bal discover service Service -p ballerinax/cdc"));
         }
-        JsonObject overview = json(http, "ballerinax/postgresql");
+        JsonObject overview = json(http, "package", "ballerinax/postgresql");
         Assert.assertEquals(overview.getAsJsonObject("serviceTypes").getAsJsonArray("entries").get(0)
-                .getAsJsonObject().get("command").getAsString(), "bal discover ballerinax/postgresql service "
-                + "cdc:Service", "the listener's package may describe the methods a service of it defines");
+                .getAsJsonObject().get("command").getAsString(), "bal discover service cdc:Service -p "
+                + "ballerinax/postgresql", "the listener's package may describe the methods a service of it defines");
     }
 
     @Test
     public void aSiblingModulesServiceTypeIsReachedThroughModule() {
         LoadedPackage loaded = attaching(Node.external("test", "pkg.events", "Service"), null, "events");
-        Assert.assertEquals(rowCommand(loaded), "bal discover test/pkg service events:Service");
+        Assert.assertEquals(rowCommand(loaded), "bal discover service events:Service -p test/pkg");
         Assert.assertTrue(open(loaded, "events:Service").get("note").getAsString()
-                .contains("declared in test/pkg.events — bal discover test/pkg --module events service Service"));
+                .contains("declared in test/pkg.events — bal discover service Service -p test/pkg --module events"));
     }
 
     @Test
     public void aSiblingModulesServiceTypeIsReachedThroughModuleFromAnotherSubmodule() {
         LoadedPackage loaded = attaching(Node.external("test", "pkg.b", "Service"), "a", "a", "b");
         Assert.assertTrue(bare(loaded).get("note").getAsString()
-                .endsWith(" — bal discover test/pkg --module b service Service"), bare(loaded).toString());
+                .endsWith(" — bal discover service Service -p test/pkg --module b"), bare(loaded).toString());
     }
 
     @Test
     public void aForeignServiceTypeNeedingQuotesIsQuotedInItsCommand() {
         LoadedPackage loaded = attaching(Node.external("test", "pkg.b", "'Service"), "a", "a", "b");
         Assert.assertTrue(bare(loaded).get("note").getAsString()
-                .endsWith(" — bal discover test/pkg --module b service \"'Service\""), bare(loaded).toString());
+                .endsWith(" — bal discover service \"'Service\" -p test/pkg --module b"), bare(loaded).toString());
     }
 
     @Test
     public void theDefaultModuleIsReachedFromASubmoduleWithoutModule() {
         LoadedPackage loaded = attachingIn("pkg.core", Node.external("test", "pkg.core", "Service"), "events");
         Assert.assertTrue(bare(loaded).get("note").getAsString()
-                .endsWith(" — bal discover test/pkg.core service Service"), bare(loaded).toString());
+                .endsWith(" — bal discover service Service -p test/pkg.core"), bare(loaded).toString());
     }
 
     @Test
     public void aPackageWhoseNameMerelyExtendsThisOneIsOpenedThroughItsLocalStub() {
         LoadedPackage loaded = attaching(Node.external("test", "pkg.driver", "Service"), null, "events");
-        Assert.assertEquals(rowCommand(loaded), "bal discover test/pkg service driver:Service");
+        Assert.assertEquals(rowCommand(loaded), "bal discover service driver:Service -p test/pkg");
         String note = open(loaded, "driver:Service").get("note").getAsString();
         Assert.assertTrue(note.endsWith("declared in test/pkg.driver"), note);
     }
@@ -210,9 +209,9 @@ public class ServiceAnswersTest {
     public void anotherPackagesSubmoduleIsOpenedThroughItsLocalStub() {
         LoadedPackage loaded = attaching(Node.external("other", "lib.events", "Service"), null);
         String command = rowCommand(loaded);
-        Assert.assertEquals(command, "bal discover test/pkg service events:Service");
+        Assert.assertEquals(command, "bal discover service events:Service -p test/pkg");
 
-        JsonObject answer = open(loaded, command.substring(command.lastIndexOf(' ') + 1));
+        JsonObject answer = open(loaded, command.split(" ")[3]);
         Assert.assertEquals(answer.get("container").getAsString(), "events:Service");
         String note = answer.get("note").getAsString();
         Assert.assertTrue(note.endsWith("declared in other/lib.events"), note);
@@ -244,13 +243,11 @@ public class ServiceAnswersTest {
     }
 
     private static JsonObject bare(LoadedPackage loaded) {
-        return JsonParser.parseString(JsonRenderer.render(Containers.render(loaded, Surface.Scope.SERVICE,
-                new Containers.Options(List.of(), null, 1)).value())).getAsJsonObject();
+        return JsonParser.parseString(JsonRenderer.render(Asked.of(loaded, "service").value())).getAsJsonObject();
     }
 
     private static JsonObject open(LoadedPackage loaded, String selector) {
-        Result<DiscoverResult> answer = Containers.render(loaded, Surface.Scope.SERVICE,
-                new Containers.Options(List.of(selector), null, 1));
+        Result<DiscoverResult> answer = Asked.of(loaded, "service", selector);
         Assert.assertTrue(answer.isOk(), selector);
         return JsonParser.parseString(JsonRenderer.render(answer.value())).getAsJsonObject();
     }

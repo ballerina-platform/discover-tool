@@ -26,7 +26,6 @@ import io.ballerina.tools.discover.central.HttpTransport;
 import io.ballerina.tools.discover.cli.Cli;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.symbols.Surface;
-import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Overview;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.Search;
@@ -84,18 +83,16 @@ public class PointersTest {
         answers.add(Overview.of(context));
         answers.add(expect(Search.render(context, new Search.Options(List.of("e"), 1))));
         for (Surface.Scope scope : Surface.Scope.values()) {
-            answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of()))));
-            answers.add(expect(Containers.render(context, scope, new Containers.Options(List.of(), "config", 1))));
+            answers.add(expect(Asked.of(context, scope.verb())));
+            answers.add(expect(Asked.of(context, scope.verb(), "--filter", "config")));
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 if (container.isModule()) {
                     continue;
                 }
-                answers.add(expect(Containers.render(context, scope,
-                        new Containers.Options(List.of(container.name())))));
-                answers.add(expect(Containers.render(context, scope,
-                        new Containers.Options(List.of(container.name()), "zzznosuchmember", 1))));
-                for (Containers.Options narrowed : narrowings(container)) {
-                    answers.add(expect(Containers.render(context, scope, narrowed)));
+                answers.add(expect(Asked.of(context, scope.verb(), container.name())));
+                answers.add(expect(Asked.of(context, scope.verb(), container.name(), "--filter", "zzznosuchmember")));
+                for (String[] narrowed : narrowings(container)) {
+                    answers.add(expect(Asked.of(context, narrowed)));
                 }
             }
         }
@@ -139,13 +136,17 @@ public class PointersTest {
         return commands;
     }
 
-    private static List<Containers.Options> narrowings(Surface.Container container) {
-        List<Containers.Options> narrowings = new ArrayList<>();
+    private static List<String[]> narrowings(Surface.Container container) {
+        List<String[]> narrowings = new ArrayList<>();
+        String verb = container.scope().verb();
         container.memberNames().stream().findFirst().filter(name -> name.length() > 3)
-                .ifPresent(name -> narrowings.add(new Containers.Options(List.of(container.name()),
-                        name.substring(1, name.length() - 1), 1)));
-        container.operations().stream().findFirst().ifPresent(operation -> narrowings.add(new Containers.Options(
-                List.of(container.name(), operation.segments().get(0), operation.fn().accessor()))));
+                .ifPresent(name -> narrowings.add(new String[] {verb, container.name(), "--filter",
+                        name.substring(1, name.length() - 1)}));
+        container.operations().stream().findFirst().ifPresent(operation -> narrowings.add(new String[] {
+                "resource", operation.segments().get(0), operation.fn().accessor(), "--" + verb, container.name()}));
+        if (!container.standalone().isEmpty()) {
+            narrowings.add(new String[] {"method", "--" + verb, container.name()});
+        }
         return narrowings;
     }
 
@@ -388,7 +389,7 @@ public class PointersTest {
         }
         if (!text.contains(" " + pkg)) {
             // A cross-package edge, so it has to name a real coordinate and this package must not be it.
-            Assert.assertTrue(Pattern.compile("bal discover [\\w.]+/[\\w.]+(:[\\w.+-]+)? ").matcher(text).find(),
+            Assert.assertTrue(Pattern.compile("(-p|package) [\\w.]+/[\\w.]+(:[\\w.+-]+)?( |$)").matcher(text).find(),
                     slug + ": `" + text + "` names no package coordinate");
             return false;
         }

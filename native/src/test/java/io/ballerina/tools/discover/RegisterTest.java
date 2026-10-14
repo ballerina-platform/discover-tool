@@ -25,7 +25,6 @@ import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.JsonRenderer;
 import io.ballerina.tools.discover.render.TextRenderer;
 import io.ballerina.tools.discover.symbols.Surface;
-import io.ballerina.tools.discover.views.Containers;
 import io.ballerina.tools.discover.views.Readme;
 import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
@@ -60,20 +59,17 @@ public class RegisterTest {
         List<Answer> answers = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
             String verb = scope.verb();
-            add(answers, verb, Containers.render(context, scope, new Containers.Options(List.of())));
-            add(answers, verb + " --filter config",
-                    Containers.render(context, scope, new Containers.Options(List.of(), "config", 1)));
+            add(answers, verb, Asked.of(context, verb));
+            add(answers, verb + " --filter config", Asked.of(context, verb, "--filter", "config"));
             for (Surface.Container container : Surface.of(context.library(), scope)) {
-                List<String> selector = container.isModule() ? List.of() : List.of(container.name());
-                if (!selector.isEmpty()) {
-                    add(answers, verb + " " + container.name(),
-                            Containers.render(context, scope, new Containers.Options(selector)));
+                List<String> owner = container.isModule() ? List.of() : List.of("--" + verb, container.name());
+                if (!container.isModule()) {
+                    add(answers, verb + " " + container.name(), Asked.of(context, verb, container.name()));
                 }
                 for (String member : container.memberNames().stream().limit(3).toList()) {
-                    List<String> one = new ArrayList<>(selector);
-                    one.add(member);
-                    add(answers, verb + " " + String.join(" ", one),
-                            Containers.render(context, scope, new Containers.Options(one)));
+                    List<String> one = new ArrayList<>(List.of(container.isModule() ? verb : "method", member));
+                    one.addAll(owner);
+                    add(answers, String.join(" ", one), Asked.of(context, one.toArray(String[]::new)));
                 }
             }
         }

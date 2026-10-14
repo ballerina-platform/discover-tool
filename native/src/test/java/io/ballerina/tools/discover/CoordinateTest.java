@@ -49,9 +49,9 @@ public class CoordinateTest {
     @Test
     public void anImportsKeywordEscapeIsRejectedWithTheUnescapedForm() {
         for (String[] each : new String[][] {
-                {"ballerinax/'client.config:1.0.0", "Run `bal discover ballerinax/client.config:1.0.0`."},
-                {"ballerina/lang.'int", "Run `bal discover ballerina/lang.int`."},
-                {"'ballerina/http", "Run `bal discover ballerina/http`."}}) {
+                {"ballerinax/'client.config:1.0.0", "Run `bal discover package ballerinax/client.config:1.0.0`."},
+                {"ballerina/lang.'int", "Run `bal discover package ballerina/lang.int`."},
+                {"'ballerina/http", "Run `bal discover package ballerina/http`."}}) {
             Result<Coordinate> parsed = Coordinate.parse(each[0]);
             Assert.assertFalse(parsed.isOk(), each[0]);
             Failure.Validation failure = (Failure.Validation) parsed.failure();
@@ -110,12 +110,12 @@ public class CoordinateTest {
         Failure.Validation prefixed = rejected("ballerinax/kafka:v4.6.5");
         Assert.assertEquals(prefixed.message(),
                 "'v4.6.5' in 'ballerinax/kafka:v4.6.5' is not a version: a version has no leading v.");
-        Assert.assertEquals(prefixed.suggestion(), "Run `bal discover ballerinax/kafka:4.6.5`.");
+        Assert.assertEquals(prefixed.suggestion(), "Run `bal discover package ballerinax/kafka:4.6.5`.");
 
         Failure.Validation zero = rejected("ballerina/http:02.15.07");
         Assert.assertEquals(zero.message(),
                 "'02.15.07' in 'ballerina/http:02.15.07' is not a version: a number in a version has no leading zero.");
-        Assert.assertEquals(zero.suggestion(), "Run `bal discover ballerina/http:2.15.7`.");
+        Assert.assertEquals(zero.suggestion(), "Run `bal discover package ballerina/http:2.15.7`.");
         Assert.assertTrue(Coordinate.parse("ballerina/http:0.10.0-0.alpha").isOk());
     }
 
@@ -124,7 +124,7 @@ public class CoordinateTest {
         Failure.Validation npm = rejected("ballerinax/kafka@4.6.5");
         Assert.assertEquals(npm.message(), "Invalid package name 'ballerinax/kafka@4.6.5': a version follows a ':', "
                 + "not an '@'.");
-        Assert.assertEquals(npm.suggestion(), "Run `bal discover ballerinax/kafka:4.6.5`.");
+        Assert.assertEquals(npm.suggestion(), "Run `bal discover package ballerinax/kafka:4.6.5`.");
 
         Failure.Validation bare = rejected("kafka");
         Assert.assertEquals(bare.message(),
@@ -136,10 +136,12 @@ public class CoordinateTest {
 
     @Test
     public void aCorrectedCoordinateCarriesTheRestOfTheCommandAndASearchDoesNot() {
-        Result<Coordinate> npm = Coordinate.parse("ballerinax/kafka@4.6.5", " client Producer");
+        Result<Coordinate> npm = Coordinate.parse("ballerinax/kafka@4.6.5",
+                pkg -> Command.of("client", "Producer").in(pkg, null).text());
         Assert.assertEquals(((Failure.Validation) npm.failure()).command(),
-                "bal discover ballerinax/kafka:4.6.5 client Producer");
-        Result<Coordinate> bare = Coordinate.parse("kafka", " client Producer");
+                "bal discover client Producer -p ballerinax/kafka:4.6.5");
+        Result<Coordinate> bare = Coordinate.parse("kafka", pkg -> Command.of("client", "Producer").in(pkg, null)
+                .text());
         Assert.assertEquals(((Failure.Validation) bare.failure()).command(), "bal discover search kafka");
     }
 }

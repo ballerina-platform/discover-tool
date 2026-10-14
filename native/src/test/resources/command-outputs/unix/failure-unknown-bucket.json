@@ -1,1 +1,0 @@
-{"kind":"validation","message":"'nosuchbucket' is not a bucket.","suggestion":"The buckets are client, service, class, funcs, type, readme, search. To find what is named 'nosuchbucket': `bal discover ballerinax/kafka search nosuchbucket`.","command":"bal discover ballerinax/kafka search nosuchbucket"}
