@@ -238,7 +238,7 @@ public class ServiceAnswersTest {
     // The command the package's overview opens its one service type with.
     private static String rowCommand(LoadedPackage loaded) {
         return Overview.of(loaded).sections().stream()
-                .filter(section -> Surface.Scope.SERVICE.verb().equals(section.bucket()))
+                .filter(section -> Surface.Scope.SERVICE.commandNoun().equals(section.bucket()))
                 .findFirst().orElseThrow().rows().get(0).command();
     }
 

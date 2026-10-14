@@ -30,21 +30,21 @@ Next: bal discover resource <path> <accessor> -p ballerinax/googleapis.gmail --c
 ballerinax/googleapis.gmail · service
 ballerinax/googleapis.gmail has no service types.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/googleapis.gmail
   type    39  bal discover type -p ballerinax/googleapis.gmail
 == class ==
 ballerinax/googleapis.gmail · class
 ballerinax/googleapis.gmail has no classes.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/googleapis.gmail
   type    39  bal discover type -p ballerinax/googleapis.gmail
 == function ==
 ballerinax/googleapis.gmail · function
 ballerinax/googleapis.gmail has no functions.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/googleapis.gmail
   type    39  bal discover type -p ballerinax/googleapis.gmail
 == type ==

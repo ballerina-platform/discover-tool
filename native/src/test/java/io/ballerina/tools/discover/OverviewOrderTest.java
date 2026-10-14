@@ -155,7 +155,7 @@ public class OverviewOrderTest {
 
     private static List<String> names(DiscoverResult.Overview overview) {
         return overview.sections().stream()
-                .filter(section -> section.bucket().equals(Surface.Scope.CLASS.verb()))
+                .filter(section -> section.bucket().equals(Surface.Scope.CLASS.commandNoun()))
                 .findFirst().orElseThrow().rows().stream()
                 .map(DiscoverResult.Overview.Row::name)
                 .toList();

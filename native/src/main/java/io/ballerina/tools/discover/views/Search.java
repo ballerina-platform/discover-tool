@@ -56,8 +56,6 @@ import java.util.Map;
  */
 public final class Search {
 
-    public static final String BUCKET = "search";
-
     private static final String KEYWORD_SEPARATOR = "\\s+";
 
     private static final Map<Surface.Scope, DiscoverResult.Search.Kind> CONTAINER_KINDS = Map.of(
@@ -109,7 +107,7 @@ public final class Search {
         collectSubmodules(loaded, keywords, found);
 
         List<DiscoverResult.Search.Hit> all = found.values().stream().flatMap(List::stream).toList();
-        String command = loaded.command(BUCKET).with(options.keywords()).text();
+        Command command = loaded.command(Command.SEARCH).with(options.keywords());
         Result<Containers.Page> page = Containers.Page.of(options.page(), all.size(), command);
         if (!page.isOk()) {
             return page.cast();
@@ -209,7 +207,7 @@ public final class Search {
             if (matches(section.title(), keywords)) {
                 found.get(DiscoverResult.Search.Kind.README).add(new DiscoverResult.Search.Hit(section.title(), null,
                         null, section.number(),
-                        loaded.command(Readme.BUCKET, String.valueOf(section.number())).text()));
+                        loaded.command(Command.README, String.valueOf(section.number())).text()));
             }
         }
     }

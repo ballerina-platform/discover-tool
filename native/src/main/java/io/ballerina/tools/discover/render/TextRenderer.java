@@ -30,8 +30,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -57,18 +55,23 @@ public final class TextRenderer {
     private static final String REQUIRED = "required";
     private static final String OPTIONAL = "optional";
     private static final String DOCUMENTED = "that mention it only in their documentation";
-    private static final Pattern PAGE_ARGUMENT = Pattern.compile(" --page \\d+$");
+
+    private static final String NAME_PLACEHOLDER = "<name>";
+
+    private static final String CONTAINER_PLACEHOLDER = "<container>";
 
     /** How a search group's rows read in the shared command shape its {@code Next:} line prints. */
     private static final Map<DiscoverResult.Search.Kind, List<String>> SEARCH_PLACEHOLDERS = Map.of(
-            DiscoverResult.Search.Kind.RESOURCES, List.of("<container>", "<accessor>", "<path>"),
-            DiscoverResult.Search.Kind.REMOTE, List.of("<container>", "<name>"),
-            DiscoverResult.Search.Kind.METHODS, List.of("<container>", "<name>"),
+            DiscoverResult.Search.Kind.RESOURCES, List.of(CONTAINER_PLACEHOLDER, "<accessor>", "<path>"),
+            DiscoverResult.Search.Kind.REMOTE, List.of(CONTAINER_PLACEHOLDER, NAME_PLACEHOLDER),
+            DiscoverResult.Search.Kind.METHODS, List.of(CONTAINER_PLACEHOLDER, NAME_PLACEHOLDER),
             DiscoverResult.Search.Kind.README, List.of("<n>"));
 
-    private static final List<String> NAME_PLACEHOLDER = List.of("<name>");
+    private static final List<String> NAME_PLACEHOLDERS = List.of(NAME_PLACEHOLDER);
 
     private static final String SEARCH_PLACEHOLDER = "<keyword>";
+
+    private static final String ROW_PLACEHOLDER = "<row>";
 
     private static final String ACCESSOR_PLACEHOLDER = "<accessor>";
 
@@ -136,8 +139,10 @@ public final class TextRenderer {
             case DiscoverResult.TypeRoster roster -> roster.next();
             default -> null;
         };
-        Matcher page = next == null ? null : PAGE_ARGUMENT.matcher(next);
-        return page == null || !page.find() ? null : next.substring(0, page.start()) + " --filter <keyword>";
+        Command turned = next == null ? null : Command.parse(next).orElse(null);
+        return turned == null || turned.page() == Command.FIRST_PAGE
+                ? null
+                : turned.paged(Command.FIRST_PAGE).filtered(Command.placeholder(SEARCH_PLACEHOLDER)).text();
     }
 
     private static void fill(Layout layout, DiscoverResult result, Context where) {
@@ -165,11 +170,11 @@ public final class TextRenderer {
         List<String> lines = new ArrayList<>();
         List<String> patterns = new ArrayList<>();
         for (DiscoverResult.Overview.Section section : overview.sections()) {
-            Surface.Scope scope = Surface.Scope.ofVerb(section.bucket()).orElse(Surface.Scope.MODULE);
+            Surface.Scope scope = Surface.Scope.ofCommandNoun(section.bucket()).orElse(Surface.Scope.MODULE);
             lines.add(capitalised(scope.plural()) + " (" + section.total() + ")");
             List<DiscoverResult.Overview.Row> rows = section.rows();
             Drill drill = Drill.of(rows.stream().map(DiscoverResult.Overview.Row::name).toList(),
-                    rows.stream().map(DiscoverResult.Overview.Row::command).toList(), "<name>");
+                    rows.stream().map(DiscoverResult.Overview.Row::command).toList(), NAME_PLACEHOLDER);
             TextTable table = scope == Surface.Scope.MODULE
                     ? new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT)
                     : new TextTable(TextTable.Column.LEFT,
@@ -219,19 +224,22 @@ public final class TextRenderer {
         Command.Target pkg = where.pkg() == null
                 ? null
                 : new Command.Target(Coordinate.text(where.pkg(), where.pin()), where.module());
-        String bucketPattern = Command.of(BUCKET_PLACEHOLDER, NAME_PLACEHOLDER).in(pkg).text();
         boolean foldable = pkg != null && patterns.size() > 1 && patterns.stream().allMatch(pattern ->
                 overview.sections().stream().anyMatch(section ->
-                        pattern.equals(bucketPattern.replace(BUCKET_PLACEHOLDER, section.bucket()))));
+                        pattern.equals(namePattern(section.bucket(), pkg))));
         if (foldable) {
-            layout.next(bucketPattern);
+            layout.next(namePattern(BUCKET_PLACEHOLDER, pkg));
         } else {
             patterns.forEach(layout::next);
         }
         layout.inlinedNext.forEach(layout::next);
         if (pkg != null && !overview.sections().isEmpty()) {
-            layout.next(Command.of(Command.SEARCH, SEARCH_PLACEHOLDER).in(pkg).text());
+            layout.next(Command.of(Command.SEARCH, Command.placeholder(SEARCH_PLACEHOLDER)).in(pkg).text());
         }
+    }
+
+    private static String namePattern(String noun, Command.Target pkg) {
+        return Command.of(noun, Command.placeholder(NAME_PLACEHOLDER)).in(pkg).text();
     }
 
     // A listing opened in place under its row: its headings one level below the row, their entries below them, its
@@ -249,7 +257,7 @@ public final class TextRenderer {
     }
 
     private static void containerRoster(Layout layout, DiscoverResult.ContainerRoster roster, Context where) {
-        String[] noun = switch (Surface.Scope.ofVerb(where.bucket()).orElse(Surface.Scope.MODULE)) {
+        String[] noun = switch (Surface.Scope.ofCommandNoun(where.bucket()).orElse(Surface.Scope.MODULE)) {
             case CLIENT -> new String[] {"client", "clients"};
             case CLASS -> new String[] {"class", "classes"};
             case SERVICE -> new String[] {"service type", "service types"};
@@ -269,7 +277,7 @@ public final class TextRenderer {
             names.add(type.name());
             commands.add(type.command());
         });
-        Drill drill = Drill.of(names, commands, "<name>");
+        Drill drill = Drill.of(names, commands, NAME_PLACEHOLDER);
         Map<String, List<Integer>> byListener = new LinkedHashMap<>();
         for (int i = 0; i < containers.size(); i++) {
             DiscoverResult.ContainerRoster.Container container = containers.get(i);
@@ -535,11 +543,12 @@ public final class TextRenderer {
     }
 
     private static void emptyBucket(Layout layout, DiscoverResult.EmptyBucket empty, Context where) {
-        String plural = Surface.Scope.ofVerb(empty.bucket()).map(Surface.Scope::plural).orElse(empty.bucket() + "s");
+        String plural = Surface.Scope.ofCommandNoun(empty.bucket()).map(Surface.Scope::plural)
+                .orElse(empty.bucket() + "s");
         layout.top((where.pkg() == null ? "This package" : where.pkg()) + " has no " + plural + ".");
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
         empty.elsewhere().forEach(other -> table.row(other.bucket(), String.valueOf(other.count()), other.command()));
-        layout.section("Other buckets", table);
+        layout.section("Elsewhere in the package", table);
         layout.warning(empty.warning());
     }
 
@@ -601,7 +610,7 @@ public final class TextRenderer {
                 });
             }
             Drill drill = Drill.ofParts(literals, hits.stream().map(DiscoverResult.Search.Hit::command).toList(),
-                    SEARCH_PLACEHOLDERS.getOrDefault(group.kind(), NAME_PLACEHOLDER));
+                    SEARCH_PLACEHOLDERS.getOrDefault(group.kind(), NAME_PLACEHOLDERS));
             for (int i = 0; i < hits.size(); i++) {
                 DiscoverResult.Search.Hit hit = hits.get(i);
                 switch (group.kind()) {
@@ -630,27 +639,24 @@ public final class TextRenderer {
         List<String> packageRows = search.packages().stream()
                 .map(DiscoverResult.CentralSearch.PackageHit::arguments)
                 .toList();
-        Drill packages = Drill.of(packageRows,
-                search.packages().stream().map(DiscoverResult.CentralSearch.PackageHit::command).toList(), "<row>");
-        TextTable packageTable = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        TextTable packageTable = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
         for (int i = 0; i < packageRows.size(); i++) {
-            packageTable.row(packageRows.get(i), search.packages().get(i).summary(), packages.explicit(i));
+            packageTable.row(packageRows.get(i), search.packages().get(i).summary());
         }
         layout.section(shownOf("Packages", search.packages().size(), search.packagesTotal()), packageTable);
         List<String> symbolRows = search.symbols().stream()
                 .map(DiscoverResult.CentralSearch.SymbolHit::arguments)
                 .toList();
-        Drill symbols = Drill.of(symbolRows,
-                search.symbols().stream().map(DiscoverResult.CentralSearch.SymbolHit::command).toList(), "<row>");
-        TextTable symbolTable = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT, TextTable.Column.LEFT);
+        TextTable symbolTable = new TextTable(TextTable.Column.LEFT, TextTable.Column.LEFT);
         for (int i = 0; i < symbolRows.size(); i++) {
-            symbolTable.row(search.symbols().get(i).kind(), symbolRows.get(i), symbols.explicit(i));
+            symbolTable.row(search.symbols().get(i).kind(), symbolRows.get(i));
         }
         layout.section(shownOf("Symbols", search.symbols().size(), search.symbolsTotal()), symbolTable);
         layout.more(remaining(search.packages().size() + search.symbols().size(),
                 search.packagesTotal() + search.symbolsTotal(), search.paging()), search.paging());
-        layout.next(packages.pattern());
-        layout.next(symbols.pattern());
+        if (!packageRows.isEmpty() || !symbolRows.isEmpty()) {
+            layout.next(Command.PREFIX + ROW_PLACEHOLDER);
+        }
         layout.next(search.next());
     }
 
@@ -752,7 +758,7 @@ public final class TextRenderer {
 
     private static Drill methodDrill(List<DiscoverResult.Method> methods) {
         return Drill.of(methods.stream().map(DiscoverResult.Method::name).toList(),
-                methods.stream().map(DiscoverResult.Method::command).toList(), "<name>");
+                methods.stream().map(DiscoverResult.Method::command).toList(), NAME_PLACEHOLDER);
     }
 
     private static TextTable methodTable(List<DiscoverResult.Method> methods, Drill drill) {
@@ -878,7 +884,7 @@ public final class TextRenderer {
                 List<String> own = new ArrayList<>();
                 for (int i = 0; i < commands.get(row).size(); i++) {
                     String command = commands.get(row).get(i);
-                    if (pattern == null || !command.equals(filled(pattern, literals.get(row).get(i), placeholders))) {
+                    if (pattern == null || !pattern.equals(shapeOf(command, literals.get(row).get(i), placeholders))) {
                         own.add(command);
                     }
                 }
@@ -888,30 +894,43 @@ public final class TextRenderer {
         }
 
         private static String shapeOf(String command, List<String> literals, List<String> placeholders) {
-            String shape = command;
+            Command shape = Command.parse(command).orElse(null);
             for (int part = 0; part < literals.size() && shape != null; part++) {
-                shape = shapeOf(shape, literals.get(part), placeholders.get(part));
+                shape = reshaped(shape, literals.get(part), placeholders.get(part));
             }
-            return shape;
+            return shape == null ? null : shape.text();
         }
 
-        private static String shapeOf(String command, String literal, String placeholder) {
-            String needle = " " + literal;
-            for (int at = command.lastIndexOf(needle); at >= 0; at = command.lastIndexOf(needle, at - 1)) {
-                int end = at + needle.length();
-                if (end == command.length() || command.charAt(end) == ' ') {
-                    return command.substring(0, at + 1) + placeholder + command.substring(end);
+        /** {@code command} with {@code literal} swapped for {@code placeholder}, or {@code null} if it cannot be. */
+        static String shapeOf(String command, String literal, String placeholder) {
+            return shapeOf(command, List.of(literal), List.of(placeholder));
+        }
+
+        // The literal is the container a member command names with its flag, or a run of the command's names; a
+        // literal the shell would see quoted is never shaped, since a reader fills the placeholder in as shown.
+        private static Command reshaped(Command command, String literal, String placeholder) {
+            List<String> words = List.of(literal.split(" "));
+            if (words.stream().anyMatch(word -> !Texts.shellWord(word).equals(word))) {
+                return null;
+            }
+            if (CONTAINER_PLACEHOLDER.equals(placeholder)) {
+                Command.Owner owner = command.owner();
+                return owner != null && owner.name().equals(literal)
+                        ? command.ownedBy(owner.kind(), Command.placeholder(placeholder))
+                        : null;
+            }
+            List<String> names = command.names();
+            for (int at = names.size() - words.size(); at >= 0; at--) {
+                if (names.subList(at, at + words.size()).equals(words)) {
+                    List<String> labels = List.of(placeholder.split(" "));
+                    List<String> shaped = new ArrayList<>(names.subList(0, at));
+                    (labels.size() == words.size() ? labels : List.of(placeholder))
+                            .forEach(label -> shaped.add(Command.placeholder(label)));
+                    shaped.addAll(names.subList(at + words.size(), names.size()));
+                    return command.withNames(shaped);
                 }
             }
             return null;
-        }
-
-        private static String filled(String pattern, List<String> literals, List<String> placeholders) {
-            String command = pattern;
-            for (int part = 0; part < literals.size(); part++) {
-                command = command.replace(placeholders.get(part), literals.get(part));
-            }
-            return command;
         }
 
         List<String> unfit(int row) {

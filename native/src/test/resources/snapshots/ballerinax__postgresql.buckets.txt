@@ -109,7 +109,7 @@ Next: bal discover class -p ballerinax/postgresql --filter <keyword>
 ballerinax/postgresql · function
 ballerinax/postgresql has no functions.
 
-Other buckets
+Elsewhere in the package
   client     1  bal discover client -p ballerinax/postgresql
   service    1  bal discover service -p ballerinax/postgresql
   class    125  bal discover class -p ballerinax/postgresql

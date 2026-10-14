@@ -52,21 +52,21 @@ Next: bal discover client Client -p ballerinax/redis --filter <keyword>
 ballerinax/redis · service
 ballerinax/redis has no service types.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/redis
   type    10  bal discover type -p ballerinax/redis
 == class ==
 ballerinax/redis · class
 ballerinax/redis has no classes.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/redis
   type    10  bal discover type -p ballerinax/redis
 == function ==
 ballerinax/redis · function
 ballerinax/redis has no functions.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/redis
   type    10  bal discover type -p ballerinax/redis
 == type ==

@@ -58,7 +58,7 @@ public class RegisterTest {
         LoadedPackage context = FixtureCorpus.loadedFixture(slug);
         List<Answer> answers = new ArrayList<>();
         for (Surface.Scope scope : Surface.Scope.values()) {
-            String verb = scope.verb();
+            String verb = scope.commandNoun();
             add(answers, verb, Asked.of(context, verb));
             add(answers, verb + " --filter config", Asked.of(context, verb, "--filter", "config"));
             for (Surface.Container container : Surface.of(context.library(), scope)) {

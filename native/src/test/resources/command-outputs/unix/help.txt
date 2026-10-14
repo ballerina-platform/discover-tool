@@ -23,7 +23,8 @@ Nouns:
   readme [<n>|"<title>"]             The readme, or one section of it.
 
 A name means one thing; no name, a listing. Every noun but package takes the package
-with -p; search takes it only to search one package.
+with -p; search takes it only to search one package. Flags may come before the noun
+or after it.
 
 Typical session:
 
@@ -66,3 +67,7 @@ Run `bal discover <noun> --help` for one noun's names, flags and examples.
   --refresh                                Ignore any cached copy and rewrite it.
                                            Worth passing only when a name should
                                            exist and does not.
+  --client|--class|--service <name>        The container that declares a method or
+                                           resource, for method and resource only:
+                                           one at most, left out when exactly one
+                                           container declares it.

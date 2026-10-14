@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.model;
 
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
@@ -672,8 +673,8 @@ public final class FromCentral {
         List<String> candidates = submodulesOf(docs, qualified).stream()
                 .map(module -> module.id().substring(prefix.length()))
                 .toList();
-        String command = new Coordinate(qualified, pin).command(null);
-        String dropped = "drop --module for the default module: " + Failure.quoted(command) + ".";
+        Command command = Command.overview(new Coordinate(qualified, pin).target(null));
+        String dropped = "drop --module for the default module: " + Failure.quoted(command.text()) + ".";
         String suggestion;
         if (candidates.isEmpty()) {
             suggestion = qualified.qualified() + " publishes no submodules, so " + dropped;

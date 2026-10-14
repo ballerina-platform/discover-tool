@@ -66,8 +66,6 @@ import java.util.stream.Collectors;
  */
 public final class SearchCentral {
 
-    public static final String VERB = "search";
-
     public static final int PACKAGES_PER_PAGE = 10;
 
     public static final int SYMBOLS_PER_PAGE = 25;
@@ -102,7 +100,7 @@ public final class SearchCentral {
             return new Failure.Validation("--module reads one package's submodule, and a search covers all of "
                     + "Central.", "Drop --module: " + Failure.quoted(typed) + ".", typed);
         }
-        return Search.misuse(Command.of(VERB), keywords, filter);
+        return Search.misuse(Command.of(Command.SEARCH), keywords, filter);
     }
 
     public static Result<DiscoverResult> render(List<String> keywords, int page, HttpOptions http) {
@@ -123,18 +121,18 @@ public final class SearchCentral {
         int symbolTotal = symbols.value().total();
         int pages = Math.max(1, Math.max(pagesOf(packageTotal, PACKAGES_PER_PAGE), pagesOf(symbolTotal,
                 SYMBOLS_PER_PAGE)));
-        String command = command(keywords);
+        Command command = Command.of(Command.SEARCH, keywords);
         if (page > pages) {
-            String fixed = pages == 1 ? command : command + " --page " + pages;
+            String fixed = command.paged(pages).text();
             return Result.err(new Failure.Validation("Page " + page + " is out of range: Central's answer has "
                     + pages + (pages == 1 ? " page." : " pages."),
                     "Pass a page from 1 to " + pages + ", e.g. " + Failure.quoted(fixed) + ".", fixed));
         }
         List<DiscoverResult.CentralSearch.PackageHit> packageHits = packages.value().items().stream()
                 .map(row -> new DiscoverResult.CentralSearch.PackageHit(row.org() + "/" + row.name(), row.version(),
-                        Texts.firstSentence(row.summary()), arguments(Command.overview(
+                        Texts.firstSentence(row.summary()), Command.overview(
                                 new Command.Target(Coordinate.text(row.org() + "/" + row.name(), row.version()),
-                                        null)))))
+                                        null))))
                 .toList();
         List<DiscoverResult.CentralSearch.SymbolHit> symbolHits = symbols.value().items().stream()
                 .map(SearchCentral::symbolHit)
@@ -144,17 +142,12 @@ public final class SearchCentral {
                 ? null
                 : new DiscoverResult.Paging(page, pages, packageTotal + symbolTotal - seen);
         return Result.ok(new DiscoverResult.CentralSearch(keywords, packageHits, packageTotal, symbolHits,
-                symbolTotal, paging, page < pages ? command + " --page " + (page + 1) : null));
+                symbolTotal, paging, page < pages ? command.paged(page + 1).text() : null));
     }
 
     /** {@code bal discover search} with {@code keywords}, each a shell word. */
     public static String command(List<String> keywords) {
-        return Command.of(VERB, keywords).text();
-    }
-
-    // What follows `bal discover` in `command`.
-    private static String arguments(Command command) {
-        return command.text().substring(Command.PREFIX.length());
+        return Command.of(Command.SEARCH, keywords).text();
     }
 
     private static int pagesOf(int total, int size) {
@@ -183,7 +176,7 @@ public final class SearchCentral {
                         ? hit.overview("resource method", parent, symbol)
                         : new DiscoverResult.CentralSearch.SymbolHit(qualified, row.version(), module,
                                 "resource method", parent, null, path, parts[0],
-                                hit.arguments(Command.of(Command.RESOURCE, path, parts[0])
+                                hit.located(Command.of(Command.RESOURCE, path, parts[0])
                                         .ownedBy(bucket.get(), parent)));
             }
             String method = row.remote() ? "remote method"
@@ -193,13 +186,13 @@ public final class SearchCentral {
         return switch (row.type()) {
             case LISTENER_METHOD, OBJECT_METHOD -> parent == null
                     ? hit.overview(kind, null, symbol)
-                    : hit.of(kind, parent, symbol, Command.of(Types.BUCKET, parent));
-            case FUNCTION -> hit.of(FUNCTION, null, symbol, Command.of(Surface.Scope.MODULE.verb(), symbol));
-            case CLIENT -> hit.of(kind, null, symbol, Command.of(Surface.Scope.CLIENT.verb(), symbol));
-            case CLASS -> hit.of(kind, null, symbol, Command.of(Surface.Scope.CLASS.verb(), symbol));
-            case SERVICE_TYPE -> hit.of(kind, null, symbol, Command.of(Surface.Scope.SERVICE.verb(), symbol));
+                    : hit.of(kind, parent, symbol, Command.of(Command.TYPE, parent));
+            case FUNCTION -> hit.of(FUNCTION, null, symbol, Command.of(Surface.Scope.MODULE.commandNoun(), symbol));
+            case CLIENT -> hit.of(kind, null, symbol, Command.of(Surface.Scope.CLIENT.commandNoun(), symbol));
+            case CLASS -> hit.of(kind, null, symbol, Command.of(Surface.Scope.CLASS.commandNoun(), symbol));
+            case SERVICE_TYPE -> hit.of(kind, null, symbol, Command.of(Surface.Scope.SERVICE.commandNoun(), symbol));
             default -> DECLARATIONS.contains(row.type()) || row.type().endsWith(TYPE_FORM)
-                    ? hit.of(kind, null, symbol, Command.of(Types.BUCKET, symbol))
+                    ? hit.of(kind, null, symbol, Command.of(Command.TYPE, symbol))
                     : hit.overview(kind, null, symbol);
         };
     }
@@ -207,11 +200,11 @@ public final class SearchCentral {
     // The bucket a method row's container is listed under, or empty when the row is not a method's.
     private static Optional<String> methodBucket(CentralSearch.SymbolRow row) {
         return switch (row.type()) {
-            case CLIENT_METHOD -> Optional.of(Surface.Scope.CLIENT.verb());
-            case CLASS_METHOD -> Optional.of(Surface.Scope.CLASS.verb());
-            case SERVICE_METHOD -> Optional.of(Surface.Scope.SERVICE.verb());
+            case CLIENT_METHOD -> Optional.of(Surface.Scope.CLIENT.commandNoun());
+            case CLASS_METHOD -> Optional.of(Surface.Scope.CLASS.commandNoun());
+            case SERVICE_METHOD -> Optional.of(Surface.Scope.SERVICE.commandNoun());
             case OBJECT_METHOD -> row.remote() || row.resource()
-                    ? Optional.of(Surface.Scope.CLIENT.verb())
+                    ? Optional.of(Surface.Scope.CLIENT.commandNoun())
                     : Optional.empty();
             default -> Optional.empty();
         };
@@ -222,11 +215,11 @@ public final class SearchCentral {
 
         DiscoverResult.CentralSearch.SymbolHit of(String kind, String container, String name, Command command) {
             return new DiscoverResult.CentralSearch.SymbolHit(qualified, version, module, kind, container, name, null,
-                    null, arguments(command));
+                    null, located(command));
         }
 
-        String arguments(Command command) {
-            return SearchCentral.arguments(command.in(pkg));
+        Command located(Command command) {
+            return command.in(pkg);
         }
 
         DiscoverResult.CentralSearch.SymbolHit overview(String kind, String container, String name) {

@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The synopsis and the flag list, rendered from {@link Commands}' picocli model rather than hand-written.
@@ -45,7 +47,8 @@ final class UsageRenderer {
     private static final String USAGE = "Usage: " + Command.PREFIX;
 
     /** Flags rendered first, in this order: the package, then the container. */
-    private static final List<String> LEADING = List.of(Command.PACKAGE_FLAG, "--client", "--class", "--service");
+    private static final List<String> LEADING =
+            Stream.concat(Stream.of(Command.PACKAGE_FLAG), Command.OWNER_FLAGS.stream()).toList();
 
     private UsageRenderer() {
     }
@@ -87,12 +90,18 @@ final class UsageRenderer {
                 + " and " + names.get(names.size() - 1) + ".";
     }
 
+    // The container flags are one slot, since only one of them is ever given.
     private static List<String> slots(Commands.Grammar grammar, String noun) {
         List<String> slots = new ArrayList<>();
         slots.add(noun == null ? Usage.ROOT_LABEL : noun + Usage.label(noun));
         Set<String> required = Usage.requiredFlags(noun);
         for (OptionSpec option : orderedOptions(grammar.spec(noun))) {
-            slots.add(slot(option, required.contains(option.shortestName())));
+            String name = option.shortestName();
+            if (!Command.OWNER_FLAGS.contains(name)) {
+                slots.add(slot(option, required.contains(name)));
+            } else if (Command.OWNER_FLAGS.get(0).equals(name)) {
+                slots.add("[" + String.join("|", Command.OWNER_FLAGS) + " " + option.paramLabel() + "]");
+            }
         }
         return slots;
     }
@@ -104,11 +113,22 @@ final class UsageRenderer {
     }
 
     /** Every flag {@code noun} accepts, minus {@code --help} — a row saying "this is help" is not worth one. */
-    static String flagList(Commands.Grammar grammar, String noun) {
-        List<Row> rows = orderedOptions(grammar.spec(noun)).stream()
+    static List<Row> flagRows(Commands.Grammar grammar, String noun) {
+        return orderedOptions(grammar.spec(noun)).stream()
                 .map(option -> new Row(label(option), description(option)))
                 .toList();
-        return rows.isEmpty() ? "" : table(rows);
+    }
+
+    /** The flags {@code noun} takes that the root's help does not list: the package, and the container flags. */
+    static List<Row> ownFlagRows(Commands.Grammar grammar, String noun) {
+        Set<String> shared = grammar.spec(null).options().stream()
+                .filter(option -> !Command.PACKAGE_FLAG.equals(option.shortestName()))
+                .flatMap(option -> Stream.of(option.names()))
+                .collect(Collectors.toSet());
+        return orderedOptions(grammar.spec(noun)).stream()
+                .filter(option -> !shared.contains(option.shortestName()))
+                .map(option -> new Row(label(option), description(option)))
+                .toList();
     }
 
     private static List<OptionSpec> orderedOptions(CommandSpec spec) {

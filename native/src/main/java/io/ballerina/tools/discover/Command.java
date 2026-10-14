@@ -20,25 +20,28 @@ package io.ballerina.tools.discover;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * Every command this tool prints, built in one place and written in one order:
  * {@code bal discover <noun> [name ...] -p <org>/<name>[:<version>] [--client|--class|--service <C>] [--module <m>]
- * [--filter <keyword>]}. {@code --page} is appended last by whoever turns a page.
+ * [--filter <keyword>] [--page <n>]}.
  *
  * <p>The {@code package} noun takes its coordinate as its name rather than with {@code -p}, and {@code search}
  * without a package asks Central.
  *
+ * <p>Every word is shell-quoted as it needs, except a {@link #placeholder}, which is written as its label.
+ *
  * @param noun what is asked for: {@code client}, {@code method}, {@code package}
- * @param names the names after the noun, as this tool prints them; a placeholder in angle brackets is written
- *     unquoted
+ * @param names the names after the noun
  * @param target the package and module it is asked of, or {@code null} for a Central search
  * @param owner the container a {@code method} or {@code resource} is declared by, or {@code null}
  * @param filter the {@code --filter} keyword, or {@code null}
+ * @param page the {@code --page} number, written only past the first page
  * @since 0.1.0
  */
-public record Command(String noun, List<String> names, Target target, Owner owner, String filter) {
+public record Command(String noun, List<String> names, Target target, Owner owner, String filter, int page) {
 
     public static final String PREFIX = "bal discover ";
 
@@ -57,14 +60,26 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     public static final List<String> NOUNS = List.of(
             PACKAGE, SEARCH, CLIENT, SERVICE, CLASS, FUNCTION, TYPE, METHOD, RESOURCE, README);
 
-    /** The nouns a container flag applies to. */
-    public static final List<String> MEMBER_NOUNS = List.of(METHOD, RESOURCE);
-
+    public static final String FLAG_PREFIX = "--";
     public static final String PACKAGE_FLAG = "-p";
+    public static final String PACKAGE_LONG_FLAG = FLAG_PREFIX + PACKAGE;
+    public static final String CLIENT_FLAG = FLAG_PREFIX + CLIENT;
+    public static final String CLASS_FLAG = FLAG_PREFIX + CLASS;
+    public static final String SERVICE_FLAG = FLAG_PREFIX + SERVICE;
     public static final String MODULE_FLAG = "--module";
     public static final String FILTER_FLAG = "--filter";
     public static final String PAGE_FLAG = "--page";
-    public static final String FLAG_PREFIX = "--";
+
+    /** The container flags, in the order the usage lists them. */
+    public static final List<String> OWNER_FLAGS = List.of(CLIENT_FLAG, CLASS_FLAG, SERVICE_FLAG);
+
+    public static final int FIRST_PAGE = 1;
+
+    // No argument can hold a NUL, so a word marked with one was never typed.
+    private static final char PLACEHOLDER_MARK = '\0';
+
+    private static final Map<String, String> OWNER_KINDS = Map.of(
+            CLIENT_FLAG, CLIENT, CLASS_FLAG, CLASS, SERVICE_FLAG, SERVICE);
 
     /**
      * @param pkg {@code org/name}, with {@code :version} when the command pins one
@@ -88,11 +103,11 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public static Command of(String noun, String... names) {
-        return new Command(noun, List.of(names), null, null, null);
+        return of(noun, List.of(names));
     }
 
     public static Command of(String noun, List<String> names) {
-        return new Command(noun, names, null, null, null);
+        return new Command(noun, names, null, null, null, FIRST_PAGE);
     }
 
     /** {@code bal discover package <pkg> [--module <m>]}: a package's overview. */
@@ -100,30 +115,17 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         return of(PACKAGE).in(target);
     }
 
-    /**
-     * Where an overview command this tool printed points — the inverse of {@link #overview(Target)}'s text — or
-     * empty for any other command.
-     */
-    public static Optional<Target> targetOf(String overview) {
-        String start = PREFIX + PACKAGE + " ";
-        if (!overview.startsWith(start)) {
-            return Optional.empty();
-        }
-        String[] words = overview.substring(start.length()).split(" ");
-        if (words.length == 1) {
-            return Optional.of(new Target(words[0], null));
-        }
-        return words.length == 3 && MODULE_FLAG.equals(words[1])
-                ? Optional.of(new Target(words[0], words[2]))
-                : Optional.empty();
+    /** A word written as {@code label} itself, never quoted: what a reader replaces, such as {@code <name>}. */
+    public static String placeholder(String label) {
+        return PLACEHOLDER_MARK + label;
+    }
+
+    public static boolean isPlaceholder(String word) {
+        return !word.isEmpty() && word.charAt(0) == PLACEHOLDER_MARK;
     }
 
     public Command in(Target target) {
-        return new Command(noun, names, target, owner, filter);
-    }
-
-    public Command in(String pkg, String module) {
-        return in(new Target(pkg, module));
+        return new Command(noun, names, target, owner, filter, page);
     }
 
     public Command with(String... more) {
@@ -133,38 +135,110 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     public Command with(List<String> more) {
         List<String> all = new ArrayList<>(names);
         all.addAll(more);
-        return new Command(noun, all, target, owner, filter);
+        return withNames(all);
+    }
+
+    public Command withNames(List<String> others) {
+        return new Command(noun, others, target, owner, filter, page);
     }
 
     public Command ownedBy(String kind, String name) {
-        return new Command(noun, names, target, new Owner(kind, name), filter);
+        return ownedBy(new Owner(kind, name));
     }
 
-    public Command withoutOwner() {
-        return new Command(noun, names, target, null, filter);
+    public Command ownedBy(Owner other) {
+        return new Command(noun, names, target, other, filter, page);
     }
 
     /** This command narrowed by {@code keyword}, or as it is when {@code keyword} is {@code null}. */
     public Command filtered(String keyword) {
-        return new Command(noun, names, target, owner, keyword);
+        return new Command(noun, names, target, owner, keyword, page);
+    }
+
+    /** This command on page {@code number}; the first page writes no {@code --page}. */
+    public Command paged(int number) {
+        return new Command(noun, names, target, owner, filter, number);
     }
 
     public String text() {
         StringBuilder text = new StringBuilder(PREFIX).append(noun);
+        if (target != null && PACKAGE.equals(noun)) {
+            text.append(' ').append(word(target.pkg()));
+        }
         names.forEach(name -> text.append(' ').append(word(name)));
-        if (target != null) {
-            text.append(PACKAGE.equals(noun) ? " " : " " + PACKAGE_FLAG + " ").append(Texts.shellWord(target.pkg()));
+        if (target != null && !PACKAGE.equals(noun)) {
+            flag(text, PACKAGE_FLAG, target.pkg());
         }
         if (owner != null) {
-            text.append(' ').append(owner.flag()).append(' ').append(Texts.shellWord(owner.name()));
+            flag(text, owner.flag(), owner.name());
         }
         if (target != null && target.module() != null) {
-            text.append(' ').append(MODULE_FLAG).append(' ').append(Texts.shellWord(target.module()));
+            flag(text, MODULE_FLAG, target.module());
         }
         if (filter != null) {
-            text.append(' ').append(FILTER_FLAG).append(' ').append(Texts.shellWord(filter));
+            flag(text, FILTER_FLAG, filter);
+        }
+        if (page != FIRST_PAGE) {
+            flag(text, PAGE_FLAG, String.valueOf(page));
         }
         return text.toString();
+    }
+
+    /** What follows {@code bal discover}. */
+    public String arguments() {
+        return text().substring(PREFIX.length());
+    }
+
+    /**
+     * The command {@link #text()} wrote, read back word by word; empty for any other text. Lets a renderer that holds
+     * only a result's printed command reshape it, a name for a placeholder, without touching any other word.
+     */
+    public static Optional<Command> parse(String text) {
+        if (text == null || !text.startsWith(PREFIX)) {
+            return Optional.empty();
+        }
+        List<String> words = ShellWords.split(text.substring(PREFIX.length()));
+        if (words.isEmpty()) {
+            return Optional.empty();
+        }
+        String noun = words.get(0);
+        List<String> names = new ArrayList<>();
+        String pkg = null;
+        String module = null;
+        String filter = null;
+        Owner owner = null;
+        int page = FIRST_PAGE;
+        for (int i = 1; i < words.size(); i++) {
+            String word = words.get(i);
+            boolean flag = PACKAGE_FLAG.equals(word) || MODULE_FLAG.equals(word) || FILTER_FLAG.equals(word)
+                    || PAGE_FLAG.equals(word) || OWNER_KINDS.containsKey(word);
+            if (!flag) {
+                if (PACKAGE.equals(noun) && pkg == null) {
+                    pkg = word;
+                } else {
+                    names.add(word);
+                }
+                continue;
+            }
+            if (++i == words.size()) {
+                return Optional.empty();
+            }
+            String value = words.get(i);
+            switch (word) {
+                case PACKAGE_FLAG -> pkg = value;
+                case MODULE_FLAG -> module = value;
+                case FILTER_FLAG -> filter = value;
+                case PAGE_FLAG -> {
+                    if (!value.chars().allMatch(Character::isDigit)) {
+                        return Optional.empty();
+                    }
+                    page = Integer.parseInt(value);
+                }
+                default -> owner = new Owner(OWNER_KINDS.get(word), value);
+            }
+        }
+        Target target = pkg == null ? null : new Target(pkg, module);
+        return Optional.of(new Command(noun, names, target, owner, filter, page));
     }
 
     @Override
@@ -172,7 +246,48 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         return text();
     }
 
+    private static void flag(StringBuilder text, String flag, String value) {
+        text.append(' ').append(flag).append(' ').append(word(value));
+    }
+
     private static String word(String name) {
-        return name.startsWith("<") && name.endsWith(">") ? name : Texts.shellWord(name);
+        return isPlaceholder(name) ? name.substring(1) : Texts.shellWord(name);
+    }
+
+    // Splits a command line as a POSIX shell does: whitespace between words, quotes and backslashes inside one.
+    private static final class ShellWords {
+
+        private ShellWords() {
+        }
+
+        static List<String> split(String line) {
+            List<String> words = new ArrayList<>();
+            StringBuilder word = null;
+            for (int i = 0; i < line.length(); i++) {
+                char c = line.charAt(i);
+                if (c == ' ') {
+                    if (word != null) {
+                        words.add(word.toString());
+                        word = null;
+                    }
+                    continue;
+                }
+                word = word == null ? new StringBuilder() : word;
+                if (c == '\\' && i + 1 < line.length()) {
+                    word.append(line.charAt(++i));
+                } else if (c == '\'' || c == '"') {
+                    int end = line.indexOf(c, i + 1);
+                    end = end < 0 ? line.length() : end;
+                    word.append(line, i + 1, end);
+                    i = end;
+                } else {
+                    word.append(c);
+                }
+            }
+            if (word != null) {
+                words.add(word.toString());
+            }
+            return words;
+        }
     }
 }

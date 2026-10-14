@@ -119,8 +119,8 @@ public class ViewsAgreeTest {
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 List<String> owner = container.isModule()
                         ? List.of()
-                        : List.of("--" + scope.verb(), container.name());
-                String noun = container.isModule() ? scope.verb() : "method";
+                        : List.of(scope.commandFlag(), container.name());
+                String noun = container.isModule() ? scope.commandNoun() : "method";
                 List<List<String>> selectors = new ArrayList<>();
                 container.memberNames().forEach(name -> selectors.add(with(List.of(noun, name), owner)));
                 container.operations().stream().limit(OPERATIONS_PER_CONTAINER).forEach(operation ->
@@ -131,7 +131,7 @@ public class ViewsAgreeTest {
                             String.join(" ", selector));
                     // An exact member name or an exact path plus its accessor names ONE callable; anything else
                     // here is the selector grammar failing to reach something the package declares.
-                    Assert.assertTrue(answer instanceof DiscoverResult.Signature, slug + " " + scope.verb() + " "
+                    Assert.assertTrue(answer instanceof DiscoverResult.Signature, slug + " " + scope.commandNoun() + " "
                             + selector + " did not resolve to one callable: " + answer.getClass().getSimpleName());
                     DiscoverResult.Signature signature = (DiscoverResult.Signature) answer;
                     SIGNATURES.incrementAndGet();
@@ -142,7 +142,7 @@ public class ViewsAgreeTest {
                             continue;
                         }
                         Assert.assertTrue(snapshot.contains(line.stripLeading()),
-                                slug + " " + scope.verb() + " " + selector + " quotes a line api does not:\n  "
+                                slug + " " + scope.commandNoun() + " " + selector + " quotes a line api does not:\n  "
                                         + line);
                         TOTAL_CHECKED.incrementAndGet();
                     }

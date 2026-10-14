@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.symbols;
 
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.Library;
@@ -70,27 +71,27 @@ public final class Surface {
     public enum Scope {
 
         /** Objects reached with {@code ->}: every derived-CLIENT declaration, from either Central bucket. */
-        CLIENT("client", "client", "clients"),
+        CLIENT(Command.CLIENT, "client", "clients"),
 
         /**
          * A service type, paired with the listener it binds to in one leaf — a service cannot run without
          * attaching to a listener, and a listener with no service attached does nothing, so neither half is
          * independently addressable.
          */
-        SERVICE("service", "service type", "service types"),
+        SERVICE(Command.SERVICE, "service type", "service types"),
 
         /** Objects reached with {@code .}: classes and object types that are neither clients nor services. */
-        CLASS("class", "class", "classes"),
+        CLASS(Command.CLASS, "class", "classes"),
 
         /** Functions at module scope, which belong to no object. */
-        MODULE("function", "function", "functions");
+        MODULE(Command.FUNCTION, "function", "functions");
 
-        private final String verb;
+        private final String commandNoun;
         private final String noun;
         private final String plural;
 
-        Scope(String verb, String noun, String plural) {
-            this.verb = verb;
+        Scope(String commandNoun, String noun, String plural) {
+            this.commandNoun = commandNoun;
             this.noun = noun;
             this.plural = plural;
         }
@@ -105,14 +106,19 @@ public final class Surface {
             return plural;
         }
 
-        /** The verb that addresses this scope. */
-        public String verb() {
-            return verb;
+        /** The command noun that addresses this scope: {@code client}, {@code function}. */
+        public String commandNoun() {
+            return commandNoun;
         }
 
-        /** The scope {@code verb} addresses, if it addresses one. */
-        public static Optional<Scope> ofVerb(String verb) {
-            return Arrays.stream(values()).filter(scope -> scope.verb.equals(verb)).findFirst();
+        /** The flag a member command names a container of this scope with: {@code --client}. */
+        public String commandFlag() {
+            return Command.FLAG_PREFIX + commandNoun;
+        }
+
+        /** The scope {@code noun} addresses, if it addresses one. */
+        public static Optional<Scope> ofCommandNoun(String noun) {
+            return Arrays.stream(values()).filter(scope -> scope.commandNoun.equals(noun)).findFirst();
         }
     }
 

@@ -20,21 +20,21 @@ Next: bal discover method <name> -p ballerinax/sap --client Client
 ballerinax/sap · service
 ballerinax/sap has no service types.
 
-Other buckets
+Elsewhere in the package
   client  1  bal discover client -p ballerinax/sap
   type    4  bal discover type -p ballerinax/sap
 == class ==
 ballerinax/sap · class
 ballerinax/sap has no classes.
 
-Other buckets
+Elsewhere in the package
   client  1  bal discover client -p ballerinax/sap
   type    4  bal discover type -p ballerinax/sap
 == function ==
 ballerinax/sap · function
 ballerinax/sap has no functions.
 
-Other buckets
+Elsewhere in the package
   client  1  bal discover client -p ballerinax/sap
   type    4  bal discover type -p ballerinax/sap
 == type ==

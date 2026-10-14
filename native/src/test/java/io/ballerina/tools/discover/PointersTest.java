@@ -83,14 +83,15 @@ public class PointersTest {
         answers.add(Overview.of(context));
         answers.add(expect(Search.render(context, new Search.Options(List.of("e"), 1))));
         for (Surface.Scope scope : Surface.Scope.values()) {
-            answers.add(expect(Asked.of(context, scope.verb())));
-            answers.add(expect(Asked.of(context, scope.verb(), "--filter", "config")));
+            answers.add(expect(Asked.of(context, scope.commandNoun())));
+            answers.add(expect(Asked.of(context, scope.commandNoun(), "--filter", "config")));
             for (Surface.Container container : Surface.of(context.library(), scope)) {
                 if (container.isModule()) {
                     continue;
                 }
-                answers.add(expect(Asked.of(context, scope.verb(), container.name())));
-                answers.add(expect(Asked.of(context, scope.verb(), container.name(), "--filter", "zzznosuchmember")));
+                answers.add(expect(Asked.of(context, scope.commandNoun(), container.name())));
+                answers.add(expect(Asked.of(context, scope.commandNoun(), container.name(), "--filter",
+                        "zzznosuchmember")));
                 for (String[] narrowed : narrowings(container)) {
                     answers.add(expect(Asked.of(context, narrowed)));
                 }
@@ -138,7 +139,7 @@ public class PointersTest {
 
     private static List<String[]> narrowings(Surface.Container container) {
         List<String[]> narrowings = new ArrayList<>();
-        String verb = container.scope().verb();
+        String verb = container.scope().commandNoun();
         container.memberNames().stream().findFirst().filter(name -> name.length() > 3)
                 .ifPresent(name -> narrowings.add(new String[] {verb, container.name(), "--filter",
                         name.substring(1, name.length() - 1)}));
@@ -212,8 +213,8 @@ public class PointersTest {
                 addIfPresent(commands, search.next());
             }
             case DiscoverResult.CentralSearch search -> {
-                search.packages().forEach(hit -> commands.add(hit.command()));
-                search.symbols().forEach(hit -> commands.add(hit.command()));
+                search.packages().forEach(hit -> commands.add(hit.command().text()));
+                search.symbols().forEach(hit -> commands.add(hit.command().text()));
                 addIfPresent(commands, search.next());
             }
             case DiscoverResult.EmptyBucket empty ->

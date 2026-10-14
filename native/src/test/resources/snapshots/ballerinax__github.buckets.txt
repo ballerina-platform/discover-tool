@@ -45,21 +45,21 @@ Next: bal discover resource <group> -p ballerinax/github --client Client
 ballerinax/github · service
 ballerinax/github has no service types.
 
-Other buckets
+Elsewhere in the package
   client     1  bal discover client -p ballerinax/github
   type    1228  bal discover type -p ballerinax/github
 == class ==
 ballerinax/github · class
 ballerinax/github has no classes.
 
-Other buckets
+Elsewhere in the package
   client     1  bal discover client -p ballerinax/github
   type    1228  bal discover type -p ballerinax/github
 == function ==
 ballerinax/github · function
 ballerinax/github has no functions.
 
-Other buckets
+Elsewhere in the package
   client     1  bal discover client -p ballerinax/github
   type    1228  bal discover type -p ballerinax/github
 == type ==

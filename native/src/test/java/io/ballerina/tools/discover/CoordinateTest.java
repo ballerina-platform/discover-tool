@@ -137,11 +137,11 @@ public class CoordinateTest {
     @Test
     public void aCorrectedCoordinateCarriesTheRestOfTheCommandAndASearchDoesNot() {
         Result<Coordinate> npm = Coordinate.parse("ballerinax/kafka@4.6.5",
-                pkg -> Command.of("client", "Producer").in(pkg, null).text());
+                pkg -> Command.of("client", "Producer").in(new Command.Target(pkg, null)).text());
         Assert.assertEquals(((Failure.Validation) npm.failure()).command(),
                 "bal discover client Producer -p ballerinax/kafka:4.6.5");
-        Result<Coordinate> bare = Coordinate.parse("kafka", pkg -> Command.of("client", "Producer").in(pkg, null)
-                .text());
+        Result<Coordinate> bare = Coordinate.parse("kafka",
+                pkg -> Command.of("client", "Producer").in(new Command.Target(pkg, null)).text());
         Assert.assertEquals(((Failure.Validation) bare.failure()).command(), "bal discover search kafka");
     }
 }

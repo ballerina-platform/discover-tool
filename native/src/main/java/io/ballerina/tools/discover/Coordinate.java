@@ -133,11 +133,6 @@ public record Coordinate(QualifiedName qualified, Version version) {
         return new Command.Target(text(qualified.qualified(), version == null ? null : version.text()), module);
     }
 
-    /** The overview of this coordinate's {@code module}. */
-    public String command(String module) {
-        return Command.overview(target(module)).text();
-    }
-
     /** {@code org/name}, with {@code :version} when {@code version} is not null. */
     public static String text(String qualified, String version) {
         return version == null ? qualified : qualified + VERSION_SEPARATOR + version;

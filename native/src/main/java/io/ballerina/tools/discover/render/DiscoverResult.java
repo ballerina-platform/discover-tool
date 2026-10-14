@@ -667,12 +667,13 @@ public sealed interface DiscoverResult {
          * @param qualified {@code org/name}
          * @param version the version Central matched
          * @param summary the package's own summary, its first sentence, or empty
-         * @param arguments what follows {@code bal discover} in the command that opens its overview
+         * @param command the command that opens its overview
          */
-        public record PackageHit(String qualified, String version, String summary, String arguments) {
+        public record PackageHit(String qualified, String version, String summary, Command command) {
 
-            public String command() {
-                return Command.PREFIX + arguments;
+            /** What follows {@code bal discover} in {@link #command()}. */
+            public String arguments() {
+                return command.arguments();
             }
         }
 
@@ -685,13 +686,14 @@ public sealed interface DiscoverResult {
          * @param name its name, or {@code null} for a resource method
          * @param path a resource method's path, as this tool prints it, or {@code null}
          * @param accessor a resource method's accessor, or {@code null}
-         * @param arguments what follows {@code bal discover} in the command that opens it
+         * @param command the command that opens it
          */
         public record SymbolHit(String qualified, String version, String module, String kind, String container,
-                String name, String path, String accessor, String arguments) {
+                String name, String path, String accessor, Command command) {
 
-            public String command() {
-                return Command.PREFIX + arguments;
+            /** What follows {@code bal discover} in {@link #command()}. */
+            public String arguments() {
+                return command.arguments();
             }
         }
     }
