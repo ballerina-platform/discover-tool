@@ -61,8 +61,10 @@ import java.util.stream.Stream;
  *   <li>stderr — on failure, one {@link Failure} and nothing else, in the run's output mode: one JSON object,
  *       or {@code error: <message>} with the suggestion indented below it
  *   <li>exit 0 — success, and stdout is COMPLETE
- *   <li>exit 2 — a usage error: the command line itself is malformed, so nothing was looked up. In text mode
- *       the failure is followed by the synopsis and a pointer to {@code --help}
+ *   <li>exit 2 — a usage error: the command line itself is malformed, so nothing was looked up; or, once the
+ *       package is read, it is incomplete — more names than the noun takes, or a member several containers declare
+ *       with no container flag — while everything it names exists. In text mode the failure is followed by the
+ *       synopsis and a pointer to {@code --help}
  *   <li>exit 1 — every other failure. What to do next is {@code kind} and {@code suggestion} in the failure,
  *       never the code
  * </ul>
@@ -78,15 +80,9 @@ import java.util.stream.Stream;
  */
 public final class Cli {
 
-    private static final String OUTPUT_FLAG = "--output";
-
-    private static final String HELP_FLAG = "--help";
-
     static final int FAILED = 1;
 
     private static final int USAGE_ERROR = 2;
-
-    private static final int FIRST_PAGE = 1;
 
     private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
 
@@ -94,8 +90,20 @@ public final class Cli {
 
     private static final String WRITE_VERSION = "To read a specific version, write it after the package: ";
 
-    /** The old grammar's word for the module's functions, mapped when an old command is rewritten. */
-    private static final String OLD_FUNCTIONS = "funcs";
+    /** What is typed for a noun out of habit: the old grammar's bucket names, and plurals. */
+    private static final Map<String, String> NOUN_ALIASES = Map.ofEntries(
+            Map.entry("funcs", Command.FUNCTION), Map.entry("func", Command.FUNCTION),
+            Map.entry("functions", Command.FUNCTION), Map.entry("methods", Command.METHOD),
+            Map.entry("clients", Command.CLIENT), Map.entry("services", Command.SERVICE),
+            Map.entry("classes", Command.CLASS), Map.entry("types", Command.TYPE),
+            Map.entry("resources", Command.RESOURCE), Map.entry("packages", Command.PACKAGE));
+
+    /** The nouns whose names are a member of a container, which a container flag names. */
+    private static final Set<String> MEMBER_NOUNS = Set.of(Command.METHOD, Command.RESOURCE);
+
+    private static final String PLACEHOLDER_KEYWORD = "<keyword>";
+
+    private static final String END_OF_OPTIONS = "--";
 
     private static final String PATH_SEPARATOR = "/";
 
@@ -148,6 +156,10 @@ public final class Cli {
 
         Commands.Grammar grammar = Commands.Grammar.create();
         boolean json = jsonOutput(argv, interactive, grammar);
+        Failure misnamed = misnamedNoun(argv);
+        if (misnamed != null) {
+            return new UsageErrors(grammar, null, streams, json).error(misnamed);
+        }
         CommandLine.ParseResult parsed;
         try {
             parsed = grammar.line().parseArgs(argv.toArray(new String[0]));
@@ -175,7 +187,7 @@ public final class Cli {
         UsageErrors usage = new UsageErrors(grammar, nounName, streams, json);
         Invocation call = Invocation.of(grammar.root(), nounName, nounName == null ? null : grammar.nouns()
                 .get(nounName));
-        Failure misuse = misuse(grammar, call);
+        Failure misuse = misuse(grammar, call, literalWords(argv));
         if (misuse != null) {
             return usage.error(misuse);
         }
@@ -186,9 +198,15 @@ public final class Cli {
     }
 
     // What makes the command line itself unusable, before anything is fetched; null when it is well formed.
-    private static Failure misuse(Commands.Grammar grammar, Invocation call) {
+    private static Failure misuse(Commands.Grammar grammar, Invocation call, int literal) {
         if (call.version() != null) {
             return versionFlag(call);
+        }
+        String repeated = Invocation.repeatedFlag(grammar.root(), call.noun() == null ? null
+                : grammar.nouns().get(call.noun()));
+        if (repeated != null) {
+            return new Failure.Validation(repeated + " is given both before the noun and after it.",
+                    "Pass " + repeated + " once.");
         }
         if (!call.rest().isEmpty()) {
             String first = call.rest().get(0);
@@ -199,7 +217,7 @@ public final class Cli {
                     "For a package's overview, write " + Failure.quoted(Command.PREFIX + Command.PACKAGE + " "
                             + PLACEHOLDER_PACKAGE) + ".");
         }
-        Failure option = unknownOption(grammar, call);
+        Failure option = unknownOption(grammar, call, literal);
         if (option != null) {
             return option;
         }
@@ -214,9 +232,10 @@ public final class Cli {
     }
 
     private static Failure packageMisuse(Invocation call) {
-        if (call.pkg() != null && call.names().isEmpty()) {
-            String command = Command.overview(new Command.Target(call.pkg(), call.module())).filtered(call.filter())
-                    .text() + call.pageArgument();
+        if (call.pkg() != null) {
+            String pkg = call.names().isEmpty() ? call.pkg() : call.names().get(0);
+            String command = call.paged(Command.overview(new Command.Target(pkg, call.module()))
+                    .filtered(call.filter())).text();
             return new Failure.Validation("package takes the package as its name, not after -p.",
                     "Run " + Failure.quoted(command) + ".", command);
         }
@@ -229,16 +248,83 @@ public final class Cli {
     }
 
     private static Failure scopedMisuse(Invocation call) {
-        if (call.pkg() == null) {
-            return new Failure.Validation(call.noun() + " needs the package it reads: -p " + Commands.PACKAGE_LABEL
-                    + ".", "Add it, e.g. " + Failure.quoted(Command.of(call.noun(), call.echoed())
-                    .in(new Command.Target("ballerinax/github", call.module())).text()) + ".");
+        String misplaced = misplacedPackage(call);
+        if (misplaced != null) {
+            return packageAsName(call, misplaced);
         }
-        if (call.owners() > 1) {
-            return new Failure.Validation("A " + call.noun() + " has one container; pass one of --client, --class "
-                    + "and --service.", "Keep the one that declares it.");
+        if (call.pkg() == null) {
+            return missingPackage(call);
+        }
+        if (call.owners().size() > 1) {
+            return severalOwnerFlags(call);
         }
         return tooManyNames(call);
+    }
+
+    // A name that is a package coordinate: the package typed where a name goes, one name more than the noun takes
+    // when -p is missing. A path and a readme title may hold '/' too: a resource's name is the package only beside a
+    // whole path and accessor, and neither is ever with -p given.
+    private static String misplacedPackage(Invocation call) {
+        List<String> names = call.names();
+        Integer max = MAX_NAMES.get(call.noun());
+        if (max == null) {
+            return null;
+        }
+        boolean resource = Command.RESOURCE.equals(call.noun());
+        boolean slashed = resource || Command.README.equals(call.noun());
+        boolean possible = call.pkg() == null
+                ? names.size() <= max + 1 && (!resource || names.size() > max)
+                : !slashed && names.size() <= max;
+        if (!possible) {
+            return null;
+        }
+        for (String name : names) {
+            List<String> others = new ArrayList<>(names);
+            others.remove(name);
+            boolean coordinate = name.contains(PATH_SEPARATOR) && Coordinate.parse(name).isOk();
+            if (coordinate && (!resource || !others.get(others.size() - 1).contains(PATH_SEPARATOR))) {
+                return name;
+            }
+        }
+        return null;
+    }
+
+    private static Failure packageAsName(Invocation call, String pkg) {
+        List<String> others = new ArrayList<>(call.names());
+        others.remove(pkg);
+        String target = call.pkg() == null ? pkg : call.pkg();
+        String command = call.paged(call.withNames(others).command(new Command.Target(target, call.module())))
+                .text();
+        String where = call.pkg() == null ? "name it with -p" : "-p names the package already";
+        return new Failure.Validation("'" + pkg + "' is a package, not a " + call.noun() + " name; " + where + ".",
+                "Run " + Failure.quoted(command) + ".", command);
+    }
+
+    // Never a package the caller did not give: the search that finds one, or the command's shape.
+    private static Failure missingPackage(Invocation call) {
+        String message = call.noun() + " needs the package it reads: -p " + Commands.PACKAGE_LABEL + ".";
+        Command shape = Command.of(call.noun(), call.echoed())
+                .in(new Command.Target(Command.placeholder(PLACEHOLDER_PACKAGE), call.module()));
+        String write = "Write " + Failure.quoted((call.owner() == null ? shape : shape.ownedBy(call.owner())).text());
+        if (call.names().isEmpty() || Command.README.equals(call.noun())) {
+            return new Failure.Validation(message, write + "; to find the package, "
+                    + Failure.quoted(Command.of(Command.SEARCH, Command.placeholder(PLACEHOLDER_KEYWORD)).text())
+                    + ".");
+        }
+        String name = call.echoed().get(0);
+        String search = Command.of(Command.SEARCH, name).text();
+        return new Failure.Validation(message,
+                write + "; to find the package that declares '" + name + "': " + Failure.quoted(search) + ".",
+                search);
+    }
+
+    private static Failure severalOwnerFlags(Invocation call) {
+        List<Failure.Owner> rows = call.owners().stream()
+                .map(owner -> new Failure.Owner(owner.flag() + " " + owner.name(),
+                        call.paged(call.ownedBy(owner).command()).text()))
+                .toList();
+        return new Failure.Validation("A " + call.noun() + " has one container; pass one of "
+                + String.join(", ", Command.OWNER_FLAGS) + ".", "Keep the one that declares it:", rows);
     }
 
     private static Failure tooManyNames(Invocation call) {
@@ -251,12 +337,27 @@ public final class Cli {
         if (version != null) {
             return version;
         }
-        String command = CONTAINER_NOUNS.containsKey(call.noun()) && !Command.FUNCTION.equals(call.noun())
-                ? call.retarget(memberOf(call.noun(), call.echoed())).text() + call.pageArgument()
-                : call.withNames(names.subList(0, max)).command().text() + call.pageArgument();
-        String takes = max == 1 ? "one name" : "a path and its accessor";
-        return new Failure.Validation(call.noun() + " takes " + takes + "; got " + names.size() + ".",
-                "Run " + Failure.quoted(command) + ".", command);
+        // Which of a member's names is a container or a path is known only once the package is read.
+        if (MEMBER_NOUNS.contains(call.noun())) {
+            return null;
+        }
+        Command fixed;
+        if (CONTAINER_NOUNS.containsKey(call.noun()) && !Command.FUNCTION.equals(call.noun())) {
+            fixed = call.retarget(memberOf(call.noun(), call.echoed()));
+        } else if (Command.README.equals(call.noun())) {
+            fixed = call.withNames(List.of(String.join(" ", names))).command();
+        } else {
+            fixed = call.withNames(names.subList(0, max)).command();
+        }
+        String command = call.paged(fixed).text();
+        return new Failure.Validation(tooMany(call.noun(), names.size()), "Run " + Failure.quoted(command) + ".",
+                command);
+    }
+
+    private static String tooMany(String noun, int given) {
+        String takes = Command.RESOURCE.equals(noun) ? "a path and its accessor"
+                : Command.README.equals(noun) ? "one section, a title in quotes" : "one name";
+        return noun + " takes " + takes + "; got " + given + ".";
     }
 
     // `client C m` read as the member it names: a method, or a resource when a path or an accessor follows.
@@ -266,8 +367,9 @@ public final class Cli {
         return Command.of(resource ? Command.RESOURCE : Command.METHOD, member).ownedBy(noun, names.get(0));
     }
 
-    private static Failure unknownOption(Commands.Grammar grammar, Invocation call) {
-        String unknown = call.names().stream()
+    // `literal`: how many of the last names follow `--`, where a leading dash is part of the name.
+    private static Failure unknownOption(Commands.Grammar grammar, Invocation call, int literal) {
+        String unknown = call.names().subList(0, Math.max(0, call.names().size() - literal)).stream()
                 .filter(name -> name.startsWith(FLAG_START) && name.length() > 1)
                 .findFirst()
                 .orElse(null);
@@ -284,15 +386,19 @@ public final class Cli {
             words.add(call.noun());
             words.addAll(call.names());
         }
-        String pkg = words.get(0);
-        String bucket = words.size() > 1 ? words.get(1) : null;
-        List<String> selectors = words.size() > 2
-                ? words.subList(2, words.size()).stream().map(PathTree::plainSelector).toList()
+        String typed = words.remove(0);
+        String pkg = typed;
+        if (!words.isEmpty() && Version.isComplete(words.get(0))) {
+            pkg = Coordinate.text(pkg, words.remove(0));
+        }
+        String bucket = words.isEmpty() ? null : words.get(0);
+        List<String> selectors = words.size() > 1
+                ? words.subList(1, words.size()).stream().map(PathTree::plainSelector).toList()
                 : List.of();
         Command mapped = oldBucket(bucket, selectors);
-        String command = mapped.in(new Command.Target(pkg, call.module())).filtered(call.filter()).text()
-                + call.pageArgument();
-        return new Failure.Validation("The package goes after -p now, and what to read comes first.",
+        String command = call.paged(mapped.in(new Command.Target(pkg, call.module())).filtered(call.filter()))
+                .text();
+        return new Failure.Validation("'" + typed + "' is not a noun; name the package with -p.",
                 "Run " + Failure.quoted(command) + ".", command);
     }
 
@@ -300,14 +406,17 @@ public final class Cli {
         if (bucket == null) {
             return Command.of(Command.PACKAGE);
         }
-        String noun = OLD_FUNCTIONS.equals(bucket) ? Command.FUNCTION : bucket;
+        String noun = NOUN_ALIASES.getOrDefault(bucket, bucket);
+        if (!Command.NOUNS.contains(noun)) {
+            return Command.of(Command.SEARCH, bucket);
+        }
         if (CONTAINER_NOUNS.containsKey(noun) && !Command.FUNCTION.equals(noun) && selectors.size() > 1) {
             return memberOf(noun, selectors);
         }
         if (Command.README.equals(noun) && !selectors.isEmpty()) {
             return Command.of(noun, String.join(" ", selectors));
         }
-        return Command.NOUNS.contains(noun) ? Command.of(noun, selectors) : Command.of(Command.PACKAGE);
+        return Command.of(noun, selectors);
     }
 
     // A word where the noun goes is most often a name (`go doc` leaves the kind out too): the search finds it.
@@ -317,6 +426,56 @@ public final class Cli {
         return new Failure.Validation("'" + token + "' is not a noun. The nouns are " + String.join(", ",
                 Command.NOUNS) + ".", "To find what is named '" + token + "': " + Failure.quoted(search) + ".",
                 search);
+    }
+
+    /**
+     * An old bucket name or a plural typed as the noun ({@code funcs}, {@code methods}): the same command with the
+     * noun it meant, or {@code null}. Read off argv before parsing, since the noun decides which flags parse.
+     */
+    private static Failure misnamedNoun(List<String> argv) {
+        Commands.Grammar probe = Commands.Grammar.create();
+        int at = firstWord(argv, valueOptions(probe));
+        String noun = at < 0 ? null : NOUN_ALIASES.get(argv.get(at));
+        if (noun == null) {
+            return null;
+        }
+        String message = "'" + argv.get(at) + "' is not a noun; the noun is " + noun + ".";
+        List<String> fixed = new ArrayList<>(argv);
+        fixed.set(at, noun);
+        try {
+            CommandLine.ParseResult parsed = probe.line().parseArgs(fixed.toArray(new String[0]));
+            Invocation call = Invocation.of(probe.root(), noun, probe.nouns().get(noun));
+            if (parsed.hasSubcommand() && call.coordinate() != null && misuse(probe, call, literalWords(fixed))
+                    == null) {
+                String command = call.paged(call.command()).text();
+                return new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command);
+            }
+        } catch (CommandLine.ParameterException unparsed) {
+            // Then the rest of the command is wrong too; the noun is still the first thing to fix.
+        }
+        return new Failure.Validation(message, "Write " + noun + " in its place.");
+    }
+
+    private static int literalWords(List<String> argv) {
+        int end = argv.indexOf(END_OF_OPTIONS);
+        return end < 0 ? 0 : argv.size() - end - 1;
+    }
+
+    // The index of the first word that is neither a flag nor a flag's value, or -1.
+    private static int firstWord(List<String> argv, Set<String> takesValue) {
+        for (int i = 0; i < argv.size(); i++) {
+            String token = argv.get(i);
+            if (END_OF_OPTIONS.equals(token)) {
+                return i + 1 < argv.size() ? i + 1 : -1;
+            }
+            if (!token.startsWith(FLAG_START)) {
+                return i;
+            }
+            if (takesValue.contains(token)) {
+                i++;
+            }
+        }
+        return -1;
     }
 
     private static int searchCentral(Invocation call, Streams streams, HttpOptions http, boolean json,
@@ -334,7 +493,7 @@ public final class Cli {
             return fail(found.failure(), streams, json);
         }
         TextRenderer.Context where = new TextRenderer.Context(null, null,
-                List.of(SearchCentral.VERB, String.join(" ", keywords)), null, null, null);
+                List.of(Command.SEARCH, String.join(" ", keywords)), null, null, null);
         streams.out().accept((json ? JsonRenderer.render(found.value())
                 : TextRenderer.render(found.value(), where)) + "\n");
         return 0;
@@ -343,7 +502,7 @@ public final class Cli {
     private static int lookup(Invocation call, Streams streams, HttpOptions http, String projectDir, boolean json,
             UsageErrors usage) {
         Result<Coordinate> coordinate = Coordinate.parse(call.coordinate(),
-                corrected -> call.command(new Command.Target(corrected, call.module())).text() + call.pageArgument());
+                corrected -> call.paged(call.command(new Command.Target(corrected, call.module()))).text());
         if (!coordinate.isOk()) {
             return usage.error(coordinate.failure());
         }
@@ -365,11 +524,18 @@ public final class Cli {
             return fail(loaded.failure().retargeted(pinned::retargeted), streams, json);
         }
 
+        Failure meant = memberMeant(loaded.value(), call);
+        if (meant != null) {
+            return usage.error(readAt(meant, loaded.value()));
+        }
         Result<DiscoverResult> answer = answer(loaded.value(), call);
         if (!answer.isOk()) {
-            return fail(readAt(answer.failure(), loaded.value()), streams, json);
+            Failure failure = readAt(answer.failure(), loaded.value());
+            return failure instanceof Failure.Validation validation && validation.asksToChoose()
+                    ? usage.error(failure)
+                    : fail(failure, streams, json);
         }
-        if (call.page() != FIRST_PAGE && answer.value().paging() == null) {
+        if (call.page() != Command.FIRST_PAGE && answer.value().paging() == null) {
             return fail(readAt(notPaged(pinned), loaded.value()), streams, json);
         }
         String read = loaded.value().version().text();
@@ -381,6 +547,18 @@ public final class Cli {
         return 0;
     }
 
+    // More names than a method or a resource takes, read against the package: the member command they meant.
+    private static Failure memberMeant(LoadedPackage loaded, Invocation call) {
+        if (!MEMBER_NOUNS.contains(call.noun()) || call.names().size() <= MAX_NAMES.get(call.noun())) {
+            return null;
+        }
+        Containers.Ask ask = Command.RESOURCE.equals(call.noun()) ? Containers.Ask.RESOURCE : Containers.Ask.METHOD;
+        String command = call.paged(Containers.memberMeant(loaded, ask, call.owner(), call.names())
+                .filtered(call.filter())).text();
+        return new Failure.Validation(tooMany(call.noun(), call.names().size()),
+                "Run " + Failure.quoted(command) + ".", command);
+    }
+
     private static Result<DiscoverResult> answer(LoadedPackage loaded, Invocation call) {
         Result<DiscoverResult> plain = answerFrom(loaded, call);
         if (!plain.isOk() || !loaded.bound().settles(() -> JsonRenderer.render(plain.value()))) {
@@ -388,6 +566,27 @@ public final class Cli {
         }
         LoadedPackage settled = loaded.withSource();
         return settled.library() == loaded.library() ? plain : answerFrom(settled, call);
+    }
+
+    /**
+     * What {@code argv} — a noun, its names and its flags, no package — answers of {@code loaded}, parsed and
+     * dispatched as {@link #run} does it, without fetching anything. Lets a test ask a view the way a caller does.
+     *
+     * @throws IllegalArgumentException when {@code argv} does not parse to a noun
+     */
+    public static Result<DiscoverResult> answerOf(LoadedPackage loaded, List<String> argv) {
+        Commands.Grammar grammar = Commands.Grammar.create();
+        CommandLine.ParseResult parsed;
+        try {
+            parsed = grammar.line().parseArgs(argv.toArray(new String[0]));
+        } catch (CommandLine.ParameterException cause) {
+            throw new IllegalArgumentException(cause.getMessage(), cause);
+        }
+        if (!parsed.hasSubcommand()) {
+            throw new IllegalArgumentException("No noun in " + argv);
+        }
+        String noun = parsed.subcommand().commandSpec().name();
+        return answerFrom(loaded, Invocation.of(grammar.root(), noun, grammar.nouns().get(noun)));
     }
 
     private static Result<DiscoverResult> answerFrom(LoadedPackage loaded, Invocation call) {
@@ -433,21 +632,25 @@ public final class Cli {
         return jsonOutput(argv, interactive, Commands.Grammar.create());
     }
 
-    private static boolean jsonOutput(List<String> argv, boolean interactive, Commands.Grammar grammar) {
-        Set<String> takesValue = Stream.concat(Stream.of(grammar.line()), grammar.line().getSubcommands().values()
-                        .stream())
+    // Every flag spelling that takes a value, at the root or under any noun.
+    private static Set<String> valueOptions(Commands.Grammar grammar) {
+        return Stream.concat(Stream.of(grammar.line()), grammar.line().getSubcommands().values().stream())
                 .flatMap(line -> line.getCommandSpec().options().stream())
                 .filter(option -> option.arity().min() > 0)
                 .flatMap(option -> Arrays.stream(option.names()))
                 .collect(Collectors.toSet());
+    }
+
+    private static boolean jsonOutput(List<String> argv, boolean interactive, Commands.Grammar grammar) {
+        Set<String> takesValue = valueOptions(grammar);
         for (int i = 0; i < argv.size(); i++) {
             String token = argv.get(i);
             String value = null;
-            if (token.startsWith(OUTPUT_FLAG + "=")) {
-                value = token.substring(OUTPUT_FLAG.length() + 1);
+            if (token.startsWith(Commands.OUTPUT_FLAG + "=")) {
+                value = token.substring(Commands.OUTPUT_FLAG.length() + 1);
             } else if (takesValue.contains(token) && i + 1 < argv.size()) {
                 i++;
-                value = token.equals(OUTPUT_FLAG) ? argv.get(i) : null;
+                value = token.equals(Commands.OUTPUT_FLAG) ? argv.get(i) : null;
             }
             if (Commands.JSON_OUTPUT.equals(value) || Commands.TEXT_OUTPUT.equals(value)) {
                 return Commands.JSON_OUTPUT.equals(value);
@@ -470,7 +673,7 @@ public final class Cli {
             return version;
         }
         if (Command.TYPE.equals(call.noun())) {
-            return Types.misuse(call.command(Command.TYPE).text(),
+            return Types.misuse(call.command(Command.TYPE),
                     new Types.Options(call.names(), call.filter(), call.page()));
         }
         if (Command.SEARCH.equals(call.noun())) {
@@ -480,7 +683,7 @@ public final class Cli {
     }
 
     private static Failure pageBeforeFirst(int page, String firstPage) {
-        if (page >= FIRST_PAGE) {
+        if (page >= Command.FIRST_PAGE) {
             return null;
         }
         return new Failure.Validation("Page " + page + " is out of range: pages are numbered from 1.",
@@ -501,8 +704,8 @@ public final class Cli {
         if (!Version.isComplete(version)) {
             return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
         }
-        String command = call.at(new Coordinate(qualified, Version.parse(version).value())).command().text()
-                + call.pageArgument();
+        String command = call.paged(call.at(new Coordinate(qualified, Version.parse(version).value())).command())
+                .text();
         return new Failure.Validation(message, WRITE_VERSION + Failure.quoted(command) + ".", command);
     }
 
@@ -608,7 +811,7 @@ public final class Cli {
         }
 
         private String help() {
-            return Command.PREFIX + (noun == null ? "" : noun + " ") + HELP_FLAG;
+            return Command.PREFIX + (noun == null ? "" : noun + " ") + Commands.HELP_FLAG;
         }
 
         private int write(Failure failure, boolean pointToHelp) {

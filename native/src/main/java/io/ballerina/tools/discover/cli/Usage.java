@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.cli;
 import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.views.SearchCentral;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,17 +95,18 @@ final class Usage {
                     "A container's methods, or one method's signature.",
                     "Without a name, the remote and plain methods of the container --client, --class or "
                             + "--service names. With one, its signature, the types it uses, how to create its "
-                            + "container and the readme sections that call it; init is the constructor. The "
-                            + "container flag may be left out when exactly one container declares the method.",
+                            + "container and the readme sections that call it; init is the constructor. Pass one "
+                            + "container flag at most, or none when exactly one container declares the method.",
                     List.of(example(Command.METHOD, "-p " + EXAMPLE_PACKAGE + " --client Producer"),
                             example(Command.METHOD, "send -p " + EXAMPLE_PACKAGE + " --client Producer"),
                             example(Command.METHOD, "send -p " + EXAMPLE_PACKAGE))),
             Command.RESOURCE, new Noun(" [<path> [<accessor>]]",
                     "A container's resource paths, or one resource method's signature.",
-                    "Without a path, the resource paths of the container --client names, grouped by segment once "
+                    "Without a path, the resource paths of the container --client, --class or --service names, "
+                            + "grouped by segment once "
                             + "there are more than fit. With a path, the paths under it; with its accessor too, "
-                            + "that resource method's signature. A path parameter is written :name. The "
-                            + "container flag may be left out when exactly one container declares the path.",
+                            + "that resource method's signature. A path parameter is written :name. Pass one "
+                            + "container flag at most, or none when exactly one container declares the path.",
                     List.of(example(Command.RESOURCE, "-p " + EXAMPLE_GITHUB + " --client Client"),
                             example(Command.RESOURCE, "gists -p " + EXAMPLE_GITHUB + " --client Client"),
                             example(Command.RESOURCE, "gists/public get -p " + EXAMPLE_GITHUB
@@ -122,7 +124,7 @@ final class Usage {
 
     private static final String NAMES =
             "A name means one thing; no name, a listing. Every noun but package takes the package with -p; "
-                    + "search takes it only to search one package.";
+                    + "search takes it only to search one package. Flags may come before the noun or after it.";
 
     /**
      * The typical session, as commands.
@@ -152,6 +154,11 @@ final class Usage {
 
     private static final String MORE = "Run `bal discover <noun> --help` for one noun's names, flags and examples.";
 
+    private static final String SHARED_FLAGS = "Every noun also takes the flags `bal discover --help` lists.";
+
+    private static final String OWNER_FLAGS_ROW = "The container that declares a method or resource, for method and "
+            + "resource only: one at most, left out when exactly one container declares it.";
+
     private Usage() {
     }
 
@@ -169,11 +176,10 @@ final class Usage {
                 .append("\n").append(UsageRenderer.prose(VERSION, 0))
                 .append(UsageRenderer.prose(EXIT_CODES, 0))
                 .append(UsageRenderer.prose(MORE, 0));
-        String flags = UsageRenderer.flagList(grammar, null);
-        if (!flags.isEmpty()) {
-            text.append("\n").append(flags);
-        }
-        return text.toString();
+        List<UsageRenderer.Row> flags = new ArrayList<>(UsageRenderer.flagRows(grammar, null));
+        flags.add(new UsageRenderer.Row(String.join("|", Command.OWNER_FLAGS) + " " + Commands.OWNER_LABEL,
+                OWNER_FLAGS_ROW));
+        return text.append("\n").append(UsageRenderer.table(flags)).toString();
     }
 
     /** One noun's usage text: its synopsis, what it reads, examples, and its flags. */
@@ -185,9 +191,12 @@ final class Usage {
                 .append("\n").append(UsageRenderer.prose(about.description(), 0))
                 .append("\nExamples:\n");
         about.examples().forEach(example -> text.append("  ").append(example).append("\n"));
-        text.append("\n").append(UsageRenderer.prose(EXIT_CODES, 0))
-                .append("\n").append(UsageRenderer.flagList(grammar, noun));
-        return text.toString();
+        text.append("\n").append(UsageRenderer.prose(EXIT_CODES, 0));
+        List<UsageRenderer.Row> own = UsageRenderer.ownFlagRows(grammar, noun);
+        if (!own.isEmpty()) {
+            text.append("\n").append(UsageRenderer.table(own));
+        }
+        return text.append("\n").append(UsageRenderer.prose(SHARED_FLAGS, 0)).toString();
     }
 
     /** {@code noun}'s names in a synopsis, with a leading space, or empty when it takes none. */

@@ -1,1 +1,1 @@
-{"kind":"validation","message":"The package goes after -p now, and what to read comes first.","suggestion":"Run `bal discover method send -p ballerinax/kafka --client Producer`.","command":"bal discover method send -p ballerinax/kafka --client Producer"}
+{"kind":"validation","message":"'ballerinax/kafka' is not a noun; name the package with -p.","suggestion":"Run `bal discover method send -p ballerinax/kafka --client Producer`.","command":"bal discover method send -p ballerinax/kafka --client Producer"}

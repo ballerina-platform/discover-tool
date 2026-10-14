@@ -56,8 +56,6 @@ import java.util.Set;
  */
 public final class Types {
 
-    public static final String BUCKET = "type";
-
     private Types() {
     }
 
@@ -100,7 +98,8 @@ public final class Types {
     /** Every declaration the bucket lists, in the package's own order. */
     public static List<Declared> declared(LoadedPackage loaded) {
         return entries(loaded.library()).stream()
-                .map(entry -> new Declared(entry.kind(), entry.name(), loaded.command(BUCKET, entry.name()).text()))
+                .map(entry -> new Declared(entry.kind(), entry.name(),
+                        loaded.command(Command.TYPE, entry.name()).text()))
                 .toList();
     }
 
@@ -132,7 +131,7 @@ public final class Types {
     }
 
     public static Result<DiscoverResult> render(LoadedPackage loaded, Options options) {
-        Failure misuse = misuse(baseCommand(loaded), options);
+        Failure misuse = misuse(loaded.command(Command.TYPE), options);
         if (misuse != null) {
             return Result.err(misuse);
         }
@@ -143,25 +142,20 @@ public final class Types {
     }
 
     /**
-     * The failure for more than one name, or a name with {@code --filter}, or {@code null}; checked before the
-     * package is fetched.
+     * The failure for a name with {@code --filter}, or {@code null}; checked before the package is fetched.
      *
-     * @param command the command the bucket is listed with, e.g. {@code bal discover ballerina/io type}
+     * @param listing the command the types are listed with, e.g. {@code bal discover type -p ballerina/io}
      */
-    public static Failure misuse(String command, Options options) {
-        if (options.selectors().size() > 1) {
-            return new Failure.Validation(
-                    "The type bucket takes one declaration name; got " + options.selectors().size() + ".",
-                    "Name one declaration, or list them all: `" + command + "`.");
+    public static Failure misuse(Command listing, Options options) {
+        if (options.selectors().size() != 1 || !options.filtered()) {
+            return null;
         }
-        if (options.selectors().size() == 1 && options.filtered()) {
-            return new Failure.Validation(
-                    "The --filter option narrows a listing, and '" + options.selectors().get(0)
-                            + "' names one declaration.",
-                    "Drop --filter, or drop the name: `" + command + " --filter "
-                            + Texts.shellWord(options.filter()) + "`.");
-        }
-        return null;
+        String named = listing.with(options.selectors()).text();
+        return new Failure.Validation(
+                "The --filter option narrows a listing, and '" + options.selectors().get(0)
+                        + "' names one declaration.",
+                "Drop --filter: " + Failure.quoted(named) + "; or drop the name: "
+                        + Failure.quoted(listing.filtered(options.filter()).text()) + ".", named);
     }
 
     private static List<Entry> entries(Library library) {
@@ -210,16 +204,12 @@ public final class Types {
         return library.listeners().stream().anyMatch(listener -> listener.name().equals(name));
     }
 
-    private static String baseCommand(LoadedPackage loaded) {
-        return loaded.command(BUCKET).text();
-    }
-
     private static Result<DiscoverResult> roster(LoadedPackage loaded, Options options) {
         List<Entry> all = entries(loaded.library());
         if (all.isEmpty()) {
-            return Result.ok(Containers.emptyBucket(loaded, BUCKET));
+            return Result.ok(Containers.emptyBucket(loaded, Command.TYPE));
         }
-        String command = loaded.command(BUCKET).filtered(options.filtered() ? options.filter() : null).text();
+        Command command = loaded.command(Command.TYPE).filtered(options.filtered() ? options.filter() : null);
 
         List<Entry> surface = all;
         List<DiscoverResult.Documented.Entry> documented = List.of();
@@ -228,7 +218,7 @@ public final class Types {
             surface = split.surface();
             documented = split.documented().stream().map(Entry::name).sorted(Texts.LOCALE_ORDER)
                     .<DiscoverResult.Documented.Entry>map(name ->
-                            new DiscoverResult.Method(name, loaded.command(BUCKET, name).text()))
+                            new DiscoverResult.Method(name, loaded.command(Command.TYPE, name).text()))
                     .toList();
         }
 
@@ -239,7 +229,7 @@ public final class Types {
                     .filter(entry -> entry.kind().equals(kind))
                     .map(Entry::name)
                     .sorted(Texts.LOCALE_ORDER)
-                    .map(name -> new DiscoverResult.Method(name, loaded.command(BUCKET, name).text()))
+                    .map(name -> new DiscoverResult.Method(name, loaded.command(Command.TYPE, name).text()))
                     .toList();
             byKind.put(kind, methods);
             counts.put(kind, methods.size());
@@ -298,7 +288,7 @@ public final class Types {
             return declaration(loaded, index, enumName,
                     "'" + requested + "' is a member of the enum " + enumName + ".");
         }
-        String listing = baseCommand(loaded);
+        String listing = loaded.command(Command.TYPE).text();
         if (owners.isEmpty()) {
             return Result.err(loaded.symbolNotFound(List.of(requested),
                     "'" + requested + "' is not a type in " + loaded.place() + ".",
@@ -307,7 +297,8 @@ public final class Types {
         List<String> enums = owners.stream().map(TypeDef.Enumeration::name).toList();
         return Result.err(loaded.symbolNotFound(List.of(requested),
                 "'" + requested + "' is a member of the enums " + Texts.and(enums) + " in " + loaded.place() + ".",
-                "Open the enum you mean, e.g. " + Failure.quoted(loaded.command(BUCKET, enums.get(0)).text()) + ".",
+                "Open the enum you mean, e.g. "
+                        + Failure.quoted(loaded.command(Command.TYPE, enums.get(0)).text()) + ".",
                 null));
     }
 
@@ -359,10 +350,10 @@ public final class Types {
     private static String commandFor(LoadedPackage loaded, String name) {
         for (Surface.Scope scope : Surface.Scope.values()) {
             if (Surface.byName(Surface.of(loaded.library(), scope), name).isPresent()) {
-                return loaded.command(scope.verb(), name).text();
+                return loaded.command(scope.commandNoun(), name).text();
             }
         }
-        return loaded.command(BUCKET, name).text();
+        return loaded.command(Command.TYPE, name).text();
     }
 
     /**
@@ -386,7 +377,7 @@ public final class Types {
                                     module.pinnedVersion().orElse(null),
                                     loaded.targetFor(module)
                                             .map(target -> pinnedTo(loaded, module, target))
-                                            .map(target -> Command.of(BUCKET,
+                                            .map(target -> Command.of(Command.TYPE,
                                                     Identifiers.plain(external.recordName())).in(target).text())
                                             .orElse(null)));
                 }

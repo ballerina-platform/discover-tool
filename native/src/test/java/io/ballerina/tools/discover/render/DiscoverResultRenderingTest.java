@@ -40,7 +40,7 @@ import java.util.Map;
 public class DiscoverResultRenderingTest {
 
     private static String kafka(String noun, String... names) {
-        return Command.of(noun, names).in("ballerinax/kafka", null).text();
+        return Command.of(noun, names).in(new Command.Target("ballerinax/kafka", null)).text();
     }
 
     private static DiscoverResult.Overview kafkaOverview(List<DiscoverResult.Overview.Submodule> submodules,
@@ -733,7 +733,7 @@ public class DiscoverResultRenderingTest {
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "This package has no functions.",
                 "",
-                "Other buckets",
+                "Elsewhere in the package",
                 "  client  3  bal discover client -p ballerinax/kafka",
                 "  class   4  bal discover class -p ballerinax/kafka"));
 
@@ -755,8 +755,8 @@ public class DiscoverResultRenderingTest {
     // Methods of `pkg`'s Client, each with the command that opens it.
     private static List<DiscoverResult.Method> methods(String pkg, String... names) {
         return Arrays.stream(names)
-                .map(name -> new DiscoverResult.Method(name, Command.of("method", name).in(pkg, null)
-                        .ownedBy("client", "Client").text()))
+                .map(name -> new DiscoverResult.Method(name, Command.of("method", name)
+                        .in(new Command.Target(pkg, null)).ownedBy("client", "Client").text()))
                 .toList();
     }
 
@@ -764,8 +764,8 @@ public class DiscoverResultRenderingTest {
     private static DiscoverResult.ResourceList.Resource resource(String pkg, String path, String... accessors) {
         Map<String, String> commands = new LinkedHashMap<>();
         for (String accessor : accessors) {
-            commands.put(accessor, Command.of("resource", path, accessor).in(pkg, null).ownedBy("client", "Client")
-                    .text());
+            commands.put(accessor, Command.of("resource", path, accessor).in(new Command.Target(pkg, null))
+                    .ownedBy("client", "Client").text());
         }
         return new DiscoverResult.ResourceList.Resource(path, List.of(accessors), commands);
     }

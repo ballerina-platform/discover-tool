@@ -51,21 +51,21 @@ Next: bal discover client Client -p ballerinax/googleapis.sheets --filter <keywo
 ballerinax/googleapis.sheets · service
 ballerinax/googleapis.sheets has no service types.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/googleapis.sheets
   type    32  bal discover type -p ballerinax/googleapis.sheets
 == class ==
 ballerinax/googleapis.sheets · class
 ballerinax/googleapis.sheets has no classes.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/googleapis.sheets
   type    32  bal discover type -p ballerinax/googleapis.sheets
 == function ==
 ballerinax/googleapis.sheets · function
 ballerinax/googleapis.sheets has no functions.
 
-Other buckets
+Elsewhere in the package
   client   1  bal discover client -p ballerinax/googleapis.sheets
   type    32  bal discover type -p ballerinax/googleapis.sheets
 == type ==

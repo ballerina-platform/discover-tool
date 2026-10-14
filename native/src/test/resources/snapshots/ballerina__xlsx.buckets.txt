@@ -2,7 +2,7 @@
 ballerina/xlsx · client
 ballerina/xlsx has no clients.
 
-Other buckets
+Elsewhere in the package
   class      3  bal discover class -p ballerina/xlsx
   function   6  bal discover function -p ballerina/xlsx
   type      41  bal discover type -p ballerina/xlsx
@@ -10,7 +10,7 @@ Other buckets
 ballerina/xlsx · service
 ballerina/xlsx has no service types.
 
-Other buckets
+Elsewhere in the package
   class      3  bal discover class -p ballerina/xlsx
   function   6  bal discover function -p ballerina/xlsx
   type      41  bal discover type -p ballerina/xlsx

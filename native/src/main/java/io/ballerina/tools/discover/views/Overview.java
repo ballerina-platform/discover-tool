@@ -84,11 +84,11 @@ public final class Overview {
         counts.keySet().removeAll(LISTED_AS_SECTIONS);
         DiscoverResult.Overview.TypeCounts types = counts.isEmpty()
                 ? null
-                : new DiscoverResult.Overview.TypeCounts(counts, loaded.command(Types.BUCKET).text());
+                : new DiscoverResult.Overview.TypeCounts(counts, loaded.command(Command.TYPE).text());
         DiscoverResult.Overview.ReadmeSummary readme = loaded.readme().isEmpty()
                 ? null
                 : new DiscoverResult.Overview.ReadmeSummary(Readme.sectionsOf(loaded).size(),
-                        loaded.command(Readme.BUCKET).text());
+                        loaded.command(Command.README).text());
         List<DiscoverResult.Overview.Submodule> submodules = loaded.submodules().stream()
                 .map(submodule -> new DiscoverResult.Overview.Submodule(submodule.name(),
                         Texts.firstSentence(submodule.summary()),
@@ -104,9 +104,9 @@ public final class Overview {
         }
         Map<Surface.Scope, Integer> shown = shares(shared, Containers.MAX_ENTRIES - fixed);
         List<DiscoverResult.Overview.Section> sections = new ArrayList<>();
-        rows.forEach((scope, all) -> sections.add(new DiscoverResult.Overview.Section(scope.verb(),
+        rows.forEach((scope, all) -> sections.add(new DiscoverResult.Overview.Section(scope.commandNoun(),
                 all.subList(0, shown.getOrDefault(scope, all.size())), all.size(),
-                loaded.command(scope.verb()).text())));
+                loaded.command(scope.commandNoun()).text())));
         return new DiscoverResult.Overview(List.copyOf(sections), types, readme, submodules, loaded.warning(),
                 members);
     }

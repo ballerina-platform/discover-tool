@@ -74,7 +74,7 @@ public class CliTest {
             return err.toString();
         }
 
-        private JsonObject failure() {
+        JsonObject failure() {
             JsonElement parsed = JsonParser.parseString(err.toString());
             Assert.assertTrue(parsed.isJsonObject(), "stderr is not one JSON object: " + err);
             return parsed.getAsJsonObject();
@@ -232,12 +232,8 @@ public class CliTest {
                         "bal discover type Error -p ballerina/http"),
                 new Case(List.of("function", "a", "b", "-p", "ballerina/log"),
                         "bal discover function a -p ballerina/log"),
-                new Case(List.of("method", "send", "extra", "-p", "ballerinax/kafka", "--client", "Producer"),
-                        "bal discover method send -p ballerinax/kafka --client Producer"),
-                new Case(List.of("resource", "gists/public", "get", "extra", "-p", "ballerinax/github", "--client",
-                        "Client"), "bal discover resource gists/public get -p ballerinax/github --client Client"),
                 new Case(List.of("readme", "Data", "serialization", "-p", "ballerinax/kafka"),
-                        "bal discover readme Data -p ballerinax/kafka"),
+                        "bal discover readme \"Data serialization\" -p ballerinax/kafka"),
                 new Case(List.of("package", "ballerinax/kafka", "client"), "bal discover package ballerinax/kafka"))) {
             String label = String.join(" ", each.argv());
             Capture capture = new Capture();
@@ -246,6 +242,38 @@ public class CliTest {
             Assert.assertEquals(capture.field("kind"), "validation", label);
             Assert.assertEquals(capture.field("command"), each.command(), label);
             Assert.assertTrue(capture.field("suggestion").contains("`" + each.command() + "`"), capture.stderr());
+        }
+    }
+
+    @Test
+    public void moreNamesThanAMemberTakesAreReadAgainstThePackageForTheCommandTheyMeant() {
+        record Case(String slug, List<String> argv, String command) { }
+        String version = FixtureCorpus.FIXTURE_VERSION.text();
+        for (Case each : List.of(
+                new Case("ballerinax__kafka", List.of("method", "Producer", "send", "-p", "ballerinax/kafka"),
+                        "bal discover method send -p ballerinax/kafka --client Producer"),
+                new Case("ballerinax__kafka", List.of("method", "send", "extra", "-p", "ballerinax/kafka",
+                        "--client", "Producer"), "bal discover method send -p ballerinax/kafka --client Producer"),
+                new Case("ballerinax__github", List.of("resource", "gists", "public", "get", "-p",
+                        "ballerinax/github"), "bal discover resource gists/public get -p ballerinax/github"),
+                new Case("ballerinax__github", List.of("resource", "Client", "gists/public", "get", "-p",
+                        "ballerinax/github"), "bal discover resource gists/public get -p ballerinax/github --client "
+                        + "Client"),
+                new Case("ballerinax__github", List.of("resource", "gists/public", "get", "extra", "-p",
+                        "ballerinax/github", "--client", "Client"),
+                        "bal discover resource gists/public get -p ballerinax/github --client Client"),
+                new Case("ballerinax__github", List.of("resource", "no", "such", "get", "-p", "ballerinax/github"),
+                        "bal discover resource -p ballerinax/github"))) {
+            String label = String.join(" ", each.argv());
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), centralFor(each.slug(), version)), 2,
+                    label + ": " + capture.stderr());
+            Assert.assertEquals(capture.field("kind"), "validation", label);
+            Assert.assertEquals(capture.field("command"), each.command(), label);
+            Capture followed = new Capture();
+            Assert.assertEquals(Cli.run(List.of(each.command().substring(Command.PREFIX.length()).replace("\"", "")
+                    .split(" ")), followed.streams(), centralFor(each.slug(), version)), 0,
+                    each.command() + ": " + followed.stderr());
         }
     }
 
@@ -270,8 +298,8 @@ public class CliTest {
 
         Capture close = new Capture();
         Assert.assertEquals(Cli.run(List.of("method", "close", "-p", "ballerinax/kafka"), close.streams(),
-                centralFor("ballerinax__kafka", "4.6.5")), 1, close.stderr());
-        Assert.assertEquals(close.field("kind"), "symbol-not-found", close.stderr());
+                centralFor("ballerinax__kafka", "4.6.5")), 2, close.stderr());
+        Assert.assertEquals(close.field("kind"), "validation", close.stderr());
         Assert.assertFalse(close.failure().has("command"), "no one owner is preferred: " + close.stderr());
         Assert.assertFalse(close.failure().has("candidates"), close.stderr());
         JsonArray owners = close.failure().getAsJsonArray("owners");
@@ -834,7 +862,7 @@ public class CliTest {
         Capture text = run(List.of("function", "-p", "ballerinax/kafka"), "ballerinax__kafka", "4.6.5", true);
         Assert.assertTrue(text.stdout().startsWith("ballerinax/kafka:4.6.5 · function\n"
                         + "ballerinax/kafka has no functions.\n\n"
-                        + "Other buckets\n"
+                        + "Elsewhere in the package\n"
                         + "  client    3  bal discover client -p ballerinax/kafka\n"),
                 text.stdout());
     }
@@ -981,12 +1009,13 @@ public class CliTest {
     public void aMemberOnSeveralContainersFailsWithTheBucketsListing() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("method", "'commit", "-p", "ballerinax/kafka"), capture.streams(),
-                centralFor("ballerinax__kafka", "4.6.5"), null, true), 1);
-        Assert.assertEquals(capture.stderr(), "error: 'commit' is declared by Caller and Consumer in "
+                centralFor("ballerinax__kafka", "4.6.5"), null, true), 2);
+        Assert.assertTrue(capture.stderr().startsWith("error: 'commit' is declared by Caller and Consumer in "
                 + "ballerinax/kafka:4.6.5.\n"
-                + "  Name the one you mean:\n"
+                + "  Name the one you mean with --client, --class, --service:\n"
                 + "    Caller    bal discover method commit -p ballerinax/kafka --client Caller\n"
-                + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n");
+                + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n"
+                + "Usage: bal discover method "), capture.stderr());
     }
 
     @Test
@@ -1694,7 +1723,10 @@ public class CliTest {
                 new Case("validation", 2, List.of("type", "A", "B", "-p", "ballerinax/kafka"), never()),
                 new Case("validation", 2, List.of("type", "A", "-p", "ballerinax/kafka", "--filter", "x"), never()),
                 new Case("validation", 2, List.of("method", "poll", "x", "-p", "ballerinax/kafka", "--client",
-                        "Consumer"), never()),
+                        "Consumer"), kafka),
+                new Case("validation", 2, List.of("method", "close", "-p", "ballerinax/kafka"), kafka),
+                new Case("symbol-not-found", 1, List.of("method", "send", "-p", "ballerinax/kafka", "--class",
+                        "Producer"), kafka),
                 new Case("validation", 2, List.of("ballerinax/kafka", "client", "Consumer"), never()),
                 new Case("validation", 2, List.of("client", "Consumer"), never()),
                 new Case("symbol-not-found", 1,
@@ -1723,8 +1755,9 @@ public class CliTest {
         Capture filtered = new Capture();
         Assert.assertEquals(Cli.run(List.of("type", "Error", "-p", "ballerina/io", "--filter", "x"),
                 filtered.streams(), never()), 2);
-        Assert.assertEquals(filtered.field("suggestion"), "Drop --filter, or drop the name: "
-                + "`bal discover type -p ballerina/io --filter x`.");
+        Assert.assertEquals(filtered.field("suggestion"), "Drop --filter: `bal discover type Error -p ballerina/io`; "
+                + "or drop the name: `bal discover type -p ballerina/io --filter x`.");
+        Assert.assertEquals(filtered.field("command"), "bal discover type Error -p ballerina/io");
     }
 
     @Test

@@ -52,21 +52,21 @@ Next: bal discover client Client -p ballerinax/slack --filter <keyword>
 ballerinax/slack · service
 ballerinax/slack has no service types.
 
-Other buckets
+Elsewhere in the package
   client    1  bal discover client -p ballerinax/slack
   type    507  bal discover type -p ballerinax/slack
 == class ==
 ballerinax/slack · class
 ballerinax/slack has no classes.
 
-Other buckets
+Elsewhere in the package
   client    1  bal discover client -p ballerinax/slack
   type    507  bal discover type -p ballerinax/slack
 == function ==
 ballerinax/slack · function
 ballerinax/slack has no functions.
 
-Other buckets
+Elsewhere in the package
   client    1  bal discover client -p ballerinax/slack
   type    507  bal discover type -p ballerinax/slack
 == type ==

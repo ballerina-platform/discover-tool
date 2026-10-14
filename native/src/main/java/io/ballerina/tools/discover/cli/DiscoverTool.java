@@ -45,8 +45,8 @@ import java.util.function.IntSupplier;
  * test in the suite hermetic: they drive {@link Cli#run} with an injected cache and cannot accidentally read or
  * write a developer's real {@code ~/.cache}.
  *
- * <p>{@code bal} hands the whole argument list through unparsed, so the tool owns its own grammar, and
- * {@link System#exit} here is what carries the exit code to the shell.
+ * <p>{@code bal} hands the whole argument list through unparsed (see {@link #setParentCmdParser}), so the tool owns
+ * its own grammar, and {@link System#exit} here is what carries the exit code to the shell.
  *
  * @since 0.1.0
  */
@@ -63,7 +63,7 @@ public class DiscoverTool implements BLauncherCmd {
      * {@code ballerina: unknown option: '--help'} at exit 1. It is put back on the argument list, so {@link Cli}
      * alone decides what help means.
      */
-    @CommandLine.Option(names = {"--help", "-h"}, hidden = true)
+    @CommandLine.Option(names = {Commands.HELP_FLAG, Commands.HELP_SHORT}, hidden = true)
     private boolean helpFlag;
 
     private final PrintStream outStream;
@@ -102,10 +102,7 @@ public class DiscoverTool implements BLauncherCmd {
     @Override
     public void execute() {
         boolean basicProxyAuthAllowed = allowBasicProxyAuthInTunnels();
-        List<String> argv = new ArrayList<>(argList == null ? List.of() : argList);
-        if (helpFlag) {
-            argv.add("--help");
-        }
+        List<String> argv = arguments();
         HttpOptions.Builder builder = HttpOptions.builder()
                 .cache(buildCache())
                 .basicProxyAuthDisabled(!basicProxyAuthAllowed)
@@ -132,6 +129,14 @@ public class DiscoverTool implements BLauncherCmd {
         if (exits && code != 0) {
             System.exit(code);
         }
+    }
+
+    List<String> arguments() {
+        List<String> argv = new ArrayList<>(argList == null ? List.of() : argList);
+        if (helpFlag) {
+            argv.add(Commands.HELP_FLAG);
+        }
+        return argv;
     }
 
     static int guarded(IntSupplier run, List<String> argv, boolean interactive, PrintStream errStream) {
@@ -228,7 +233,17 @@ public class DiscoverTool implements BLauncherCmd {
         sb.append("  ").append(UsageRenderer.synopsisLine(Commands.Grammar.create())).append("\n");
     }
 
+    /**
+     * Makes {@code bal}'s launcher pass every argument through. Left to its defaults, the launcher parses a flag
+     * before the first word as its own and rejects it ({@code ballerina: unknown option: '-p'}), so
+     * {@code bal discover -p ballerinax/kafka method send} would never reach the tool.
+     */
     @Override
     public void setParentCmdParser(CommandLine parentCmdParser) {
+        CommandLine own = parentCmdParser.getSubcommands().get(getName());
+        if (own != null) {
+            own.setUnmatchedOptionsArePositionalParams(true);
+            own.setStopAtPositional(true);
+        }
     }
 }

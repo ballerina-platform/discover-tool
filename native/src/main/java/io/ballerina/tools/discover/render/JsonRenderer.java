@@ -39,10 +39,10 @@ public final class JsonRenderer {
 
     /** Each bucket's key in an overview: what one of its rows is, plural, as the type roster names them. */
     private static final Map<String, String> OVERVIEW_KEYS = Map.of(
-            Surface.Scope.CLIENT.verb(), DiscoverResult.TypeRoster.Kind.CLIENTS.key(),
-            Surface.Scope.SERVICE.verb(), DiscoverResult.TypeRoster.Kind.SERVICE_TYPES.key(),
-            Surface.Scope.CLASS.verb(), DiscoverResult.TypeRoster.Kind.CLASSES.key(),
-            Surface.Scope.MODULE.verb(), Surface.Scope.MODULE.plural());
+            Surface.Scope.CLIENT.commandNoun(), DiscoverResult.TypeRoster.Kind.CLIENTS.key(),
+            Surface.Scope.SERVICE.commandNoun(), DiscoverResult.TypeRoster.Kind.SERVICE_TYPES.key(),
+            Surface.Scope.CLASS.commandNoun(), DiscoverResult.TypeRoster.Kind.CLASSES.key(),
+            Surface.Scope.MODULE.commandNoun(), Surface.Scope.MODULE.plural());
 
     private JsonRenderer() {
     }
@@ -116,7 +116,7 @@ public final class JsonRenderer {
             entry.addProperty("shown", section.rows().size());
             entry.addProperty("total", section.total());
             entry.addProperty("command", section.command());
-            if (overview.members() != null && Surface.Scope.CLIENT.verb().equals(section.bucket())) {
+            if (overview.members() != null && Surface.Scope.CLIENT.commandNoun().equals(section.bucket())) {
                 JsonObject members = toJson(overview.members());
                 members.remove("warning");
                 entry.add("members", members);
@@ -556,7 +556,7 @@ public final class JsonRenderer {
             entry.addProperty("qualified", hit.qualified());
             entry.addProperty("version", hit.version());
             entry.addProperty("summary", hit.summary());
-            entry.addProperty("command", hit.command());
+            entry.addProperty("command", hit.command().text());
             packages.add(entry);
         }
         json.add("packages", window(packages, search.packagesTotal()));
@@ -571,7 +571,7 @@ public final class JsonRenderer {
             addIfPresent(entry, "name", hit.name());
             addIfPresent(entry, "path", hit.path());
             addIfPresent(entry, "accessor", hit.accessor());
-            entry.addProperty("command", hit.command());
+            entry.addProperty("command", hit.command().text());
             symbols.add(entry);
         }
         json.add("symbols", window(symbols, search.symbolsTotal()));

@@ -22,6 +22,7 @@ import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.views.Containers;
 import picocli.CommandLine;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,10 +50,19 @@ final class Commands {
 
     static final String VERSION_FLAG = "--version";
 
+    static final String HELP_FLAG = "--help";
+    static final String HELP_SHORT = "-h";
+    static final String OUTPUT_FLAG = "--output";
+    static final String REFRESH_FLAG = "--refresh";
+    static final String MODULE_SHORT = "-m";
+
     static final String JSON_OUTPUT = "json";
     static final String TEXT_OUTPUT = "text";
 
     static final String PACKAGE_LABEL = "<org>/<name>[:<version>]";
+
+    static final String OWNER_LABEL = "<name>";
+
 
     /**
      * @param line the root command line, every noun registered under it
@@ -86,10 +96,10 @@ final class Commands {
     /** The flags every noun takes. */
     static final class Flags {
 
-        @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "This text.")
+        @CommandLine.Option(names = {HELP_SHORT, HELP_FLAG}, usageHelp = true, description = "This text.")
         boolean help;
 
-        @CommandLine.Option(names = "--output", paramLabel = JSON_OUTPUT + "|" + TEXT_OUTPUT,
+        @CommandLine.Option(names = OUTPUT_FLAG, paramLabel = JSON_OUTPUT + "|" + TEXT_OUTPUT,
                 description = "Override the TTY-detected default: human text at an interactive terminal, JSON "
                         + "otherwise.")
         String output;
@@ -106,7 +116,7 @@ final class Commands {
                         + "error.")
         int page;
 
-        @CommandLine.Option(names = {Command.MODULE_FLAG, "-m"}, paramLabel = "<module>",
+        @CommandLine.Option(names = {Command.MODULE_FLAG, MODULE_SHORT}, paramLabel = "<module>",
                 description = "Target this submodule instead of the package's default module, the same "
                         + "everywhere including readme. The submodule's name only (for example httpscerr), not "
                         + "<org>/<name>.<submodule>.")
@@ -116,7 +126,7 @@ final class Commands {
         @CommandLine.Option(names = VERSION_FLAG, hidden = true, arity = "0..1", paramLabel = "<version>")
         String version;
 
-        @CommandLine.Option(names = "--refresh",
+        @CommandLine.Option(names = REFRESH_FLAG,
                 description = "Ignore any cached copy and rewrite it. Worth passing only when a name should "
                         + "exist and does not.")
         boolean refresh;
@@ -125,7 +135,7 @@ final class Commands {
     /** The package a noun is asked of. */
     static final class Package {
 
-        @CommandLine.Option(names = {Command.PACKAGE_FLAG, "--package"}, paramLabel = PACKAGE_LABEL,
+        @CommandLine.Option(names = {Command.PACKAGE_FLAG, Command.PACKAGE_LONG_FLAG}, paramLabel = PACKAGE_LABEL,
                 description = "The package to read, as bal pull names it. With no version, the one your project's "
                         + "Dependencies.toml locks, else Central's latest.")
         String pkg;
@@ -134,14 +144,15 @@ final class Commands {
     /** The container a method or resource is declared by. */
     static final class Owners {
 
-        @CommandLine.Option(names = "--client", paramLabel = "<name>",
-                description = "The client that declares it. Optional when exactly one container does.")
+        @CommandLine.Option(names = Command.CLIENT_FLAG, paramLabel = OWNER_LABEL,
+                description = "The client that declares it.")
         String client;
 
-        @CommandLine.Option(names = "--class", paramLabel = "<name>", description = "The class that declares it.")
+        @CommandLine.Option(names = Command.CLASS_FLAG, paramLabel = OWNER_LABEL,
+                description = "The class that declares it.")
         String classOwner;
 
-        @CommandLine.Option(names = "--service", paramLabel = "<name>",
+        @CommandLine.Option(names = Command.SERVICE_FLAG, paramLabel = OWNER_LABEL,
                 description = "The service type that declares it.")
         String service;
     }
@@ -179,14 +190,9 @@ final class Commands {
         /** The {@code -p} value, or {@code null} for a noun that takes none. */
         abstract String pkg();
 
-        /** The container flag given, or {@code null}. */
-        Command.Owner owner() {
-            return null;
-        }
-
-        /** How many container flags were given. */
-        int owners() {
-            return 0;
+        /** The container flags given. */
+        List<Command.Owner> owners() {
+            return List.of();
         }
     }
 
@@ -194,7 +200,8 @@ final class Commands {
     static final class PackageNoun extends Noun {
 
         // Hidden and never valid: declared only so the CLI can say the package is this noun's name.
-        @CommandLine.Option(names = {Command.PACKAGE_FLAG, "--package"}, hidden = true, paramLabel = PACKAGE_LABEL)
+        @CommandLine.Option(names = {Command.PACKAGE_FLAG, Command.PACKAGE_LONG_FLAG}, hidden = true,
+                paramLabel = PACKAGE_LABEL)
         String pkg;
 
         @Override
@@ -222,20 +229,18 @@ final class Commands {
         Owners owners = new Owners();
 
         @Override
-        Command.Owner owner() {
+        List<Command.Owner> owners() {
+            List<Command.Owner> given = new ArrayList<>();
             if (owners.client != null) {
-                return new Command.Owner(Command.CLIENT, owners.client);
+                given.add(new Command.Owner(Command.CLIENT, owners.client));
             }
             if (owners.classOwner != null) {
-                return new Command.Owner(Command.CLASS, owners.classOwner);
+                given.add(new Command.Owner(Command.CLASS, owners.classOwner));
             }
-            return owners.service == null ? null : new Command.Owner(Command.SERVICE, owners.service);
-        }
-
-        @Override
-        int owners() {
-            return (owners.client == null ? 0 : 1) + (owners.classOwner == null ? 0 : 1)
-                    + (owners.service == null ? 0 : 1);
+            if (owners.service != null) {
+                given.add(new Command.Owner(Command.SERVICE, owners.service));
+            }
+            return given;
         }
     }
 }

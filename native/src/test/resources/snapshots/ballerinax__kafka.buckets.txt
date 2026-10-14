@@ -37,7 +37,7 @@ Next: bal discover class <name> -p ballerinax/kafka
 ballerinax/kafka · function
 ballerinax/kafka has no functions.
 
-Other buckets
+Elsewhere in the package
   client    3  bal discover client -p ballerinax/kafka
   service   1  bal discover service -p ballerinax/kafka
   class     4  bal discover class -p ballerinax/kafka

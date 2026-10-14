@@ -21,6 +21,7 @@ package io.ballerina.tools.discover.central;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
 import com.google.gson.JsonParser;
+import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.QualifiedName;
@@ -438,7 +439,7 @@ public final class CentralClient {
             QualifiedName qualified, QualifiedName parent, Version parentVersion, Version version, Version pin,
             HttpOptions options) {
         String submodule = qualified.name().substring(parent.name().length() + 1);
-        String command = new Coordinate(parent, pin).command(submodule);
+        Command command = Command.overview(new Coordinate(parent, pin).target(submodule));
         String url = REGISTRY_PACKAGES_URL + encode(parent.org()) + "/" + encode(parent.name())
                 + "/" + encode(parentVersion.text());
         Result<JsonElement> response = fetchJson(url, options);
@@ -447,12 +448,12 @@ public final class CentralClient {
             return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
                     + qualified.qualified() + "' is not a package, but " + parent.qualified() + " is, and Central "
                     + "could not say which modules it publishes. If '" + submodule + "' is one of them, read it with "
-                    + Failure.quoted(command) + ".", command);
+                    + Failure.quoted(command.text()) + ".", command);
         }
         if (listed.get().contains(qualified.name())) {
             return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
                     + qualified.qualified() + "' is not a package: it is the '" + submodule + "' module of the "
-                    + parent.qualified() + " package. Read it with " + Failure.quoted(command) + ".", command);
+                    + parent.qualified() + " package. Read it with " + Failure.quoted(command.text()) + ".", command);
         }
         return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
                 + qualified.qualified() + "' is not a package, and " + parent.qualified() + " publishes no '"
@@ -666,10 +667,10 @@ public final class CentralClient {
     }
 
     private static Failure noSuchModulePage(Version version, QualifiedName qualified, Version pin, String submodule) {
-        String command = new Coordinate(qualified, pin).command(null);
+        Command command = Command.overview(new Coordinate(qualified, pin).target(null));
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), submodule, qualified.qualified()
                 + " publishes no '" + submodule + "' module at this version. Drop --module to read its default "
-                + "module: " + Failure.quoted(command) + ".", command);
+                + "module: " + Failure.quoted(command.text()) + ".", command);
     }
 
     private static boolean isNotFound(Result<?> response) {

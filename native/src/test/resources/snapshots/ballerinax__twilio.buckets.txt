@@ -51,21 +51,21 @@ Next: bal discover client Client -p ballerinax/twilio --filter <keyword>
 ballerinax/twilio · service
 ballerinax/twilio has no service types.
 
-Other buckets
+Elsewhere in the package
   client    1  bal discover client -p ballerinax/twilio
   type    279  bal discover type -p ballerinax/twilio
 == class ==
 ballerinax/twilio · class
 ballerinax/twilio has no classes.
 
-Other buckets
+Elsewhere in the package
   client    1  bal discover client -p ballerinax/twilio
   type    279  bal discover type -p ballerinax/twilio
 == function ==
 ballerinax/twilio · function
 ballerinax/twilio has no functions.
 
-Other buckets
+Elsewhere in the package
   client    1  bal discover client -p ballerinax/twilio
   type    279  bal discover type -p ballerinax/twilio
 == type ==
