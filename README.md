@@ -600,12 +600,12 @@ Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--clas
 Run `bal discover method --help` for details.
 ```
 
-A method or resource several containers declare, asked with no container flag, is a usage error (exit 2): the
-command is incomplete, though everything it names exists. It has no one command to run, so that failure carries
-none: its JSON lists each container in `owners`, as `{"name", "command"}` rows whose commands open what was named
-on it (at most 40; past that the suggestion quotes the package's `search` for the name). A name typed as some
-other kind of thing (`bal discover class close -p ballerinax/kafka`) is still a miss (exit 1) and lists its
-owners the same way.
+A method or resource several containers declare, asked with no container flag, is an `ambiguous` failure (exit
+3). It has no one command to run, so that failure carries none: its JSON lists each container in `owners`, as
+`{"name", "command"}` rows whose commands open what was named on it (at most 40; past that the suggestion quotes
+the package's `search` for the name). A name typed as some other kind of thing that several containers declare
+(`bal discover class close -p ballerinax/kafka`) is `ambiguous` too, listing its owners the same way; one that a
+single container declares is a miss (exit 1) quoting its command.
 
 A service type that declares no methods, and whose package does not describe the ones a service defines,
 answers with its own documentation and the readme sections whose code declares such a service — typed as it;
@@ -658,7 +658,9 @@ Types it uses (2)
 
 A readme of at most 10 KB prints whole, under the same header line as every other answer. A larger one lists every
 one of its sections (a heading and everything down to the next heading) with the command that opens it, never cut off.
-A large readme can be narrowed to the sections that mention a keyword:
+A title (`readme "<title>"`) is matched on its letters and digits in any case, exactly when some section's title is
+equal to it, else as part of a title; one that matches several sections is an `ambiguous` failure (exit 3) listing
+them in `sections` (`{"name", "command"}`). A large readme can be narrowed to the sections that mention a keyword:
 
 ```
 $ bal discover readme -p ballerinax/kafka --filter producer
@@ -753,7 +755,7 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | search in a package                  | `keywords`, then per kind with a match `clients`, `serviceTypes`, `classes`, `listeners`, `functions` (`name`, `command`), `remote`, `methods` (`container`, `name`, `command`), `resources` (`container`, `path`, `accessor`, `command`), `types` (`name`, `kind`, `command`), `readme` (`number`, `title`, `command`), `submodules` (`name`, `command`); `counts` (per kind), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and `overview` when nothing matched |
 | search of Central                    | `keywords`, `packages` (`entries` (`qualified`, `version`, `summary`, `command`), `shown`, `total`), `symbols` (`entries` (`qualified`, `version`, `module`, `kind`, `container`, `name` or, for a resource method, `path` and `accessor`, `command`), `shown`, `total`), `page`, `pages`, `remaining`, `next`; it names no one package, so it has no `qualified` |
 | readme                               | `readme`, `lines`, and `section`, `of`, `title` for one section                                                  |
-| readme sections                      | `sections` (`number`, `title`, `lines`, `command`), `matching` (true when narrowed by `--filter` or a title), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
+| readme sections                      | `sections` (`number`, `title`, `lines`, `command`), `matching` (true when narrowed by `--filter`), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 
 Any answer can also carry `warning` (the version could not be confirmed against the registry), and a service
 type's answers `note` (the listener it binds to, or that it attaches to none), as can an enum member's (the enum
@@ -822,9 +824,19 @@ error naming the command that reads them, never silently dropped.
 | ------ | -------------------------------------------------------------------------------- |
 | stdout | the answer, and nothing else                                                     |
 | stderr | on failure, exactly one failure, and nothing else                                |
-| exit 0 | success, and stdout is complete                                                  |
-| exit 2 | a usage error — the command line is malformed or incomplete: stdout is empty |
-| exit 1 | every other failure: stdout is empty, and the failure's `kind` and `suggestion` say what to do next |
+| exit 0 | an answer, and stdout is complete — an empty `--filter` or search result too     |
+
+On failure stdout is empty, and the exit code says what to do next, one code per action; the failure's `kind`
+and `suggestion` say the rest:
+
+| exit | means                                                                             | `kind`                                  |
+| ---- | --------------------------------------------------------------------------------- | --------------------------------------- |
+| 1    | not found: the package, version, module or name does not exist                    | `package-not-found`, `symbol-not-found` |
+| 2    | a usage error: the command is malformed, or asks for something it cannot combine | `validation`                            |
+| 3    | ambiguous: the name matches more than one thing, each listed with its command     | `ambiguous`                             |
+| 4    | Central could not be reached: the connection, DNS or TLS failed, or it timed out; may work on a retry | `upstream` with `reached: false` and no `status`, `timeout` |
+| 5    | Central answered badly: an HTTP error status (Central's or the proxy's), or a body this tool cannot read | `upstream` with a `status` or `reached: true`, `schema-drift` |
+| 6    | an internal error: a defect in `bal discover`                                     | `internal`                              |
 
 A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
 forced with `--output` (honoured even when the rest of the arguments fail to parse). In JSON it is one object
@@ -842,7 +854,7 @@ $ bal discover client NoSuchContainer -p ballerinax/kafka | cat
 ```
 
 In text it is `error: <message>`, then the suggestion and anything else the failure carries (schema issues, a
-readme's sections, the owners) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
+readme's sections, the matches) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
 
 ```
 $ bal discover package ballerina/http:2.15
@@ -862,18 +874,17 @@ the new order. A package typed as a name (`bal discover client ballerinax/kafka`
 `-p` at all is never given a package it did not name: its `command` is the Central search for the name
 (`bal discover search send`). A plural or the old bucket name as the noun (`funcs`, `methods`) is answered with
 the noun it meant. An unknown noun's `command` searches for the word, since it is most often a name typed without
-its noun (`bal discover close -p ballerinax/kafka`). Two are found once the package is read: more names than a
+its noun (`bal discover close -p ballerinax/kafka`). One is found once the package is read: more names than a
 `method` or `resource` takes, read against it (`method Producer send` is `method send --client Producer`,
-`resource gists public get` is `resource gists/public get`), and a member several containers declare with no
-container flag. Each names the command to run when there is one, and in text ends with that noun's synopsis. A
-`validation` failure that depends on what the package holds — a page past the end of the listing, a module with
-no readme — is exit 1.
+`resource gists public get` is `resource gists/public get`); it names the command to run, and in text ends with
+that noun's synopsis. A `validation` failure that depends on what the package holds — a page past the end of the
+listing — is exit 2 as well, without the synopsis.
 
-A search that matches nothing is an answer, not a failure (exit 0). `upstream` and `timeout` are worth re-running unchanged once their cause has passed or been fixed; `validation`,
+A search that matches nothing is an answer, not a failure (exit 0). `upstream` and `timeout` at exit 4 are worth re-running unchanged once their cause has passed or been fixed, and an `upstream` at exit 5 once Central or the proxy is fixed; `validation`, `ambiguous`,
 `package-not-found` and `symbol-not-found` need a different command — `symbol-not-found` is a container, member,
-path or type not named exactly as listed, or asked as a noun that does not hold it, or a container flag naming no container of its kind (a `--module` the package does not publish
-is `package-not-found` with `module`, and lists the submodules it does in `candidates`; a name asked as a noun
-that does not hold it, and several containers declare, lists them in `owners`); `schema-drift` means Central's payload
+path, type or readme section not named exactly as listed, or asked as a noun that does not hold it, or a container flag naming no container of its kind, or a readme a module does not publish (a `--module` the package does not publish
+is `package-not-found` with `module`, and lists the submodules it does in `candidates`; a name several containers
+declare is `ambiguous` and lists them in `owners`); `schema-drift` means Central's payload
 changed shape and is for a maintainer; `internal` is a defect in `bal discover` itself, to report with the
 command that produced it. An `upstream` failure's `message` names what failed: the host, or the
 proxy and the `Settings.toml` that sets it. Its `reached` is `true` when Central answered, with an error status

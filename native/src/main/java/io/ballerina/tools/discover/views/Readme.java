@@ -111,15 +111,14 @@ public final class Readme {
             return filtered(loaded, sections, options);
         }
         if (markdown.getBytes(StandardCharsets.UTF_8).length > WHOLE_LIMIT_BYTES) {
-            return Result.ok(listing(loaded, sections, sections, false));
+            return Result.ok(listing(loaded, sections));
         }
         return Result.ok(new DiscoverResult.Readme(markdown, lineCount(markdown), loaded.warning()));
     }
 
-    private static DiscoverResult.ReadmeSections listing(
-            LoadedPackage loaded, List<Section> sections, List<Section> shown, boolean matching) {
-        return new DiscoverResult.ReadmeSections(rows(loaded, shown), shown.size(), null, null, loaded.warning(),
-                matching);
+    private static DiscoverResult.ReadmeSections listing(LoadedPackage loaded, List<Section> sections) {
+        return new DiscoverResult.ReadmeSections(rows(loaded, sections), sections.size(), null, null,
+                loaded.warning(), false);
     }
 
     private static List<DiscoverResult.ReadmeSections.Section> rows(LoadedPackage loaded, List<Section> sections) {
@@ -129,8 +128,16 @@ public final class Readme {
                 .toList();
     }
 
+    private static Failure severalSections(LoadedPackage loaded, String requested, List<Section> found) {
+        return loaded.ambiguous(List.of(requested),
+                "'" + requested + "' matches " + found.size() + " readme sections of " + loaded.place() + ".",
+                "Name the one you mean:", Failure.SECTIONS,
+                found.stream().map(section -> new Failure.Match(section.number() + ". " + section.title(),
+                        command(loaded.target(), String.valueOf(section.number())).text())).toList());
+    }
+
     private static Failure noReadme(LoadedPackage loaded) {
-        return new Failure.Validation(
+        return loaded.symbolNotFound(List.of(Command.README),
                 loaded.label() + " publishes no readme"
                         + (loaded.module() == null ? "." : " for module " + loaded.module() + "."),
                 loaded.module() != null
@@ -139,7 +146,8 @@ public final class Readme {
                                 + "` lists what the default module declares and its submodules."
                         : loaded.submodules().isEmpty()
                                 ? "This package publishes no other module either."
-                                : "Check its other modules: `" + Command.overview(loaded.target(null)) + "`.");
+                                : "Check its other modules: `" + Command.overview(loaded.target(null)) + "`.",
+                null);
     }
 
     /** Every addressable section of the resolved module's readme, in the readme's own order. */
@@ -275,14 +283,13 @@ public final class Readme {
                     sections.stream().map(section -> section.number() + ". " + section.title()).toList()));
         }
         if (found.size() > 1) {
-            return Result.ok(listing(loaded, sections, found, true));
+            return Result.err(severalSections(loaded, requested, found));
         }
         Section section = found.get(0);
         if (filter != null && !matches(section, filter)) {
             String unfiltered = command(loaded.target(), requested).text();
-            return Result.err(new Failure.Validation(
-                    "Section " + requested + " (\"" + section.title() + "\") does not mention \""
-                            + filter + "\".",
+            return Result.err(loaded.symbolNotFound(List.of(requested, filter),
+                    "Section " + requested + " (\"" + section.title() + "\") does not mention \"" + filter + "\".",
                     "Drop --filter to read it anyway: " + Failure.quoted(unfiltered) + ".", unfiltered));
         }
         return Result.ok(toResult(section, sections.size(), loaded));

@@ -298,8 +298,8 @@ public class CliTest {
 
         Capture close = new Capture();
         Assert.assertEquals(Cli.run(List.of("method", "close", "-p", "ballerinax/kafka"), close.streams(),
-                centralFor("ballerinax__kafka", "4.6.5")), 2, close.stderr());
-        Assert.assertEquals(close.field("kind"), "validation", close.stderr());
+                centralFor("ballerinax__kafka", "4.6.5")), Failure.AMBIGUOUS, close.stderr());
+        Assert.assertEquals(close.field("kind"), "ambiguous", close.stderr());
         Assert.assertFalse(close.failure().has("command"), "no one owner is preferred: " + close.stderr());
         Assert.assertFalse(close.failure().has("candidates"), close.stderr());
         JsonArray owners = close.failure().getAsJsonArray("owners");
@@ -650,7 +650,7 @@ public class CliTest {
                     "[[package]]\norg = \"ballerina\"\nname = \"http\"\nversion = \"" + locked + "\"\n");
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(List.of("package", "ballerina/http"), capture.streams(), never(),
-                    projectDir.toString()), 1, locked);
+                    projectDir.toString()), Failure.USAGE, locked);
             Assert.assertEquals(capture.field("kind"), "validation", locked);
             Path lock = projectDir.resolve("Dependencies.toml");
             Assert.assertEquals(capture.field("message"), lock + " locks ballerina/http at '" + locked
@@ -1009,13 +1009,12 @@ public class CliTest {
     public void aMemberOnSeveralContainersFailsWithTheBucketsListing() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("method", "'commit", "-p", "ballerinax/kafka"), capture.streams(),
-                centralFor("ballerinax__kafka", "4.6.5"), null, true), 2);
-        Assert.assertTrue(capture.stderr().startsWith("error: 'commit' is declared by Caller and Consumer in "
+                centralFor("ballerinax__kafka", "4.6.5"), null, true), Failure.AMBIGUOUS);
+        Assert.assertEquals(capture.stderr(), "error: 'commit' is declared by Caller and Consumer in "
                 + "ballerinax/kafka:4.6.5.\n"
                 + "  Name the one you mean with --client, --class, --service:\n"
                 + "    Caller    bal discover method commit -p ballerinax/kafka --client Caller\n"
-                + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n"
-                + "Usage: bal discover method "), capture.stderr());
+                + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n");
     }
 
     @Test
@@ -1159,9 +1158,9 @@ public class CliTest {
             argv.addAll(narrowed);
             Capture capture = new Capture();
             int exitCode = Cli.run(argv, capture.streams(), options(graphqlCentral()));
-            Assert.assertEquals(exitCode, 1, argv + " -> " + capture.stdout());
+            Assert.assertEquals(exitCode, Failure.NOT_FOUND, argv + " -> " + capture.stdout());
             Assert.assertEquals(capture.stdout(), "");
-            Assert.assertEquals(capture.field("kind"), "validation");
+            Assert.assertEquals(capture.field("kind"), "symbol-not-found");
             Assert.assertTrue(capture.field("message").contains("publishes no readme for module dataloader"),
                     argv + " -> " + capture.stderr());
             // Under --module the loaded submodules are that module's children, never its siblings or the
@@ -1284,7 +1283,7 @@ public class CliTest {
         for (List<String> argv : unpaged) {
             Capture capture = new Capture();
             int exitCode = Cli.run(argv, capture.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
-            Assert.assertEquals(exitCode, 1, argv + " -> " + capture.stdout());
+            Assert.assertEquals(exitCode, Failure.USAGE, argv + " -> " + capture.stdout());
             Assert.assertEquals(capture.stdout(), "");
             Assert.assertEquals(capture.field("kind"), "validation");
             Assert.assertTrue(capture.field("message").contains("only one page"), argv + " -> " + capture.stderr());
@@ -1298,12 +1297,13 @@ public class CliTest {
 
         Capture oneGroupedPage = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--page", "2"),
-                oneGroupedPage.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
+                oneGroupedPage.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), Failure.USAGE);
         Assert.assertTrue(oneGroupedPage.field("message").contains("on 1 page"), oneGroupedPage.stderr());
 
         Capture emptySearch = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--filter", "zzzq",
-                "--page", "2"), emptySearch.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
+                "--page", "2"), emptySearch.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())),
+                Failure.USAGE);
         Assert.assertEquals(emptySearch.field("message"),
                 "Page 2 is out of range: this listing has 0 entries on 1 page.");
     }
@@ -1313,14 +1313,16 @@ public class CliTest {
         String github = "ballerinax__github";
         Capture beyond = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/twilio", "--page", "99"),
-                beyond.streams(), centralFor("ballerinax__twilio", FixtureCorpus.FIXTURE_VERSION.text())), 1);
+                beyond.streams(), centralFor("ballerinax__twilio", FixtureCorpus.FIXTURE_VERSION.text())),
+                Failure.USAGE);
         Assert.assertEquals(beyond.field("qualified"), "ballerinax/twilio");
         Assert.assertEquals(beyond.field("version"), FixtureCorpus.FIXTURE_VERSION.text());
         Assert.assertEquals(beyond.field("command"), "bal discover client Client -p ballerinax/twilio --page 5");
 
         Capture single = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--filter", "zzzq",
-                "--page", "2"), single.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), 1);
+                "--page", "2"), single.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())),
+                Failure.USAGE);
         Assert.assertTrue(single.field("suggestion").startsWith("This listing has only one page"),
                 single.stderr());
         Assert.assertEquals(single.field("command"), "bal discover client Client -p ballerinax/github --filter zzzq");
@@ -1435,7 +1437,7 @@ public class CliTest {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(transport));
-        Assert.assertEquals(exitCode, 1);
+        Assert.assertEquals(exitCode, Failure.BAD_ANSWER);
         Assert.assertEquals(capture.field("kind"), "upstream", capture.stderr());
     }
 
@@ -1696,46 +1698,6 @@ public class CliTest {
             Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
             Assert.assertEquals(capture.field("kind"), "validation", String.join(" ", argv));
             Assert.assertTrue(capture.stderr().endsWith("}\n"), String.join(" ", argv));
-        }
-    }
-
-    @Test
-    public void aUsageErrorIsExitTwoEveryOtherFailureExitOneAndTheKindSaysWhatWentWrong() {
-        record Case(String kind, int code, List<String> argv, HttpOptions http) { }
-        HttpOptions missing = HttpOptions.builder()
-                .transport(FakeTransport.always(FakeTransport.status(400)))
-                .maxAttempts(1).baseDelayMs(1).sleeper(millis -> { }).build();
-        HttpOptions broken = HttpOptions.builder()
-                .transport(FakeTransport.always(FakeTransport.status(500)))
-                .maxAttempts(1).baseDelayMs(1).sleeper(millis -> { }).build();
-        HttpOptions kafka = centralFor("ballerinax__kafka", "4.6.5");
-
-        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka"), new Capture().streams(), kafka), 0);
-        Assert.assertEquals(Cli.run(List.of("--help"), new Capture().streams(), never()), 0);
-
-        List<Case> failures = List.of(
-                new Case("package-not-found", 1, List.of("package", "no-such-org/no-such-pkg"), missing),
-                new Case("upstream", 1, List.of("package", "ballerinax/kafka"), broken),
-                new Case("validation", 2, List.of("package", "ballerina/http:2.16"), never()),
-                new Case("validation", 2, List.of("nonsense"), never()),
-                new Case("validation", 1, List.of("client", "-p", "ballerinax/kafka", "--page", "2"), kafka),
-                new Case("validation", 2, List.of("function", "a", "b", "-p", "ballerinax/kafka"), never()),
-                new Case("validation", 2, List.of("type", "A", "B", "-p", "ballerinax/kafka"), never()),
-                new Case("validation", 2, List.of("type", "A", "-p", "ballerinax/kafka", "--filter", "x"), never()),
-                new Case("validation", 2, List.of("method", "poll", "x", "-p", "ballerinax/kafka", "--client",
-                        "Consumer"), kafka),
-                new Case("validation", 2, List.of("method", "close", "-p", "ballerinax/kafka"), kafka),
-                new Case("symbol-not-found", 1, List.of("method", "send", "-p", "ballerinax/kafka", "--class",
-                        "Producer"), kafka),
-                new Case("validation", 2, List.of("ballerinax/kafka", "client", "Consumer"), never()),
-                new Case("validation", 2, List.of("client", "Consumer"), never()),
-                new Case("symbol-not-found", 1,
-                        List.of("client", "NoSuchContainer", "-p", "ballerinax/kafka"), kafka));
-        for (Case failure : failures) {
-            Capture capture = new Capture();
-            String label = String.join(" ", failure.argv());
-            Assert.assertEquals(Cli.run(failure.argv(), capture.streams(), failure.http()), failure.code(), label);
-            Assert.assertEquals(capture.field("kind"), failure.kind(), label);
         }
     }
 

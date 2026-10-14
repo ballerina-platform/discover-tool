@@ -155,7 +155,7 @@ public class GrammarTest {
 
     @Test
     public void aMemberSeveralContainersDeclareListsEachOwnersCommand() {
-        CliTest.Capture several = failure(2, "ballerinax__kafka", "method", "-p", KAFKA);
+        CliTest.Capture several = failure(Failure.AMBIGUOUS, "ballerinax__kafka", "method", "-p", KAFKA);
         Assert.assertEquals(several.failure().getAsJsonArray("owners").size(), 7, several.stderr());
         Assert.assertTrue(several.stderr().contains("bal discover method -p " + KAFKA + " --client Producer"),
                 several.stderr());
