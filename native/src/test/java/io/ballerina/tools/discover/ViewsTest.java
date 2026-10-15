@@ -469,18 +469,22 @@ public class ViewsTest {
     }
 
     @Test
-    public void aContainerThatIsNotThereFailsWithTheBucketsListing() {
+    public void aContainerThatIsNotThereFailsWithTheSearchAndTheBucketsListing() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        assertMiss(miss(http, "client", "client"), "'client' is not a client in " + http.label() + ".",
-                "List the clients: `bal discover client -p ballerina/http`.", "bal discover client -p ballerina/http");
+        assertMiss(miss(http, "client", "client"),
+                "'client' is not a client, nor a member of any client, in " + http.label() + ".",
+                "Search the package for it: `bal discover search client -p ballerina/http`; or list the clients: "
+                        + "`bal discover client -p ballerina/http`.", "bal discover search client -p ballerina/http");
         assertMiss(miss(http, "function", "nosuch"), "'nosuch' is not a function in " + http.label() + ".",
                 "List the functions: `bal discover function -p ballerina/http`.",
                         "bal discover function -p ballerina/http");
         // A name nothing in the bucket declares, whether as a container, a member or a path.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        assertMiss(miss(github, "client", "gist"), "'gist' is not a client in " + github.label() + ".",
-                "List the clients: `bal discover client -p ballerinax/github`.",
-                        "bal discover client -p ballerinax/github");
+        assertMiss(miss(github, "client", "gist"),
+                "'gist' is not a client, nor a member of any client, in " + github.label() + ".",
+                "Search the package for it: `bal discover search gist -p ballerinax/github`; or list the clients: "
+                        + "`bal discover client -p ballerinax/github`.",
+                "bal discover search gist -p ballerinax/github");
     }
 
     @Test

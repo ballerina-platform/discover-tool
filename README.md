@@ -850,7 +850,7 @@ name, it carries no `command` and lists them in `owners` instead:
 
 ```
 $ bal discover client NoSuchContainer -p ballerinax/kafka | cat
-{"kind":"symbol-not-found","message":"'NoSuchContainer' is not a client in ballerinax/kafka:4.6.5.","qualified":"ballerinax/kafka","version":"4.6.5","requested":["NoSuchContainer"],"suggestion":"List the clients: `bal discover client -p ballerinax/kafka`.","command":"bal discover client -p ballerinax/kafka"}
+{"kind":"symbol-not-found","message":"'NoSuchContainer' is not a client, nor a member of any client, in ballerinax/kafka:4.6.5.","qualified":"ballerinax/kafka","version":"4.6.5","requested":["NoSuchContainer"],"suggestion":"Search the package for it: `bal discover search NoSuchContainer -p ballerinax/kafka`; or list the clients: `bal discover client -p ballerinax/kafka`.","command":"bal discover search NoSuchContainer -p ballerinax/kafka"}
 ```
 
 In text it is `error: <message>`, then the suggestion and anything else the failure carries (schema issues, a
