@@ -430,15 +430,7 @@ public final class Containers {
         boolean resource = options.ask() == Ask.RESOURCE;
         String what = resource ? "resource method" : "method";
         if (options.selectors().isEmpty()) {
-            Ask other = resource ? Ask.METHOD : Ask.RESOURCE;
-            boolean declared = containersOf(loaded).stream().anyMatch(container -> !members(container, other)
-                    .isEmpty());
-            String next = declared
-                    ? loaded.command(resource ? Command.METHOD : Command.RESOURCE).text()
-                    : loaded.overview().text();
-            return loaded.symbolNotFound(List.of(), "No container in " + loaded.place() + " declares a " + what
-                    + ".", (declared ? "List the " + (resource ? "methods" : "resource methods") + " instead: "
-                    : "See what it declares: ") + Failure.quoted(next) + ".", next);
+            return noneOfItsKind(loaded, resource, what);
         }
         String token = options.selectors().get(0);
         String typed = String.join(" ", plainWords(options.selectors()));
@@ -450,21 +442,48 @@ public final class Containers {
                 return misplaced.get();
             }
         }
-        String keyword = token;
-        if (resource) {
-            Optional<String> segment = PathTree.splitPath(PathTree.plainSelector(token)).stream()
-                    .filter(word -> !word.isEmpty() && !word.startsWith(PathTree.PARAMETER))
-                    .findFirst();
-            if (segment.isEmpty()) {
-                String listing = loaded.command(Command.RESOURCE).text();
-                return loaded.symbolNotFound(options.selectors(), message,
-                        "List the resource methods: " + Failure.quoted(listing) + ".", listing);
-            }
-            keyword = segment.get();
+        Optional<String> keyword = searchKeyword(token);
+        if (keyword.isEmpty()) {
+            String listing = loaded.command(Command.RESOURCE).text();
+            return loaded.symbolNotFound(options.selectors(), message,
+                    "List the resource methods: " + Failure.quoted(listing) + ".", listing);
         }
-        String search = loaded.command(Command.SEARCH, PathTree.plainSelector(keyword)).text();
+        String search = loaded.command(Command.SEARCH, keyword.get()).text();
         return loaded.symbolNotFound(options.selectors(), message,
-                "Search the package for it: " + Failure.quoted(search) + ".", search);
+                Search.SEARCH_FOR_IT + Failure.quoted(search) + ".", search);
+    }
+
+    /**
+     * The word a search finds a typed name by: a path's first literal segment, since a search matches one segment,
+     * and a dotted {@code Container.member}'s member. Empty for a path with no literal segment.
+     */
+    public static Optional<String> searchKeyword(String token) {
+        String plain = PathTree.plainSelector(token);
+        if (plain.contains(PathTree.SEPARATOR)) {
+            return PathTree.splitPath(plain).stream()
+                    .filter(segment -> !segment.isEmpty() && !segment.startsWith(PathTree.PARAMETER))
+                    .findFirst();
+        }
+        int dot = plain.lastIndexOf(MEMBER_ACCESS);
+        return Optional.of(dot >= 0 && dot < plain.length() - 1 ? plain.substring(dot + 1) : plain);
+    }
+
+    // Nothing to list of the kind asked: the containers that declare the other kind, else the package's overview.
+    private static Failure noneOfItsKind(LoadedPackage loaded, boolean resource, String what) {
+        Ask other = resource ? Ask.METHOD : Ask.RESOURCE;
+        String message = "No container in " + loaded.place() + " declares a " + what;
+        Optional<Surface.Container> owner = containersOf(loaded).stream()
+                .filter(container -> !members(container, other).isEmpty())
+                .findFirst();
+        if (owner.isEmpty()) {
+            String overview = loaded.overview().text();
+            return new Failure.Validation(message + ".", "See what it declares: " + Failure.quoted(overview) + ".",
+                    overview);
+        }
+        String noun = owner.get().scope().commandNoun();
+        String listing = bucketCommand(loaded, noun);
+        return new Failure.Validation(message + "; its " + (resource ? "methods" : "resource methods")
+                + " are read under " + noun + ".", "Run " + Failure.quoted(listing) + ".", listing);
     }
 
     // `Producer.send`, the way code calls it: the method on the container its flag names.
@@ -481,14 +500,27 @@ public final class Containers {
                         List.of(method)).filtered(filterOf(options)).text()));
     }
 
+    // A name a container noun holds nowhere may have been a container or a member of one: the package's search
+    // for it, beside the noun's listing.
     private static Failure notInBucket(LoadedPackage loaded, Surface.Scope scope, String token, Options options) {
-        Optional<Failure> misplaced = heldElsewhere(loaded, scope, notA(loaded, token, scope.noun()), token, options);
+        String message = scope == Surface.Scope.MODULE
+                ? notA(loaded, token, scope.noun())
+                : named(token) + " is not " + article(scope.noun()) + ", nor a member of any " + scope.noun()
+                        + ", in " + loaded.place() + ".";
+        Optional<Failure> misplaced = heldElsewhere(loaded, scope, notA(loaded, token, scope.noun()), token, options)
+                .or(() -> dotted(loaded, message, token, options));
         if (misplaced.isPresent()) {
             return misplaced.get();
         }
         String listing = bucketCommand(loaded, scope.commandNoun());
-        return loaded.symbolNotFound(List.of(token), notA(loaded, token, scope.noun()),
-                "List the " + scope.plural() + ": " + Failure.quoted(listing) + ".", listing);
+        String list = "the " + scope.plural() + ": " + Failure.quoted(listing) + ".";
+        Optional<String> keyword = searchKeyword(token);
+        if (scope == Surface.Scope.MODULE || keyword.isEmpty()) {
+            return loaded.symbolNotFound(List.of(token), message, "List " + list, listing);
+        }
+        String search = loaded.command(Command.SEARCH, keyword.get()).text();
+        return loaded.symbolNotFound(List.of(token), message,
+                Search.SEARCH_FOR_IT + Failure.quoted(search) + "; or list " + list, search);
     }
 
     /**

@@ -837,7 +837,7 @@ public class CliTest {
     }
 
     @Test
-    public void namingSomethingNoBucketHoldsFailsWithTheBucketsListingAndNoCandidates() {
+    public void namingSomethingNoBucketHoldsFailsWithThePackagesSearchAndNoCandidates() {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("client", "FailoverClientt", "-p", "ballerina/http"), capture.streams(),
                 centralFor("ballerina__http", "2.16.6"));
@@ -845,7 +845,9 @@ public class CliTest {
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
         Assert.assertFalse(capture.failure().has("candidates"), capture.stderr());
-        Assert.assertEquals(capture.field("command"), "bal discover client -p ballerina/http");
+        Assert.assertEquals(capture.field("command"), "bal discover search FailoverClientt -p ballerina/http");
+        Assert.assertTrue(capture.field("suggestion").endsWith("or list the clients: `bal discover client -p "
+                + "ballerina/http`."), capture.stderr());
         Assert.assertTrue(capture.failure().getAsJsonArray("requested").toString().contains("FailoverClientt"),
                 capture.stderr());
     }

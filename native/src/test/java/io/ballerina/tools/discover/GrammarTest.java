@@ -294,7 +294,10 @@ public class GrammarTest {
                         "bal discover function printInfo -p ballerina/log"},
                 {List.of("methods", "send", "-p", KAFKA, "--client", "Producer"),
                         "bal discover method send -p " + KAFKA + " --client Producer"},
-                {List.of("-p", KAFKA, "clients"), "bal discover client -p " + KAFKA}};
+                {List.of("-p", KAFKA, "clients"), "bal discover client -p " + KAFKA},
+                {List.of("packages", "-p", KAFKA), "bal discover package " + KAFKA},
+                {List.of("classes", "Producer", "send", "-p", KAFKA),
+                        "bal discover method send -p " + KAFKA + " --class Producer"}};
     }
 
     @Test(dataProvider = "aliases")
@@ -343,9 +346,41 @@ public class GrammarTest {
     }
 
     @Test
-    public void aMethodAskedOfAPackageWithOnlyResourcesPointsAtTheResources() {
-        CliTest.Capture none = failure(NOT_FOUND, "ballerinax__github", "method", "-p", GITHUB);
-        Assert.assertEquals(none.field("command"), "bal discover resource -p " + GITHUB, none.stderr());
+    public void aMethodAskedOfAPackageWithOnlyResourcesPointsAtTheirContainers() {
+        CliTest.Capture none = failure(USAGE, "ballerinax__github", "method", "-p", GITHUB);
+        Assert.assertEquals(none.field("command"), "bal discover client -p " + GITHUB, none.stderr());
+    }
+
+    @Test
+    public void aPathTypedWithoutThePackageIsNeverTakenForThePackage() {
+        for (String noun : List.of("resource", "client")) {
+            CliTest.Capture path = failure(USAGE, null, noun, "gists/public", "get");
+            Assert.assertTrue(path.field("suggestion").startsWith("Write `bal discover " + noun
+                    + " gists/public get -p <org>/<name>`"), path.stderr());
+            Assert.assertEquals(path.field("command"), "bal discover search gists", path.stderr());
+        }
+        CliTest.Capture given = failure(NOT_FOUND, "ballerinax__github", "client", "gist/public", "-p", GITHUB);
+        Assert.assertEquals(given.field("command"), "bal discover search gist -p " + GITHUB, given.stderr());
+    }
+
+    @Test
+    public void aContainerNounRecoversADottedMemberOrAStrayWordInOneHop() {
+        for (String noun : List.of("client", "class")) {
+            CliTest.Capture dotted = failure(NOT_FOUND, "ballerinax__kafka", noun, "Producer.send", "-p", KAFKA);
+            Assert.assertEquals(dotted.field("command"), "bal discover method send -p " + KAFKA
+                    + " --client Producer", dotted.stderr());
+        }
+        CliTest.Capture extra = failure(USAGE, null, "client", "Producer", "send", "extra", "-p", KAFKA);
+        Assert.assertEquals(extra.field("command"), "bal discover method send -p " + KAFKA + " --client Producer",
+                extra.stderr());
+    }
+
+    @Test
+    public void aPluralNounWithNoPackageGetsTheShapeAndTheSearch() {
+        CliTest.Capture plural = failure(USAGE, null, "functions", "printInfo");
+        Assert.assertTrue(plural.field("message").startsWith("'functions' is not a noun; the noun is function. "),
+                plural.stderr());
+        Assert.assertEquals(plural.field("command"), "bal discover search printInfo", plural.stderr());
     }
 
     @Test

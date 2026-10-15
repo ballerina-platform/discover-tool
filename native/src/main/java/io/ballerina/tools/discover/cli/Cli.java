@@ -99,6 +99,10 @@ public final class Cli {
 
     private static final String PATH_SEPARATOR = "/";
 
+    /** The accessors a resource is most often declared with, which tell a resource's last name from a stray word. */
+    private static final Set<String> RESOURCE_ACCESSORS =
+            Set.of("get", "post", "put", "delete", "patch", "head", "options", "default");
+
 
     /** How many names each noun takes; {@code search} takes any number of keywords. */
     private static final Map<String, Integer> MAX_NAMES = Map.of(
@@ -257,31 +261,47 @@ public final class Cli {
     }
 
     // A name that is a package coordinate: the package typed where a name goes, one name more than the noun takes
-    // when -p is missing. A path and a readme title may hold '/' too: a resource's name is the package only beside a
-    // whole path and accessor, and neither is ever with -p given.
+    // when -p is missing. A resource path reads as a coordinate too, so the package is the last name, or the first
+    // when a path follows it. With -p given, a slashed name where a path or a readme title may go is the package only
+    // when it is the same package.
     private static String misplacedPackage(Invocation call) {
         List<String> names = call.names();
         Integer max = MAX_NAMES.get(call.noun());
-        if (max == null) {
+        String candidate = max == null ? null : packageCandidate(names);
+        if (candidate == null) {
             return null;
         }
         boolean resource = Command.RESOURCE.equals(call.noun());
-        boolean slashed = resource || Command.README.equals(call.noun());
-        boolean possible = call.pkg() == null
-                ? names.size() <= max + 1 && (!resource || names.size() > max)
-                : !slashed && names.size() <= max;
-        if (!possible) {
+        if (call.pkg() == null) {
+            return names.size() <= max + 1 && (!resource || names.size() > max) ? candidate : null;
+        }
+        if (names.size() > max) {
             return null;
         }
-        for (String name : names) {
-            List<String> others = new ArrayList<>(names);
-            others.remove(name);
-            boolean coordinate = name.contains(PATH_SEPARATOR) && Coordinate.parse(name).isOk();
-            if (coordinate && (!resource || !others.get(others.size() - 1).contains(PATH_SEPARATOR))) {
-                return name;
-            }
+        boolean slashed = resource || Command.README.equals(call.noun())
+                || (CONTAINER_NOUNS.containsKey(call.noun()) && !Command.FUNCTION.equals(call.noun()));
+        return !slashed || samePackage(candidate, call.pkg()) ? candidate : null;
+    }
+
+    private static String packageCandidate(List<String> names) {
+        if (names.isEmpty()) {
+            return null;
         }
-        return null;
+        String last = names.get(names.size() - 1);
+        if (isCoordinate(last)) {
+            return last;
+        }
+        String first = names.get(0);
+        return names.size() > 1 && names.get(1).contains(PATH_SEPARATOR) && isCoordinate(first) ? first : null;
+    }
+
+    private static boolean isCoordinate(String word) {
+        return word.contains(PATH_SEPARATOR) && Coordinate.parse(word).isOk();
+    }
+
+    private static boolean samePackage(String typed, String pkg) {
+        Result<Coordinate> given = Coordinate.parse(pkg);
+        return given.isOk() && Coordinate.parse(typed).value().qualified().equals(given.value().qualified());
     }
 
     private static Failure.Validation packageAsName(Invocation call, String pkg) {
@@ -306,7 +326,7 @@ public final class Cli {
                     + Failure.quoted(Command.of(Command.SEARCH, Command.placeholder(PLACEHOLDER_KEYWORD)).text())
                     + ".");
         }
-        String name = call.echoed().get(0);
+        String name = Containers.searchKeyword(call.echoed().get(0)).orElse(call.echoed().get(0));
         String search = Command.of(Command.SEARCH, name).text();
         return new Failure.Validation(message,
                 write + "; to find the package that declares '" + name + "': " + Failure.quoted(search) + ".",
@@ -355,11 +375,14 @@ public final class Cli {
         return noun + " takes " + takes + "; got " + given + ".";
     }
 
-    // `client C m` read as the member it names: a method, or a resource when a path or an accessor follows.
+    // `client C m` read as the member it names: a resource when a path or an accessor follows, else the method,
+    // and any word after a method dropped.
     private static Command memberOf(String noun, List<String> names) {
         List<String> member = names.subList(1, names.size());
-        boolean resource = member.size() > 1 || member.get(0).contains(PATH_SEPARATOR);
-        return Command.of(resource ? Command.RESOURCE : Command.METHOD, member).ownedBy(noun, names.get(0));
+        boolean resource = member.get(0).contains(PATH_SEPARATOR)
+                || member.size() > 1 && RESOURCE_ACCESSORS.contains(member.get(member.size() - 1));
+        return (resource ? Command.of(Command.RESOURCE, member) : Command.of(Command.METHOD, member.get(0)))
+                .ownedBy(noun, names.get(0));
     }
 
     // `literal`: how many of the last names follow `--`, where a leading dash is part of the name.
@@ -435,18 +458,33 @@ public final class Cli {
         String message = "'" + argv.get(at) + "' is not a noun; the noun is " + noun + ".";
         List<String> fixed = new ArrayList<>(argv);
         fixed.set(at, noun);
+        Failure.Validation fixedNoun = fixedNoun(probe, fixed, noun, message);
+        return fixedNoun != null ? fixedNoun : new Failure.Validation(message, "Write " + noun + " in its place.");
+    }
+
+    // The command with the noun fixed, folding in the fix of whatever else it still gets wrong; null when the rest
+    // does not parse or names nothing runnable.
+    private static Failure.Validation fixedNoun(Commands.Grammar probe, List<String> fixed, String noun,
+            String message) {
+        Invocation call;
         try {
-            CommandLine.ParseResult parsed = probe.line().parseArgs(fixed.toArray(new String[0]));
-            Invocation call = Invocation.of(probe.root(), noun, probe.nouns().get(noun));
-            if (parsed.hasSubcommand() && call.coordinate() != null && misuse(probe, call, literalWords(fixed))
-                    == null) {
-                String command = call.paged(call.command()).text();
-                return new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command);
+            if (!probe.line().parseArgs(fixed.toArray(new String[0])).hasSubcommand()) {
+                return null;
             }
+            call = Invocation.of(probe.root(), noun, probe.nouns().get(noun));
         } catch (CommandLine.ParameterException unparsed) {
-            // Then the rest of the command is wrong too; the noun is still the first thing to fix.
+            return null;
         }
-        return new Failure.Validation(message, "Write " + noun + " in its place.");
+        Failure.Validation further = misuse(probe, call, literalWords(fixed));
+        if (further != null) {
+            return new Failure.Validation(message + " " + further.message(), further.suggestion(), further.command(),
+                    further.qualified(), further.version(), further.owners());
+        }
+        if (call.coordinate() == null) {
+            return null;
+        }
+        String command = call.paged(call.command()).text();
+        return new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command);
     }
 
     private static int literalWords(List<String> argv) {

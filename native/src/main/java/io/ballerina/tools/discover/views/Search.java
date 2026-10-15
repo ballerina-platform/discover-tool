@@ -58,6 +58,9 @@ public final class Search {
 
     private static final String KEYWORD_SEPARATOR = "\\s+";
 
+    /** How a failure suggests searching the package for a name. */
+    public static final String SEARCH_FOR_IT = "Search the package for it: ";
+
     private static final Map<Surface.Scope, DiscoverResult.Search.Kind> CONTAINER_KINDS = Map.of(
             Surface.Scope.CLIENT, DiscoverResult.Search.Kind.CLIENTS,
             Surface.Scope.SERVICE, DiscoverResult.Search.Kind.SERVICE_TYPES,
