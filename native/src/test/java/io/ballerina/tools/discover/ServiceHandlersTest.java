@@ -87,10 +87,19 @@ public class ServiceHandlersTest {
     }
 
     private static HttpOptions central(boolean withMetadata) {
+        return optionsOver(transport(withMetadata));
+    }
+
+    private static HttpOptions optionsOver(FakeTransport transport) {
+        return HttpOptions.builder().transport(transport).baseDelayMs(1).sleeper(millis -> {
+        }).build();
+    }
+
+    private static FakeTransport transport(boolean withMetadata) {
         String docs = FixtureCorpus.loadRawFixture(KAFKA).toString();
         JsonObject entry = new JsonObject();
         entry.addProperty("balaURL", BALA_URL);
-        FakeTransport transport = FakeTransport.routing(url -> {
+        return FakeTransport.routing(url -> {
             if (url.contains("/docs/")) {
                 return FakeTransport.ok(docs);
             }
@@ -100,8 +109,6 @@ public class ServiceHandlersTest {
             return url.matches(".*/registry/packages/[^/]+/[^/]+") ? FakeTransport.ok("[\"4.6.6\"]")
                     : FakeTransport.status(404);
         }).downloading(url -> BALA_URL.equals(url) ? Optional.of(bala(withMetadata)) : Optional.empty());
-        return HttpOptions.builder().transport(transport).baseDelayMs(1).sleeper(millis -> {
-        }).build();
     }
 
     private static String run(HttpOptions http, String... argv) {
@@ -117,6 +124,22 @@ public class ServiceHandlersTest {
         withOutput.add("--output");
         withOutput.add("json");
         return JsonParser.parseString(run(http, withOutput.toArray(new String[0]))).getAsJsonObject();
+    }
+
+    @Test
+    public void aMethodNoServiceDeclaresIsFoundWithoutReadingTheHandlerFile() {
+        FakeTransport transport = transport(true);
+        JsonObject answer = json(optionsOver(transport), "method", "poll", "-p", "ballerinax/kafka:4.6.6");
+        Assert.assertEquals(answer.get("name").getAsString(), "poll");
+        Assert.assertEquals(transport.urls().stream().filter(url -> !url.contains("/docs/")).toList(), List.of());
+    }
+
+    @Test
+    public void aMethodOnlyAServiceDescribesIsFoundByReadingTheHandlerFile() {
+        FakeTransport transport = transport(true);
+        JsonObject answer = json(optionsOver(transport), "method", "onError", "-p", "ballerinax/kafka:4.6.6");
+        Assert.assertEquals(answer.getAsJsonArray("handlers").size(), 1);
+        Assert.assertTrue(transport.urls().contains(BALA_URL));
     }
 
     @Test
