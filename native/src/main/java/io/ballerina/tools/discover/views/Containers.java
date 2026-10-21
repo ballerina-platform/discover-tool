@@ -270,8 +270,13 @@ public final class Containers {
                     : Result.err(noSuchOwner(loaded, scope, name, options));
         }
         List<Surface.Container> owners = candidates.stream()
-                .filter(container -> declares(loaded, container, options))
+                .filter(container -> selects(container, options))
                 .toList();
+        if (owners.isEmpty() || options.selectors().isEmpty()) {
+            owners = candidates.stream()
+                    .filter(container -> selects(container, options) || describes(loaded, container, options))
+                    .toList();
+        }
         if (owners.size() == 1) {
             return answer(loaded, owners.get(0).scope(), owners.get(0), options.selectors(), options);
         }
@@ -346,16 +351,18 @@ public final class Containers {
                 PathTree.resolve(tree, PathTree.splitPath(selector)) instanceof PathTree.Resolution.Found);
     }
 
-    // Whether `container` declares what a member command asks for: the method or the resource it names, or with no
-    // name, any method or resource at all — or a method a marker service type's package describes.
-    private static boolean declares(LoadedPackage loaded, Surface.Container container, Options options) {
-        List<String> selectors = options.selectors();
-        boolean selected = selectors.isEmpty()
+    // Whether `container` itself declares what a member command asks for: the method or the resource it names, or
+    // with no name, any method or resource at all.
+    private static boolean selects(Surface.Container container, Options options) {
+        return options.selectors().isEmpty()
                 ? !members(container, options.ask()).isEmpty()
-                : !select(container, options.ask(), selectors).isEmpty();
-        if (selected) {
-            return true;
-        }
+                : !select(container, options.ask(), options.selectors()).isEmpty();
+    }
+
+    // Whether a marker service type's package describes a method the command asks for. Only read once no container
+    // declares the name itself, so a lookup that no service is part of never fetches the package's handler file.
+    private static boolean describes(LoadedPackage loaded, Surface.Container container, Options options) {
+        List<String> selectors = options.selectors();
         return options.ask() == Ask.METHOD && container.scope() == Surface.Scope.SERVICE
                 && loaded.handlersOf(container.name())
                         .map(described -> described.handlers().stream()
