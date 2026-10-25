@@ -135,7 +135,7 @@ final class Usage {
             Typical session:
 
               1. Find a package or a symbol:  bal discover search kafka send
-              2. What a package offers:       bal discover package ballerinax/kafka
+              2. What a package offers:       bal discover package ballerinax/kafka  (or bal discover ballerinax/kafka)
               3. Find a name inside it:       bal discover search send -p ballerinax/kafka
               4. One call, fully addressed:   bal discover method send -p ballerinax/kafka --client Producer
                                               bal discover resource gists/public get -p ballerinax/github \\

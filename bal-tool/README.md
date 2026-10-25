@@ -24,6 +24,7 @@ the noun too (`bal discover -p ballerinax/kafka method send`). `bal discover pac
 <org>/<package>` is the package's overview: its clients, service types, classes and functions with their member
 counts, one line for its types by kind, one for its readme's sections, and its submodules, each with the command
 that opens it.
+The noun may be left out for this one: `bal discover <org>/<package>` is the same command.
 
 `<org>/<package>` always names a package, never a module of one: `bal discover package ballerinax/aws.auth` fails
 with the command that reads that module, `bal discover package ballerinax/aws --module auth`. To find a package in

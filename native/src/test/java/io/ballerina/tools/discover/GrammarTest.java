@@ -169,8 +169,6 @@ public class GrammarTest {
     @DataProvider(name = "oldForms")
     public Object[][] oldForms() {
         return new Object[][] {
-                {List.of(KAFKA), "bal discover package " + KAFKA},
-                {List.of(KAFKA, "--module", "sub"), "bal discover package " + KAFKA + " --module sub"},
                 {List.of(KAFKA, "client"), "bal discover client -p " + KAFKA},
                 {List.of(KAFKA, "client", "Producer"), "bal discover client Producer -p " + KAFKA},
                 {List.of(KAFKA, "client", "Producer", "send"),
@@ -194,6 +192,69 @@ public class GrammarTest {
         Assert.assertEquals(old.field("command"), command, old.stderr());
         Assert.assertEquals(old.field("suggestion"), "Run `" + command + "`.");
         Assert.assertEquals(old.field("message"), "'" + argv.get(0) + "' is not a noun; name the package with -p.");
+    }
+
+    private static CliTest.Capture run(HttpOptions http, String... argv) {
+        CliTest.Capture capture = new CliTest.Capture();
+        Assert.assertEquals(Cli.run(List.of(argv), capture.streams(), http), 0, String.join(" ", argv) + ": "
+                + capture.stderr());
+        return capture;
+    }
+
+    @DataProvider(name = "bareCoordinates")
+    public Object[][] bareCoordinates() {
+        return new Object[][] {
+                {List.of(KAFKA), List.of("package", KAFKA)},
+                {List.of(KAFKA + ":" + FixtureCorpus.FIXTURE_VERSION.text()),
+                        List.of("package", KAFKA + ":" + FixtureCorpus.FIXTURE_VERSION.text())},
+                {List.of(KAFKA, "--output", "json"), List.of("package", KAFKA, "--output", "json")},
+                {List.of(KAFKA, "--output", "text"), List.of("package", KAFKA, "--output", "text")},
+                {List.of("--output", "text", KAFKA), List.of("--output", "text", "package", KAFKA)},
+                {List.of(KAFKA, "--refresh"), List.of("package", KAFKA, "--refresh")}};
+    }
+
+    @Test(dataProvider = "bareCoordinates")
+    public void aBarePackageCoordinateIsThePackageOverview(List<String> bare, List<String> overview) {
+        CliTest.Capture typed = run(central("ballerinax__kafka"), bare.toArray(String[]::new));
+        CliTest.Capture named = run(central("ballerinax__kafka"), overview.toArray(String[]::new));
+        Assert.assertEquals(typed.stdout(), named.stdout());
+        Assert.assertEquals(typed.stderr(), named.stderr());
+    }
+
+    @Test
+    public void aBareCoordinateWithAModuleReadsTheSameAnswerAsPackage() {
+        CliTest.Capture typed = new CliTest.Capture();
+        CliTest.Capture named = new CliTest.Capture();
+        int bare = Cli.run(List.of(KAFKA, "--module", "sub"), typed.streams(), central("ballerinax__kafka"));
+        int overview = Cli.run(List.of("package", KAFKA, "--module", "sub"), named.streams(),
+                central("ballerinax__kafka"));
+        Assert.assertEquals(bare, overview);
+        Assert.assertEquals(typed.stdout(), named.stdout());
+        Assert.assertEquals(typed.stderr(), named.stderr());
+    }
+
+    @Test
+    public void aBareCoordinateOfAMissingPackageFailsAsPackageDoes() {
+        CliTest.Capture typed = new CliTest.Capture();
+        CliTest.Capture named = new CliTest.Capture();
+        int bare = Cli.run(List.of("ballerinax/nonesuch"), typed.streams(), central("ballerinax__kafka"));
+        int overview = Cli.run(List.of("package", "ballerinax/nonesuch"), named.streams(),
+                central("ballerinax__kafka"));
+        Assert.assertNotEquals(bare, 0);
+        Assert.assertEquals(bare, overview);
+        Assert.assertEquals(typed.stderr(), named.stderr());
+    }
+
+    @Test
+    public void aBareCoordinateGivenWithThePackageFlagIsStillAUsageError() {
+        CliTest.Capture both = failure(USAGE, null, KAFKA, "-p", KAFKA);
+        Assert.assertEquals(both.field("message"), "'" + KAFKA + "' is not a noun; name the package with -p.");
+    }
+
+    @Test
+    public void aBareWordThatIsNotACoordinateIsStillAnUnknownNoun() {
+        CliTest.Capture word = failure(USAGE, null, "kafka");
+        Assert.assertTrue(word.field("message").startsWith("'kafka' is not a noun."), word.stderr());
     }
 
     @Test
