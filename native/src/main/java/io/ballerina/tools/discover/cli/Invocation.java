@@ -61,6 +61,18 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
                 either(own.version, top.version), own.refresh || top.refresh);
     }
 
+    /** Whether the line is one package coordinate and nothing else: the package overview, written without its noun. */
+    boolean asBareCoordinate() {
+        return noun == null && pkg == null && rest.size() == 1 && Cli.isCoordinate(rest.get(0));
+    }
+
+    /** This bare coordinate as the {@code package} command it stands for. */
+    Invocation asPackageOverview() {
+        String named = rest.get(0);
+        return new Invocation(Command.PACKAGE, List.of(named), List.of(), pkg, named, owners, output, filter, page,
+                module, version, refresh);
+    }
+
     // The container flags typed before the noun, then after it.
     private static List<Command.Owner> owners(Commands.Root root, Commands.Noun values) {
         List<Command.Owner> owners = new ArrayList<>(root.owners.given());

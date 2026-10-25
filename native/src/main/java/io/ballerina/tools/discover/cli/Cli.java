@@ -179,9 +179,10 @@ public final class Cli {
             streams.out().accept(nounName == null ? Usage.root() : Usage.noun(nounName));
             return Failure.ANSWERED;
         }
-        UsageErrors usage = new UsageErrors(grammar, nounName, streams, json);
-        Invocation call = Invocation.of(grammar.root(), nounName, nounName == null ? null : grammar.nouns()
+        Invocation typed = Invocation.of(grammar.root(), nounName, nounName == null ? null : grammar.nouns()
                 .get(nounName));
+        Invocation call = typed.asBareCoordinate() ? typed.asPackageOverview() : typed;
+        UsageErrors usage = new UsageErrors(grammar, call.noun(), streams, json);
         Failure.Validation misuse = misuse(grammar, call, literalWords(argv));
         if (misuse != null) {
             return usage.error(misuse);
@@ -295,7 +296,7 @@ public final class Cli {
         return names.size() > 1 && names.get(1).contains(PATH_SEPARATOR) && isCoordinate(first) ? first : null;
     }
 
-    private static boolean isCoordinate(String word) {
+    static boolean isCoordinate(String word) {
         return word.contains(PATH_SEPARATOR) && Coordinate.parse(word).isOk();
     }
 
