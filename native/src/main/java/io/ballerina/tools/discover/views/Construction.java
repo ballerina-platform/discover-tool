@@ -47,8 +47,9 @@ import java.util.stream.Collectors;
  * error or nil. The variable is the type's name with its leading capitals lower-cased ({@code HTTPClient} is
  * {@code httpClient}), and the prefix before it when that would be a keyword ({@code github:Client githubClient}).
  * The arguments are the required parameters by name, an included record's included: a parameter with a default and
- * a rest parameter may be left out. A class with no {@code init} is constructed with no arguments; an object type
- * is not constructed at all.
+ * a rest parameter may be left out, and every required parameter after one left out is passed as a named argument
+ * ({@code new (host, clientConfig = clientConfig)}), since a positional argument cannot skip a parameter. A class
+ * with no {@code init} is constructed with no arguments; an object type is not constructed at all.
  *
  * @since 0.1.0
  */
@@ -75,10 +76,7 @@ final class Construction {
                             type + " " + variable(container, own) + " = new ();", null, null))
                     : Optional.empty();
         }
-        String arguments = init.get().params().stream()
-                .filter(Construction::isRequired)
-                .map(param -> Identifiers.write(param.name()))
-                .collect(Collectors.joining(", "));
+        String arguments = arguments(init.get().params());
         String declared = init.get().params().stream()
                 .map(param -> Signatures.renderParam(param, written -> qualified(written, own)))
                 .collect(Collectors.joining(", "));
@@ -86,6 +84,21 @@ final class Construction {
         return Optional.of(new DiscoverResult.Signature.Create(
                 type + " " + variable(container, own) + " = " + check + "new (" + arguments + ");",
                 Fn.Constructor.NAME + "(" + declared + ")", initCommand));
+    }
+
+    // Positional until the first parameter left out; after it, Ballerina accepts the rest only as named arguments.
+    private static String arguments(List<Param> params) {
+        List<String> arguments = new ArrayList<>();
+        boolean named = false;
+        for (Param param : params) {
+            if (!isRequired(param)) {
+                named = true;
+                continue;
+            }
+            String name = Identifiers.write(param.name());
+            arguments.add(named ? name + " = " + name : name);
+        }
+        return String.join(", ", arguments);
     }
 
     private static boolean isRequired(Param param) {
