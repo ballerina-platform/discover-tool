@@ -86,6 +86,59 @@ public class LeafExtrasTest {
         Assert.assertNull(go.create().command());
     }
 
+    private static final String DEFAULT_VALUE = "defaultValue";
+
+    private static String createdWith(Decl... initParams) {
+        Payload payload = Payload.pkg();
+        payload.with("clients", Decl.client("Client", Decl.method("init", initParams),
+                Decl.method("send").on("isRemote")));
+        payload.with("records", Decl.record("Config", Decl.field("port", Node.builtin("int"))),
+                Decl.record("Params", Decl.field("seed", Node.builtin("int"))));
+        Library library = Pipeline.build(payload.module());
+        LoadedPackage acme = new LoadedPackage(QualifiedName.parse("acme/acme").value(), FixtureCorpus.FIXTURE_VERSION,
+                library, Optional.empty(), null, List.of(), List.of(), null, null, () -> library, Map::of);
+        Result<DiscoverResult> send = Asked.of(acme, "method", "send", "--client", "Client");
+        Assert.assertTrue(send.isOk(), send.isOk() ? "" : send.failure().describe());
+        return ((DiscoverResult.Signature) send.value()).create().code();
+    }
+
+    private static Decl included(String name, String record) {
+        return Decl.param(name, Node.named(record, "records").on("isInclusion"));
+    }
+
+    @Test
+    public void anIncludedRecordAfterASkippedDefaultIsPassedByName() {
+        Assert.assertEquals(createdWith(Decl.param("host", Node.builtin("string")),
+                        Decl.param("username", Node.builtin("string")).with(DEFAULT_VALUE, "()"),
+                        Decl.param("password", Node.builtin("string")).with(DEFAULT_VALUE, "()"),
+                        included("clientConfig", "Config")),
+                "acme:Client acmeClient = new (host, clientConfig = clientConfig);");
+    }
+
+    @Test
+    public void everyIncludedRecordAfterASkippedDefaultIsPassedByName() {
+        Assert.assertEquals(createdWith(Decl.param("modelType", Node.builtin("string")),
+                        Decl.param("serviceUrl", Node.builtin("string")).with(DEFAULT_VALUE, "\"http://x\""),
+                        included("modelParameters", "Params"), included("connectionConfig", "Config")),
+                "acme:Client acmeClient = new (modelType, modelParameters = modelParameters, "
+                        + "connectionConfig = connectionConfig);");
+    }
+
+    @Test
+    public void aRestParameterIsLeftOut() {
+        Assert.assertEquals(createdWith(Decl.param("a", Node.builtin("string")),
+                        Decl.param("r", Node.structural().on("isRestParam").elementType(Node.builtin("string")))),
+                "acme:Client acmeClient = new (a);");
+    }
+
+    @Test
+    public void aKeywordNamedArgumentIsQuotedOnBothSides() {
+        Assert.assertEquals(createdWith(Decl.param("url", Node.builtin("string")),
+                        Decl.param("timeout", Node.builtin("int")).with(DEFAULT_VALUE, "10"),
+                        included("type", "Config")),
+                "acme:Client acmeClient = new (url, 'type = 'type);");
+    }
+
     @Test
     public void noLineIsInventedForWhatHasNoConstructorOrIsTheConstructor() {
         Assert.assertNull(leaf("ballerinax__kafka", Surface.Scope.CLIENT, "Producer", "init").create());
