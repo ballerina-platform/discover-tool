@@ -312,17 +312,23 @@ public class GrammarTest {
             Assert.assertTrue(root.stdout().contains("\n  " + noun + " "), noun + ": " + root.stdout());
             CliTest.Capture help = new CliTest.Capture();
             Assert.assertEquals(Cli.run(List.of(noun, "--help"), help.streams(), CliTest.never()), 0, noun);
-            Assert.assertTrue(help.stdout().startsWith("Usage: bal discover " + noun), help.stdout());
-            Assert.assertTrue(help.stdout().contains("\nExamples:\n  bal discover " + noun), help.stdout());
-            Assert.assertFalse(help.stdout().contains("\n  --refresh "), "shared flags are the root's: " + noun);
-            Assert.assertTrue(help.stdout().endsWith("Every noun also takes the flags `bal discover --help` lists.\n"),
-                    help.stdout());
+            String text = help.stdout();
+            Assert.assertTrue(text.contains("\n\nUsage: bal discover " + noun), text);
+            Assert.assertTrue(text.indexOf("\nUsage: ") < text.indexOf("\nOptions:\n")
+                    && text.indexOf("\nOptions:\n") < text.indexOf("\nExamples:\n  # "), text);
+            Assert.assertFalse(text.contains("\n  --refresh "), "shared options are the root's: " + noun);
+            Assert.assertTrue(text.contains("every option 'bal discover --help' lists\n"), text);
+            Assert.assertFalse(text.contains("Exit codes"), text);
+            text.lines().forEach(line -> Assert.assertTrue(line.length() <= 80, noun + ": " + line));
         }
-        Assert.assertTrue(root.stdout().contains("\n  --client|--class|--service <name> "), root.stdout());
+        Assert.assertTrue(root.stdout().contains("\n  --client|--class|--service <name>\n"), root.stdout());
+        Assert.assertFalse(root.stdout().contains("Exit codes"), root.stdout());
+        root.stdout().lines().forEach(line -> Assert.assertTrue(line.length() <= 80, line));
         CliTest.Capture method = new CliTest.Capture();
         Assert.assertEquals(Cli.run(List.of("method", "-h"), method.streams(), CliTest.never()), 0);
-        Assert.assertTrue(method.stdout().startsWith("Usage: bal discover method [<name>] -p <org>/<name>"
-                + "[:<version>]\n                    [--client|--class|--service <name>]"), method.stdout());
+        Assert.assertTrue(method.stdout().contains("\nUsage: bal discover method [<name>] -p <org>/<name>"
+                + "[:<version>]\n                    [--client|--class|--service <name>] [options]\n"),
+                method.stdout());
     }
 
     @DataProvider(name = "packageAsName")

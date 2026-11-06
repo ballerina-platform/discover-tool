@@ -1,1 +1,1 @@
-{"severity":"error","kind":"usage","message":"unknown option '--version'","suggestion":"To read a specific version, write it after the package.","command":"bal discover package ballerinax/github:6.0.0"}
+{"severity":"error","kind":"usage","message":"unknown option '--version'","suggestion":"Run 'bal discover package --help' for the usage."}

@@ -44,6 +44,14 @@ dependencies {
     testImplementation "org.testng:testng:${testngVersion}"
 }
 
+processResources {
+    def toolVersion = rootProject.ext.toolVersionOf("${project.version}")
+    inputs.property('toolVersion', toolVersion)
+    filesMatching('**/tool.properties') {
+        expand(toolVersion: toolVersion)
+    }
+}
+
 checkstyle {
     toolVersion "${checkstylePluginVersion}"
     configFile rootProject.file("config/checkstyle/build/checkstyle.xml")

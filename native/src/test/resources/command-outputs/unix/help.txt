@@ -1,76 +1,42 @@
-Usage: bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]]
-                    [--client|--class|--service <name>] [--output-format json|text]
-                    [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
+Read a Ballerina package's API off Central; trust it over memory or the web
 
-Read a Ballerina package off Central. A signature from here is the source for what
-compiles; a readme, a web search and a remembered API are not.
+Usage: bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]] [options]
 
-Nouns:
-  package <org>/<name>[:<version>]   A package's overview.
-  search <keyword> ...               Central's packages and symbols, or with -p
-                                     every name in one package.
-  client [<name>]                    The clients, or one client's members.
-  service [<name>]                   The service types, or one with what a service
-                                     of it implements.
-  class [<name>]                     The classes, or one class's members.
-  function [<name>]                  The module's functions, or one function's
-                                     signature.
-  type [<name>]                      Every type, or one declaration.
-  method [<name>]                    A container's methods, or one method's
-                                     signature.
-  resource [<path> [<accessor>]]     A container's resource paths, or one resource
-                                     method's signature.
-  readme [<n>|"<title>"]             The readme, or one section of it.
+Commands:
+  package <org>/<name>[:<version>]  a package's overview
+  search <keyword> ...              search Central, or one package with -p
+  client [<name>]                   the clients, or one client's members
+  service [<name>]                  the service types, or one and its methods
+  class [<name>]                    the classes, or one class's members
+  function [<name>]                 the functions, or one function's signature
+  type [<name>]                     every type, or one declaration
+  method [<name>]                   a container's methods, or one's signature
+  resource [<path> [<accessor>]]    resource paths, or one method's signature
+  readme [<n>|"<title>"]            the readme, or one section of it
+  Run 'bal discover <noun> --help' for a noun's options and examples.
 
-A name means one thing; no name, a listing. Every noun but package takes the package
-with -p; search takes it only to search one package. Flags may come before the noun
-or after it.
+Options:
+  --client|--class|--service <name>
+                              name the container of a method or resource
+  --filter <keyword>          narrow a listing to the names that match a keyword
+  -h, --help                  print this help
+  --module <name>             read this submodule by name, e.g. httpscerr
+  --output-format json|text   set the format (default: text on a TTY, else json)
+  -p, --package <org>/<name>[:<version>]
+                              read this package, as bal pull names it
+  --page <n>                  show page n, 40 entries a page (default: 1)
+  --refresh                   ignore the cached copy and fetch it again
+  -V, --version               print the tool's version
 
-Typical session:
-
-  1. Find a package or a symbol:  bal discover search kafka send
-  2. What a package offers:       bal discover package ballerinax/kafka  (or bal discover ballerinax/kafka)
-  3. Find a name inside it:       bal discover search send -p ballerinax/kafka
-  4. One call, fully addressed:   bal discover method send -p ballerinax/kafka --client Producer
-                                  bal discover resource gists/public get -p ballerinax/github \
-                                      --client Client
-  5. Its container, left out:     bal discover method send -p ballerinax/kafka
-  6. A record, enum or error:     bal discover type ConnectionConfig -p ballerinax/github
-  7. One specific version:        bal discover client Client -p ballerina/http:2.15.7
-
-With no version after the package, the one your project's Dependencies.toml locks is
-read (found from the current directory up), else Central's latest.
-Exit codes: 0 an answer (an empty search or --filter too), 1 not found (a package,
-name or page), 2 a usage error, 3 ambiguous (the matches are listed), 4 Central
-unavailable for now (retry later), 5 an answer from Central a retry will not change,
-6 an internal error.
-Run `bal discover <noun> --help` for one noun's names, flags and examples.
-
-  -p, --package <org>/<name>[:<version>]   The package to read, as bal pull names
-                                           it. With no version, the one your
-                                           project's Dependencies.toml locks, else
-                                           Central's latest.
-  --client|--class|--service <name>        The container that declares a method or
-                                           resource, for method and resource only:
-                                           one at most, left out when exactly one
-                                           container declares it.
-  --output-format json|text                Override the TTY-detected default: human
-                                           text at an interactive terminal, JSON
-                                           otherwise.
-  --filter <keyword>                       Narrow a listing to entries whose name,
-                                           path, parameter or type matches this
-                                           keyword. Filtering is local; nothing is
-                                           sent to Central. On package it searches
-                                           the package's names, as search does.
-  --page <n>                               Show page <n> (counting from 1) of a
-                                           listing longer than 40 entries. A page
-                                           past the last one, or against an answer
-                                           that has only one page, is an error.
-  -m, --module <module>                    Target this submodule instead of the
-                                           package's default module, the same
-                                           everywhere including readme. The
-                                           submodule's name only (for example
-                                           httpscerr), not <org>/<name>.<submodule>.
-  --refresh                                Ignore any cached copy and rewrite it.
-                                           Worth passing only when a name should
-                                           exist and does not.
+Examples:
+  # Find a package or a symbol on Central
+  bal discover search kafka send
+  # What a package offers
+  bal discover package ballerinax/kafka
+  # One call, fully addressed
+  bal discover method send -p ballerinax/kafka --client Producer
+  bal discover resource gists/public get -p ballerinax/github --client Client
+  # A record, enum or error
+  bal discover type ConnectionConfig -p ballerinax/github
+  # One version; without one, ./Dependencies.toml's lock, else the latest
+  bal discover client Client -p ballerina/http:2.15.7

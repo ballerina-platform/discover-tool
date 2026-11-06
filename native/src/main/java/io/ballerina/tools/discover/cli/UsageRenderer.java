@@ -27,30 +27,30 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
- * The synopsis and the flag list, rendered from {@link Commands}' picocli model rather than hand-written.
+ * The synopsis and the option rows, rendered from {@link Commands}' picocli model rather than hand-written.
  *
- * <p>A flag's name, label and description are declared once, on {@link Commands}, and rendered rather than
+ * <p>An option's name, label and description are declared once, on {@link Commands}, and rendered rather than
  * repeated. What a noun's names are called is {@link Usage}'s, since the grammar declares one list for every noun.
  *
  * @since 0.1.0
  */
 final class UsageRenderer {
 
-    /** The widest line the text may reach. Chosen to fit an 80-column terminal with a little slack. */
-    private static final int WIDTH = 84;
+    /** The widest line the help may reach. */
+    static final int WIDTH = 80;
 
-    private static final int GAP = 3;
+    /** Where a two-column row's right column starts; a longer label puts it on a line of its own. */
+    static final int OPTION_COLUMN = 30;
+
+    static final String INDENT = "  ";
+
+    private static final int GAP = 2;
 
     private static final String USAGE = "Usage: " + Command.PREFIX;
 
     private static final String OPTIONS_SLOT = "[options]";
-
-    /** Flags rendered first, in this order: the package, then the container. */
-    private static final List<String> LEADING =
-            Stream.concat(Stream.of(Command.PACKAGE_FLAG), Command.OWNER_FLAGS.stream()).toList();
 
     private UsageRenderer() {
     }
@@ -60,99 +60,76 @@ final class UsageRenderer {
         return wrap(USAGE, slots(grammar, noun), USAGE.length());
     }
 
-    /**
-     * The one-line synopsis a usage error ends with: the noun and its names, the package and container flags it
-     * takes, and {@code [options]} for the rest.
-     */
+    /** The same synopsis on one line, for the end of a usage error. */
     static String usageLine(Commands.Grammar grammar, String noun) {
-        List<String> slots = new ArrayList<>();
-        slots.add(noun == null ? Usage.ROOT_LABEL : noun + Usage.label(noun));
-        Set<String> required = Usage.requiredFlags(noun);
-        for (OptionSpec option : orderedOptions(grammar.spec(noun))) {
-            String name = option.shortestName();
-            if (Command.PACKAGE_FLAG.equals(name)) {
-                slots.add(slot(option, required.contains(name)));
-            } else if (Command.OWNER_FLAGS.get(0).equals(name)) {
-                slots.add("[" + String.join("|", Command.OWNER_FLAGS) + " " + option.paramLabel() + "]");
-            }
-        }
-        slots.add(OPTIONS_SLOT);
-        return USAGE + String.join(" ", slots);
+        return USAGE + String.join(" ", slots(grammar, noun));
     }
 
-    /** The root synopsis on one unwrapped line, {@code --help} included, for the launcher's one-line usage. */
+    /** The root synopsis on one unwrapped line, for the launcher's one-line usage. */
     static String synopsisLine(Commands.Grammar grammar) {
-        List<String> slots = new ArrayList<>(slots(grammar, null));
-        grammar.spec(null).options().stream()
-                .filter(OptionSpec::usageHelp)
-                .forEach(help -> slots.add("[" + String.join("|", help.names()) + "]"));
-        return Command.PREFIX + String.join(" ", slots);
+        return Command.PREFIX + String.join(" ", slots(grammar, null));
     }
 
-    // The container flags are one slot, since only one of them is ever given.
+    // The noun and its names, the package, the container flags as one slot (only one is ever given), the rest.
     private static List<String> slots(Commands.Grammar grammar, String noun) {
         List<String> slots = new ArrayList<>();
         slots.add(noun == null ? Usage.ROOT_LABEL : noun + Usage.label(noun));
         Set<String> required = Usage.requiredFlags(noun);
-        for (OptionSpec option : orderedOptions(grammar.spec(noun))) {
+        for (OptionSpec option : visible(grammar.spec(noun))) {
             String name = option.shortestName();
-            if (!Command.OWNER_FLAGS.contains(name)) {
-                slots.add(slot(option, required.contains(name)));
-            } else if (Command.OWNER_FLAGS.get(0).equals(name)) {
-                slots.add("[" + String.join("|", Command.OWNER_FLAGS) + " " + option.paramLabel() + "]");
+            if (Command.PACKAGE_FLAG.equals(name)) {
+                String spelled = name + " " + option.paramLabel();
+                slots.add(required.contains(name) ? spelled : "[" + spelled + "]");
+            } else if (noun != null && Command.OWNER_FLAGS.get(0).equals(name)) {
+                slots.add("[" + ownerLabel(option) + "]");
             }
         }
+        slots.add(OPTIONS_SLOT);
         return slots;
     }
 
-    private static String slot(OptionSpec option, boolean required) {
-        String name = option.shortestName();
-        String spelled = option.arity().max() == 0 ? name : name + " " + option.paramLabel();
-        return required ? spelled : "[" + spelled + "]";
-    }
-
     /**
-     * Every flag {@code noun} accepts, minus {@code --help} — a row saying "this is help" is not worth one — with
-     * the container flags as one row described by {@code owners}.
+     * Every option {@code noun} takes, the container flags as one row described by {@code owners}: the required
+     * ones first, then the rest by long name.
      */
-    static List<Row> flagRows(Commands.Grammar grammar, String noun, String owners) {
-        return rows(orderedOptions(grammar.spec(noun)), owners);
+    static List<Row> optionRows(Commands.Grammar grammar, String noun, String owners) {
+        return rows(visible(grammar.spec(noun)), Usage.requiredFlags(noun), owners);
     }
 
-    /** The flags {@code noun} takes that the root's help does not list: the package, and the container flags. */
-    static List<Row> ownFlagRows(Commands.Grammar grammar, String noun, String owners) {
+    /** The options {@code noun} takes that the root's help does not describe: the package, and the containers. */
+    static List<Row> ownOptionRows(Commands.Grammar grammar, String noun, String owners) {
         Set<String> shared = grammar.spec(null).options().stream()
                 .map(OptionSpec::shortestName)
                 .filter(name -> !Command.PACKAGE_FLAG.equals(name) && !Command.OWNER_FLAGS.contains(name))
                 .collect(Collectors.toSet());
-        return rows(orderedOptions(grammar.spec(noun)).stream()
+        return rows(visible(grammar.spec(noun)).stream()
                 .filter(option -> !shared.contains(option.shortestName()))
-                .toList(), owners);
+                .toList(), Usage.requiredFlags(noun), owners);
     }
 
-    private static List<Row> rows(List<OptionSpec> options, String owners) {
+    private static List<Row> rows(List<OptionSpec> options, Set<String> required, String owners) {
+        List<OptionSpec> ordered = options.stream()
+                .sorted(Comparator.comparing((OptionSpec option) -> !required.contains(option.shortestName()))
+                        .thenComparing(OptionSpec::longestName))
+                .toList();
         List<Row> rows = new ArrayList<>();
-        for (OptionSpec option : options) {
+        for (OptionSpec option : ordered) {
             String name = option.shortestName();
             if (!Command.OWNER_FLAGS.contains(name)) {
-                rows.add(new Row(label(option), description(option)));
+                rows.add(new Row(label(option), String.join(" ", option.description())));
             } else if (Command.OWNER_FLAGS.get(0).equals(name)) {
-                rows.add(new Row(String.join("|", Command.OWNER_FLAGS) + " " + option.paramLabel(), owners));
+                rows.add(new Row(ownerLabel(option), owners));
             }
         }
         return rows;
     }
 
-    private static List<OptionSpec> orderedOptions(CommandSpec spec) {
-        return spec.options().stream()
-                .filter(option -> !option.usageHelp() && !option.hidden())
-                .sorted(Comparator.comparingInt(UsageRenderer::rank))
-                .toList();
+    private static List<OptionSpec> visible(CommandSpec spec) {
+        return spec.options().stream().filter(option -> !option.hidden()).toList();
     }
 
-    private static int rank(OptionSpec option) {
-        int leading = LEADING.indexOf(option.shortestName());
-        return leading < 0 ? LEADING.size() : leading;
+    private static String ownerLabel(OptionSpec option) {
+        return String.join("|", Command.OWNER_FLAGS) + " " + option.paramLabel();
     }
 
     private static String label(OptionSpec option) {
@@ -162,36 +139,27 @@ final class UsageRenderer {
         return option.arity().max() == 0 ? spelled : spelled + " " + option.paramLabel();
     }
 
-    private static String description(OptionSpec option) {
-        return String.join(" ", option.description());
-    }
-
     /**
      * One row of a two-column table.
      *
      * @param label the left column
-     * @param text the right column, wrapped beside it
+     * @param text the right column, one line
      */
     record Row(String label, String text) { }
 
-    static String table(List<Row> rows) {
-        int labelWidth = rows.stream().mapToInt(row -> row.label().length()).max().orElse(0);
-        int indent = 2 + labelWidth + GAP;
+    /** Rows whose right column starts at {@code column}; a label too long for it puts the text below it. */
+    static String table(List<Row> rows, int column) {
         StringBuilder text = new StringBuilder();
         for (Row row : rows) {
-            String lead = "  " + row.label() + " ".repeat(indent - 2 - row.label().length());
-            text.append(paragraph(lead, row.text(), indent));
+            String lead = INDENT + row.label();
+            if (lead.length() + GAP > column) {
+                text.append(lead).append("\n").append(" ".repeat(column));
+            } else {
+                text.append(lead).append(" ".repeat(column - lead.length()));
+            }
+            text.append(row.text()).append("\n");
         }
         return text.toString();
-    }
-
-    /** A paragraph of prose, wrapped to {@link #WIDTH} and hanging at {@code indent}. */
-    static String prose(String body, int indent) {
-        return paragraph(" ".repeat(indent), body, indent);
-    }
-
-    private static String paragraph(String lead, String body, int indent) {
-        return wrap(lead, List.of(body.trim().split("\\s+")), indent);
     }
 
     private static String wrap(String lead, List<String> tokens, int indent) {
@@ -199,9 +167,6 @@ final class UsageRenderer {
         int column = lead.length();
         boolean first = true;
         for (String token : tokens) {
-            if (token.isEmpty()) {
-                continue;
-            }
             if (!first && column + 1 + token.length() > WIDTH) {
                 text.append("\n").append(" ".repeat(indent));
                 column = indent;

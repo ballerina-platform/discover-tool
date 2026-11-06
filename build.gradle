@@ -39,6 +39,15 @@ allprojects {
     }
 }
 
+// The version the tool is published at: the project version without its snapshot or timestamp suffix.
+ext.toolVersionOf = { String extVersion ->
+    if (extVersion.matches(project.ext.timestampedVersionRegex)) {
+        def splitVersion = extVersion.split('-')
+        return splitVersion.length > 3 ? splitVersion[0..-4].join('-') : extVersion
+    }
+    return extVersion.replace("${project.ext.snapshotVersion}", '')
+}
+
 final String moduleVersion = project.version.replace(project.ext.snapshotVersion, '')
 
 release {

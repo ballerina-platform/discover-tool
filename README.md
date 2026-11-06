@@ -79,10 +79,12 @@ request in this order.
 | `--output-format json\|text` | Override the default: text when stdout is a terminal, JSON otherwise. |
 | `--filter <keyword>`   | Narrow a listing to entries whose name, path, parameter or type contains the keyword. Filtering is local to the fetched payload; nothing is sent to Central. On `package` it runs `search <keyword>`. |
 | `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is an error. |
-| `-m, --module <module>` | Target a submodule instead of the default module, on every noun including `readme`. The package's overview lists the submodules it has. |
-| `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. |
+| `--module <name>`      | Target a submodule instead of the default module, on every noun including `readme`. The package's overview lists the submodules it has. A name Ballerina would not accept as a module name is a usage error, before anything is fetched. `--module` has no short form. |
+| `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. A switch takes no value: `--refresh=true` is a usage error. |
+| `-V, --version`        | Print the tool's version (`0.1.0`) and exit 0. Only before or without a noun. |
 
-`bal discover <noun> --help` prints one noun's names, flags and examples.
+`bal discover --help` prints a one-line description, the synopsis, the nouns, every option and commented examples;
+`bal discover <noun> --help` prints one noun's description, synopsis, own options and examples.
 
 ## Walkthrough
 
@@ -891,9 +893,9 @@ A warning never changes the exit code. It is its own report on stderr, never par
 warning is `stale-cache`: Central could not be reached to confirm the version, so the cached copy was read.
 
 A usage error is a `usage` failure. Most are found before anything is looked up: an unknown option, an
-option with a missing or invalid value (`--output-format xml`, `--page x`, `--page 0`, `--refresh=yes`), given twice, or
-given both before the noun and after it, no noun, a malformed package name or incomplete version, `--version`, a
-version typed as a name, an unknown noun, more names than a noun takes, more than one container flag, a `type`
+option with a missing or invalid value (`--output-format xml`, `--page x`, `--page 0`, `--refresh=true`,
+`--module 'bad!name'`), given twice, or given both before the noun and after it, no noun, a malformed package name
+or incomplete version, `--version` after a noun, a version typed as a name, an unknown noun, more names than a noun takes, more than one container flag, a `type`
 name with `--filter`, a `search` with no keyword, with `--filter`, or (across Central) with `--module`, and the
 old package-first form (`bal discover ballerinax/kafka client Producer`), whose `command` is the same request in
 the new order. A package typed as a name (`bal discover client ballerinax/kafka`) is moved to `-p`; a noun with no
@@ -923,11 +925,12 @@ TLS or the proxy failed, and `status` is then the proxy's own answer when it gav
 username and password).
 
 **Which version is read.** The one written in the coordinate (`ballerina/http:2.15.7`), even inside a project that
-locks another. Otherwise, inside a Ballerina project the tool walks up to `Ballerina.toml` and uses the version
-`Dependencies.toml` locks, so a lookup sees what `bal build` compiles against, and outside one (or for a package
-the project does not depend on yet) it uses Central's latest. A written version must be complete SemVer, with no
+locks another. Otherwise, when the current directory is a Ballerina project (it holds `Ballerina.toml`), the tool
+uses the version its `Dependencies.toml` locks, so a lookup sees what `bal build` compiles against; it never looks
+in a parent directory. Anywhere else (or for a package the project does not depend on yet) it uses Central's
+latest. A written version must be complete SemVer, with no
 leading `v` or zero: `ballerina/http:2.15` is a `usage` failure, and so is a version typed as a positional
-(`bal discover client 2.15.0 -p ballerina/http`) or as `--version`, each suggesting the coordinate to type. A lock that
+(`bal discover client 2.15.0 -p ballerina/http`), suggesting the coordinate to type. A lock that
 names no complete version, or one Central does not publish, is a failure naming the `Dependencies.toml` it was
 read from; `bal build` regenerates the file when it is deleted. A version Central does not publish is answered
 with the published versions nearest it. `--module` composes unchanged:
@@ -1074,7 +1077,9 @@ check 0 client -p ballerina/sql                      # clients Central files as 
 check 0 package ballerina/http:2.16.6                # a version in the coordinate
 check 2 package ballerina/http:2.16                  # an incomplete version
 check 2 client 2.16.6 -p ballerina/http              # no version argument
-check 2 package ballerina/http --version 2.16.6      # no --version flag
+check 2 package ballerina/http --version 2.16.6      # --version only before a noun
+check 0 --version                                    # the tool's version
+check 2 client -p ballerinax/kafka --refresh=true    # a switch takes no value
 check 2 nosuchnoun -p ballerina/http
 check 2 client                                       # a noun needs -p
 check 2 ballerina/http client                        # the old package-first form

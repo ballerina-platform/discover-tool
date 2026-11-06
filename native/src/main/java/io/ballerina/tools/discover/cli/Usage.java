@@ -19,14 +19,15 @@
 package io.ballerina.tools.discover.cli;
 
 import io.ballerina.tools.discover.Command;
-import io.ballerina.tools.discover.views.SearchCentral;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * The PROSE of the usage text: everything a reader cannot derive from the grammar.
+ * The PROSE of the usage text: everything a reader cannot derive from the grammar, laid out as the Ballerina CLI
+ * tool guide asks — a one-line description, {@code Usage:}, the commands, {@code Options:}, then commented
+ * {@code Examples:}, no line over {@value UsageRenderer#WIDTH} columns.
  *
  * <p>It teaches only "what can I ask, and how". The rules a caller carries INTO a lookup (a truncated listing
  * means narrow further, a failure's {@code kind} is the branch to read) are the agent's standing instructions,
@@ -39,170 +40,156 @@ final class Usage {
     /** What follows {@code bal discover} in the root's synopsis. */
     static final String ROOT_LABEL = "<noun> [<name> ...]";
 
-    private static final String EXAMPLE_PACKAGE = "ballerinax/kafka";
+    private static final String KAFKA = " -p ballerinax/kafka";
 
-    private static final String EXAMPLE_GITHUB = "ballerinax/github";
+    private static final String GITHUB = " -p ballerinax/github";
+
+    private static final String PRODUCER = KAFKA + " --client Producer";
+
+    private static final String GITHUB_CLIENT = GITHUB + " --client Client";
+
+    /** Where the root's command descriptions start: past the longest noun and its names. */
+    private static final int COMMAND_COLUMN = 36;
+
+    /**
+     * One example: what it shows, then the command.
+     *
+     * @param comment what it shows, one line
+     * @param commands the commands that show it
+     */
+    private record Example(String comment, List<String> commands) {
+
+        Example(String comment, String command) {
+            this(comment, List.of(command));
+        }
+    }
 
     /**
      * What one noun reads.
      *
-     * @param label its names in the synopsis, with a leading space, or empty for none
-     * @param summary one line, for the root's list of nouns
-     * @param description its own help's paragraph
-     * @param examples commands its own help shows
+     * @param label its names in the synopsis, with a leading space
+     * @param summary one line, for the root's list of commands
+     * @param description its own help's one line
+     * @param examples what its own help shows
      */
-    private record Noun(String label, String summary, String description, List<String> examples) { }
+    private record Noun(String label, String summary, String description, List<Example> examples) { }
 
     private static final Map<String, Noun> NOUNS = Map.of(
-            Command.PACKAGE, new Noun(" " + Commands.PACKAGE_LABEL,
-                    "A package's overview.",
-                    "The package's overview: its clients, service types, classes and functions, its types and its "
-                            + "readme, each with the command that opens it. The package is this noun's name, not a "
-                            + "-p flag. With --filter, every name in the package that holds the keyword.",
-                    List.of(example(Command.PACKAGE, EXAMPLE_PACKAGE), example(Command.PACKAGE,
-                            "ballerina/http:2.15.7"))),
-            Command.SEARCH, new Noun(" <keyword> ...",
-                    "Central's packages and symbols, or with -p every name in one package.",
-                    "Without -p, asks Central for the packages and the symbols that match every keyword, "
-                            + SearchCentral.PACKAGES_PER_PAGE + " and " + SearchCentral.SYMBOLS_PER_PAGE
-                            + " a page, ranked by Central. With -p, matches every name in that package, locally; "
-                            + "each keyword is a case-insensitive part of the name.",
-                    List.of(example(Command.SEARCH, "kafka send"), example(Command.SEARCH, "send -p "
-                            + EXAMPLE_PACKAGE))),
+            Command.PACKAGE, new Noun(" " + Commands.PACKAGE_LABEL, "a package's overview",
+                    "Show a package's overview: what it declares, each with the command that opens it",
+                    List.of(new Example("The version your project locks, else Central's latest",
+                                    example(Command.PACKAGE, "ballerinax/kafka")),
+                            new Example("Every name in the package that holds a keyword",
+                                    example(Command.PACKAGE, "ballerinax/kafka --filter send")),
+                            new Example("One version", example(Command.PACKAGE, "ballerina/http:2.15.7")))),
+            Command.SEARCH, new Noun(" <keyword> ...", "search Central, or one package with -p",
+                    "Search Central's packages and symbols, or every name in one package with -p",
+                    List.of(new Example("Central's packages and symbols that match every keyword, by rank",
+                                    example(Command.SEARCH, "kafka send")),
+                            new Example("Names in one package that hold every keyword, in any case",
+                                    example(Command.SEARCH, "send" + KAFKA)))),
             Command.CLIENT, container("client", "clients", "Producer"),
-            Command.SERVICE, new Noun(" [<name>]",
-                    "The service types, or one with what a service of it implements.",
-                    "Without a name, the package's service types and the listener each attaches to. With one, "
-                            + "the methods a service of it implements, and its listener.",
-                    List.of(example(Command.SERVICE, "-p " + EXAMPLE_PACKAGE),
-                            example(Command.SERVICE, "Service -p " + EXAMPLE_PACKAGE))),
+            Command.SERVICE, new Noun(" [<name>]", "the service types, or one and its methods",
+                    "Show the service types and their listeners, or what a service of one implements",
+                    List.of(new Example("Every service type and the listener it attaches to",
+                                    example(Command.SERVICE, KAFKA.strip())),
+                            new Example("The methods a service of it implements, and its listener",
+                                    example(Command.SERVICE, "Service" + KAFKA)))),
             Command.CLASS, container("class", "classes", "AvroSerializer"),
-            Command.FUNCTION, new Noun(" [<name>]",
-                    "The module's functions, or one function's signature.",
-                    "Without a name, the module's functions. With one, its signature, the types it uses and the "
-                            + "readme sections that call it.",
-                    List.of(example(Command.FUNCTION, "-p ballerina/log"),
-                            example(Command.FUNCTION, "printInfo -p ballerina/log"))),
-            Command.TYPE, new Noun(" [<name>]",
-                    "Every type, or one declaration.",
-                    "Without a name, every type the module declares: records, enums, errors, aliases, constants, "
-                            + "annotations, listeners and every class, client and service type. With one, its "
-                            + "declaration and the types it uses; an enum member opens its enum.",
-                    List.of(example(Command.TYPE, "-p " + EXAMPLE_GITHUB),
-                            example(Command.TYPE, "ConnectionConfig -p " + EXAMPLE_GITHUB))),
-            Command.METHOD, new Noun(" [<name>]",
-                    "A container's methods, or one method's signature.",
-                    "Without a name, the remote and plain methods of the container --client, --class or "
-                            + "--service names. With one, its signature, the types it uses, how to create its "
-                            + "container and the readme sections that call it; init is the constructor. Pass one "
-                            + "container flag at most, or none when exactly one container declares the method.",
-                    List.of(example(Command.METHOD, "-p " + EXAMPLE_PACKAGE + " --client Producer"),
-                            example(Command.METHOD, "send -p " + EXAMPLE_PACKAGE + " --client Producer"),
-                            example(Command.METHOD, "send -p " + EXAMPLE_PACKAGE))),
-            Command.RESOURCE, new Noun(" [<path> [<accessor>]]",
-                    "A container's resource paths, or one resource method's signature.",
-                    "Without a path, the resource paths of the container --client, --class or --service names, "
-                            + "grouped by segment once "
-                            + "there are more than fit. With a path, the paths under it; with its accessor too, "
-                            + "that resource method's signature. A path parameter is written :name. Pass one "
-                            + "container flag at most, or none when exactly one container declares the path.",
-                    List.of(example(Command.RESOURCE, "-p " + EXAMPLE_GITHUB + " --client Client"),
-                            example(Command.RESOURCE, "gists -p " + EXAMPLE_GITHUB + " --client Client"),
-                            example(Command.RESOURCE, "gists/public get -p " + EXAMPLE_GITHUB
-                                    + " --client Client"))),
-            Command.README, new Noun(" [<n>|\"<title>\"]",
-                    "The readme, or one section of it.",
-                    "Without a section, the readme, or its sections when it is long. With a section's number or "
-                            + "title, that section.",
-                    List.of(example(Command.README, "-p " + EXAMPLE_PACKAGE),
-                            example(Command.README, "7 -p " + EXAMPLE_PACKAGE))));
+            Command.FUNCTION, new Noun(" [<name>]", "the functions, or one function's signature",
+                    "Show the module's functions, or one function's signature",
+                    List.of(new Example("Every function", example(Command.FUNCTION, "-p ballerina/log")),
+                            new Example("Its signature, the types it uses and the readme sections that call it",
+                                    example(Command.FUNCTION, "printInfo -p ballerina/log")))),
+            Command.TYPE, new Noun(" [<name>]", "every type, or one declaration",
+                    "Show every type the module declares, or one declaration and the types it uses",
+                    List.of(new Example("Records, enums, errors, constants, listeners, classes and the rest",
+                                    example(Command.TYPE, GITHUB.strip())),
+                            new Example("One declaration; an enum member opens its enum",
+                                    example(Command.TYPE, "ConnectionConfig" + GITHUB)))),
+            Command.METHOD, new Noun(" [<name>]", "a container's methods, or one's signature",
+                    "Show a container's methods, or one method's signature and how to call it",
+                    List.of(new Example("The remote and plain methods of one container",
+                                    example(Command.METHOD, PRODUCER.strip())),
+                            new Example("Its signature, its types, how to create the client, the readme calls",
+                                    example(Command.METHOD, "send" + PRODUCER)),
+                            new Example("The constructor", example(Command.METHOD, "init" + PRODUCER)),
+                            new Example("No container flag: the one container that declares it",
+                                    example(Command.METHOD, "send" + KAFKA)))),
+            Command.RESOURCE, new Noun(" [<path> [<accessor>]]", "resource paths, or one method's signature",
+                    "Show a container's resource paths, or one resource method's signature",
+                    List.of(new Example("The resource paths, grouped by segment when there are many",
+                                    example(Command.RESOURCE, GITHUB_CLIENT.strip())),
+                            new Example("The paths under one; a path parameter is written :name",
+                                    example(Command.RESOURCE, "gists" + GITHUB_CLIENT)),
+                            new Example("One resource method's signature: the path, then its accessor",
+                                    example(Command.RESOURCE, "gists/public get" + GITHUB_CLIENT)))),
+            Command.README, new Noun(" [<n>|\"<title>\"]", "the readme, or one section of it",
+                    "Show the readme, or one section of it by number or title",
+                    List.of(new Example("The readme, or its sections when it is long",
+                                    example(Command.README, KAFKA.strip())),
+                            new Example("One section, by its number or its title in quotes",
+                                    example(Command.README, "7" + KAFKA)))));
 
-    private static final String INTRO =
-            "Read a Ballerina package off Central. A signature from here is the source for what compiles; a "
-                    + "readme, a web search and a remembered API are not.";
+    private static final String DESCRIPTION =
+            "Read a Ballerina package's API off Central; trust it over memory or the web";
 
-    private static final String NAMES =
-            "A name means one thing; no name, a listing. Every noun but package takes the package with -p; "
-                    + "search takes it only to search one package. Flags may come before the noun or after it.";
+    private static final String MORE = "Run 'bal discover <noun> --help' for a noun's options and examples.";
 
-    /**
-     * The typical session, as commands.
-     *
-     * <p>Written out rather than generated: the VALUE of this block is the specific packages and the specific
-     * name shapes, which no model of the grammar knows.
-     */
-    private static final String SESSION = """
-            Typical session:
+    private static final List<Example> SESSION = List.of(
+            new Example("Find a package or a symbol on Central", example(Command.SEARCH, "kafka send")),
+            new Example("What a package offers", example(Command.PACKAGE, "ballerinax/kafka")),
+            new Example("One call, fully addressed", List.of(example(Command.METHOD, "send" + PRODUCER),
+                    example(Command.RESOURCE, "gists/public get" + GITHUB_CLIENT))),
+            new Example("A record, enum or error", example(Command.TYPE, "ConnectionConfig" + GITHUB)),
+            new Example("One version; without one, ./Dependencies.toml's lock, else the latest",
+                    example(Command.CLIENT, "Client -p ballerina/http:2.15.7")));
 
-              1. Find a package or a symbol:  bal discover search kafka send
-              2. What a package offers:       bal discover package ballerinax/kafka  (or bal discover ballerinax/kafka)
-              3. Find a name inside it:       bal discover search send -p ballerinax/kafka
-              4. One call, fully addressed:   bal discover method send -p ballerinax/kafka --client Producer
-                                              bal discover resource gists/public get -p ballerinax/github \\
-                                                  --client Client
-              5. Its container, left out:     bal discover method send -p ballerinax/kafka
-              6. A record, enum or error:     bal discover type ConnectionConfig -p ballerinax/github
-              7. One specific version:        bal discover client Client -p ballerina/http:2.15.7
-            """;
+    private static final String SHARED_OPTIONS = "every option 'bal discover --help' lists";
 
-    private static final String VERSION =
-            "With no version after the package, the one your project's Dependencies.toml locks is read (found "
-                    + "from the current directory up), else Central's latest.";
+    private static final String OWNER_ROW = "name the container of a method or resource";
 
-    private static final String EXIT_CODES = "Exit codes: 0 an answer (an empty search or --filter too), 1 not "
-            + "found (a package, name or page), 2 a usage error, 3 ambiguous (the matches are listed), 4 Central "
-            + "unavailable for now (retry later), 5 an answer from Central a retry will not change, 6 an internal "
-            + "error.";
-
-    private static final String MORE = "Run `bal discover <noun> --help` for one noun's names, flags and examples.";
-
-    private static final String SHARED_FLAGS = "Every noun also takes the flags `bal discover --help` lists.";
-
-    private static final String OWNER_FLAGS_ROW = "The container that declares a method or resource, for method and "
-            + "resource only: one at most, left out when exactly one container declares it.";
-
-    private static final String OWNER_FLAGS_OWN_ROW = "The client, class or service type that declares it: one at "
-            + "most, left out when exactly one container declares it.";
+    private static final String OWN_OWNER_ROW = "name the container, unless only one declares it";
 
     private Usage() {
     }
 
-    /** The whole usage text: what the tool is, what it can be asked, and how to walk it. */
+    /** The whole usage text: what the tool is, the commands, the options, and how to walk it. */
     static String root() {
         Commands.Grammar grammar = Commands.Grammar.create();
-        StringBuilder text = new StringBuilder()
-                .append(UsageRenderer.synopsis(grammar, null))
-                .append("\n").append(UsageRenderer.prose(INTRO, 0))
-                .append("\nNouns:\n").append(UsageRenderer.table(Command.NOUNS.stream()
+        return DESCRIPTION + "\n\n"
+                + UsageRenderer.synopsis(grammar, null)
+                + "\nCommands:\n" + UsageRenderer.table(Command.NOUNS.stream()
                         .map(noun -> new UsageRenderer.Row(noun + label(noun), NOUNS.get(noun).summary()))
-                        .toList()))
-                .append("\n").append(UsageRenderer.prose(NAMES, 0))
-                .append("\n").append(SESSION)
-                .append("\n").append(UsageRenderer.prose(VERSION, 0))
-                .append(UsageRenderer.prose(EXIT_CODES, 0))
-                .append(UsageRenderer.prose(MORE, 0));
-        return text.append("\n").append(UsageRenderer.table(UsageRenderer.flagRows(grammar, null, OWNER_FLAGS_ROW)))
-                .toString();
+                        .toList(), COMMAND_COLUMN)
+                + UsageRenderer.INDENT + MORE + "\n"
+                + "\nOptions:\n" + UsageRenderer.table(UsageRenderer.optionRows(grammar, null, OWNER_ROW),
+                        UsageRenderer.OPTION_COLUMN)
+                + examples(SESSION);
     }
 
-    /** One noun's usage text: its synopsis, what it reads, examples, and its flags. */
+    /** One noun's usage text: what it reads, its synopsis, its own options, and examples. */
     static String noun(String noun) {
         Commands.Grammar grammar = Commands.Grammar.create();
         Noun about = NOUNS.get(noun);
-        StringBuilder text = new StringBuilder()
-                .append(UsageRenderer.synopsis(grammar, noun))
-                .append("\n").append(UsageRenderer.prose(about.description(), 0))
-                .append("\nExamples:\n");
-        about.examples().forEach(example -> text.append("  ").append(example).append("\n"));
-        text.append("\n").append(UsageRenderer.prose(EXIT_CODES, 0));
-        List<UsageRenderer.Row> own = UsageRenderer.ownFlagRows(grammar, noun, OWNER_FLAGS_OWN_ROW);
-        if (!own.isEmpty()) {
-            text.append("\n").append(UsageRenderer.table(own));
-        }
-        return text.append("\n").append(UsageRenderer.prose(SHARED_FLAGS, 0)).toString();
+        List<UsageRenderer.Row> own = UsageRenderer.ownOptionRows(grammar, noun, OWN_OWNER_ROW);
+        return about.description() + "\n\n"
+                + UsageRenderer.synopsis(grammar, noun)
+                + "\nOptions:\n" + UsageRenderer.table(own, UsageRenderer.OPTION_COLUMN)
+                + UsageRenderer.INDENT + (own.isEmpty() ? "" : "and ") + SHARED_OPTIONS + "\n"
+                + examples(about.examples());
     }
 
-    /** {@code noun}'s names in a synopsis, with a leading space, or empty when it takes none. */
+    private static String examples(List<Example> examples) {
+        StringBuilder text = new StringBuilder("\nExamples:\n");
+        for (Example example : examples) {
+            text.append(UsageRenderer.INDENT).append("# ").append(example.comment()).append("\n");
+            example.commands().forEach(command -> text.append(UsageRenderer.INDENT).append(command).append("\n"));
+        }
+        return text.toString();
+    }
+
+    /** {@code noun}'s names in a synopsis, with a leading space. */
     static String label(String noun) {
         return NOUNS.get(noun).label();
     }
@@ -215,12 +202,11 @@ final class Usage {
     }
 
     private static Noun container(String noun, String plural, String example) {
-        return new Noun(" [<name>]",
-                "The " + plural + ", or one " + noun + "'s members.",
-                "Without a name, the package's " + plural + ", each with its method counts. With one, its "
-                        + "members: resource paths, remote methods and methods, each with the command that opens "
-                        + "it.",
-                List.of(example(noun, "-p " + EXAMPLE_PACKAGE), example(noun, example + " -p " + EXAMPLE_PACKAGE)));
+        return new Noun(" [<name>]", "the " + plural + ", or one " + noun + "'s members",
+                "Show the package's " + plural + ", or one " + noun + "'s members, each with its command",
+                List.of(new Example("Every " + noun + ", with its method counts", example(noun, KAFKA.strip())),
+                        new Example("Its resource paths, remote methods and methods",
+                                example(noun, example + KAFKA))));
     }
 
     private static String example(String noun, String rest) {

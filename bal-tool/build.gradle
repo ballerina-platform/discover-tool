@@ -34,27 +34,13 @@ description = 'Ballerina - Discover Tool'
 
 def packageName = 'tool_discover'
 def packageOrg = 'ballerina'
-def tomlVersion = stripBallerinaExtensionVersion("${project.version}")
+def tomlVersion = rootProject.ext.toolVersionOf("${project.version}")
 def ballerinaTomlFilePlaceHolder = new File("${project.rootDir}/config/resources/ToolBallerina.toml")
 def balToolTomlFilePlaceHolder = new File("${project.rootDir}/config/resources/BalTool.toml")
 def ballerinaTomlFile = new File("$project.projectDir/Ballerina.toml")
 def balToolTomlFile = new File("$project.projectDir/BalTool.toml")
 def distributionPath = layout.buildDirectory.dir("jballerina-tools-${ballerinaLangVersion}").get().asFile.path
 def distributionBinPath = "${distributionPath}/bin"
-
-def stripBallerinaExtensionVersion(String extVersion) {
-    if (extVersion.matches(project.ext.timestampedVersionRegex)) {
-        def splitVersion = extVersion.split('-')
-        if (splitVersion.length > 3) {
-            def strippedValues = splitVersion[0..-4]
-            return strippedValues.join('-')
-        } else {
-            return extVersion
-        }
-    } else {
-        return extVersion.replace("${project.ext.snapshotVersion}", '')
-    }
-}
 
 ballerina {
     packageOrganization = packageOrg
