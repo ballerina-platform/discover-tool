@@ -149,8 +149,8 @@ public class FromCentralTest {
         Failure.PackageNotFound failure = (Failure.PackageNotFound) selected.failure();
         Assert.assertEquals(failure.module(), "nosuch");
         Assert.assertEquals(failure.suggestion(), "ballerina/graphql publishes these submodules: dataloader, "
-                + "subgraph. Pass one of them to --module, or drop --module for the default module: "
-                + "`bal discover package ballerina/graphql`.");
+                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
+        Assert.assertEquals(failure.command().text(), "bal discover package ballerina/graphql");
     }
 
     @Test

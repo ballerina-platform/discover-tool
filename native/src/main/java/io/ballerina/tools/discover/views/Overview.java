@@ -107,7 +107,7 @@ public final class Overview {
         rows.forEach((scope, all) -> sections.add(new DiscoverResult.Overview.Section(scope.commandNoun(),
                 all.subList(0, shown.getOrDefault(scope, all.size())), all.size(),
                 loaded.command(scope.commandNoun()).text())));
-        return new DiscoverResult.Overview(List.copyOf(sections), types, readme, submodules, loaded.warning(),
+        return new DiscoverResult.Overview(List.copyOf(sections), types, readme, submodules,
                 members);
     }
 

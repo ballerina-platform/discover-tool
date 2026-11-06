@@ -60,8 +60,8 @@ public record Coordinate(QualifiedName qualified, Version version) {
         int colon = input.indexOf(VERSION_SEPARATOR);
         String pkg = colon < 0 ? input : input.substring(0, colon);
         if (pkg.indexOf(QUOTE) >= 0) {
-            return fix("A package name is written unescaped, but " + input + " quotes part of it the way an "
-                    + "import does.", input.replace(String.valueOf(QUOTE), ""), commandFor);
+            return fix("a package name is written unescaped, but " + input + " quotes part of it the way an "
+                    + "import does", input.replace(String.valueOf(QUOTE), ""), commandFor);
         }
         Result<QualifiedName> qualified = QualifiedName.parse(pkg);
         if (!qualified.isOk()) {
@@ -80,23 +80,24 @@ public record Coordinate(QualifiedName qualified, Version version) {
         }
         String pkg = qualified.qualified();
         if (version.isEmpty()) {
-            return Result.err(new Failure.Validation("Nothing follows the ':' in '" + input + "'.",
-                    "Write a version after it, " + pkg + COMPLETE_FORM + ", or drop the ':'" + LOCKED_OR_LATEST + pkg));
+            return Result.err(new Failure.Validation("nothing follows the ':' in '" + input + "'",
+                    "Write a version after it, " + pkg + COMPLETE_FORM + ", or drop the ':'" + LOCKED_OR_LATEST + pkg
+                            + "."));
         }
         String unprefixed = version.substring(VERSION_PREFIX.length());
         if (version.toLowerCase(Locale.ROOT).startsWith(VERSION_PREFIX) && Version.isComplete(unprefixed)) {
-            return fix(quoted(version, input) + " is not a version: a version has no leading v.",
+            return fix(quoted(version, input) + " is not a version: a version has no leading v",
                     pkg + VERSION_SEPARATOR + unprefixed, commandFor);
         }
         Matcher numbers = THREE_NUMBERS.matcher(version);
         if (numbers.matches()) {
             String stripped = new BigInteger(numbers.group(1)) + "." + new BigInteger(numbers.group(2)) + "."
                     + new BigInteger(numbers.group(3));
-            return fix(quoted(version, input) + " is not a version: a number in a version has no leading zero.",
+            return fix(quoted(version, input) + " is not a version: a number in a version has no leading zero",
                     pkg + VERSION_SEPARATOR + stripped, commandFor);
         }
-        return Result.err(new Failure.Validation(quoted(version, input) + " is not a complete version.",
-                "Write it in full, " + pkg + COMPLETE_FORM + ", or drop it" + LOCKED_OR_LATEST + pkg));
+        return Result.err(new Failure.Validation(quoted(version, input) + " is not a complete version",
+                "Write it in full, " + pkg + COMPLETE_FORM + ", or drop it" + LOCKED_OR_LATEST + pkg + "."));
     }
 
     private static String quoted(String version, String input) {
@@ -109,23 +110,23 @@ public record Coordinate(QualifiedName qualified, Version version) {
         if (at > 0) {
             String rewritten = input.substring(0, at) + VERSION_SEPARATOR + input.substring(at + 1);
             if (parse(rewritten).isOk()) {
-                return fix("Invalid package name '" + input + "': a version follows a ':', not an '@'.",
+                return fix("invalid package name '" + input + "': a version follows a ':', not an '@'",
                         rewritten, commandFor);
             }
         }
         if (input.indexOf('/') < 0 && QualifiedName.parse(ORG_PLACEHOLDER + "/" + input).isOk()) {
             String search = SearchCentral.command(List.of(input));
             return Result.err(new Failure.Validation(
-                    "Invalid package name '" + input + "': a package is named with its organization, <org>/"
-                            + input + ".",
-                    Failure.quoted(search) + " lists the packages that match, with their organizations.", search));
+                    "invalid package name '" + input + "': a package is named with its organization, <org>/"
+                            + input,
+                    "Search Central for the packages that match, with their organizations.", search));
         }
         return invalid.cast();
     }
 
     private static Result<Coordinate> fix(String message, String corrected, UnaryOperator<String> commandFor) {
         String command = commandFor.apply(corrected);
-        return Result.err(new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command));
+        return Result.err(new Failure.Validation(message, "Write the package as " + corrected + ".", command));
     }
 
     /** This coordinate in {@code module}, as a command names it. */

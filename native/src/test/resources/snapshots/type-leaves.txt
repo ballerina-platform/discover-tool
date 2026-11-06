@@ -1053,5 +1053,6 @@ Types it uses (2)
       int? leaderEpoch = ();
   |};
 == ballerinax__kafka type NoSuchType ==
-error: 'NoSuchType' is not a type in ballerinax/kafka:0.0.0-fixture.
-  List the types: `bal discover type -p ballerinax/kafka`.
+bal discover: error: 'NoSuchType' is not a type in ballerinax/kafka:0.0.0-fixture
+  List the types.
+  Try: bal discover type -p ballerinax/kafka

@@ -1,1 +1,1 @@
-{"kind":"validation","message":"Unknown option '--nonesuch'.","suggestion":"Known flags are --output-format, --filter, --page, --module/-m, --refresh and --help/-h."}
+{"severity":"error","kind":"usage","message":"unknown option '--nonesuch'","suggestion":"Run 'bal discover package --help' for the usage."}

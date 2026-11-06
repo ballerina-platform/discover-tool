@@ -21,6 +21,7 @@ package io.ballerina.tools.discover;
 import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.ServiceHandlers;
+import io.ballerina.tools.discover.views.Containers;
 
 import java.util.List;
 import java.util.Map;
@@ -114,6 +115,29 @@ public record LoadedPackage(
             List<Failure.Match> matches) {
         return new Failure.Ambiguous(qualified.qualified(), version.text(), module, requested, message, suggestion,
                 matchesKey, matches);
+    }
+
+    /**
+     * A name that matches nothing at the level the lookup reached: every name at that level when there are at most
+     * {@value Containers#MAX_ENTRIES}, else the command that lists them. Never a near match picked for the caller.
+     *
+     * @param plural what the level holds, e.g. {@code clients}
+     * @param listing the command that lists the level
+     * @param candidates every name at the level, in the listing's order
+     * @param search the package's search for the name, or {@code null} when there is none to offer
+     */
+    public Failure missAmong(List<String> requested, String message, String plural, String listing,
+            List<String> candidates, String search) {
+        if (!candidates.isEmpty() && candidates.size() <= Containers.MAX_ENTRIES) {
+            String suggestion = "Name one of the " + plural + " below"
+                    + (search == null ? "." : ", or search the package with " + Failure.quoted(search) + ".");
+            return symbolNotFoundAmong(requested, message, suggestion, candidates);
+        }
+        if (search == null) {
+            return symbolNotFound(requested, message, "List the " + plural + ".", listing);
+        }
+        return symbolNotFound(requested, message, "Search the package for it, or list the " + plural + " with "
+                + Failure.quoted(listing) + ".", search);
     }
 
     /** A miss in a listing no command prints, so the failure itself carries every entry of it. */

@@ -108,14 +108,11 @@ public sealed interface DiscoverResult {
      * @param readme the readme's section count, or {@code null} when the module publishes no readme
      * @param submodules every OTHER module this package publishes, regardless of which one the sections
      *     describe — empty for a package that publishes only its default module; never cut
-     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
-     *     registry — see {@code Loader.unverifiedWarning}
      * @param members the package's one client's own listing, page 1 as naming it under {@code client} answers it,
      *     when the package has exactly one client; else {@code null}
      */
     record Overview(List<Section> sections, TypeCounts types, ReadmeSummary readme, List<Submodule> submodules,
-            String warning, DiscoverResult members)
-            implements DiscoverResult {
+            DiscoverResult members) implements DiscoverResult {
 
         /**
          * One callable bucket's first rows.
@@ -165,14 +162,12 @@ public sealed interface DiscoverResult {
      *     not-attachable types included
      * @param paging which page this is, or {@code null} when the whole roster fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
-     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
-     *     registry — see {@code Loader.unverifiedWarning}
      * @param notAttachable the {@code service} bucket's service types no listener of the package accepts — still
      *     addressable by name, listed apart so they are never read as bindable — on this page: they follow the
      *     bindable containers in one paged listing, so the two together stay under the ceiling
      * @param notAttachableTotal how many such types the bucket (or the {@code --filter}) selects
      */
-    record ContainerRoster(List<Container> containers, int total, Paging paging, String next, String warning,
+    record ContainerRoster(List<Container> containers, int total, Paging paging, String next,
             List<NotAttachable> notAttachable, int notAttachableTotal) implements DiscoverResult {
 
         /**
@@ -210,14 +205,12 @@ public sealed interface DiscoverResult {
      * @param total how many entries (resources plus groups) exist at this level
      * @param paging which page this is, or {@code null} when the whole level fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
-     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
-     *     registry — see {@code Loader.unverifiedWarning}
      * @param note the listener a service type binds to, or that it is attachable to none — {@code null} outside the
      *     {@code service} bucket
      */
     record PathGroups(
             String container, List<ResourceList.Resource> resources, List<Group> groups, Counts counts, int total,
-            Paging paging, String next, String warning, String note) implements DiscoverResult {
+            Paging paging, String next, String note) implements DiscoverResult {
 
         /**
          * @param resources resource paths ending at this level
@@ -245,14 +238,12 @@ public sealed interface DiscoverResult {
      * @param paging which page this is, or {@code null} when the whole listing fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param documented entries a {@code --filter} matched only in their documentation, paged after the paths
-     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
-     *     registry — see {@code Loader.unverifiedWarning}
      * @param note the listener a service type binds to, or that it is attachable to none — {@code null} outside the
      *     {@code service} bucket
      */
     record ResourceList(
             String container, List<Resource> resources, int shown, int total, Paging paging, String next,
-            Documented documented, String warning, String note) implements DiscoverResult {
+            Documented documented, String note) implements DiscoverResult {
 
         /**
          * @param path the resource's path, {@code :name}-spelled for parameters, {@code .} for the root
@@ -291,14 +282,12 @@ public sealed interface DiscoverResult {
      * @param paging which page this is, or {@code null} when the whole listing fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param documented entries a {@code --filter} matched only in their documentation, paged after the methods
-     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
-     *     registry — see {@code Loader.unverifiedWarning}
      * @param note the listener a service type binds to, or that it is attachable to none — {@code null} outside the
      *     {@code service} bucket
      */
     record MethodList(
             String container, List<Method> methods, boolean remote, int shown, int total, Paging paging,
-            String next, Documented documented, String warning, String note) implements DiscoverResult { }
+            String next, Documented documented, String note) implements DiscoverResult { }
 
     /**
      * What a service type's package says a service of it must or may define: the methods to implement, and the
@@ -308,13 +297,11 @@ public sealed interface DiscoverResult {
      * @param container the service type
      * @param handlers the methods, in the package's own order
      * @param rules the constraints that range over more than one of them
-     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
-     *     registry — see {@code Loader.unverifiedWarning}
      * @param note the listener the service type binds to, or that it is attachable to none
      */
     record ServiceHandlerList(
-            String container, List<ServiceHandlers.Handler> handlers, List<ServiceHandlers.Rule> rules,
-            String warning, String note) implements DiscoverResult {
+            String container, List<ServiceHandlers.Handler> handlers, List<ServiceHandlers.Rule> rules, String note)
+            implements DiscoverResult {
 
         public ServiceHandlerList {
             handlers = List.copyOf(handlers);
@@ -331,11 +318,10 @@ public sealed interface DiscoverResult {
      * @param description its documentation, verbatim, or empty
      * @param sections the readme sections whose code declares a service of it
      * @param next where to look when no section does: the readme, or {@code null} when the module publishes none
-     * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the listener the service type binds to, or that it is attachable to none, or {@code null}
      */
     record ServiceExamples(String container, String description, List<ReadmeSections.Section> sections, String next,
-            String warning, String note) implements DiscoverResult { }
+            String note) implements DiscoverResult { }
 
     /**
      * The {@code readme} bucket's own answer: the whole readme verbatim, or — when a section selector resolved to
@@ -348,14 +334,12 @@ public sealed interface DiscoverResult {
      * @param section the section's 1-based number, or {@code null} for the whole readme
      * @param of how many sections the readme carries, or {@code null} for the whole readme
      * @param title the section's own heading, or {@code null} for the whole readme
-     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
-     *     registry — see {@code Loader.unverifiedWarning}
      */
-    record Readme(String markdown, int lines, Integer section, Integer of, String title, String warning)
+    record Readme(String markdown, int lines, Integer section, Integer of, String title)
             implements DiscoverResult {
 
-        public Readme(String markdown, int lines, String warning) {
-            this(markdown, lines, null, null, null, warning);
+        public Readme(String markdown, int lines) {
+            this(markdown, lines, null, null, null);
         }
     }
 
@@ -367,12 +351,10 @@ public sealed interface DiscoverResult {
      * @param total how many sections actually match
      * @param paging which page this is, or {@code null} when every match fit on one
      * @param next the ready-to-run command that narrows further, or {@code null} when nothing was cut off
-     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
-     *     registry — see {@code Loader.unverifiedWarning}
      * @param matching whether the sections are the ones that matched something, rather than all the readme has
      */
     record ReadmeSections(
-            List<Section> sections, int total, Paging paging, String next, String warning, boolean matching)
+            List<Section> sections, int total, Paging paging, String next, boolean matching)
             implements DiscoverResult {
 
         /**
@@ -407,7 +389,6 @@ public sealed interface DiscoverResult {
      * @param documented other entries a {@code --filter} matched only in their documentation
      * @param paging which page of {@code documented} this is, or {@code null} when it fit on one
      * @param next the ready-to-run command that turns {@code documented}'s page, or {@code null} on the last
-     * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the listener a service type's method binds through, or {@code null}
      */
     record Signature(
@@ -415,7 +396,7 @@ public sealed interface DiscoverResult {
             String declaration, List<Parameter> params, String returns, boolean deprecated,
             List<Type> types, List<Method> omitted, List<Foreign> foreign, Create create,
             List<ReadmeSections.Section> callers, Documented documented, Paging paging,
-            String next, String warning, String note) implements DiscoverResult {
+            String next, String note) implements DiscoverResult {
 
         /**
          * One line of Ballerina that constructs the container, and its constructor's parameters.
@@ -462,13 +443,12 @@ public sealed interface DiscoverResult {
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param documented entries a {@code --filter} matched only in their documentation, paged as the sequence's
      *     last section, after the normal methods
-     * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the same joined advisory {@link ResourceList#note} carries, or {@code null}
      */
     record MixedListing(
             String container, List<ResourceList.Resource> resources, List<Method> remote, List<Method> normal,
-            Counts counts, int shown, int total, Paging paging, String next, Documented documented,
-            String warning, String note) implements DiscoverResult {
+            Counts counts, int shown, int total, Paging paging, String next, Documented documented, String note)
+            implements DiscoverResult {
 
         /**
          * @param resources resource methods in the whole listing
@@ -499,11 +479,10 @@ public sealed interface DiscoverResult {
      * @param paging which page this is, or {@code null} when the whole listing fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param documented entries a {@code --filter} matched only in their documentation, paged as the last section
-     * @param warning why the loaded version cannot be trusted, or {@code null}
      */
     record TypeRoster(
             List<Section> sections, Map<Kind, Integer> counts, int shown, int total, Paging paging, String next,
-            Documented documented, String warning) implements DiscoverResult {
+            Documented documented) implements DiscoverResult {
 
         /**
          * A section of the roster, in the order the roster lists them: its JSON key, then what one of its entries
@@ -563,12 +542,11 @@ public sealed interface DiscoverResult {
      * @param omitted every declaration it names that {@code types} does not print, each with the command that
      *     opens it
      * @param foreign the declarations it names that another package declares
-     * @param warning why the loaded version cannot be trusted, or {@code null}
      * @param note the enum an enum member's answer shows, or {@code null}
      */
     record TypeDeclaration(
             String name, String kind, String declaration, List<Signature.Type> types, List<Method> omitted,
-            List<Foreign> foreign, String warning, String note)
+            List<Foreign> foreign, String note)
             implements DiscoverResult { }
 
     /**
@@ -583,10 +561,9 @@ public sealed interface DiscoverResult {
      * @param paging which page this is, or {@code null} when every match fit on one
      * @param next the ready-to-run command that turns the page, or {@code null} when nothing was cut off
      * @param overview the command that opens the package's overview, for an answer with no match
-     * @param warning why the loaded version cannot be trusted, or {@code null}
      */
     record Search(List<String> keywords, List<Group> groups, Map<Kind, Integer> counts, int shown, int total,
-            Paging paging, String next, String overview, String warning) implements DiscoverResult {
+            Paging paging, String next, String overview) implements DiscoverResult {
 
         /** What a match is, in the order an answer lists them: its JSON key, then its noun, one and several. */
         public enum Kind {
@@ -703,9 +680,8 @@ public sealed interface DiscoverResult {
      *
      * @param bucket the bucket asked for
      * @param elsewhere every other callable bucket with something in it
-     * @param warning why the loaded version cannot be trusted, or {@code null}
      */
-    record EmptyBucket(String bucket, List<Elsewhere> elsewhere, String warning) implements DiscoverResult {
+    record EmptyBucket(String bucket, List<Elsewhere> elsewhere) implements DiscoverResult {
 
         /**
          * @param bucket the bucket's name

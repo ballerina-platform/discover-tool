@@ -49,15 +49,15 @@ public class CoordinateTest {
     @Test
     public void anImportsKeywordEscapeIsRejectedWithTheUnescapedForm() {
         for (String[] each : new String[][] {
-                {"ballerinax/'client.config:1.0.0", "Run `bal discover package ballerinax/client.config:1.0.0`."},
-                {"ballerina/lang.'int", "Run `bal discover package ballerina/lang.int`."},
-                {"'ballerina/http", "Run `bal discover package ballerina/http`."}}) {
+                {"ballerinax/'client.config:1.0.0", "bal discover package ballerinax/client.config:1.0.0"},
+                {"ballerina/lang.'int", "bal discover package ballerina/lang.int"},
+                {"'ballerina/http", "bal discover package ballerina/http"}}) {
             Result<Coordinate> parsed = Coordinate.parse(each[0]);
             Assert.assertFalse(parsed.isOk(), each[0]);
             Failure.Validation failure = (Failure.Validation) parsed.failure();
-            Assert.assertEquals(failure.message(), "A package name is written unescaped, but " + each[0]
-                    + " quotes part of it the way an import does.");
-            Assert.assertEquals(failure.suggestion(), each[1]);
+            Assert.assertEquals(failure.message(), "a package name is written unescaped, but " + each[0]
+                    + " quotes part of it the way an import does");
+            Assert.assertEquals(failure.command(), each[1]);
         }
     }
 
@@ -88,7 +88,7 @@ public class CoordinateTest {
     public void aBadNameIsRejectedBeforeTheVersionIsRead() {
         Result<Coordinate> parsed = Coordinate.parse("ballerina:2.15.7");
         Assert.assertFalse(parsed.isOk());
-        Assert.assertTrue(((Failure.Validation) parsed.failure()).message().startsWith("Invalid package name"));
+        Assert.assertTrue(((Failure.Validation) parsed.failure()).message().startsWith("invalid package name"));
     }
 
     private static Failure.Validation rejected(String input) {
@@ -100,37 +100,37 @@ public class CoordinateTest {
     @Test
     public void nothingAfterTheColonIsWordedAsSuch() {
         Failure.Validation failure = rejected("ballerina/http:");
-        Assert.assertEquals(failure.message(), "Nothing follows the ':' in 'ballerina/http:'.");
+        Assert.assertEquals(failure.message(), "nothing follows the ':' in 'ballerina/http:'");
         Assert.assertEquals(failure.suggestion(), "Write a version after it, ballerina/http:<major>.<minor>.<patch>, "
-                + "or drop the ':' to read the version your project locks or Central's latest: ballerina/http");
+                + "or drop the ':' to read the version your project locks or Central's latest: ballerina/http.");
     }
 
     @Test
     public void aLeadingVOrZeroIsCorrectedToTheVersionItSpells() {
         Failure.Validation prefixed = rejected("ballerinax/kafka:v4.6.5");
         Assert.assertEquals(prefixed.message(),
-                "'v4.6.5' in 'ballerinax/kafka:v4.6.5' is not a version: a version has no leading v.");
-        Assert.assertEquals(prefixed.suggestion(), "Run `bal discover package ballerinax/kafka:4.6.5`.");
+                "'v4.6.5' in 'ballerinax/kafka:v4.6.5' is not a version: a version has no leading v");
+        Assert.assertEquals(prefixed.suggestion(), "Write the package as ballerinax/kafka:4.6.5.");
+        Assert.assertEquals(prefixed.command(), "bal discover package ballerinax/kafka:4.6.5");
 
         Failure.Validation zero = rejected("ballerina/http:02.15.07");
         Assert.assertEquals(zero.message(),
-                "'02.15.07' in 'ballerina/http:02.15.07' is not a version: a number in a version has no leading zero.");
-        Assert.assertEquals(zero.suggestion(), "Run `bal discover package ballerina/http:2.15.7`.");
+                "'02.15.07' in 'ballerina/http:02.15.07' is not a version: a number in a version has no leading zero");
+        Assert.assertEquals(zero.command(), "bal discover package ballerina/http:2.15.7");
         Assert.assertTrue(Coordinate.parse("ballerina/http:0.10.0-0.alpha").isOk());
     }
 
     @Test
     public void aMistypedNameIsAnsweredWithTheCallersOwnPackage() {
         Failure.Validation npm = rejected("ballerinax/kafka@4.6.5");
-        Assert.assertEquals(npm.message(), "Invalid package name 'ballerinax/kafka@4.6.5': a version follows a ':', "
-                + "not an '@'.");
-        Assert.assertEquals(npm.suggestion(), "Run `bal discover package ballerinax/kafka:4.6.5`.");
+        Assert.assertEquals(npm.message(), "invalid package name 'ballerinax/kafka@4.6.5': a version follows a ':', "
+                + "not an '@'");
+        Assert.assertEquals(npm.command(), "bal discover package ballerinax/kafka:4.6.5");
 
         Failure.Validation bare = rejected("kafka");
         Assert.assertEquals(bare.message(),
-                "Invalid package name 'kafka': a package is named with its organization, <org>/kafka.");
-        Assert.assertEquals(bare.suggestion(), "`bal discover search kafka` lists the packages that match, with their "
-                + "organizations.");
+                "invalid package name 'kafka': a package is named with its organization, <org>/kafka");
+        Assert.assertEquals(bare.suggestion(), "Search Central for the packages that match, with their organizations.");
         Assert.assertEquals(bare.command(), "bal discover search kafka");
     }
 

@@ -43,8 +43,7 @@ public class DiscoverResultRenderingTest {
         return Command.of(noun, names).in(new Command.Target("ballerinax/kafka", null)).text();
     }
 
-    private static DiscoverResult.Overview kafkaOverview(List<DiscoverResult.Overview.Submodule> submodules,
-            String warning) {
+    private static DiscoverResult.Overview kafkaOverview(List<DiscoverResult.Overview.Submodule> submodules) {
         return new DiscoverResult.Overview(
                 List.of(new DiscoverResult.Overview.Section("client", List.of(
                                 new DiscoverResult.Overview.Row("Consumer", 0, 24, 0, kafka("client", "Consumer")),
@@ -55,13 +54,13 @@ public class DiscoverResultRenderingTest {
                                 1, kafka("function"))),
                 new DiscoverResult.Overview.TypeCounts(
                         new LinkedHashMap<>(Map.of(DiscoverResult.TypeRoster.Kind.RECORDS, 14)), kafka("type")),
-                new DiscoverResult.Overview.ReadmeSummary(11, kafka("readme")), submodules, warning, null);
+                new DiscoverResult.Overview.ReadmeSummary(11, kafka("readme")), submodules, null);
     }
 
     @Test
     public void anOverviewListsEachBucketsFirstRowsThenTheTypeAndReadmeLines() {
         TextRenderer.Context where = new TextRenderer.Context("ballerinax/kafka", null, List.of(), null, null, "4.6.6");
-        Assert.assertEquals(TextRenderer.render(kafkaOverview(List.of(), null), where), lines(
+        Assert.assertEquals(TextRenderer.render(kafkaOverview(List.of()), where), lines(
                 "ballerinax/kafka:4.6.6",
                 "",
                 "Clients (3)",
@@ -79,7 +78,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void anOverviewGivesEveryRowItsCommandInJson() {
-        JsonObject json = JsonParser.parseString(JsonRenderer.render(kafkaOverview(List.of(), null)))
+        JsonObject json = JsonParser.parseString(JsonRenderer.render(kafkaOverview(List.of())))
                 .getAsJsonObject();
         Assert.assertEquals(json.getAsJsonObject("clients").toString(),
                 "{\"entries\":[{\"name\":\"Consumer\",\"remote\":24,\"command\":\"" + kafka("client",
@@ -97,7 +96,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void anEmptyOverviewSaysSoInTextAndIsAnEmptyObjectInJson() {
-        DiscoverResult result = new DiscoverResult.Overview(List.of(), null, null, List.of(), null, null);
+        DiscoverResult result = new DiscoverResult.Overview(List.of(), null, null, List.of(), null);
         Assert.assertEquals(TextRenderer.render(result), "Nothing to list.");
         Assert.assertEquals(JsonRenderer.render(result), "{}");
     }
@@ -108,7 +107,7 @@ public class DiscoverResultRenderingTest {
                 new DiscoverResult.Overview.Submodule("dataloader", "load data from a source with batching and caching",
                         "bal discover package ballerina/graphql --module dataloader"),
                 new DiscoverResult.Overview.Submodule("subgraph", "create subgraphs for a federated GraphQL service",
-                        "bal discover package ballerina/graphql --module subgraph")), null, null);
+                        "bal discover package ballerina/graphql --module subgraph")), null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Nothing to list.",
                 "",
@@ -126,18 +125,6 @@ public class DiscoverResultRenderingTest {
     }
 
     @Test
-    public void anUnverifiedVersionsWarningAppearsInBothRenderings() {
-        DiscoverResult result = kafkaOverview(List.of(),
-                "the registry was unreachable, so this version came off disk unchecked");
-        Assert.assertTrue(TextRenderer.render(result).contains(
-                "\n\nWarning: the registry was unreachable, so this version came off disk unchecked\n"));
-        String json = JsonRenderer.render(result);
-        Assert.assertEquals(
-                JsonParser.parseString(json).getAsJsonObject().get("warning").getAsString(),
-                "the registry was unreachable, so this version came off disk unchecked");
-    }
-
-    @Test
     public void aContainerRosterListsNamesInTextAndCommandsInJson() {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(
@@ -145,7 +132,7 @@ public class DiscoverResultRenderingTest {
                                 "Caller", 0, 3, 0, null, null, "bal discover client Caller -p ballerinax/kafka"),
                         new DiscoverResult.ContainerRoster.Container(
                                 "Consumer", 0, 24, 0, null, null, "bal discover client Consumer -p ballerinax/kafka")),
-                2, null, null, null, List.of(), 0);
+                2, null, null, List.of(), 0);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 containers",
                 "",
@@ -176,7 +163,7 @@ public class DiscoverResultRenderingTest {
                                 "bal discover service Service -p ballerinax/kafka"),
                         new DiscoverResult.ContainerRoster.Container(
                                 "Plain", 0, 1, 0, null, null, "bal discover service Plain -p ballerinax/kafka")),
-                2, null, null, null, List.of(), 0);
+                2, null, null, List.of(), 0);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 containers",
                 "",
@@ -200,7 +187,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(new DiscoverResult.ContainerRoster.Container(
                         "Service", 0, 0, 0, "http:Listener", null, "bal discover service Service -p ballerina/http")),
-                1, new DiscoverResult.Paging(1, 2, 2), "bal discover service -p ballerina/http --page 2", null,
+                1, new DiscoverResult.Paging(1, 2, 2), "bal discover service -p ballerina/http --page 2",
                 List.of(new DiscoverResult.ContainerRoster.NotAttachable(
                         "RequestInterceptor", "bal discover service RequestInterceptor -p ballerina/http")),
                 3);
@@ -236,7 +223,7 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.ContainerRoster.Container(
                                 "InterceptableService", 0, 0, 1, "http:Listener", "package source unavailable",
                                 "bal discover service InterceptableService -p ballerina/http")),
-                2, null, null, null, List.of(), 0);
+                2, null, null, List.of(), 0);
         Assert.assertTrue(TextRenderer.render(result).contains(
                 "http:Listener — unverified (package source unavailable)\n  InterceptableService"));
 
@@ -255,7 +242,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(new DiscoverResult.ContainerRoster.Container(
                         "Service", 0, 0, 0, "http:Listener", null, "bal discover service Service -p ballerina/http")),
-                6, new DiscoverResult.Paging(1, 2, 5), "bal discover service -p ballerina/http --page 2", null,
+                6, new DiscoverResult.Paging(1, 2, 5), "bal discover service -p ballerina/http --page 2",
                 List.of(), 5);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "6 containers",
@@ -275,7 +262,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.ContainerRoster(
                 List.of(new DiscoverResult.ContainerRoster.Container(
                         "A", 0, 1, 0, null, null, "bal discover class A -p pkg")),
-                91, new DiscoverResult.Paging(1, 3, 51), "bal discover class -p pkg --page 2", null, List.of(), 0);
+                91, new DiscoverResult.Paging(1, 3, 51), "bal discover class -p pkg --page 2", List.of(), 0);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "91 containers",
                 "",
@@ -299,7 +286,7 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.PathGroups.Group(
                                 "orgs", 124, "bal discover client orgs -p ballerinax/github")),
                 new DiscoverResult.PathGroups.Counts(0, 42), 42, new DiscoverResult.Paging(1, 2, 40),
-                "bal discover client -p ballerinax/github --page 2", null, null);
+                "bal discover client -p ballerinax/github --page 2", null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "42 path groups",
                 "",
@@ -329,7 +316,7 @@ public class DiscoverResultRenderingTest {
                 List.of(resource("ballerinax/github", "repos/:owner/:repo", "get", "patch", "delete")),
                 List.of(new DiscoverResult.PathGroups.Group("repos/actions", 38,
                         "bal discover resource repos/actions get -p ballerinax/github --client Client")),
-                new DiscoverResult.PathGroups.Counts(1, 1), 2, null, null, null, null);
+                new DiscoverResult.PathGroups.Counts(1, 1), 2, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "1 resource path here, 1 path group",
@@ -361,7 +348,7 @@ public class DiscoverResultRenderingTest {
         String client = "bal discover resource -p pkg --client Client";
         DiscoverResult result = new DiscoverResult.PathGroups("Client", here, List.of(),
                 new DiscoverResult.PathGroups.Counts(45, 3), 48, new DiscoverResult.Paging(1, 2, 8),
-                client + " --page 2", null, null);
+                client + " --page 2", null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.startsWith("Client\n45 resource paths here, 3 path groups\n"), text);
         Assert.assertTrue(text.endsWith("\n... 8 more (page 1 of 2)\nNext: bal discover resource <path> <accessor> "
@@ -378,7 +365,7 @@ public class DiscoverResultRenderingTest {
                         resource("ballerinax/github", "gists", "get", "post"),
                         resource("ballerinax/github", "gists/:gistId", "get", "delete"),
                         resource("ballerinax/github", "gists/starred", "get")),
-                3, 3, null, null, DiscoverResult.Documented.NONE, null, null);
+                3, 3, null, null, DiscoverResult.Documented.NONE, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "3 resource paths",
                 "",
@@ -408,7 +395,7 @@ public class DiscoverResultRenderingTest {
                 List.of(resource("ballerinax/github", "gists/starred", "get"),
                         resource("ballerinax/github", "gists/'public", "get"),
                         resource("ballerinax/github", "gists/'private", "get", "post")),
-                3, 3, null, null, DiscoverResult.Documented.NONE, null, null);
+                3, 3, null, null, DiscoverResult.Documented.NONE, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "3 resource paths",
                 "",
@@ -423,7 +410,7 @@ public class DiscoverResultRenderingTest {
     public void aPaginatedMethodListNamesTheNextPageInBothRenderings() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
                 methods(TWILIO, "createAccount", "createAddress"), true, 40, 199, new DiscoverResult.Paging(1, 5, 159),
-                TWILIO_CLIENT + " --page 2", DiscoverResult.Documented.NONE, null, null);
+                TWILIO_CLIENT + " --page 2", DiscoverResult.Documented.NONE, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
                 "199 remote methods",
@@ -449,7 +436,7 @@ public class DiscoverResultRenderingTest {
     public void aLaterPageCountsOnlyWhatComesAfterIt() {
         DiscoverResult result = new DiscoverResult.MethodList("Client",
                 methods(TWILIO, "deleteConferenceRecording"), true, 40, 199, new DiscoverResult.Paging(2, 5, 119),
-                "bal discover client Client -p ballerinax/twilio --page 3", DiscoverResult.Documented.NONE, null, null);
+                "bal discover client Client -p ballerinax/twilio --page 3", DiscoverResult.Documented.NONE, null);
         Assert.assertTrue(TextRenderer.render(result).endsWith(lines(
                 "... 119 more (page 2 of 5)",
                 "Next: bal discover method <name> -p " + TWILIO + " --client Client",
@@ -457,7 +444,7 @@ public class DiscoverResultRenderingTest {
 
         DiscoverResult last = new DiscoverResult.MethodList("Client",
                 methods(TWILIO, "updateUsageTrigger"), true, 39, 199, new DiscoverResult.Paging(5, 5, 0), null,
-                DiscoverResult.Documented.NONE, null, null);
+                DiscoverResult.Documented.NONE, null);
         Assert.assertTrue(TextRenderer.render(last).endsWith("Last page (page 5 of 5)\nNext: bal discover method "
                 + "<name> -p " + TWILIO
                 + " --client Client"));
@@ -466,7 +453,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void theWholeReadmeIsPrintedVerbatimWithNoWrappingInText() {
-        DiscoverResult result = new DiscoverResult.Readme("## Overview\n\nbody", 3, null);
+        DiscoverResult result = new DiscoverResult.Readme("## Overview\n\nbody", 3);
         Assert.assertEquals(TextRenderer.render(result), "## Overview\n\nbody");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
@@ -477,7 +464,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void oneSectionCarriesItsPositionInJsonAndAHeaderLineInText() {
-        DiscoverResult result = new DiscoverResult.Readme("## Quickstart\n\ncode", 3, 2, 5, "Quickstart", null);
+        DiscoverResult result = new DiscoverResult.Readme("## Quickstart\n\ncode", 3, 2, 5, "Quickstart");
         Assert.assertEquals(TextRenderer.render(result), "Section 2 of 5: Quickstart\n\n## Quickstart\n\ncode");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
@@ -492,7 +479,7 @@ public class DiscoverResultRenderingTest {
                 List.of(
                         new DiscoverResult.ReadmeSections.Section(1, "Overview", 10, "bal discover readme 1 -p pkg"),
                         new DiscoverResult.ReadmeSections.Section(3, "Quickstart", 25, "bal discover readme 3 -p pkg")),
-                2, null, null, null, true);
+                2, null, null, true);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 matching sections",
                 "",
@@ -510,7 +497,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void noSectionMatchingTheFilterIsNoneInTextAndAnEmptyArrayInJson() {
-        DiscoverResult result = new DiscoverResult.ReadmeSections(List.of(), 0, null, null, null, true);
+        DiscoverResult result = new DiscoverResult.ReadmeSections(List.of(), 0, null, null, true);
         Assert.assertEquals(TextRenderer.render(result), "No matching sections.");
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
@@ -527,7 +514,7 @@ public class DiscoverResultRenderingTest {
                         new DiscoverResult.Signature.Parameter(
                                 "queries", "GistsListPublicQueries", null, "inclusion", "Queries to send")),
                 "BaseGist[]|error", false, types, omitted, List.of(), null, List.of(),
-                DiscoverResult.Documented.NONE, null, null, null, note);
+                DiscoverResult.Documented.NONE, null, null, note);
     }
 
     @Test
@@ -539,7 +526,7 @@ public class DiscoverResultRenderingTest {
                 new DiscoverResult.Documented(
                         List.copyOf(methods("pkg", "ping", "auth")), 82),
                 new DiscoverResult.Paging(2, 3, 2),
-                command + " --page 3", null, null);
+                command + " --page 3", null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.contains("\nMentioned only in their documentation (2 of 82)\n  ping\n  auth\n"), text);
         Assert.assertTrue(text.endsWith("\n... 2 more that mention it only in their documentation (page 2 of 3)\n"
@@ -561,7 +548,7 @@ public class DiscoverResultRenderingTest {
                 List.of(), null, List.of(),
                 new DiscoverResult.Documented(List.copyOf(methods("pkg", "ping")), 41),
                 new DiscoverResult.Paging(1, 2, 1),
-                command + " --page 2", null, null);
+                command + " --page 2", null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.endsWith(lines(
                 "... 1 more that mention it only in their documentation (page 1 of 2)",
@@ -579,7 +566,7 @@ public class DiscoverResultRenderingTest {
                         "bal discover method createCall -p ballerinax/twilio --client Client")),
                 false, 1, 199, new DiscoverResult.Paging(1, 5, 159),
                 "bal discover client Client -p ballerinax/twilio --page 2",
-                DiscoverResult.Documented.NONE, null, null);
+                DiscoverResult.Documented.NONE, null);
         String text = TextRenderer.render(result, new TextRenderer.Context("ballerinax/twilio", null,
                 List.of("client"), null, null, null));
         Assert.assertTrue(text.startsWith("ballerinax/twilio · client · Client\n"), text);
@@ -652,7 +639,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.MixedListing("Client",
                 List.of(resource(HTTP, ":...path", "get", "post")),
                 methods(HTTP, "execute", "get"), methods(HTTP, "getCookieStore"),
-                new DiscoverResult.MixedListing.Counts(1, 2, 1), 4, 4, null, null, DiscoverResult.Documented.NONE, null,
+                new DiscoverResult.MixedListing.Counts(1, 2, 1), 4, 4, null, null, DiscoverResult.Documented.NONE,
                 null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
@@ -691,8 +678,7 @@ public class DiscoverResultRenderingTest {
                 List.of(), methods("pkg", "execute"),
                 methods("pkg", "'close"), new DiscoverResult.MixedListing.Counts(0, 2, 2),
                 2, 4, new DiscoverResult.Paging(1, 2, 2), next,
-                new DiscoverResult.Documented(List.copyOf(methods("pkg", "forward")), 3),
-                null, null);
+                new DiscoverResult.Documented(List.copyOf(methods("pkg", "forward")), 3), null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "2 remote methods, 2 methods",
                 "",
@@ -728,8 +714,8 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.EmptyBucket("function",
                 List.of(new DiscoverResult.EmptyBucket.Elsewhere("client", 3,
                         "bal discover client -p ballerinax/kafka"),
-                        new DiscoverResult.EmptyBucket.Elsewhere("class", 4, "bal discover class -p ballerinax/kafka")),
-                null);
+                        new DiscoverResult.EmptyBucket.Elsewhere("class", 4,
+                                "bal discover class -p ballerinax/kafka")));
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "This package has no functions.",
                 "",

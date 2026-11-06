@@ -69,6 +69,8 @@ public final class JdkHttpTransport implements HttpTransport {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(30);
 
+    private static final String NO_DETAIL = "no detail given";
+
     private final HttpClient client;
     private final long archiveLimit;
     private final ProxyAuthenticator authenticator;
@@ -149,7 +151,7 @@ public final class JdkHttpTransport implements HttpTransport {
                     .header("Accept", "application/json")
                     .build();
         } catch (IllegalArgumentException malformed) {
-            return new Reply.Failed(Reply.Problem.BAD_URL, describe(malformed));
+            return new Reply.Failed(Reply.Problem.BAD_URL, deepest(malformed));
         }
 
         try {
@@ -160,7 +162,7 @@ public final class JdkHttpTransport implements HttpTransport {
             return new Reply.TimedOut();
         } catch (IOException failed) {
             return authenticator != null && authenticator.rejected(request.uri())
-                    ? new Reply.Failed(Reply.Problem.PROXY_REJECTED, describe(failed))
+                    ? new Reply.Failed(Reply.Problem.PROXY_REJECTED, deepest(failed))
                     : failure(failed);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
@@ -304,13 +306,13 @@ public final class JdkHttpTransport implements HttpTransport {
     static Reply.Failed failure(IOException failed) {
         for (Throwable cause = failed; cause != null; cause = cause.getCause()) {
             if (cause instanceof UnresolvedAddressException || cause instanceof UnknownHostException) {
-                return new Reply.Failed(Reply.Problem.UNRESOLVED, describe(cause));
+                return new Reply.Failed(Reply.Problem.UNRESOLVED, deepest(cause));
             }
             if (cause instanceof SSLException) {
                 return new Reply.Failed(Reply.Problem.TLS, certificateProblem(cause).orElse(deepest(cause)));
             }
         }
-        String message = describe(failed);
+        String message = deepest(failed);
         Matcher tunnel = TUNNEL_FAILED.matcher(message);
         if (tunnel.find()) {
             return new Reply.Failed(Reply.Problem.TUNNEL, message, Integer.valueOf(tunnel.group(1)));
@@ -337,7 +339,7 @@ public final class JdkHttpTransport implements HttpTransport {
     }
 
     private static String deepest(Throwable failure) {
-        return messageIn(failure).orElseGet(() -> describe(failure));
+        return messageIn(failure).orElse(NO_DETAIL);
     }
 
     private static Optional<String> messageIn(Throwable failure) {
@@ -348,10 +350,5 @@ public final class JdkHttpTransport implements HttpTransport {
             }
         }
         return Optional.ofNullable(message);
-    }
-
-    private static String describe(Throwable cause) {
-        String message = cause.getMessage();
-        return message == null || message.isEmpty() ? cause.getClass().getSimpleName() : message;
     }
 }

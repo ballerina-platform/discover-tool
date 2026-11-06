@@ -152,10 +152,10 @@ public final class Types {
         }
         String named = listing.with(options.selectors()).text();
         return new Failure.Validation(
-                "The --filter option narrows a listing, and '" + options.selectors().get(0)
-                        + "' names one declaration.",
-                "Drop --filter: " + Failure.quoted(named) + "; or drop the name: "
-                        + Failure.quoted(listing.filtered(options.filter()).text()) + ".", named);
+                "the --filter option narrows a listing, and '" + options.selectors().get(0)
+                        + "' names one declaration",
+                "Drop --filter, or drop the name: " + Failure.quoted(listing.filtered(options.filter()).text())
+                        + ".", named);
     }
 
     private static List<Entry> entries(Library library) {
@@ -202,6 +202,17 @@ public final class Types {
 
     private static boolean isListener(Library library, String name) {
         return library.listeners().stream().anyMatch(listener -> listener.name().equals(name));
+    }
+
+    // Every type's name, in the listing's order: by kind, then by name.
+    private static List<String> typeNames(LoadedPackage loaded) {
+        List<Entry> all = entries(loaded.library());
+        List<String> names = new ArrayList<>();
+        for (DiscoverResult.TypeRoster.Kind kind : DiscoverResult.TypeRoster.Kind.values()) {
+            all.stream().filter(entry -> entry.kind().equals(kind)).map(Entry::name).sorted(Texts.LOCALE_ORDER)
+                    .forEach(names::add);
+        }
+        return names;
     }
 
     private static Result<DiscoverResult> roster(LoadedPackage loaded, Options options) {
@@ -255,7 +266,7 @@ public final class Types {
                 ? DiscoverResult.Documented.NONE
                 : new DiscoverResult.Documented(window.slice(documented, total), documented.size());
         return Result.ok(new DiscoverResult.TypeRoster(List.copyOf(sections), counts, shown, total,
-                window.paging(), window.next(command), documentedHere, loaded.warning()));
+                window.paging(), window.next(command), documentedHere));
     }
 
     private static Result<DiscoverResult> leaf(LoadedPackage loaded, String requested, int page) {
@@ -290,16 +301,16 @@ public final class Types {
         }
         String listing = loaded.command(Command.TYPE).text();
         if (owners.isEmpty()) {
-            return Result.err(loaded.symbolNotFound(List.of(requested),
-                    "'" + requested + "' is not a type in " + loaded.place() + ".",
-                    "List the types: " + Failure.quoted(listing) + ".", listing));
+            return Result.err(loaded.missAmong(List.of(requested),
+                    "'" + requested + "' is not a type in " + loaded.place(), "types", listing,
+                    typeNames(loaded), null));
         }
         List<String> enums = owners.stream().map(TypeDef.Enumeration::name).toList();
-        return Result.err(loaded.symbolNotFound(List.of(requested),
-                "'" + requested + "' is a member of the enums " + Texts.and(enums) + " in " + loaded.place() + ".",
-                "Open the enum you mean, e.g. "
-                        + Failure.quoted(loaded.command(Command.TYPE, enums.get(0)).text()) + ".",
-                null));
+        return Result.err(loaded.ambiguous(List.of(requested),
+                "'" + requested + "' is a member of the enums " + Texts.and(enums) + " in " + loaded.place(),
+                "Open the enum you mean:", Failure.OWNERS, enums.stream()
+                        .map(name -> new Failure.Match(name, loaded.command(Command.TYPE, name).text()))
+                        .toList()));
     }
 
     private static Result<DiscoverResult> declaration(
@@ -312,7 +323,7 @@ public final class Types {
         return Result.ok(new DiscoverResult.TypeDeclaration(Identifiers.plain(name),
                 kindOf(loaded.library(), typeDef).noun(),
                 TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure),
-                foreignOf(loaded, closure, index, List.of()), loaded.warning(), note));
+                foreignOf(loaded, closure, index, List.of()), note));
     }
 
     private static List<TypeDef.Enumeration> enumsWithMember(LoadedPackage loaded, String member) {
@@ -331,8 +342,7 @@ public final class Types {
         return new DiscoverResult.TypeDeclaration(Identifiers.plain(name),
                 DiscoverResult.TypeRoster.Kind.ANNOTATIONS.noun(),
                 Documents.renderAnnotation(annotation), closure.types(index), omittedOf(loaded, closure),
-                foreignOf(loaded, closure, index, annotation.type().map(List::of).orElse(List.of())),
-                loaded.warning(), null);
+                foreignOf(loaded, closure, index, annotation.type().map(List::of).orElse(List.of())), null);
     }
 
     private static Optional<Library.AnnotationDef> annotationNamed(Library library, String name) {

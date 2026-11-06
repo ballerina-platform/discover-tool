@@ -144,10 +144,10 @@ public final class Loader {
             return Result.ok(CentralClient.ResolvedVersion.locked(Version.parse(locked).value(), lock));
         }
         return Result.err(new Failure.Validation(
-                lock + " locks " + qualified.qualified() + " at '" + locked + "', which is not a complete version.",
-                "Fix the " + qualified.qualified() + " entry in " + lock + ", or delete the file and run `bal build` "
+                lock + " locks " + qualified.qualified() + " at '" + locked + "', which is not a complete version",
+                "Fix the " + qualified.qualified() + " entry in " + lock + ", or delete the file and run 'bal build' "
                         + "to regenerate it; or write a version after the package: " + qualified.qualified()
-                        + ":<version>"));
+                        + ":<version>."));
     }
 
     /**

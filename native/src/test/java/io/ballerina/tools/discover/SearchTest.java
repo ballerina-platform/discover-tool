@@ -128,7 +128,7 @@ public class SearchTest {
     public void aSearchNeedsAKeywordAndTakesNoFilter() {
         CliTest.Capture none = new CliTest.Capture();
         Assert.assertEquals(Cli.run(List.of("search", "-p", "ballerinax/kafka"), none.streams(), CliTest.never()), 2);
-        Assert.assertEquals(none.field("kind"), "validation");
+        Assert.assertEquals(none.field("kind"), "usage");
         CliTest.Capture filtered = new CliTest.Capture();
         Assert.assertEquals(Cli.run(List.of("search", "send", "-p", "ballerinax/kafka", "--filter", "x"),
                 filtered.streams(), CliTest.never()), 2);

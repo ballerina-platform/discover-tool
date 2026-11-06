@@ -113,12 +113,11 @@ public final class Readme {
         if (markdown.getBytes(StandardCharsets.UTF_8).length > WHOLE_LIMIT_BYTES) {
             return Result.ok(listing(loaded, sections));
         }
-        return Result.ok(new DiscoverResult.Readme(markdown, lineCount(markdown), loaded.warning()));
+        return Result.ok(new DiscoverResult.Readme(markdown, lineCount(markdown)));
     }
 
     private static DiscoverResult.ReadmeSections listing(LoadedPackage loaded, List<Section> sections) {
-        return new DiscoverResult.ReadmeSections(rows(loaded, sections), sections.size(), null, null,
-                loaded.warning(), false);
+        return new DiscoverResult.ReadmeSections(rows(loaded, sections), sections.size(), null, null, false);
     }
 
     private static List<DiscoverResult.ReadmeSections.Section> rows(LoadedPackage loaded, List<Section> sections) {
@@ -130,7 +129,7 @@ public final class Readme {
 
     private static Failure severalSections(LoadedPackage loaded, String requested, List<Section> found) {
         return loaded.ambiguous(List.of(requested),
-                "'" + requested + "' matches " + found.size() + " readme sections of " + loaded.place() + ".",
+                "'" + requested + "' matches " + found.size() + " readme sections of " + loaded.place(),
                 "Name the one you mean:", Failure.SECTIONS,
                 found.stream().map(section -> new Failure.Match(section.number() + ". " + section.title(),
                         command(loaded.target(), String.valueOf(section.number())).text())).toList());
@@ -139,15 +138,17 @@ public final class Readme {
     private static Failure noReadme(LoadedPackage loaded) {
         return loaded.symbolNotFound(List.of(Command.README),
                 loaded.label() + " publishes no readme"
-                        + (loaded.module() == null ? "." : " for module " + loaded.module() + "."),
+                        + (loaded.module() == null ? "" : " for module " + loaded.module()),
                 loaded.module() != null
-                        ? "Read the default module's instead: `" + command(loaded.target(null))
-                                + "`. Or find another module's: `" + Command.overview(loaded.target(null))
-                                + "` lists what the default module declares and its submodules."
+                        ? "Read the default module's instead. Or find another module's: "
+                                + Failure.quoted(Command.overview(loaded.target(null)).text())
+                                + " lists what the default module declares and its submodules."
                         : loaded.submodules().isEmpty()
                                 ? "This package publishes no other module either."
-                                : "Check its other modules: `" + Command.overview(loaded.target(null)) + "`.",
-                null);
+                                : "Check its other modules.",
+                loaded.module() != null
+                        ? command(loaded.target(null)).text()
+                        : loaded.submodules().isEmpty() ? null : Command.overview(loaded.target(null)).text());
     }
 
     /** Every addressable section of the resolved module's readme, in the readme's own order. */
@@ -277,9 +278,9 @@ public final class Readme {
         List<Section> found = byNumber.isPresent() ? List.of(byNumber.get()) : byTitle(sections, requested);
         if (found.isEmpty()) {
             return Result.err(loaded.symbolNotFoundAmong(List.of(requested),
-                    "No readme section of " + loaded.place() + " is numbered or titled '" + requested + "'.",
-                    "Pass the number or title of one of the sections listed, or read the whole readme: `"
-                            + command(loaded.target()) + "`.",
+                    "no readme section of " + loaded.place() + " is numbered or titled '" + requested + "'",
+                    "Pass the number or title of one of the sections listed, or read the whole readme with "
+                            + Failure.quoted(command(loaded.target()).text()) + ".",
                     sections.stream().map(section -> section.number() + ". " + section.title()).toList()));
         }
         if (found.size() > 1) {
@@ -289,8 +290,8 @@ public final class Readme {
         if (filter != null && !matches(section, filter)) {
             String unfiltered = command(loaded.target(), requested).text();
             return Result.err(new Failure.Validation(
-                    "Section " + requested + " (\"" + section.title() + "\") does not mention \"" + filter + "\".",
-                    "Drop --filter to read it anyway: " + Failure.quoted(unfiltered) + ".", unfiltered));
+                    "section " + requested + " (\"" + section.title() + "\") does not mention \"" + filter + "\"",
+                    "Drop --filter to read it anyway.", unfiltered));
         }
         return Result.ok(toResult(section, sections.size(), loaded));
     }
@@ -328,7 +329,7 @@ public final class Readme {
 
     private static DiscoverResult.Readme toResult(Section section, int total, LoadedPackage loaded) {
         return new DiscoverResult.Readme(
-                section.markdown(), section.lines(), section.number(), total, section.title(), loaded.warning());
+                section.markdown(), section.lines(), section.number(), total, section.title());
     }
 
     private static Result<DiscoverResult> filtered(LoadedPackage loaded, List<Section> sections, Options options) {
@@ -346,6 +347,6 @@ public final class Readme {
         Containers.Page window = page.value();
         List<DiscoverResult.ReadmeSections.Section> shown = items.subList(window.from(), window.to());
         return Result.ok(new DiscoverResult.ReadmeSections(
-                shown, items.size(), window.paging(), window.next(command), loaded.warning(), true));
+                shown, items.size(), window.paging(), window.next(command), true));
     }
 }

@@ -46,6 +46,8 @@ final class UsageRenderer {
 
     private static final String USAGE = "Usage: " + Command.PREFIX;
 
+    private static final String OPTIONS_SLOT = "[options]";
+
     /** Flags rendered first, in this order: the package, then the container. */
     private static final List<String> LEADING =
             Stream.concat(Stream.of(Command.PACKAGE_FLAG), Command.OWNER_FLAGS.stream()).toList();
@@ -58,8 +60,24 @@ final class UsageRenderer {
         return wrap(USAGE, slots(grammar, noun), USAGE.length());
     }
 
+    /**
+     * The one-line synopsis a usage error ends with: the noun and its names, the package and container flags it
+     * takes, and {@code [options]} for the rest.
+     */
     static String usageLine(Commands.Grammar grammar, String noun) {
-        return USAGE + String.join(" ", slots(grammar, noun));
+        List<String> slots = new ArrayList<>();
+        slots.add(noun == null ? Usage.ROOT_LABEL : noun + Usage.label(noun));
+        Set<String> required = Usage.requiredFlags(noun);
+        for (OptionSpec option : orderedOptions(grammar.spec(noun))) {
+            String name = option.shortestName();
+            if (Command.PACKAGE_FLAG.equals(name)) {
+                slots.add(slot(option, required.contains(name)));
+            } else if (Command.OWNER_FLAGS.get(0).equals(name)) {
+                slots.add("[" + String.join("|", Command.OWNER_FLAGS) + " " + option.paramLabel() + "]");
+            }
+        }
+        slots.add(OPTIONS_SLOT);
+        return USAGE + String.join(" ", slots);
     }
 
     /** The root synopsis on one unwrapped line, {@code --help} included, for the launcher's one-line usage. */
@@ -69,25 +87,6 @@ final class UsageRenderer {
                 .filter(OptionSpec::usageHelp)
                 .forEach(help -> slots.add("[" + String.join("|", help.names()) + "]"));
         return Command.PREFIX + String.join(" ", slots);
-    }
-
-    static String knownFlags(CommandSpec spec) {
-        List<OptionSpec> options = spec.options().stream()
-                .filter(option -> !option.hidden())
-                .sorted(Comparator.comparing(OptionSpec::usageHelp))
-                .toList();
-        List<String> names = options.stream()
-                .map(option -> {
-                    List<String> spellings = new ArrayList<>(List.of(option.names()));
-                    spellings.sort(Comparator.comparingInt(String::length).reversed());
-                    return String.join("/", spellings);
-                })
-                .toList();
-        if (names.size() < 2) {
-            return names.isEmpty() ? "This command takes no flags." : "The only known flag is " + names.get(0) + ".";
-        }
-        return "Known flags are " + String.join(", ", names.subList(0, names.size() - 1))
-                + " and " + names.get(names.size() - 1) + ".";
     }
 
     // The container flags are one slot, since only one of them is ever given.

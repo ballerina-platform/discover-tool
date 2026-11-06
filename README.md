@@ -78,7 +78,7 @@ request in this order.
 | `--client`, `--class`, `--service <name>` | The container a `method` or `resource` is declared by; optional when exactly one declares it. |
 | `--output-format json\|text` | Override the default: text when stdout is a terminal, JSON otherwise. |
 | `--filter <keyword>`   | Narrow a listing to entries whose name, path, parameter or type contains the keyword. Filtering is local to the fetched payload; nothing is sent to Central. On `package` it runs `search <keyword>`. |
-| `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
+| `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is an error. |
 | `-m, --module <module>` | Target a submodule instead of the default module, on every noun including `readme`. The package's overview lists the submodules it has. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. |
 
@@ -569,13 +569,25 @@ Next: bal discover method <name> -p ballerinax/twilio --client Client
 The entries a `--filter` matched only in their documentation are named after the ones it matched by name,
 path, parameter or type, and paged after them under the same `--page` — each is one more call away by name.
 
-A name that matches nothing fails (exit 1, see The contract, below), suggesting the listing to choose from
-rather than a guess at what was meant:
+A name that matches nothing fails (exit 1, see The contract, below) and never guesses at what was meant: it
+lists every name at the level the lookup reached, sorted as the listing sorts them, when there are 40 or fewer,
+and otherwise points at the listing to choose from:
 
 ```
 $ bal discover method sendd -p ballerinax/kafka --client Producer
-error: 'sendd' is not a method of Producer in ballerinax/kafka:4.6.5.
-  List its methods: `bal discover method -p ballerinax/kafka --client Producer`.
+bal discover: error: 'sendd' is not a method of Producer in ballerinax/kafka:4.6.8
+  Name one of the methods of Producer below.
+  candidates:
+    close
+    flush
+    getTopicPartitions
+    send
+    sendWithMetadata
+
+$ bal discover method createAccountt -p ballerinax/twilio --client Client
+bal discover: error: 'createAccountt' is not a method of Client in ballerinax/twilio:5.0.2
+  List the methods of Client.
+  Try: bal discover method -p ballerinax/twilio --client Client
 ```
 
 So does a name asked as a noun that does not hold it — the suggestion is the command with the noun that does,
@@ -585,24 +597,26 @@ containers declare fails with each one's command:
 
 ```
 $ bal discover client Listener -p ballerinax/kafka
-error: 'Listener' is not a client in ballerinax/kafka:4.6.5.
-  It is a listener: `bal discover type Listener -p ballerinax/kafka`.
+bal discover: error: 'Listener' is not a client in ballerinax/kafka:4.6.8
+  It is a listener.
+  Try: bal discover type Listener -p ballerinax/kafka
 
 $ bal discover method send -p ballerinax/kafka --class Producer
-error: 'Producer' is a client, not a class, in ballerinax/kafka:4.6.5.
-  Run `bal discover method send -p ballerinax/kafka --client Producer`.
+bal discover: error: 'Producer' is a client, not a class, in ballerinax/kafka:4.6.8
+  Name it with --client.
+  Try: bal discover method send -p ballerinax/kafka --client Producer
 
 $ bal discover method close -p ballerinax/kafka
-error: 'close' is declared by Consumer and Producer in ballerinax/kafka:4.6.5.
+bal discover: error: 'close' is declared by Consumer and Producer in ballerinax/kafka:4.6.8
   Name the one you mean with --client, --class, --service:
     Consumer  bal discover method close -p ballerinax/kafka --client Consumer
     Producer  bal discover method close -p ballerinax/kafka --client Producer
-Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] [--output-format json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
-Run `bal discover method --help` for details.
+Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] [options]
+Try 'bal discover method --help' for more information.
 ```
 
 A method or resource several containers declare, asked with no container flag, is an `ambiguous` failure (exit
-3). It has no one command to run, so that failure carries none: its JSON lists each container in `owners`, as
+2, a usage error). It has no one command to run, so that failure carries none: its JSON lists each container in `owners`, as
 `{"name", "command"}` rows whose commands open what was named on it (at most 40; past that the suggestion quotes
 the package's `search` for the name). A name typed as some other kind of thing that several containers declare
 (`bal discover class close -p ballerinax/kafka`) is `ambiguous` too, listing its owners the same way; one that a
@@ -660,7 +674,7 @@ Types it uses (2)
 A readme of at most 10 KB prints whole, under the same header line as every other answer. A larger one lists every
 one of its sections (a heading and everything down to the next heading) with the command that opens it, never cut off.
 A title (`readme "<title>"`) is matched on its letters and digits in any case, exactly when some section's title is
-equal to it, else as part of a title; one that matches several sections is an `ambiguous` failure (exit 3) listing
+equal to it, else as part of a title; one that matches several sections is an `ambiguous` failure (exit 2) listing
 them in `sections` (`{"name", "command"}`). A large readme can be narrowed to the sections that mention a keyword:
 
 ```
@@ -752,14 +766,13 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`) |
 | empty noun                           | `bucket` (the noun), `total`, `elsewhere` (`bucket`, `count`, `command`)                                            |
-| one service type                     | `container`, `note`, `warning`; when the package describes the methods a service defines, `handlers` (`name`, or `id` for a shape a service names itself, as `rules` refer to it, `kind`, `signature`, `required`, `repeatable`, `accessors`, `doc`, `deprecated`, `params`, `returns`) and `rules` (`requirement`, `handlers`, `message`); when it declares none and describes none, `methods` (empty), `description`, `examples` (`number`, `title`, `lines`, `command`) and `next` (the readme) when no section declares one |
+| one service type                     | `container`, `note`; when the package describes the methods a service defines, `handlers` (`name`, or `id` for a shape a service names itself, as `rules` refer to it, `kind`, `signature`, `required`, `repeatable`, `accessors`, `doc`, `deprecated`, `params`, `returns`) and `rules` (`requirement`, `handlers`, `message`); when it declares none and describes none, `methods` (empty), `description`, `examples` (`number`, `title`, `lines`, `command`) and `next` (the readme) when no section declares one |
 | search in a package                  | `keywords`, then per kind with a match `clients`, `serviceTypes`, `classes`, `listeners`, `functions` (`name`, `command`), `remote`, `methods` (`container`, `name`, `command`), `resources` (`container`, `path`, `accessor`, `command`), `types` (`name`, `kind`, `command`), `readme` (`number`, `title`, `command`), `submodules` (`name`, `command`); `counts` (per kind), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and `overview` when nothing matched |
 | search of Central                    | `keywords`, `packages` (`entries` (`qualified`, `version`, `summary`, `command`), `shown`, `total`), `symbols` (`entries` (`qualified`, `version`, `module`, `kind`, `container`, `name` or, for a resource method, `path` and `accessor`, `command`), `shown`, `total`), `page`, `pages`, `remaining`, `next`; it names no one package, so it has no `qualified` |
 | readme                               | `readme`, `lines`, and `section`, `of`, `title` for one section                                                  |
 | readme sections                      | `sections` (`number`, `title`, `lines`, `command`), `matching` (true when narrowed by `--filter`), `shown`, `total`, `page`, `pages`, `remaining`, `next` |
 
-Any answer can also carry `warning` (the version could not be confirmed against the registry), and a service
-type's answers `note` (the listener it binds to, or that it attaches to none), as can an enum member's (the enum
+A service type's answers carry `note` (the listener it binds to, or that it attaches to none), as can an enum member's (the enum
 it shows). `documented` lists entries a `--filter` matched
 only in their documentation, alphabetically and shaped as their listing rows are — a method, function or type
 with its `command`, a resource path once with every matching accessor's `commands` — held to the same ceiling
@@ -824,48 +837,60 @@ error naming the command that reads them, never silently dropped.
 |        |                                                                                  |
 | ------ | -------------------------------------------------------------------------------- |
 | stdout | the answer, and nothing else                                                     |
-| stderr | on failure, exactly one failure, and nothing else                                |
+| stderr | any warning, each its own report, and on failure exactly one failure             |
 | exit 0 | an answer, and stdout is complete — an empty `--filter` or search result too     |
 
-On failure stdout is empty, and the exit code says what to do next, one code per action; the failure's `kind`
-and `suggestion` say the rest:
+On failure stdout is empty. The exit code follows the Ballerina CLI tool guide's closed table: 2 for a usage
+error, 1 for every other failure, 130 when interrupted (SIGINT); `bal discover` never exits 3 or 4. The failure's
+`kind` says which failure it is, and each `kind` falls under one core kind, which decides the exit code:
 
-| exit | means                                                                             | `kind`                                  |
-| ---- | --------------------------------------------------------------------------------- | --------------------------------------- |
-| 1    | not found: the package, version, module, name or page does not exist             | `package-not-found`, `symbol-not-found`, `page-not-found` |
-| 2    | a usage error: the command is malformed, or asks for something it cannot combine — or the version the project's `Dependencies.toml` locks is malformed | `validation` |
-| 3    | ambiguous: the name matches more than one thing, each listed with its command     | `ambiguous`                             |
-| 4    | Central is unavailable for now, so the same command may work later: the connection, DNS or TLS failed, it timed out, Central answered 429, 500, 502, 503 or 504, or the proxy answered its `CONNECT` with 502, 503 or 504 | `upstream`, `timeout` |
-| 5    | Central answered with something a retry will not change: any other error status (Central's, or the proxy's, such as 407), or a body this tool cannot read | `upstream`, `schema-drift` |
-| 6    | an internal error: a defect in `bal discover`                                     | `internal`                              |
+| `kind`              | core kind | exit | means                                                                             |
+| ------------------- | --------- | ---- | --------------------------------------------------------------------------------- |
+| `usage`             | `usage`   | 2    | the command is malformed, or asks for something it cannot combine — or the version the project's `Dependencies.toml` locks is malformed |
+| `ambiguous`         | `usage`   | 2    | the name matches more than one thing, each listed with its command                |
+| `package-not-found` | `runtime` | 1    | Central publishes no such package, version or module                              |
+| `symbol-not-found`  | `runtime` | 1    | no name in the package matches what was asked                                     |
+| `page-not-found`    | `runtime` | 1    | a page past the end of a paged listing                                            |
+| `upstream`          | `runtime` | 1    | Central or the proxy failed to answer, or answered with an error status or a body that is not JSON |
+| `timeout`           | `runtime` | 1    | Central did not answer in time                                                    |
+| `schema-drift`      | `runtime` | 1    | Central answered with a shape this tool does not read                             |
+| `internal`          | `runtime` | 1    | a defect in `bal discover`                                                        |
 
-A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
-forced with `--output-format` (honoured even when the rest of the arguments fail to parse). In JSON it is one object
-carrying `kind`, `message` (the one-sentence headline text mode prints after `error:`) and `suggestion`. Its
+A failure is written in the same mode as an answer would have been: JSON when stdout is not a terminal, text when
+it is, either forced with `--output-format` (honoured even when the rest of the arguments fail to parse). In JSON it
+is one object carrying `"severity":"error"`, `kind`, `message` (what went wrong: one line, lowercase-first, with
+no closing period, the same text mode prints after `bal discover: error:`) and `suggestion`. Its
 `qualified` is always `org/name` (an `upstream` or `timeout` failure carries it once the request was for a
 package), and `version` (when one was reached) and `module` (when `--module` was passed) are keys of their own.
-When the failure has one fix, the suggestion quotes your whole command with it applied, and `command` holds
-that command, ready to run (`bal discover client Producer -p ballerinax/kafka --version 4.6.5` is answered with
-`bal discover client Producer -p ballerinax/kafka:4.6.5`). When it has several, one per container that declares the
-name, it carries no `command` and lists them in `owners` instead:
+When the failure has one fix, `command` holds your whole command with it applied, ready to run
+(`bal discover client 4.6.5 -p ballerinax/kafka` is answered with `bal discover client -p ballerinax/kafka:4.6.5`),
+and the suggestion says what it changes without quoting it. When a name matches nothing, the failure lists every
+name at that level in `candidates` (at most 40; past that it carries the listing's `command` instead). When the
+name matches several things, one per container that declares it, it carries no `command` and lists them in
+`owners` instead:
 
 ```
 $ bal discover client NoSuchContainer -p ballerinax/kafka | cat
-{"kind":"symbol-not-found","message":"'NoSuchContainer' is not a client, nor a member of any client, in ballerinax/kafka:4.6.5.","qualified":"ballerinax/kafka","version":"4.6.5","requested":["NoSuchContainer"],"suggestion":"Search the package for it: `bal discover search NoSuchContainer -p ballerinax/kafka`; or list the clients: `bal discover client -p ballerinax/kafka`.","command":"bal discover search NoSuchContainer -p ballerinax/kafka"}
+{"severity":"error","kind":"symbol-not-found","message":"'NoSuchContainer' is not a client, nor a member of any client, in ballerinax/kafka:4.6.8","qualified":"ballerinax/kafka","version":"4.6.8","requested":["NoSuchContainer"],"suggestion":"Name one of the clients below, or search the package with 'bal discover search NoSuchContainer -p ballerinax/kafka'.","candidates":["Caller","Consumer","Producer"]}
 ```
 
-In text it is `error: <message>`, then the suggestion and anything else the failure carries (schema issues, a
-readme's sections, the matches) indented below it; a usage error then ends with the synopsis and a pointer to `--help`:
+In text it is `bal discover: error: <message>`, then the suggestion indented below it, `Try: <command>` below that
+when one command fixes it, and anything else the failure carries (schema issues, candidates, the matches); a usage
+error then ends with the one-line synopsis and a pointer to `--help`:
 
 ```
 $ bal discover package ballerina/http:2.15
-error: '2.15' in 'ballerina/http:2.15' is not a complete version.
-  Write it in full, ballerina/http:<major>.<minor>.<patch>, or drop it to read the version your project locks or Central's latest: ballerina/http
-Usage: bal discover package <org>/<name>[:<version>] [--output-format json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
-Run `bal discover package --help` for details.
+bal discover: error: '2.15' in 'ballerina/http:2.15' is not a complete version
+  Write it in full, ballerina/http:<major>.<minor>.<patch>, or drop it to read the version your project locks or Central's latest: ballerina/http.
+Usage: bal discover package <org>/<name>[:<version>] [options]
+Try 'bal discover package --help' for more information.
 ```
 
-A usage error is a `validation` failure. Most are found before anything is looked up: an unknown option, an
+A warning never changes the exit code. It is its own report on stderr, never part of the answer:
+`{"severity":"warning","kind":"stale-cache","message":…}` in JSON, `bal discover: warning: <message>` in text. The one
+warning is `stale-cache`: Central could not be reached to confirm the version, so the cached copy was read.
+
+A usage error is a `usage` failure. Most are found before anything is looked up: an unknown option, an
 option with a missing or invalid value (`--output-format xml`, `--page x`, `--page 0`, `--refresh=yes`), given twice, or
 given both before the noun and after it, no noun, a malformed package name or incomplete version, `--version`, a
 version typed as a name, an unknown noun, more names than a noun takes, more than one container flag, a `type`
@@ -878,18 +903,18 @@ the noun it meant. An unknown noun's `command` searches for the word, since it i
 its noun (`bal discover close -p ballerinax/kafka`). One is found once the package is read: more names than a
 `method` or `resource` takes, read against it (`method Producer send` is `method send --client Producer`,
 `resource gists public get` is `resource gists/public get`); it names the command to run, and in text ends with
-that noun's synopsis. A `validation` failure that depends on what the package holds — a readme section asked with a `--filter` keyword it does not mention — is exit 2 as well, without the
-synopsis.
+that noun's synopsis. A `usage` failure that depends on what the package holds — a readme section asked with a `--filter` keyword it does not mention — is exit 2 as well.
 
 A search that matches nothing is an answer, not a failure (exit 0), and so is an empty `--filter`; a page past the
 end of a paged listing is `page-not-found` (exit 1), carrying `page`, `pages` and the last page's `command`, while
-`--page 0`, or `--page` on an answer that is never paged, is a usage error. `upstream` and `timeout` at exit 4 are
-worth re-running unchanged later, and only they say so; an `upstream` at exit 5 needs Central or the proxy fixed;
-`validation`, `ambiguous`,
+`--page 0`, or `--page` on an answer that is never paged, is a usage error. A `timeout`, or an `upstream` failure
+with no answer from Central or a passing status (429, 500, 502, 503, 504, or the proxy's 502, 503, 504), is worth
+re-running unchanged later, and only those say so; any other `upstream` failure needs Central or the proxy fixed;
+`usage`, `ambiguous`,
 `package-not-found` and `symbol-not-found` need a different command — `symbol-not-found` is a container, member,
 path, type or readme section not named exactly as listed, or asked as a noun that does not hold it, or a container flag naming no container of its kind, or a readme a module does not publish (a `--module` the package does not publish
 is `package-not-found` with `module`, and lists the submodules it does in `candidates`; a name several containers
-declare is `ambiguous` and lists them in `owners`); `schema-drift` means Central's payload
+or enums declare is `ambiguous` and lists them in `owners`); `schema-drift` means Central's payload
 changed shape and is for a maintainer; `internal` is a defect in `bal discover` itself, to report with the
 command that produced it. An `upstream` failure's `message` names what failed: the host, or the
 proxy and the `Settings.toml` that sets it. Its `reached` is `true` when Central answered, with an error status
@@ -901,7 +926,7 @@ username and password).
 locks another. Otherwise, inside a Ballerina project the tool walks up to `Ballerina.toml` and uses the version
 `Dependencies.toml` locks, so a lookup sees what `bal build` compiles against, and outside one (or for a package
 the project does not depend on yet) it uses Central's latest. A written version must be complete SemVer, with no
-leading `v` or zero: `ballerina/http:2.15` is a `validation` failure, and so is a version typed as a positional
+leading `v` or zero: `ballerina/http:2.15` is a `usage` failure, and so is a version typed as a positional
 (`bal discover client 2.15.0 -p ballerina/http`) or as `--version`, each suggesting the coordinate to type. A lock that
 names no complete version, or one Central does not publish, is a failure naming the `Dependencies.toml` it was
 read from; `bal build` regenerates the file when it is deleted. A version Central does not publish is answered
@@ -1035,7 +1060,7 @@ check 0 resource gists -p ballerinax/github --client Client
 check 0 resource gists/public get -p ballerinax/github --client Client
 check 0 resource "gists/'public" get -p ballerinax/github  # Ballerina's spelling; the one container answers
 check 0 method send -p ballerinax/kafka              # the one container declaring it answers
-check 1 method close -p ballerinax/kafka             # two containers declare it
+check 2 method close -p ballerinax/kafka             # two containers declare it
 check 1 method send -p ballerinax/kafka --class Producer  # a container flag of the wrong kind
 check 0 search send -p ballerinax/kafka              # names inside one package
 check 0 package ballerinax/kafka --filter send       # the same search

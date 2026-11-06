@@ -213,7 +213,7 @@ public class ServiceHandlersTest {
         Assert.assertEquals(service.rules().get(0).handlers(), List.of("query"));
         Assert.assertEquals(service.handlers().get(0).id(), "query", "what the rule names it by");
         DiscoverResult.ServiceHandlerList list = new DiscoverResult.ServiceHandlerList("Service", service.handlers(),
-                service.rules(), null, null);
+                service.rules(), null);
         Assert.assertTrue(TextRenderer.render(list).contains("returns anydata|error\n  query, any number\n"),
                 TextRenderer.render(list));
         Assert.assertTrue(JsonRenderer.render(list).contains("{\"id\":\"query\",\"kind\":\"resource\""),
@@ -295,7 +295,7 @@ public class ServiceHandlersTest {
         ServiceHandlers.Handler handler = new ServiceHandlers.Handler("onEvent", ServiceHandlers.Kind.REMOTE, true,
                 false, List.of(), null, null, List.of(), null, "onEvent");
         String text = TextRenderer.render(new DiscoverResult.ServiceHandlerList(
-                "Service", List.of(handler), List.of(new ServiceHandlers.Rule(null, List.of(), null)), null, null));
+                "Service", List.of(handler), List.of(new ServiceHandlers.Rule(null, List.of(), null)), null));
         Assert.assertEquals(text, "Service\nMethods to implement (1)\n\nremote function onEvent()\n  required");
     }
 
@@ -309,8 +309,8 @@ public class ServiceHandlersTest {
         Assert.assertEquals(code, 1, err.toString());
         JsonObject failure = JsonParser.parseString(err.toString()).getAsJsonObject();
         Assert.assertEquals(failure.get("kind").getAsString(), "symbol-not-found");
-        Assert.assertEquals(failure.get("command").getAsString(),
-                "bal discover method -p ballerinax/kafka --service Service");
+        Assert.assertEquals(failure.getAsJsonArray("candidates").toString(), "[\"onConsumerRecord\",\"onError\"]");
+        Assert.assertFalse(failure.has("command"), err.toString());
     }
 
     @Test

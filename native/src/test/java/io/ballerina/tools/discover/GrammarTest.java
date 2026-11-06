@@ -37,7 +37,7 @@ public class GrammarTest {
 
     private static final int USAGE = Failure.USAGE;
 
-    private static final int NOT_FOUND = Failure.NOT_FOUND;
+    private static final int NOT_FOUND = Failure.RUNTIME;
 
     private static final String GITHUB = "ballerinax/github";
 
@@ -55,7 +55,7 @@ public class GrammarTest {
                 + ": " + capture.stderr());
         Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
         if (expected == Failure.USAGE) {
-            Assert.assertEquals(capture.field("kind"), "validation", String.join(" ", argv));
+            Assert.assertTrue(List.of("usage", "ambiguous").contains(capture.field("kind")), String.join(" ", argv));
         }
         return capture;
     }
@@ -128,9 +128,9 @@ public class GrammarTest {
         JsonObject leading = answer("ballerinax__kafka", "--client", "Producer", "method", "send", "-p", KAFKA);
         Assert.assertEquals(leading.get("container").getAsString(), "Producer", leading.toString());
         Assert.assertEquals(failure(USAGE, null, "--client", "Producer", "client", "-p", KAFKA).field("message"),
-                "Unknown option '--client'.");
+                "unknown option '--client'");
         Assert.assertTrue(failure(USAGE, null, "--client", "A", "method", "-p", KAFKA, "--client", "B").field("message")
-                .endsWith(" is given both before the noun and after it."));
+                .endsWith(" is given both before the noun and after it"));
     }
 
     @Test
@@ -143,7 +143,7 @@ public class GrammarTest {
         Assert.assertTrue(resources.has("resources"), resources.toString());
         CliTest.Capture none = failure(NOT_FOUND, "ballerinax__github", "method", "-p", GITHUB, "--client", "Client");
         Assert.assertEquals(none.field("message"), "Client declares no methods in " + GITHUB + ":"
-                + FixtureCorpus.FIXTURE_VERSION.text() + ".");
+                + FixtureCorpus.FIXTURE_VERSION.text());
         Assert.assertEquals(none.field("command"), "bal discover resource -p " + GITHUB + " --client Client");
     }
 
@@ -155,12 +155,14 @@ public class GrammarTest {
         Assert.assertEquals(wrong.field("command"), "bal discover method send -p " + KAFKA + " --client Producer");
         CliTest.Capture none = failure(NOT_FOUND, "ballerinax__kafka", "method", "send", "-p", KAFKA, "--client",
                 "Nope");
-        Assert.assertEquals(none.field("command"), "bal discover client -p " + KAFKA);
+        Assert.assertFalse(none.failure().has("command"), none.stderr());
+        Assert.assertEquals(none.failure().getAsJsonArray("candidates").toString(),
+                "[\"Caller\",\"Consumer\",\"Producer\"]");
     }
 
     @Test
     public void aMemberSeveralContainersDeclareListsEachOwnersCommand() {
-        CliTest.Capture several = failure(Failure.AMBIGUOUS, "ballerinax__kafka", "method", "-p", KAFKA);
+        CliTest.Capture several = failure(Failure.USAGE, "ballerinax__kafka", "method", "-p", KAFKA);
         Assert.assertEquals(several.failure().getAsJsonArray("owners").size(), 7, several.stderr());
         Assert.assertTrue(several.stderr().contains("bal discover method -p " + KAFKA + " --client Producer"),
                 several.stderr());
@@ -190,8 +192,8 @@ public class GrammarTest {
     public void thePackageFirstFormIsAUsageErrorWithTheSameRequestInTheNewOrder(List<String> argv, String command) {
         CliTest.Capture old = failure(USAGE, null, argv.toArray(String[]::new));
         Assert.assertEquals(old.field("command"), command, old.stderr());
-        Assert.assertEquals(old.field("suggestion"), "Run `" + command + "`.");
-        Assert.assertEquals(old.field("message"), "'" + argv.get(0) + "' is not a noun; name the package with -p.");
+        Assert.assertEquals(old.field("suggestion"), "Name the noun first and the package with -p.");
+        Assert.assertEquals(old.field("message"), "'" + argv.get(0) + "' is not a noun; name the package with -p");
     }
 
     private static CliTest.Capture run(HttpOptions http, String... argv) {
@@ -248,13 +250,22 @@ public class GrammarTest {
     @Test
     public void aBareCoordinateGivenWithThePackageFlagIsStillAUsageError() {
         CliTest.Capture both = failure(USAGE, null, KAFKA, "-p", KAFKA);
-        Assert.assertEquals(both.field("message"), "'" + KAFKA + "' is not a noun; name the package with -p.");
+        Assert.assertEquals(both.field("message"), "'" + KAFKA + "' is not a noun; name the package with -p");
+    }
+
+    @Test
+    public void anUnknownFlagAfterABareCoordinateIsAnUnknownOption() {
+        for (List<String> argv : List.of(List.of(KAFKA, "--nonesuch"), List.of(KAFKA, "--output", "json"))) {
+            CliTest.Capture unknown = failure(USAGE, null, argv.toArray(String[]::new));
+            Assert.assertEquals(unknown.field("message"), "unknown option '" + argv.get(1) + "'", unknown.stderr());
+            Assert.assertEquals(unknown.field("suggestion"), "Run 'bal discover --help' for the usage.");
+        }
     }
 
     @Test
     public void aBareWordThatIsNotACoordinateIsStillAnUnknownNoun() {
         CliTest.Capture word = failure(USAGE, null, "kafka");
-        Assert.assertTrue(word.field("message").startsWith("'kafka' is not a noun."), word.stderr());
+        Assert.assertTrue(word.field("message").startsWith("'kafka' is not a noun;"), word.stderr());
     }
 
     @Test
@@ -269,7 +280,7 @@ public class GrammarTest {
                     USAGE);
             Assert.assertTrue(text.stderr().contains("\nUsage: bal discover " + noun + " "), text.stderr());
             Assert.assertTrue(text.stderr().contains(" -p <org>/<name>[:<version>] "), text.stderr());
-            Assert.assertTrue(text.stderr().endsWith("Run `bal discover " + noun + " --help` for details.\n"),
+            Assert.assertTrue(text.stderr().endsWith("Try 'bal discover " + noun + " --help' for more information.\n"),
                     text.stderr());
         }
     }
@@ -284,12 +295,12 @@ public class GrammarTest {
     @Test
     public void oneContainerFlagAtATimeAndOnlyOnMethodAndResource() {
         CliTest.Capture two = failure(USAGE, null, "method", "send", "-p", KAFKA, "--client", "A", "--class", "B");
-        Assert.assertEquals(two.field("message"), "A method has one container; pass one of --client, --class, "
-                + "--service.");
+        Assert.assertEquals(two.field("message"), "a method has one container; pass one of --client, --class, "
+                + "--service");
         Assert.assertEquals(two.failure().getAsJsonArray("owners").get(1).getAsJsonObject().get("command")
                 .getAsString(), "bal discover method send -p " + KAFKA + " --class B");
         CliTest.Capture misplaced = failure(USAGE, null, "client", "Producer", "-p", KAFKA, "--client", "Producer");
-        Assert.assertEquals(misplaced.field("message"), "Unknown option '--client'.");
+        Assert.assertEquals(misplaced.field("message"), "unknown option '--client'");
         Assert.assertFalse(misplaced.field("suggestion").contains("--client"), misplaced.stderr());
     }
 
@@ -338,14 +349,14 @@ public class GrammarTest {
     public void aMissingPackageIsNeverInventedButFoundBySearch() {
         CliTest.Capture named = failure(USAGE, null, "method", "send", "--client", "Producer");
         Assert.assertEquals(named.field("command"), "bal discover search send");
-        Assert.assertEquals(named.field("suggestion"), "Write `bal discover method send -p <org>/<name> --client "
-                + "Producer`; to find the package that declares 'send': `bal discover search send`.");
+        Assert.assertEquals(named.field("suggestion"), "Search Central for the package that declares 'send', then "
+                + "write 'bal discover method send -p <org>/<name> --client Producer'.");
         CliTest.Capture bare = failure(USAGE, null, "client");
         Assert.assertFalse(bare.failure().has("command"), bare.stderr());
         Assert.assertFalse(bare.stderr().contains("github"), bare.stderr());
-        Assert.assertTrue(bare.field("suggestion").contains("`bal discover search <keyword>`"), bare.stderr());
+        Assert.assertTrue(bare.field("suggestion").contains("'bal discover search <keyword>'"), bare.stderr());
         Assert.assertTrue(failure(USAGE, null, "resource", "gists/public", "get").field("suggestion")
-                .startsWith("Write `bal discover resource gists/public get -p <org>/<name>`"));
+                .endsWith("then write 'bal discover resource gists/public get -p <org>/<name>'."));
     }
 
     @DataProvider(name = "aliases")
@@ -376,7 +387,7 @@ public class GrammarTest {
                 List.of("--page", "2", "client", "-p", "a/b", "--page", "3"),
                 List.of("--output-format", "json", "client", "-p", "a/b", "--output-format", "text"))) {
             CliTest.Capture repeated = failure(USAGE, null, argv.toArray(String[]::new));
-            Assert.assertTrue(repeated.field("message").endsWith(" is given both before the noun and after it."),
+            Assert.assertTrue(repeated.field("message").endsWith(" is given both before the noun and after it"),
                     repeated.stderr());
         }
         CliTest.Capture both = failure(USAGE, null, "-p", "a/b", "package", "c/d");
@@ -394,8 +405,9 @@ public class GrammarTest {
     @Test
     public void aResourceMissedWithoutItsContainerPointsAtTheDeepestRealPath() {
         CliTest.Capture typo = failure(NOT_FOUND, "ballerinax__github", "resource", "gists/nope", "get", "-p", GITHUB);
-        Assert.assertEquals(typo.field("command"), "bal discover resource gists -p " + GITHUB + " --client Client",
-                typo.stderr());
+        Assert.assertFalse(typo.failure().has("command"), typo.stderr());
+        typo.failure().getAsJsonArray("candidates").forEach(candidate ->
+                Assert.assertTrue(candidate.getAsString().startsWith("gists"), typo.stderr()));
     }
 
     @Test
@@ -417,12 +429,13 @@ public class GrammarTest {
     public void aPathTypedWithoutThePackageIsNeverTakenForThePackage() {
         for (String noun : List.of("resource", "client")) {
             CliTest.Capture path = failure(USAGE, null, noun, "gists/public", "get");
-            Assert.assertTrue(path.field("suggestion").startsWith("Write `bal discover " + noun
-                    + " gists/public get -p <org>/<name>`"), path.stderr());
+            Assert.assertTrue(path.field("suggestion").endsWith("then write 'bal discover " + noun
+                    + " gists/public get -p <org>/<name>'."), path.stderr());
             Assert.assertEquals(path.field("command"), "bal discover search gists", path.stderr());
         }
         CliTest.Capture given = failure(NOT_FOUND, "ballerinax__github", "client", "gist/public", "-p", GITHUB);
-        Assert.assertEquals(given.field("command"), "bal discover search gist -p " + GITHUB, given.stderr());
+        Assert.assertEquals(given.field("suggestion"), "Name one of the clients below, or search the package with "
+                + "'bal discover search gist -p " + GITHUB + "'.", given.stderr());
     }
 
     @Test
@@ -440,7 +453,7 @@ public class GrammarTest {
     @Test
     public void aPluralNounWithNoPackageGetsTheShapeAndTheSearch() {
         CliTest.Capture plural = failure(USAGE, null, "functions", "printInfo");
-        Assert.assertTrue(plural.field("message").startsWith("'functions' is not a noun; the noun is function. "),
+        Assert.assertTrue(plural.field("message").startsWith("'functions' is not a noun; the noun is function; "),
                 plural.stderr());
         Assert.assertEquals(plural.field("command"), "bal discover search printInfo", plural.stderr());
     }

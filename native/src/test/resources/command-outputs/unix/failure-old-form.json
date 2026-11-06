@@ -1,1 +1,1 @@
-{"kind":"validation","message":"'ballerinax/kafka' is not a noun; name the package with -p.","suggestion":"Run `bal discover method send -p ballerinax/kafka --client Producer`.","command":"bal discover method send -p ballerinax/kafka --client Producer"}
+{"severity":"error","kind":"usage","message":"'ballerinax/kafka' is not a noun; name the package with -p","suggestion":"Name the noun first and the package with -p.","command":"bal discover method send -p ballerinax/kafka --client Producer"}

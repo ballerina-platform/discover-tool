@@ -98,7 +98,7 @@ public final class SearchCentral {
         if (!keywords.isEmpty() && module != null) {
             String typed = command(keywords);
             return new Failure.Validation("--module reads one package's submodule, and a search covers all of "
-                    + "Central.", "Drop --module: " + Failure.quoted(typed) + ".", typed);
+                    + "Central", "Drop --module.", typed);
         }
         return Search.misuse(Command.of(Command.SEARCH), keywords, filter);
     }
@@ -124,9 +124,9 @@ public final class SearchCentral {
         Command command = Command.of(Command.SEARCH, keywords);
         if (page > pages) {
             String fixed = command.paged(pages).text();
-            return Result.err(new Failure.PageNotFound("Page " + page + " is out of range: Central's answer has "
-                    + pages + (pages == 1 ? " page." : " pages."),
-                    "Pass a page from 1 to " + pages + ", e.g. " + Failure.quoted(fixed) + ".", fixed, page, pages));
+            return Result.err(new Failure.PageNotFound("page " + page + " is out of range: Central's answer has "
+                    + pages + (pages == 1 ? " page" : " pages"),
+                    "Pass a page from 1 to " + pages + ".", fixed, page, pages));
         }
         List<DiscoverResult.CentralSearch.PackageHit> packageHits = packages.value().items().stream()
                 .map(row -> new DiscoverResult.CentralSearch.PackageHit(row.org() + "/" + row.name(), row.version(),

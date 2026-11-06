@@ -101,7 +101,7 @@ public class TunnelAuthenticationTest {
             Run run = tool(proxy, WRONG, List.of());
             Assert.assertEquals(proxy.requests(), List.of(CENTRAL_TUNNEL,
                     CENTRAL_TUNNEL + ConnectProxy.basic(USER, WRONG)));
-            Assert.assertEquals(run.exitCode(), Failure.BAD_ANSWER, run.stderr());
+            Assert.assertEquals(run.exitCode(), Failure.RUNTIME, run.stderr());
             Assert.assertTrue(run.stderr().contains("rejected the username and password in the [proxy] table of "),
                     run.stderr());
             Assert.assertTrue(run.stderr().contains("Settings.toml"), run.stderr());
@@ -113,7 +113,7 @@ public class TunnelAuthenticationTest {
         try (ConnectProxy proxy = new ConnectProxy(ConnectProxy.basic(USER, SECRET))) {
             Run run = tool(proxy, SECRET, List.of("-D" + HttpOptions.TUNNELING_DISABLED_SCHEMES + "=Basic"));
             Assert.assertTrue(proxy.requests().stream().allMatch(CENTRAL_TUNNEL::equals), proxy.requests().toString());
-            Assert.assertEquals(run.exitCode(), Failure.BAD_ANSWER, run.stderr());
+            Assert.assertEquals(run.exitCode(), Failure.RUNTIME, run.stderr());
             Assert.assertTrue(run.stderr().contains("disables Basic"), run.stderr());
             Assert.assertFalse(run.stderr().contains("rejected"), run.stderr());
         }
