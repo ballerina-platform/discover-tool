@@ -19,12 +19,14 @@
 package io.ballerina.tools.discover.cli;
 
 import java.io.Console;
+import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -33,7 +35,8 @@ import java.util.Optional;
  * <p>{@link System#console()} answers for stdin and stdout together, so a terminal run with stdin redirected would
  * read as not a terminal. The C library's {@code isatty} answers for stdout alone; it is called only when the JVM
  * grants this code native access ({@code bal} starts it with {@code --enable-native-access=ALL-UNNAMED}), since
- * otherwise the JDK prints a warning on stderr.
+ * otherwise the JDK prints a warning on stderr. On Windows the linker's default lookup holds no {@code _isatty}, so
+ * it is read from the C runtime's own library; where none resolves, the console answers.
  *
  * @since 0.1.0
  */
@@ -43,29 +46,60 @@ final class Terminal {
     private static final String POSIX_ISATTY = "isatty";
     private static final String WINDOWS_ISATTY = "_isatty";
 
+    /** The Windows C runtimes that export {@value #WINDOWS_ISATTY}: the universal one, then the legacy one. */
+    private static final List<String> WINDOWS_RUNTIMES = List.of("ucrtbase", "msvcrt");
+
     private Terminal() {
     }
 
     static boolean stdoutIsTerminal() {
-        if (!Terminal.class.getModule().isNativeAccessEnabled()) {
+        return stdoutIsTerminal(Terminal.class.getModule().isNativeAccessEnabled());
+    }
+
+    static boolean stdoutIsTerminal(boolean nativeAccess) {
+        Optional<MethodHandle> isatty = nativeAccess ? isatty() : Optional.empty();
+        if (isatty.isEmpty()) {
             return consoleIsTerminal();
         }
         try {
-            Linker linker = Linker.nativeLinker();
-            SymbolLookup libc = linker.defaultLookup();
-            Optional<MemorySegment> isatty = libc.find(POSIX_ISATTY).or(() -> libc.find(WINDOWS_ISATTY));
-            if (isatty.isEmpty()) {
-                return consoleIsTerminal();
-            }
-            MethodHandle call = linker.downcallHandle(isatty.get(),
-                    FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
-            return (int) call.invokeExact(STDOUT_FD) != 0;
+            return (int) isatty.get().invokeExact(STDOUT_FD) != 0;
+        } catch (Error fatal) {
+            throw fatal;
         } catch (Throwable unavailable) {
             return consoleIsTerminal();
         }
     }
 
-    private static boolean consoleIsTerminal() {
+    static Optional<MethodHandle> isatty() {
+        try {
+            Linker linker = Linker.nativeLinker();
+            SymbolLookup libc = linker.defaultLookup();
+            return libc.find(POSIX_ISATTY)
+                    .or(() -> libc.find(WINDOWS_ISATTY))
+                    .or(Terminal::windowsIsatty)
+                    .map(symbol -> linker.downcallHandle(symbol,
+                            FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT)));
+        } catch (RuntimeException unavailable) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<MemorySegment> windowsIsatty() {
+        return WINDOWS_RUNTIMES.stream()
+                .map(Terminal::windowsIsattyIn)
+                .flatMap(Optional::stream)
+                .findFirst();
+    }
+
+    private static Optional<MemorySegment> windowsIsattyIn(String runtime) {
+        try {
+            return SymbolLookup.libraryLookup(runtime, Arena.global()).find(WINDOWS_ISATTY);
+        } catch (IllegalArgumentException absent) {
+            return Optional.empty();
+        }
+    }
+
+    static boolean consoleIsTerminal() {
         Console console = System.console();
         return console != null && console.isTerminal();
     }
