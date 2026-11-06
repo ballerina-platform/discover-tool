@@ -130,7 +130,7 @@ public final class Readme {
     private static Failure severalSections(LoadedPackage loaded, String requested, List<Section> found) {
         return loaded.ambiguous(List.of(requested),
                 "'" + requested + "' matches " + found.size() + " readme sections of " + loaded.place(),
-                "Name the one you mean:", Failure.SECTIONS,
+                "Name the one you mean.", Failure.SECTIONS,
                 found.stream().map(section -> new Failure.Match(section.number() + ". " + section.title(),
                         command(loaded.target(), String.valueOf(section.number())).text())).toList());
     }
@@ -140,9 +140,9 @@ public final class Readme {
                 loaded.label() + " publishes no readme"
                         + (loaded.module() == null ? "" : " for module " + loaded.module()),
                 loaded.module() != null
-                        ? "Read the default module's instead. Or find another module's: "
-                                + Failure.quoted(Command.overview(loaded.target(null)).text())
-                                + " lists what the default module declares and its submodules."
+                        ? "Read the default module's readme instead, or find another module's with "
+                                + Failure.quoted(Command.overview(loaded.target(null)).text()) + ", which lists "
+                                + "the submodules."
                         : loaded.submodules().isEmpty()
                                 ? "This package publishes no other module either."
                                 : "Check its other modules.",

@@ -462,11 +462,16 @@ public class GrammarTest {
 
     @Test
     public void aResourceMissedAmongSeveralContainersSearchesItsFirstSegmentOrListsTheResources() {
+        // Few enough to list: every resource method any container declares, each once.
         CliTest.Capture slash = failure(NOT_FOUND, "ballerina__http", "resource", "/", "get", "-p", "ballerina/http");
-        Assert.assertEquals(slash.field("command"), "bal discover resource -p ballerina/http", slash.stderr());
+        Assert.assertFalse(slash.failure().has("command"), slash.stderr());
+        Assert.assertEquals(slash.failure().getAsJsonArray("candidates").get(0).getAsString(), ":...path get",
+                slash.stderr());
         CliTest.Capture typo = failure(NOT_FOUND, "ballerina__http", "resource", ":id/nope", "get", "-p",
                 "ballerina/http");
-        Assert.assertEquals(typo.field("command"), "bal discover search nope -p ballerina/http", typo.stderr());
+        Assert.assertFalse(typo.failure().has("command"), typo.stderr());
+        Assert.assertTrue(typo.field("suggestion").endsWith("search the package with "
+                + "'bal discover search nope -p ballerina/http'."), typo.stderr());
     }
 
     @Test

@@ -173,10 +173,11 @@ public class ClientTest {
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
         Assert.assertEquals(failure.qualified(), "ballerinax/github");
         Assert.assertEquals(failure.version(), "9.9.9");
-        Assert.assertTrue(failure.suggestion().contains("the version " + LOCK + " locks"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().startsWith("Fix the ballerinax/github entry in " + LOCK
+                + ", which locks this version"), failure.suggestion());
         Assert.assertTrue(failure.suggestion().contains("run 'bal build' to regenerate it"), failure.suggestion());
-        Assert.assertTrue(failure.suggestion().endsWith("write a published version after the package: "
-                + "ballerinax/github:<version>"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("write a published version after the package, "
+                + "ballerinax/github:<version>; "), failure.suggestion());
         Assert.assertTrue(failure.suggestion().contains("published versions are 6.0.0, 5.1.0"),
                 failure.suggestion());
         Assert.assertFalse(failure.suggestion().contains("omit the version"),
@@ -240,8 +241,8 @@ public class ClientTest {
                 CentralClient.ResolvedVersion.written(Version.parse("9.9.9").value());
         Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(
                 GITHUB, written, fast(transport).build()).failure();
-        Assert.assertEquals(failure.suggestion(), "Central does not publish 'ballerinax/github' at 9.9.9; published "
-                + "versions are 6.0.0, 5.1.0. Write one of them after the package: ballerinax/github:<version>");
+        Assert.assertEquals(failure.suggestion(), "Write a published version after the package, "
+                + "ballerinax/github:<version>; published versions are 6.0.0, 5.1.0.");
     }
 
     @Test
@@ -292,9 +293,9 @@ public class ClientTest {
         Failure.PackageNotFound failure = (Failure.PackageNotFound) CentralClient.fetchDocs(GITHUB,
                 CentralClient.ResolvedVersion.written(Version.parse("2.9.99").value()),
                 fast(transport).build()).failure();
-        Assert.assertEquals(failure.suggestion(), "Central does not publish 'ballerinax/github' at 2.9.99; the "
-                + "published versions nearest it are 2.11.0, 2.10.3, 2.10.2, 2.10.1, 2.10.0, 2.9.3, 2.9.2, 2.9.1, "
-                + "2.9.0, 2.8.3 and 30 others. Write one of them after the package: ballerinax/github:<version>");
+        Assert.assertEquals(failure.suggestion(), "Write a published version after the package, "
+                + "ballerinax/github:<version>; the published versions nearest it are 2.11.0, 2.10.3, 2.10.2, "
+                + "2.10.1, 2.10.0, 2.9.3, 2.9.2, 2.9.1, 2.9.0, 2.8.3 and 30 others.");
     }
 
     @Test

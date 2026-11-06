@@ -724,16 +724,12 @@ public final class CentralClient {
                     ? notFound(qualified, version)
                     : notAPackage(qualified, version, pinOf(resolved), options);
         }
-        String listed = versions.isEmpty() ? "" : "; " + nearest(versions, version);
-        String coordinate = qualified.qualified() + ":<version>";
+        String written = "write a published version after the package, " + qualified.qualified() + ":<version>"
+                + (versions.isEmpty() ? "" : "; " + nearest(versions, version)) + ".";
         String suggestion = resolved.source() == ResolvedVersion.Source.WRITTEN
-                ? "Central does not publish '" + qualified.qualified() + "' at " + version.text() + listed
-                        + (versions.isEmpty() ? ". Write a published version" : ". Write one of them")
-                        + " after the package: " + coordinate
-                : "Central does not publish '" + qualified.qualified() + "' at " + version.text() + ", the version "
-                        + resolved.lock() + " locks" + listed + ". Fix the " + qualified.qualified() + " entry "
-                        + "there, or delete the file and run 'bal build' to regenerate it; or write a published "
-                        + "version after the package: " + coordinate;
+                ? Character.toUpperCase(written.charAt(0)) + written.substring(1)
+                : "Fix the " + qualified.qualified() + " entry in " + resolved.lock() + ", which locks this "
+                        + "version, delete the file and run 'bal build' to regenerate it, or " + written;
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), null, suggestion);
     }
 

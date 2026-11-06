@@ -387,10 +387,10 @@ public final class Containers {
         String message = what + " declared by " + Texts.and(names) + " in " + loaded.place();
         String search = searchFor(loaded, selectors);
         String suggestion = rows.size() > MAX_ENTRIES
-                ? "Name the one you mean with " + String.join(", ", Command.OWNER_FLAGS) + "; the first "
+                ? "Name the one you mean with " + Texts.or(Command.OWNER_FLAGS) + "; the first "
                         + MAX_ENTRIES + " of " + rows.size() + " are below, and " + Failure.quoted(search)
-                        + " lists them all:"
-                : "Name the one you mean with " + String.join(", ", Command.OWNER_FLAGS) + ":";
+                        + " lists them all."
+                : "Name the one you mean with " + Texts.or(Command.OWNER_FLAGS) + ".";
         return loaded.ambiguous(selectors, message, suggestion, Failure.OWNERS,
                 rows.subList(0, Math.min(rows.size(), MAX_ENTRIES)));
     }
@@ -408,8 +408,8 @@ public final class Containers {
         String search = searchFor(loaded, requested);
         String suggestion = owners.size() > MAX_ENTRIES
                 ? "Name the one you mean; the first " + MAX_ENTRIES + " of " + owners.size() + " are below, and "
-                        + Failure.quoted(search) + " lists them all:"
-                : "Name the one you mean:";
+                        + Failure.quoted(search) + " lists them all."
+                : "Name the one you mean.";
         return loaded.ambiguous(requested, message, suggestion, Failure.OWNERS,
                 owners.subList(0, Math.min(owners.size(), MAX_ENTRIES)));
     }
@@ -450,12 +450,16 @@ public final class Containers {
             }
         }
         Optional<String> keyword = searchKeyword(token);
+        String plural = what + "s";
+        List<String> candidates = membersOfAll(loaded, options.ask());
         if (keyword.isEmpty()) {
             String listing = loaded.command(Command.RESOURCE).text();
-            return loaded.symbolNotFound(options.selectors(), message, "List the resource methods.", listing);
+            return loaded.missAmong(options.selectors(), message, plural, listing, candidates, null);
         }
         String search = loaded.command(Command.SEARCH, keyword.get()).text();
-        return loaded.symbolNotFound(options.selectors(), message, Search.SEARCH_FOR_IT, search);
+        return candidates.isEmpty() || candidates.size() > MAX_ENTRIES
+                ? loaded.symbolNotFound(options.selectors(), message, Search.SEARCH_FOR_IT, search)
+                : loaded.missAmong(options.selectors(), message, plural, search, candidates, search);
     }
 
     /**
@@ -610,11 +614,34 @@ public final class Containers {
     // Each resource method under `prefix`, as its path then its accessor, the way a command names it.
     private static List<String> resourcesUnder(Surface.Container container, List<String> prefix) {
         return descend(PathTree.build(container.operations()), prefix)
-                .map(node -> PathTree.operationsUnder(node).stream()
-                        .map(operation -> PathTree.join(operation.segments()) + " " + operation.fn().accessor())
-                        .sorted(Texts.LOCALE_ORDER)
-                        .toList())
+                .map(node -> resourceRows(PathTree.operationsUnder(node)))
                 .orElse(List.of());
+    }
+
+    // Resource methods as a command names them, in the listing's order: by path, each path's accessors as declared.
+    private static List<String> resourceRows(List<PathTree.Operation> operations) {
+        Map<String, Set<String>> accessorsByPath = new LinkedHashMap<>();
+        for (PathTree.Operation operation : operations) {
+            accessorsByPath.computeIfAbsent(PathTree.join(operation.segments()), path -> new LinkedHashSet<>())
+                    .add(operation.fn().accessor());
+        }
+        return accessorsByPath.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Texts.LOCALE_ORDER))
+                .flatMap(path -> path.getValue().stream().map(accessor -> path.getKey() + " " + accessor))
+                .toList();
+    }
+
+    // Every member of `ask`'s kind any container declares, each once, in the listing's order.
+    private static List<String> membersOfAll(LoadedPackage loaded, Ask ask) {
+        List<Surface.Container> containers = containersOf(loaded);
+        if (ask == Ask.RESOURCE) {
+            return resourceRows(containers.stream().flatMap(container -> container.operations().stream()).toList());
+        }
+        return containers.stream()
+                .flatMap(container -> labels(members(container, Ask.METHOD)).stream())
+                .distinct()
+                .sorted(Texts.LOCALE_ORDER)
+                .toList();
     }
 
     private static String notA(LoadedPackage loaded, String token, String noun) {

@@ -95,9 +95,9 @@ public class CliTest {
 
     private static final String GRAPHQL_VERSION = "1.17.0";
 
-    private static final String SUBGRAPH_UNCONFIRMED = "Central's page for 'subgraph' at " + GRAPHQL_VERSION
-            + " cannot be confirmed as a submodule of this package. Pass another of its submodules (dataloader, "
-            + "subgraph), or drop --module for the default module.";
+    private static final String SUBGRAPH_UNCONFIRMED = "Pass another of its submodules to --module, or drop --module"
+            + " for the default module; Central's page for 'subgraph' at " + GRAPHQL_VERSION
+            + " cannot be confirmed as one of them.";
 
     private static FakeTransport graphqlCentral(Map<String, JsonElement> modulePages) {
         return graphqlCentral(FixtureCorpus.loadRawFixture("ballerina__graphql"), modulePages);
@@ -186,8 +186,8 @@ public class CliTest {
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertTrue(transport.urls().get(0).endsWith("/docs/ballerinax/github/6.0.0"),
                 transport.urls().toString());
-        Assert.assertEquals(capture.field("suggestion"), "Central does not publish 'ballerinax/github' at 6.0.0. "
-                + "Write a published version after the package: ballerinax/github:<version>", capture.stderr());
+        Assert.assertEquals(capture.field("suggestion"),
+                "Write a published version after the package, ballerinax/github:<version>.", capture.stderr());
     }
 
     @Test
@@ -348,16 +348,23 @@ public class CliTest {
                     centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
             Assert.assertEquals(capture.stdout(), "", label);
             Assert.assertEquals(capture.field("kind"), "symbol-not-found", label);
+            // Few enough resource methods under what was reached to list them all.
             String reached = selectors.contains("gists") ? "gists" : "gists/public";
-            if (capture.failure().has("candidates")) {
-                Assert.assertFalse(capture.failure().has("command"), capture.stderr());
-                capture.failure().getAsJsonArray("candidates").forEach(candidate ->
-                        Assert.assertTrue(candidate.getAsString().startsWith(reached + "/")
-                                || candidate.getAsString().startsWith(reached + " "), capture.stderr()));
-            } else {
-                Assert.assertEquals(capture.field("command"), under.formatted(reached), label);
-            }
+            Assert.assertFalse(capture.failure().has("command"), capture.stderr());
+            Assert.assertTrue(capture.failure().has("candidates"), capture.stderr());
+            capture.failure().getAsJsonArray("candidates").forEach(candidate ->
+                    Assert.assertTrue(candidate.getAsString().startsWith(reached + "/")
+                            || candidate.getAsString().startsWith(reached + " "), capture.stderr()));
         }
+        Capture ordered = new Capture();
+        Assert.assertEquals(Cli.run(List.of("resource", "gists", "nope", "-p", "ballerinax/github", "--client",
+                "Client"), ordered.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())),
+                1);
+        // In the listing's order: by path, then each path's accessors as declared.
+        Assert.assertEquals(ordered.failure().getAsJsonArray("candidates").get(0).getAsString(), "gists get",
+                ordered.stderr());
+        Assert.assertEquals(ordered.failure().getAsJsonArray("candidates").get(1).getAsString(), "gists post",
+                ordered.stderr());
         Capture split = new Capture();
         Assert.assertEquals(Cli.run(List.of("resource", "repos", ":owner", "-p", "ballerinax/github", "--client",
                 "Client"), split.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())),
@@ -381,7 +388,7 @@ public class CliTest {
             Assert.assertEquals(capture.field("suggestion"),
                     "Name one of the resource methods under user/keys/:keyId below.");
             Assert.assertEquals(capture.failure().getAsJsonArray("candidates").toString(),
-                    "[\"user/keys/:keyId delete\",\"user/keys/:keyId get\"]");
+                    "[\"user/keys/:keyId get\",\"user/keys/:keyId delete\"]");
         }
     }
 
@@ -556,9 +563,10 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("type", "-p", "ballerina/graphql", "--module", "nosuch", "--filter", "x"),
                 capture.streams(), options(graphqlCentral())), 1, capture.stderr());
-        Assert.assertEquals(capture.field("command"), "bal discover type -p ballerina/graphql --filter x");
-        Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
-                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
+        // Two fixes, another submodule or none, so no one command.
+        Assert.assertFalse(capture.failure().has("command"), capture.stderr());
+        Assert.assertEquals(capture.field("suggestion"),
+                "Pass one of its submodules to --module, or drop --module for the default module.");
         Assert.assertEquals(capture.failure().get("candidates").toString(), "[\"dataloader\",\"subgraph\"]");
     }
 
@@ -1059,7 +1067,7 @@ public class CliTest {
                 centralFor("ballerinax__kafka", "4.6.5"), null, true), Failure.USAGE);
         Assert.assertEquals(capture.stderr(), "bal discover: error: 'commit' is declared by Caller and Consumer in "
                 + "ballerinax/kafka:4.6.5\n"
-                + "  Name the one you mean with --client, --class, --service:\n"
+                + "  Name the one you mean with --client, --class or --service.\n"
                 + "    Caller    bal discover method commit -p ballerinax/kafka --client Caller\n"
                 + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n"
                 + "Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] "
@@ -1458,8 +1466,8 @@ public class CliTest {
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "package-not-found");
-        Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
-                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
+        Assert.assertEquals(capture.field("suggestion"),
+                "Pass one of its submodules to --module, or drop --module for the default module.");
         // The submodule's own page first; the package's only once that is missing, to name what it does publish.
         Assert.assertEquals(transport.urls(), List.of(
                 CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
