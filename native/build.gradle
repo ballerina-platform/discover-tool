@@ -53,8 +53,8 @@ processResources {
 }
 
 checkstyle {
-    toolVersion "${checkstylePluginVersion}"
-    configFile rootProject.file("config/checkstyle/build/checkstyle.xml")
+    toolVersion = "${checkstylePluginVersion}"
+    configFile = rootProject.file("config/checkstyle/build/checkstyle.xml")
     configProperties = ["suppressionFile": file("${rootDir}/config/checkstyle/build/suppressions.xml")]
 }
 
@@ -69,8 +69,8 @@ spotbugsMain {
     reportLevel = spotbugsConfidence.LOW
     reportsDir = layout.buildDirectory.dir("reports/spotbugs")
     reports {
-        html.enabled true
-        text.enabled = true
+        html.required = true
+        text.required = true
     }
     def excludeFile = file("${rootDir}/spotbugs-exclude.xml")
     if (excludeFile.exists()) {
@@ -92,18 +92,28 @@ test {
     systemProperty 'project.version', "${project.version}"
     // bal's own override of the user's Ballerina home, so no test ever reads the real ~/.ballerina.
     environment 'BALLERINA_HOME_DIR', layout.buildDirectory.dir('test-ballerina-home').get().asFile.path
+    // Lets Terminal's tests call the C library's isatty, as bal's own launcher allows the tool to.
+    jvmArgs '--enable-native-access=ALL-UNNAMED'
     testLogging {
-        events 'failed'
-        exceptionFormat 'full'
+        events = ['failed']
+        exceptionFormat = 'full'
     }
     finalizedBy jacocoTestReport
 
-    afterSuite { desc, result ->
-        if (!desc.parent) {
-            println "\nTest summary: ${result.testCount} run, ${result.successfulTestCount} passed, " +
-                    "${result.failedTestCount} failed, ${result.skippedTestCount} skipped"
+    addTestListener(new TestListener() {
+        void beforeSuite(TestDescriptor suite) { }
+
+        void afterSuite(TestDescriptor suite, TestResult result) {
+            if (!suite.parent) {
+                println "\nTest summary: ${result.testCount} run, ${result.successfulTestCount} passed, " +
+                        "${result.failedTestCount} failed, ${result.skippedTestCount} skipped"
+            }
         }
-    }
+
+        void beforeTest(TestDescriptor test) { }
+
+        void afterTest(TestDescriptor test, TestResult result) { }
+    })
 }
 
 jacoco {
