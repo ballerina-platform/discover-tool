@@ -97,7 +97,7 @@ public class CliTest {
 
     private static final String SUBGRAPH_UNCONFIRMED = "Central's page for 'subgraph' at " + GRAPHQL_VERSION
             + " cannot be confirmed as a submodule of this package. Pass another of its submodules (dataloader, "
-            + "subgraph), or drop --module for the default module: `bal discover package ballerina/graphql`.";
+            + "subgraph), or drop --module for the default module.";
 
     private static FakeTransport graphqlCentral(Map<String, JsonElement> modulePages) {
         return graphqlCentral(FixtureCorpus.loadRawFixture("ballerina__graphql"), modulePages);
@@ -169,8 +169,8 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("--refresh"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.stdout(), "");
-        Assert.assertEquals(capture.field("kind"), "validation");
-        Assert.assertTrue(capture.field("message").startsWith("Name what to read: package, search, client"),
+        Assert.assertEquals(capture.field("kind"), "usage");
+        Assert.assertTrue(capture.field("message").startsWith("name what to read: package, search, client"),
                 capture.stderr());
     }
 
@@ -198,7 +198,7 @@ public class CliTest {
         Assert.assertEquals(
                 Cli.run(List.of("package", "ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.stdout(), "");
-        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertEquals(capture.field("kind"), "usage");
         Assert.assertTrue(capture.field("message").contains("--nonesuch"), capture.stderr());
     }
 
@@ -207,7 +207,7 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("nosuchnoun", "-p", "ballerinax/kafka"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.stdout(), "");
-        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertEquals(capture.field("kind"), "usage");
         Assert.assertTrue(capture.field("message").contains("nosuchnoun"), capture.stderr());
         Assert.assertTrue(capture.field("message").contains("client, service, class, function, type, method"),
                 capture.stderr());
@@ -239,9 +239,9 @@ public class CliTest {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, label);
             Assert.assertEquals(capture.stdout(), "", label);
-            Assert.assertEquals(capture.field("kind"), "validation", label);
+            Assert.assertEquals(capture.field("kind"), "usage", label);
             Assert.assertEquals(capture.field("command"), each.command(), label);
-            Assert.assertTrue(capture.field("suggestion").contains("`" + each.command() + "`"), capture.stderr());
+            Assert.assertFalse(capture.field("suggestion").contains("`"), capture.stderr());
         }
     }
 
@@ -268,7 +268,7 @@ public class CliTest {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), centralFor(each.slug(), version)), 2,
                     label + ": " + capture.stderr());
-            Assert.assertEquals(capture.field("kind"), "validation", label);
+            Assert.assertEquals(capture.field("kind"), "usage", label);
             Assert.assertEquals(capture.field("command"), each.command(), label);
             Capture followed = new Capture();
             Assert.assertEquals(Cli.run(List.of(each.command().substring(Command.PREFIX.length()).replace("\"", "")
@@ -298,7 +298,7 @@ public class CliTest {
 
         Capture close = new Capture();
         Assert.assertEquals(Cli.run(List.of("method", "close", "-p", "ballerinax/kafka"), close.streams(),
-                centralFor("ballerinax__kafka", "4.6.5")), Failure.AMBIGUOUS, close.stderr());
+                centralFor("ballerinax__kafka", "4.6.5")), Failure.USAGE, close.stderr());
         Assert.assertEquals(close.field("kind"), "ambiguous", close.stderr());
         Assert.assertFalse(close.failure().has("command"), "no one owner is preferred: " + close.stderr());
         Assert.assertFalse(close.failure().has("candidates"), close.stderr());
@@ -348,9 +348,15 @@ public class CliTest {
                     centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
             Assert.assertEquals(capture.stdout(), "", label);
             Assert.assertEquals(capture.field("kind"), "symbol-not-found", label);
-            Assert.assertFalse(capture.failure().has("candidates"), capture.stderr());
             String reached = selectors.contains("gists") ? "gists" : "gists/public";
-            Assert.assertEquals(capture.field("command"), under.formatted(reached), label);
+            if (capture.failure().has("candidates")) {
+                Assert.assertFalse(capture.failure().has("command"), capture.stderr());
+                capture.failure().getAsJsonArray("candidates").forEach(candidate ->
+                        Assert.assertTrue(candidate.getAsString().startsWith(reached + "/")
+                                || candidate.getAsString().startsWith(reached + " "), capture.stderr()));
+            } else {
+                Assert.assertEquals(capture.field("command"), under.formatted(reached), label);
+            }
         }
         Capture split = new Capture();
         Assert.assertEquals(Cli.run(List.of("resource", "repos", ":owner", "-p", "ballerinax/github", "--client",
@@ -358,7 +364,7 @@ public class CliTest {
                 1);
         Assert.assertEquals(split.field("message"),
                 "'repos :owner' is not a resource method of Client in ballerinax/github:"
-                        + FixtureCorpus.FIXTURE_VERSION.text() + ".");
+                        + FixtureCorpus.FIXTURE_VERSION.text());
         Assert.assertEquals(split.field("command"), under.formatted("repos"));
     }
 
@@ -372,8 +378,10 @@ public class CliTest {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(),
                     centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1);
-            Assert.assertEquals(capture.field("suggestion"), "List what is under user/keys/:keyId: "
-                    + "`bal discover resource user/keys/:keyId -p ballerinax/github --client Client`.");
+            Assert.assertEquals(capture.field("suggestion"),
+                    "Name one of the resource methods under user/keys/:keyId below.");
+            Assert.assertEquals(capture.failure().getAsJsonArray("candidates").toString(),
+                    "[\"user/keys/:keyId delete\",\"user/keys/:keyId get\"]");
         }
     }
 
@@ -414,11 +422,8 @@ public class CliTest {
     public void anUnknownFlagListsEveryFlagTheGrammarAccepts() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
-        String suggestion = capture.field("suggestion");
-        for (String flag : List.of("--refresh", "--output-format", "--filter", "--page", "--module/-m", "--help/-h")) {
-            Assert.assertTrue(suggestion.contains(flag), flag + " missing from: " + suggestion);
-        }
-        Assert.assertFalse(suggestion.contains("--version"), suggestion);
+        Assert.assertEquals(capture.field("message"), "unknown option '--nonesuch'");
+        Assert.assertEquals(capture.field("suggestion"), "Run 'bal discover package --help' for the usage.");
     }
 
     @Test
@@ -427,9 +432,9 @@ public class CliTest {
         Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--output", "json"), capture.streams(),
                 never()), 2);
         Assert.assertEquals(capture.stdout(), "");
-        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertEquals(capture.field("kind"), "usage");
         Assert.assertTrue(capture.field("message").contains("'--output'"), capture.stderr());
-        Assert.assertTrue(capture.field("suggestion").contains("--output-format"), capture.stderr());
+        Assert.assertEquals(capture.field("suggestion"), "Run 'bal discover package --help' for the usage.");
     }
 
     @Test
@@ -437,19 +442,17 @@ public class CliTest {
         record Case(List<String> argv, String suggestion) { }
         for (Case each : List.of(
                 new Case(List.of("package", "ballerina/http", "--version", "2.15.7"),
-                        "To read a specific version, write it "
-                        + "after the package: `bal discover package ballerina/http:2.15.7`."),
+                        "To read a specific version, write it after the package."),
                 new Case(List.of("client", "-p", "ballerina/http", "--version=2.15.7"),
-                        "To read a specific version, write "
-                        + "it after the package: `bal discover client -p ballerina/http:2.15.7`."),
+                        "To read a specific version, write it after the package."),
                 new Case(List.of("package", "ballerina/http:2.15.6", "--version"),
-                        "To read a specific version, write it after the package: ballerina/http:<version>"),
-                new Case(List.of("--version"), "To read a specific version, write <org>/<name>:<version>"))) {
+                        "To read a specific version, write it after the package: ballerina/http:<version>."),
+                new Case(List.of("--version"), "To read a specific version, write <org>/<name>:<version>."))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, each.argv().toString());
             Assert.assertEquals(capture.stdout(), "");
-            Assert.assertEquals(capture.field("kind"), "validation");
-            Assert.assertEquals(capture.field("message"), "Unknown option '--version'.");
+            Assert.assertEquals(capture.field("kind"), "usage");
+            Assert.assertEquals(capture.field("message"), "unknown option '--version'");
             Assert.assertEquals(capture.field("suggestion"), each.suggestion(), each.argv().toString());
         }
     }
@@ -458,7 +461,7 @@ public class CliTest {
     public void aFlagWithoutItsValueIsNamedWithBothSpellings() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--module"), capture.streams(), never()), 2);
-        Assert.assertEquals(capture.field("message"), "The --module option needs a value.");
+        Assert.assertEquals(capture.field("message"), "the --module option needs a value");
         Assert.assertEquals(capture.field("suggestion"), "Write --module <module> or --module=<module>.");
     }
 
@@ -468,8 +471,8 @@ public class CliTest {
         Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--page", "x"), capture.streams(), never()),
                 2);
         Assert.assertEquals(capture.stdout(), "");
-        Assert.assertEquals(capture.field("kind"), "validation");
-        Assert.assertEquals(capture.field("message"), "'x' is not a valid --page value.");
+        Assert.assertEquals(capture.field("kind"), "usage");
+        Assert.assertEquals(capture.field("message"), "'x' is not a valid --page value");
         Assert.assertEquals(capture.field("suggestion"), "Write --page <n>.");
     }
 
@@ -480,7 +483,7 @@ public class CliTest {
             Assert.assertEquals(Cli.run(List.of("client", "-p", coordinate), capture.streams(), never()), 2,
                     coordinate);
             Assert.assertEquals(capture.stdout(), "");
-            Assert.assertEquals(capture.field("kind"), "validation", coordinate);
+            Assert.assertEquals(capture.field("kind"), "usage", coordinate);
             Assert.assertTrue(capture.field("message").contains("is not a complete version"), capture.stderr());
             Assert.assertTrue(capture.field("suggestion").contains("ballerina/http:<major>.<minor>.<patch>"),
                     capture.stderr());
@@ -497,11 +500,11 @@ public class CliTest {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(), never()), 2, String.join(" ", argv));
             Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
-            Assert.assertEquals(capture.field("kind"), "validation", String.join(" ", argv));
-            Assert.assertEquals(capture.field("message"), "'4.6.5' looks like a version.", capture.stderr());
+            Assert.assertEquals(capture.field("kind"), "usage", String.join(" ", argv));
+            Assert.assertEquals(capture.field("message"), "'4.6.5' looks like a version", capture.stderr());
             String command = "bal discover " + argv.get(0) + " -p ballerinax/kafka:4.6.5";
-            Assert.assertEquals(capture.field("suggestion"),
-                    "To read a specific version, write it after the package: `" + command + "`.", capture.stderr());
+            Assert.assertEquals(capture.field("suggestion"), "To read a specific version, write it after the package.",
+                    capture.stderr());
             Assert.assertEquals(capture.field("command"), command, capture.stderr());
         }
         Capture pkg = new Capture();
@@ -522,7 +525,7 @@ public class CliTest {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, each.argv().toString());
             Assert.assertEquals(capture.field("command"), each.command(), capture.stderr());
-            Assert.assertTrue(capture.field("suggestion").contains("`" + each.command() + "`"), capture.stderr());
+            Assert.assertFalse(capture.field("suggestion").contains("`"), capture.stderr());
         }
     }
 
@@ -533,8 +536,7 @@ public class CliTest {
                 capture.streams(), options(graphqlCentral())), 1, capture.stderr());
         Assert.assertEquals(capture.field("command"), "bal discover type -p ballerina/graphql --filter x");
         Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
-                + "subgraph. Pass one of them to --module, or drop --module for the default module: "
-                + "`bal discover type -p ballerina/graphql --filter x`.");
+                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
         Assert.assertEquals(capture.failure().get("candidates").toString(), "[\"dataloader\",\"subgraph\"]");
     }
 
@@ -554,8 +556,8 @@ public class CliTest {
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertEquals(capture.field("suggestion"), "'ballerinax/aws.auth' is not a package: it is the 'auth' "
-                + "module of the ballerinax/aws package. Read it with `bal discover package ballerinax/aws --module "
-                        + "auth`.");
+                + "module of the ballerinax/aws package. Read it with --module.");
+        Assert.assertEquals(capture.field("command"), "bal discover package ballerinax/aws --module auth");
         Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/docs/")),
                 transport.urls().toString());
     }
@@ -662,13 +664,13 @@ public class CliTest {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(List.of("package", "ballerina/http"), capture.streams(), never(),
                     projectDir.toString()), Failure.USAGE, locked);
-            Assert.assertEquals(capture.field("kind"), "validation", locked);
+            Assert.assertEquals(capture.field("kind"), "usage", locked);
             Path lock = projectDir.resolve("Dependencies.toml");
             Assert.assertEquals(capture.field("message"), lock + " locks ballerina/http at '" + locked
-                    + "', which is not a complete version.");
+                    + "', which is not a complete version");
             Assert.assertEquals(capture.field("suggestion"), "Fix the ballerina/http entry in " + lock + ", or "
-                    + "delete the file and run `bal build` to regenerate it; or write a version after the package: "
-                    + "ballerina/http:<version>");
+                    + "delete the file and run 'bal build' to regenerate it; or write a version after the package: "
+                    + "ballerina/http:<version>.");
         }
     }
 
@@ -720,8 +722,8 @@ public class CliTest {
         Capture text = new Capture();
         Assert.assertEquals(Cli.run(List.of("type", "Nope", "-p", "ballerina/graphql", "--module", "subgraph",
                 "--output-format", "text"), text.streams(), options(graphqlCentral())), 1);
-        Assert.assertTrue(text.stderr().startsWith("error: 'Nope' is not a type in ballerina/graphql:"
-                + GRAPHQL_VERSION + ", module subgraph.\n"), text.stderr());
+        Assert.assertTrue(text.stderr().startsWith("bal discover: error: 'Nope' is not a type in ballerina/graphql:"
+                + GRAPHQL_VERSION + ", module subgraph\n"), text.stderr());
 
         Capture plain = new Capture();
         Assert.assertEquals(Cli.run(List.of("type", "Nope", "-p", "ballerina/graphql"), plain.streams(),
@@ -855,10 +857,11 @@ public class CliTest {
         Assert.assertEquals(exitCode, 1);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "symbol-not-found");
-        Assert.assertFalse(capture.failure().has("candidates"), capture.stderr());
-        Assert.assertEquals(capture.field("command"), "bal discover search FailoverClientt -p ballerina/http");
-        Assert.assertTrue(capture.field("suggestion").endsWith("or list the clients: `bal discover client -p "
-                + "ballerina/http`."), capture.stderr());
+        Assert.assertFalse(capture.failure().has("command"), capture.stderr());
+        Assert.assertTrue(capture.failure().getAsJsonArray("candidates").toString().contains("\"FailoverClient\""),
+                capture.stderr());
+        Assert.assertEquals(capture.field("suggestion"), "Name one of the clients below, or search the package with "
+                + "'bal discover search FailoverClientt -p ballerina/http'.");
         Assert.assertTrue(capture.failure().getAsJsonArray("requested").toString().contains("FailoverClientt"),
                 capture.stderr());
     }
@@ -996,17 +999,19 @@ public class CliTest {
         Capture json = new Capture();
         Assert.assertEquals(Cli.run(argv, json.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1);
         Assert.assertEquals(json.stdout(), "");
-        Assert.assertEquals(json.stderr(), "{\"kind\":\"symbol-not-found\",\"message\":\"'sendd' is not a method "
-                + "of Producer in ballerinax/kafka:4.6.5.\",\"qualified\":\"ballerinax/kafka\",\"version\":\"4.6.5\","
-                + "\"requested\":[\"sendd\"],\"suggestion\":\"List its methods: "
-                + "`bal discover method -p ballerinax/kafka --client Producer`.\",\"command\":"
-                + "\"bal discover method -p ballerinax/kafka --client Producer\"}\n");
+        Assert.assertEquals(json.stderr(), "{\"severity\":\"error\",\"kind\":\"symbol-not-found\",\"message\":"
+                + "\"'sendd' is not a method of Producer in ballerinax/kafka:4.6.5\","
+                + "\"qualified\":\"ballerinax/kafka\",\"version\":\"4.6.5\",\"requested\":[\"sendd\"],"
+                + "\"suggestion\":\"Name one of the methods of "
+                + "Producer below.\",\"candidates\":[\"close\",\"flush\",\"getTopicPartitions\",\"send\","
+                + "\"sendWithMetadata\"]}\n");
 
         Capture text = new Capture();
         Assert.assertEquals(Cli.run(argv, text.streams(), centralFor("ballerinax__kafka", "4.6.5"), null, true), 1);
         Assert.assertEquals(text.stdout(), "");
-        Assert.assertEquals(text.stderr(), "error: 'sendd' is not a method of Producer in ballerinax/kafka:4.6.5.\n"
-                + "  List its methods: `bal discover method -p ballerinax/kafka --client Producer`.\n");
+        Assert.assertEquals(text.stderr(), "bal discover: error: 'sendd' is not a method of Producer in "
+                + "ballerinax/kafka:4.6.5\n  Name one of the methods of Producer below.\n  candidates:\n    close\n"
+                + "    flush\n    getTopicPartitions\n    send\n    sendWithMetadata\n");
     }
 
     @Test
@@ -1022,12 +1027,15 @@ public class CliTest {
     public void aMemberOnSeveralContainersFailsWithTheBucketsListing() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("method", "'commit", "-p", "ballerinax/kafka"), capture.streams(),
-                centralFor("ballerinax__kafka", "4.6.5"), null, true), Failure.AMBIGUOUS);
-        Assert.assertEquals(capture.stderr(), "error: 'commit' is declared by Caller and Consumer in "
-                + "ballerinax/kafka:4.6.5.\n"
+                centralFor("ballerinax__kafka", "4.6.5"), null, true), Failure.USAGE);
+        Assert.assertEquals(capture.stderr(), "bal discover: error: 'commit' is declared by Caller and Consumer in "
+                + "ballerinax/kafka:4.6.5\n"
                 + "  Name the one you mean with --client, --class, --service:\n"
                 + "    Caller    bal discover method commit -p ballerinax/kafka --client Caller\n"
-                + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n");
+                + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n"
+                + "Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] "
+                + "[options]\n"
+                + "Try 'bal discover method --help' for more information.\n");
     }
 
     @Test
@@ -1171,7 +1179,7 @@ public class CliTest {
             argv.addAll(narrowed);
             Capture capture = new Capture();
             int exitCode = Cli.run(argv, capture.streams(), options(graphqlCentral()));
-            Assert.assertEquals(exitCode, Failure.NOT_FOUND, argv + " -> " + capture.stdout());
+            Assert.assertEquals(exitCode, Failure.RUNTIME, argv + " -> " + capture.stdout());
             Assert.assertEquals(capture.stdout(), "");
             Assert.assertEquals(capture.field("kind"), "symbol-not-found");
             Assert.assertTrue(capture.field("message").contains("publishes no readme for module dataloader"),
@@ -1179,10 +1187,9 @@ public class CliTest {
             // Under --module the loaded submodules are that module's children, never its siblings or the
             // default module, so their absence says nothing about what else the package publishes.
             Assert.assertFalse(capture.field("suggestion").contains("no other module"), capture.stderr());
-            Assert.assertTrue(capture.field("suggestion").contains("`bal discover package ballerina/graphql`"),
+            Assert.assertTrue(capture.field("suggestion").contains("'bal discover package ballerina/graphql'"),
                     capture.stderr());
-            Assert.assertTrue(capture.field("suggestion").contains("`bal discover readme -p ballerina/graphql`"),
-                    capture.stderr());
+            Assert.assertEquals(capture.field("command"), "bal discover readme -p ballerina/graphql", capture.stderr());
         }
     }
 
@@ -1207,8 +1214,7 @@ public class CliTest {
         Capture capture = new Capture();
         Cli.run(List.of("readme", "1", "-p", "ballerinax/kafka", "--filter", "zzzz"), capture.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
-        Assert.assertTrue(capture.field("suggestion").endsWith("`bal discover readme 1 -p ballerinax/kafka`."),
-                capture.stderr());
+        Assert.assertEquals(capture.field("command"), "bal discover readme 1 -p ballerinax/kafka", capture.stderr());
 
         Capture sections = new Capture();
         Cli.run(List.of("readme", "-p", "ballerinax/kafka", "--filter", "kafka"), sections.streams(),
@@ -1226,8 +1232,8 @@ public class CliTest {
         Capture titled = new Capture();
         Cli.run(List.of("readme", title, "-p", "ballerinax/kafka", "--filter", "zzzz"), titled.streams(),
                 centralFor("ballerinax__kafka", FixtureCorpus.FIXTURE_VERSION.text()));
-        Assert.assertTrue(titled.field("suggestion").endsWith(" readme " + Texts.shellWord(title)
-                        + " -p ballerinax/kafka`."),
+        Assert.assertTrue(titled.field("command").endsWith(" readme " + Texts.shellWord(title)
+                        + " -p ballerinax/kafka"),
                 titled.stderr());
     }
 
@@ -1276,7 +1282,7 @@ public class CliTest {
             int exitCode = Cli.run(List.of("client", "-p", "ballerinax/github", "--page", page), capture.streams(),
                     never());
             Assert.assertEquals(exitCode, 2);
-            Assert.assertEquals(capture.field("kind"), "validation");
+            Assert.assertEquals(capture.field("kind"), "usage");
             Assert.assertTrue(capture.field("message").contains("numbered from 1"), capture.stderr());
             Assert.assertEquals(capture.field("command"), "bal discover client -p ballerinax/github", capture.stderr());
         }
@@ -1298,27 +1304,27 @@ public class CliTest {
             int exitCode = Cli.run(argv, capture.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
             Assert.assertEquals(exitCode, Failure.USAGE, argv + " -> " + capture.stdout());
             Assert.assertEquals(capture.stdout(), "");
-            Assert.assertEquals(capture.field("kind"), "validation");
+            Assert.assertEquals(capture.field("kind"), "usage");
             Assert.assertTrue(capture.field("message").contains("only one page"), argv + " -> " + capture.stderr());
-            String suggestion = capture.field("suggestion");
-            Assert.assertFalse(suggestion.substring(suggestion.indexOf('`')).contains("--page"), suggestion);
+            Assert.assertEquals(capture.field("suggestion"), "Drop --page.", capture.stderr());
+            Assert.assertFalse(capture.field("command").contains("--page"), capture.stderr());
         }
         Capture quoted = new Capture();
         Cli.run(unpaged.get(2), quoted.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
-        Assert.assertEquals(quoted.field("suggestion"),
-                "Drop --page: `bal discover resource gists/public get -p ballerinax/github --client Client`.");
+        Assert.assertEquals(quoted.field("command"),
+                "bal discover resource gists/public get -p ballerinax/github --client Client");
 
         Capture oneGroupedPage = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--page", "2"),
-                oneGroupedPage.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), Failure.NOT_FOUND);
+                oneGroupedPage.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())), Failure.RUNTIME);
         Assert.assertTrue(oneGroupedPage.field("message").contains("on 1 page"), oneGroupedPage.stderr());
 
         Capture emptySearch = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--filter", "zzzq",
                 "--page", "2"), emptySearch.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())),
-                Failure.NOT_FOUND);
+                Failure.RUNTIME);
         Assert.assertEquals(emptySearch.field("message"),
-                "Page 2 is out of range: this listing has 0 entries on 1 page.");
+                "page 2 is out of range: this listing has 0 entries on 1 page");
     }
 
     @Test
@@ -1327,7 +1333,7 @@ public class CliTest {
         Capture beyond = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/twilio", "--page", "99"),
                 beyond.streams(), centralFor("ballerinax__twilio", FixtureCorpus.FIXTURE_VERSION.text())),
-                Failure.NOT_FOUND);
+                Failure.RUNTIME);
         Assert.assertEquals(beyond.field("kind"), "page-not-found");
         Assert.assertEquals(beyond.field("qualified"), "ballerinax/twilio");
         Assert.assertEquals(beyond.field("version"), FixtureCorpus.FIXTURE_VERSION.text());
@@ -1336,7 +1342,7 @@ public class CliTest {
         Capture single = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--filter", "zzzq",
                 "--page", "2"), single.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text())),
-                Failure.NOT_FOUND);
+                Failure.RUNTIME);
         Assert.assertTrue(single.field("suggestion").startsWith("This listing has only one page"),
                 single.stderr());
         Assert.assertEquals(single.field("command"), "bal discover client Client -p ballerinax/github --filter zzzq");
@@ -1355,7 +1361,7 @@ public class CliTest {
             Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerinax/kafka", argument), capture.streams(),
                     never()),
                     2, argument);
-            Assert.assertEquals(capture.field("message"), "The --filter option needs a keyword.");
+            Assert.assertEquals(capture.field("message"), "the --filter option needs a keyword");
         }
     }
 
@@ -1366,8 +1372,8 @@ public class CliTest {
         Assert.assertEquals(Cli.run(List.of("client", "Response", "-p", "ballerina/http"), capture.streams(),
                 centralFor("ballerina__http", "2.16.6"), null, true), 1);
         Assert.assertEquals(capture.stdout(), "");
-        Assert.assertEquals(capture.stderr(), "error: 'Response' is not a client in ballerina/http:2.16.6.\n"
-                + "  It is a class: `bal discover class Response -p ballerina/http`.\n");
+        Assert.assertEquals(capture.stderr(), "bal discover: error: 'Response' is not a client in "
+                + "ballerina/http:2.16.6\n  It is a class.\n  Try: bal discover class Response -p ballerina/http\n");
     }
 
     @Test
@@ -1424,8 +1430,7 @@ public class CliTest {
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertEquals(capture.field("suggestion"), "ballerina/graphql publishes these submodules: dataloader, "
-                + "subgraph. Pass one of them to --module, or drop --module for the default module: "
-                + "`bal discover package ballerina/graphql`.");
+                + "subgraph. Pass one of them to --module, or drop --module for the default module.");
         // The submodule's own page first; the package's only once that is missing, to name what it does publish.
         Assert.assertEquals(transport.urls(), List.of(
                 CentralClient.CENTRAL_BASE_URL + "registry/packages/ballerina/graphql",
@@ -1438,7 +1443,7 @@ public class CliTest {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("package", "ballerinax/kafka", "--module", "nope"), capture.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"));
-        Assert.assertEquals(exitCode, Failure.NOT_FOUND);
+        Assert.assertEquals(exitCode, Failure.RUNTIME);
         Assert.assertEquals(capture.field("kind"), "package-not-found");
         Assert.assertTrue(capture.field("suggestion").contains("publishes no submodules"), capture.stderr());
     }
@@ -1451,7 +1456,7 @@ public class CliTest {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(transport));
-        Assert.assertEquals(exitCode, Failure.UNAVAILABLE);
+        Assert.assertEquals(exitCode, Failure.RUNTIME);
         Assert.assertEquals(capture.field("kind"), "upstream", capture.stderr());
     }
 
@@ -1675,7 +1680,7 @@ public class CliTest {
         Assert.assertEquals(
                 Cli.run(List.of("package", "ballerinax/kafka", "--output-format", "xml"), capture.streams(), never()),
                 2);
-        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertEquals(capture.field("kind"), "usage");
         Assert.assertTrue(capture.field("message").contains("xml"), capture.stderr());
     }
 
@@ -1684,7 +1689,7 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("find", "kafka"), capture.streams(), never()), 2);
         // `find` parses as a package-shaped positional (no `/`), so it fails the qualified-name pattern.
-        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertEquals(capture.field("kind"), "usage");
     }
 
     @Test
@@ -1711,7 +1716,7 @@ public class CliTest {
             int exitCode = Cli.run(argv, capture.streams(), never());
             Assert.assertEquals(exitCode, 2, String.join(" ", argv));
             Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
-            Assert.assertEquals(capture.field("kind"), "validation", String.join(" ", argv));
+            Assert.assertEquals(capture.field("kind"), "usage", String.join(" ", argv));
             Assert.assertTrue(capture.stderr().endsWith("}\n"), String.join(" ", argv));
         }
     }
@@ -1721,19 +1726,19 @@ public class CliTest {
         Capture funcs = new Capture();
         Assert.assertEquals(Cli.run(List.of("function", "println", "extra", "-p", "ballerina/io:1.8.2", "--module",
                 "sub", "--filter", "x"), funcs.streams(), never()), 2);
-        Assert.assertEquals(funcs.field("message"), "function takes one name; got 2.");
-        Assert.assertEquals(funcs.field("suggestion"),
-                "Run `bal discover function println -p ballerina/io:1.8.2 --module sub --filter x`.");
+        Assert.assertEquals(funcs.field("message"), "function takes one name; got 2");
+        Assert.assertEquals(funcs.field("command"),
+                "bal discover function println -p ballerina/io:1.8.2 --module sub --filter x");
 
         Capture types = new Capture();
         Assert.assertEquals(Cli.run(List.of("type", "A", "B", "-p", "ballerina/io"), types.streams(), never()), 2);
-        Assert.assertEquals(types.field("suggestion"), "Run `bal discover type A -p ballerina/io`.");
+        Assert.assertEquals(types.field("command"), "bal discover type A -p ballerina/io");
 
         Capture filtered = new Capture();
         Assert.assertEquals(Cli.run(List.of("type", "Error", "-p", "ballerina/io", "--filter", "x"),
                 filtered.streams(), never()), 2);
-        Assert.assertEquals(filtered.field("suggestion"), "Drop --filter: `bal discover type Error -p ballerina/io`; "
-                + "or drop the name: `bal discover type -p ballerina/io --filter x`.");
+        Assert.assertEquals(filtered.field("suggestion"), "Drop --filter, or drop the name: "
+                + "'bal discover type -p ballerina/io --filter x'.");
         Assert.assertEquals(filtered.field("command"), "bal discover type Error -p ballerina/io");
     }
 
@@ -1782,16 +1787,17 @@ public class CliTest {
                     each.toString());
             Assert.assertEquals(capture.stdout(), "", each.toString());
             if (each.json()) {
-                Assert.assertEquals(capture.field("kind"), "validation", each.toString());
+                Assert.assertEquals(capture.field("kind"), "usage", each.toString());
             } else {
-                String[] lines = capture.stderr().split("\n", -1);
-                Assert.assertEquals(lines.length, 5, capture.stderr());
-                Assert.assertTrue(lines[0].startsWith("error: "), capture.stderr());
-                Assert.assertTrue(lines[1].startsWith("  ") && !lines[1].startsWith("   "), capture.stderr());
-                Assert.assertTrue(lines[2].startsWith("Usage: bal discover "), capture.stderr());
-                Assert.assertTrue(lines[3].matches("Run `bal discover (\\w+ )?--help` for details\\."),
-                        capture.stderr());
-                Assert.assertEquals(lines[4], "", capture.stderr());
+                List<String> lines = List.of(capture.stderr().split("\n", -1));
+                int last = lines.size() - 1;
+                Assert.assertTrue(lines.get(0).startsWith("bal discover: error: "), capture.stderr());
+                lines.subList(1, last - 2).forEach(line ->
+                        Assert.assertTrue(line.startsWith("  ") && !line.startsWith("   "), capture.stderr()));
+                Assert.assertTrue(lines.get(last - 2).startsWith("Usage: bal discover "), capture.stderr());
+                Assert.assertTrue(lines.get(last - 1).matches("Try 'bal discover (\\w+ )?--help' for more "
+                        + "information\\."), capture.stderr());
+                Assert.assertEquals(lines.get(last), "", capture.stderr());
             }
         }
     }
@@ -1801,10 +1807,10 @@ public class CliTest {
         record Case(List<String> argv, String message, String suggestion) { }
         for (Case each : List.of(
                 new Case(List.of("package", "ballerina/io", "--output-format", "MODE", "--output-format", "MODE"),
-                        "--output-format is given more than once.", "Pass --output-format once."),
+                        "--output-format is given more than once", "Pass --output-format once."),
                 new Case(List.of("package", "ballerina/io", "--page", "1", "--page", "2"),
-                        "--page is given more than once.", "Pass --page once."),
-                new Case(List.of("package", "ballerina/io", "--refresh=yes"), "--refresh takes no value.",
+                        "--page is given more than once", "Pass --page once."),
+                new Case(List.of("package", "ballerina/io", "--refresh=yes"), "--refresh takes no value",
                         "Write --refresh."))) {
             Capture json = new Capture();
             List<String> jsonArgv = each.argv().stream().map(word -> word.replace("MODE", "json")).toList();
@@ -1815,10 +1821,9 @@ public class CliTest {
             Capture text = new Capture();
             List<String> textArgv = each.argv().stream().map(word -> word.replace("MODE", "text")).toList();
             Assert.assertEquals(Cli.run(textArgv, text.streams(), never(), null, true), 2, textArgv.toString());
-            Assert.assertEquals(text.stderr(), "error: " + each.message() + "\n  " + each.suggestion() + "\n"
-                    + "Usage: bal discover package <org>/<name>[:<version>] [--output-format json|text] "
-                    + "[--filter <keyword>] [--page <n>] [-m <module>] [--refresh]\n"
-                    + "Run `bal discover package --help` for details.\n");
+            Assert.assertEquals(text.stderr(), "bal discover: error: " + each.message() + "\n  " + each.suggestion()
+                    + "\nUsage: bal discover package <org>/<name>[:<version>] [options]\n"
+                    + "Try 'bal discover package --help' for more information.\n");
         }
     }
 

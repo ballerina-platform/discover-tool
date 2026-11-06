@@ -90,7 +90,7 @@ public class CommandTest {
                         .ownedBy(Command.CLIENT, "C").text()))
                 .toList();
         String text = TextRenderer.render(new DiscoverResult.MethodList("C", methods, false, 2, 2, null, null,
-                DiscoverResult.Documented.NONE, null, null), TextRenderer.Context.NONE);
+                DiscoverResult.Documented.NONE, null), TextRenderer.Context.NONE);
         Assert.assertTrue(text.contains("Next: bal discover method <name> -p ballerinax/kafka --client C --module foo"),
                 text);
         Assert.assertFalse(text.contains("--module <name>"), text);

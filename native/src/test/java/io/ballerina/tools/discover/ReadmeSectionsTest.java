@@ -116,7 +116,7 @@ public class ReadmeSectionsTest {
         LoadedPackage loaded = withReadme("# Example\none\n# Other\n# Example\ntwo");
         Result<DiscoverResult> view = Readme.render(loaded, new Readme.Options("example", null, 1));
         Failure.Ambiguous failure = (Failure.Ambiguous) view.failure();
-        Assert.assertEquals(failure.exitCode(), Failure.AMBIGUOUS);
+        Assert.assertEquals(failure.exitCode(), Failure.USAGE);
         Assert.assertEquals(failure.matchesKey(), Failure.SECTIONS);
         Assert.assertEquals(failure.matches(), List.of(
                 new Failure.Match("1. Example", "bal discover readme 1 -p ballerinax/kafka"),

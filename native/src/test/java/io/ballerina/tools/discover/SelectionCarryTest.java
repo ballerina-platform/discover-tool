@@ -121,15 +121,15 @@ public class SelectionCarryTest {
     @Test
     public void aPageOutsideTheListingIsNotFoundNamingTheRange() {
         Run run = run("ballerinax__twilio", "bal discover client Client -p ballerinax/twilio --page 6");
-        Assert.assertEquals(run.code(), Failure.NOT_FOUND, run.out());
+        Assert.assertEquals(run.code(), Failure.RUNTIME, run.out());
         Assert.assertEquals(run.out(), "");
         JsonObject failure = JsonParser.parseString(run.err()).getAsJsonObject();
         Assert.assertEquals(failure.get("kind").getAsString(), "page-not-found");
         Assert.assertTrue(failure.get("message").getAsString().contains("5 pages"), run.err());
-        Assert.assertTrue(failure.get("suggestion").getAsString()
+        Assert.assertTrue(failure.get("command").getAsString()
                 .contains("bal discover client Client -p ballerinax/twilio --page 5"), run.err());
         Run readme = run("ballerinax__kafka", "bal discover readme -p ballerinax/kafka --filter kafka --page 9");
-        Assert.assertEquals(readme.code(), Failure.NOT_FOUND, readme.out());
+        Assert.assertEquals(readme.code(), Failure.RUNTIME, readme.out());
         Assert.assertEquals(JsonParser.parseString(readme.err()).getAsJsonObject().get("kind").getAsString(),
                 "page-not-found");
     }
@@ -153,7 +153,7 @@ public class SelectionCarryTest {
         JsonObject failure = JsonParser.parseString(asked.err()).getAsJsonObject();
         String canonical = resource("gists/public get");
         Assert.assertEquals(failure.get("command").getAsString(), canonical);
-        Assert.assertEquals(failure.get("suggestion").getAsString(), "Run `" + canonical + "`.");
+        Assert.assertEquals(failure.get("command").getAsString(), canonical);
         JsonObject followed = answer("ballerinax__github", canonical);
         Assert.assertEquals(followed.get("path").getAsString(), "gists/public");
         Assert.assertEquals(followed.get("accessor").getAsString(), "get");
@@ -369,12 +369,12 @@ public class SelectionCarryTest {
                 "page 2 widened back out to the whole client");
 
         Run outside = run(http, HTTP + " --page 4");
-        Assert.assertEquals(outside.code(), Failure.NOT_FOUND, outside.out());
+        Assert.assertEquals(outside.code(), Failure.RUNTIME, outside.out());
         Assert.assertEquals(outside.out(), "");
         JsonObject failure = JsonParser.parseString(outside.err()).getAsJsonObject();
         Assert.assertEquals(failure.get("kind").getAsString(), "page-not-found");
         Assert.assertTrue(failure.get("message").getAsString().contains("3 pages"), outside.err());
-        Assert.assertTrue(failure.get("suggestion").getAsString().contains(HTTP + " --page 3"), outside.err());
+        Assert.assertTrue(failure.get("command").getAsString().contains(HTTP + " --page 3"), outside.err());
     }
 
     /** The recorded redis {@code Client}: 111 remote methods and {@code close}, 112 entries on pages of 40/40/32. */

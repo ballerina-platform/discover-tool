@@ -74,9 +74,9 @@ public final class QualifiedName {
         Matcher match = PATTERN.matcher(input);
         if (!match.matches() || Version.isTraversal(match.group(1)) || Version.isTraversal(match.group(2))) {
             return Result.err(new Failure.Validation(
-                    "Invalid package name '" + input + "'. Expected '<org>/<name>'.",
+                    "invalid package name '" + input + "': expected '<org>/<name>'",
                     "Pass the package as '<org>/<name>', e.g. ballerinax/github, or '<org>/<name>:<version>' to read "
-                            + "one version, e.g. ballerinax/github:6.0.0"));
+                            + "one version, e.g. ballerinax/github:6.0.0."));
         }
         return Result.ok(new QualifiedName(match.group(1), match.group(2)));
     }

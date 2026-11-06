@@ -216,9 +216,9 @@ public class ViewsAgreeTest {
             Result<DiscoverResult> view = Types.render(http, new Types.Options(List.of(typed), null, 1));
             Assert.assertFalse(view.isOk(), typed);
             Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
-            Assert.assertEquals(failure.message(), "'" + typed + "' is not a type in " + http.label() + ".");
+            Assert.assertEquals(failure.message(), "'" + typed + "' is not a type in " + http.label());
             Assert.assertEquals(failure.command(), "bal discover type -p ballerina/http");
-            Assert.assertEquals(failure.suggestion(), "List the types: `bal discover type -p ballerina/http`.");
+            Assert.assertEquals(failure.suggestion(), "List the types.");
             Assert.assertTrue(failure.candidates().isEmpty(), failure.candidates().toString());
         }
     }

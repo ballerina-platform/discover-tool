@@ -118,7 +118,7 @@ public final class TextRenderer {
     public static String render(DiscoverResult result, Context where) {
         if (result instanceof DiscoverResult.Readme readme && readme.section() == null) {
             String header = header(where, null);
-            return header == null ? verbatimReadme(readme) : header + "\n\n" + verbatimReadme(readme);
+            return header == null ? readme.markdown() : header + "\n\n" + readme.markdown();
         }
         Layout layout = new Layout();
         layout.top(header(where, containerOf(result)));
@@ -220,7 +220,6 @@ public final class TextRenderer {
                     submodules.row(submodule.name(), submodule.command(), submodule.summary()));
             layout.section("Submodules", submodules);
         }
-        layout.warning(overview.warning());
         Command.Target pkg = where.pkg() == null
                 ? null
                 : new Command.Target(Coordinate.text(where.pkg(), where.pin()), where.module());
@@ -322,7 +321,6 @@ public final class TextRenderer {
         }
         layout.section("Not attachable to a listener" + (notAttachable.size() < notAttachableTotal
                 ? " (" + notAttachable.size() + " of " + notAttachableTotal + ")" : ""), unattachable);
-        layout.warning(roster.warning());
         layout.more(remaining(containers.size() + notAttachable.size(), roster.total(), roster.paging()),
                 roster.paging());
         layout.next(drill.pattern());
@@ -352,7 +350,7 @@ public final class TextRenderer {
         }
         layout.section("Path groups (resource methods in each)", table);
 
-        layout.notices(groups.note(), groups.warning());
+        layout.note(groups.note());
         layout.more(remaining(here.size() + groups.groups().size(), groups.total(), groups.paging()),
                 groups.paging());
         layout.next(hereDrill.pattern());
@@ -365,7 +363,7 @@ public final class TextRenderer {
         Drill drill = resourceDrill(resources.resources());
         layout.block(resourceTable(resources.resources(), drill).lines(INDENT));
         List<String> documentedDrill = documented(layout, resources.documented());
-        layout.notices(resources.note(), resources.warning());
+        layout.note(resources.note());
         layout.more(remaining(resources.shown(), resources.total(), resources.paging()), resources.paging(),
                 onlyDocumented(resources.total()));
         layout.next(drill.pattern());
@@ -381,7 +379,7 @@ public final class TextRenderer {
         Drill drill = methodDrill(methods.methods());
         layout.block(methodTable(methods.methods(), drill).lines(INDENT));
         List<String> documentedDrill = documented(layout, methods.documented());
-        layout.notices(methods.note(), methods.warning());
+        layout.note(methods.note());
         layout.more(remaining(methods.shown(), methods.total(), methods.paging()), methods.paging(),
                 onlyDocumented(methods.total()));
         layout.next(drill.pattern());
@@ -418,7 +416,7 @@ public final class TextRenderer {
                 layout.block(lines);
             }
         }
-        layout.notices(list.note(), list.warning());
+        layout.note(list.note());
     }
 
     private static void serviceExamples(Layout layout, DiscoverResult.ServiceExamples examples) {
@@ -431,7 +429,7 @@ public final class TextRenderer {
         examples.sections().forEach(section ->
                 sections.row(String.valueOf(section.number()), section.title(), section.command()));
         layout.section("Readme sections that declare one", sections);
-        layout.notices(examples.note(), examples.warning());
+        layout.note(examples.note());
         layout.next(examples.next());
     }
 
@@ -453,14 +451,10 @@ public final class TextRenderer {
         return Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
 
-    private static String verbatimReadme(DiscoverResult.Readme readme) {
-        return readme.warning() == null ? readme.markdown() : readme.markdown() + "\n\nWarning: " + readme.warning();
-    }
 
     private static void readmeSection(Layout layout, DiscoverResult.Readme readme) {
         layout.top("Section " + readme.section() + " of " + readme.of() + ": " + readme.title());
         layout.block(List.of(readme.markdown()));
-        layout.warning(readme.warning());
     }
 
     private static void readmeSections(Layout layout, DiscoverResult.ReadmeSections sections) {
@@ -477,7 +471,6 @@ public final class TextRenderer {
                     drill.explicit(i));
         }
         layout.block(table.lines(INDENT));
-        layout.warning(sections.warning());
         layout.more(remaining(rows.size(), sections.total(), sections.paging()), sections.paging());
         layout.next(drill.pattern());
         layout.next(sections.next());
@@ -506,7 +499,7 @@ public final class TextRenderer {
                 callers.row(String.valueOf(section.number()), section.title(), section.command()));
         layout.section("Readme sections that call it", callers);
         List<String> documentedDrill = documented(layout, signature.documented());
-        layout.notices(signature.note(), signature.warning());
+        layout.note(signature.note());
         layout.more(remaining(signature.documented().names().size(), signature.documented().total(),
                 signature.paging()), signature.paging(), DOCUMENTED);
         documentedDrill.forEach(layout::next);
@@ -534,7 +527,7 @@ public final class TextRenderer {
         layout.section("Remote methods (->)", methodTable(mixed.remote(), methodDrill, 0));
         layout.section("Methods (.)", methodTable(mixed.normal(), methodDrill, mixed.remote().size()));
         List<String> documentedDrill = documented(layout, mixed.documented());
-        layout.notices(mixed.note(), mixed.warning());
+        layout.note(mixed.note());
         layout.more(remaining(mixed.shown(), mixed.total(), mixed.paging()), mixed.paging());
         layout.next(drill.pattern());
         layout.next(methodDrill.pattern());
@@ -549,7 +542,6 @@ public final class TextRenderer {
         TextTable table = new TextTable(TextTable.Column.LEFT, TextTable.Column.RIGHT, TextTable.Column.LEFT);
         empty.elsewhere().forEach(other -> table.row(other.bucket(), String.valueOf(other.count()), other.command()));
         layout.section("Elsewhere in the package", table);
-        layout.warning(empty.warning());
     }
 
     private static void typeRoster(Layout layout, DiscoverResult.TypeRoster roster) {
@@ -572,7 +564,6 @@ public final class TextRenderer {
             offset += section.entries().size();
         }
         List<String> documentedDrill = documented(layout, roster.documented());
-        layout.warning(roster.warning());
         layout.more(remaining(roster.shown(), roster.total(), roster.paging()), roster.paging(),
                 onlyDocumented(roster.total()));
         layout.next(drill.pattern());
@@ -584,7 +575,6 @@ public final class TextRenderer {
         if (search.total() == 0) {
             layout.top("No name in this package holds " + String.join(" and ", search.keywords().stream()
                     .map(keyword -> "'" + keyword + "'").toList()) + ".");
-            layout.warning(search.warning());
             layout.next(search.overview());
             return;
         }
@@ -624,7 +614,6 @@ public final class TextRenderer {
             layout.section(capitalised(group.kind().plural()), table);
             layout.next(drill.pattern());
         }
-        layout.warning(search.warning());
         layout.more(remaining(search.shown(), search.total(), search.paging()), search.paging());
         layout.next(search.next());
     }
@@ -676,7 +665,7 @@ public final class TextRenderer {
             layout.block(block);
         }
         closureTail(layout, declaration.omitted(), declaration.foreign());
-        layout.notices(declaration.note(), declaration.warning());
+        layout.note(declaration.note());
     }
 
     private static void closureTail(
@@ -978,17 +967,10 @@ public final class TextRenderer {
             }
         }
 
-        /** {@code note} first — it explains what bucket this answer actually came from — then {@code warning}. */
-        void notices(String note, String warning) {
+        /** What bucket this answer actually came from, or {@code null}. */
+        void note(String note) {
             if (note != null) {
                 notices.add("Note: " + note);
-            }
-            warning(warning);
-        }
-
-        void warning(String warning) {
-            if (warning != null) {
-                notices.add("Warning: " + warning);
             }
         }
 

@@ -43,6 +43,8 @@ import java.util.Map;
  */
 public class ClientTest {
 
+    private static final String ERROR = "bal discover: error: ";
+
     private static final QualifiedName GITHUB = QualifiedName.parse("ballerinax/github").value();
 
     private static final Path LOCK = Path.of("/work/app/Dependencies.toml");
@@ -172,7 +174,7 @@ public class ClientTest {
         Assert.assertEquals(failure.qualified(), "ballerinax/github");
         Assert.assertEquals(failure.version(), "9.9.9");
         Assert.assertTrue(failure.suggestion().contains("the version " + LOCK + " locks"), failure.suggestion());
-        Assert.assertTrue(failure.suggestion().contains("run `bal build` to regenerate it"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("run 'bal build' to regenerate it"), failure.suggestion());
         Assert.assertTrue(failure.suggestion().endsWith("write a published version after the package: "
                 + "ballerinax/github:<version>"), failure.suggestion());
         Assert.assertTrue(failure.suggestion().contains("published versions are 6.0.0, 5.1.0"),
@@ -219,14 +221,12 @@ public class ClientTest {
         Assert.assertEquals(withPin.qualified(), "ballerina/graphql");
         Assert.assertEquals(withPin.version(), "1.17.0");
         Assert.assertEquals(withPin.module(), "nosuch");
-        Assert.assertTrue(withPin.suggestion().endsWith("module: `bal discover package ballerina/graphql:1.17.0`."),
-                withPin.suggestion());
+        Assert.assertEquals(withPin.command().text(), "bal discover package ballerina/graphql:1.17.0");
 
         for (CentralClient.ResolvedVersion unpinned : List.of(locked, resolved("1.17.0"))) {
             Failure.PackageNotFound without = (Failure.PackageNotFound) CentralClient.fetchModuleDocs(
                     graphql, "nosuch", unpinned, fast(transport).build()).failure();
-            Assert.assertTrue(without.suggestion().endsWith("module: `bal discover package ballerina/graphql`."),
-                    without.suggestion());
+            Assert.assertEquals(without.command().text(), "bal discover package ballerina/graphql");
             Assert.assertFalse(without.suggestion().contains("1.17.0"), without.suggestion());
         }
     }
@@ -257,8 +257,8 @@ public class ClientTest {
         Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
         Assert.assertEquals(failure.version(), "9.9.9");
         Assert.assertEquals(failure.suggestion(), "'ballerinax/aws.auth' is not a package: it is the 'auth' module "
-                + "of the ballerinax/aws package. Read it with `bal discover package ballerinax/aws:9.9.9 --module "
-                        + "auth`.");
+                + "of the ballerinax/aws package. Read it with --module.");
+        Assert.assertEquals(failure.command().text(), "bal discover package ballerinax/aws:9.9.9 --module auth");
     }
 
     @Test
@@ -273,7 +273,7 @@ public class ClientTest {
                     fast(routed).build()).failure();
             Assert.assertEquals(failure.version(), "4.6.5");
             Assert.assertEquals(failure.suggestion(),
-                    "Check the org/name spelling; `bal discover search <keyword>` lists what Central publishes.");
+                    "Check the org/name spelling; 'bal discover search <keyword>' lists what Central publishes.");
         }
     }
 
@@ -398,6 +398,10 @@ public class ClientTest {
         return ((Failure.PackageNotFound) result.failure()).suggestion();
     }
 
+    private static String command(Result<CentralClient.ResolvedVersion> result) {
+        return ((Failure.PackageNotFound) result.failure()).command().text();
+    }
+
     @Test
     public void aModuleOfAPackageIsNotReadAsOneAndNamesTheCommandThatReadsIt() {
         FakeTransport transport = registry(Map.of(
@@ -408,7 +412,7 @@ public class ClientTest {
         Assert.assertEquals(((Failure.PackageNotFound) result.failure()).qualified(), "ballerinax/aws.auth");
         String suggestion = suggestion(result);
         Assert.assertTrue(suggestion.contains("the 'auth' module of the ballerinax/aws package"), suggestion);
-        Assert.assertTrue(suggestion.contains("`bal discover package ballerinax/aws --module auth`"), suggestion);
+        Assert.assertEquals(command(result), "bal discover package ballerinax/aws --module auth");
         // The module's own row, the package's, then the package version's module list — never its docs.
         Assert.assertEquals(transport.calls(), 3);
         Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/docs/")),
@@ -423,8 +427,10 @@ public class ClientTest {
         FakeTransport transport = registry(Map.of(
                 "ballerina/one", "[\"3.1.0\"]",
                 "ballerina/one/3.1.0", modules("one", "one.two.three")));
-        String suggestion = suggestion(CentralClient.resolveLatestVersion(deep, fast(transport).build()));
-        Assert.assertTrue(suggestion.contains("`bal discover package ballerina/one --module two.three`"), suggestion);
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(deep, fast(transport).build());
+        String suggestion = suggestion(result);
+        Assert.assertEquals(command(result), "bal discover package ballerina/one --module two.three");
         Assert.assertEquals(transport.calls(), 4);
     }
 
@@ -435,10 +441,11 @@ public class ClientTest {
         FakeTransport transport = registry(Map.of(
                 "ballerina/graphql", "[\"1.17.0\"]",
                 "ballerina/graphql/1.17.0", row));
-        String suggestion = suggestion(CentralClient.resolveLatestVersion(subgraph, fast(transport).build()));
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(subgraph, fast(transport).build());
+        String suggestion = suggestion(result);
         Assert.assertEquals(suggestion, "'ballerina/graphql.subgraph' is not a package: it is the 'subgraph' module "
-                + "of the ballerina/graphql package. Read it with `bal discover package ballerina/graphql --module "
-                        + "subgraph`.");
+                + "of the ballerina/graphql package. Read it with --module.");
     }
 
     @Test
@@ -447,20 +454,24 @@ public class ClientTest {
         FakeTransport transport = registry(Map.of(
                 "ballerinax/aws", "[\"1.0.1\"]",
                 "ballerinax/aws/1.0.1", modules("aws", "aws.auth")));
-        String suggestion = suggestion(CentralClient.resolveLatestVersion(nope, fast(transport).build()));
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(nope, fast(transport).build());
+        String suggestion = suggestion(result);
         Assert.assertTrue(suggestion.contains("publishes no 'nope' module (its modules are aws, aws.auth)"),
                 suggestion);
         Assert.assertFalse(suggestion.contains("--module"), suggestion);
-        Assert.assertTrue(suggestion.contains("`bal discover search <keyword>`"), suggestion);
+        Assert.assertTrue(suggestion.contains("'bal discover search <keyword>'"), suggestion);
     }
 
     @Test
     public void aModuleListTheRegistryCannotServeStillOffersTheCommandWithoutClaimingTheModule() {
         FakeTransport transport = registry(Map.of("ballerinax/aws", "[\"1.0.1\"]"));
-        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build());
+        String suggestion = suggestion(result);
         Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes. If 'auth' is one "
                 + "of them"), suggestion);
-        Assert.assertTrue(suggestion.contains("`bal discover package ballerinax/aws --module auth`"), suggestion);
+        Assert.assertEquals(command(result), "bal discover package ballerinax/aws --module auth");
     }
 
     @Test
@@ -473,9 +484,11 @@ public class ClientTest {
                     ? FakeTransport.status(503)
                     : FakeTransport.status(404);
         });
-        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build());
+        String suggestion = suggestion(result);
         Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
-        Assert.assertTrue(suggestion.contains("`bal discover package ballerinax/aws --module auth`"), suggestion);
+        Assert.assertEquals(command(result), "bal discover package ballerinax/aws --module auth");
         // The row is retried like any other registry call before it is given up on.
         Assert.assertEquals(transport.urls().stream().filter(url -> url.endsWith("/aws/1.0.1")).count(), 3);
     }
@@ -485,7 +498,9 @@ public class ClientTest {
         FakeTransport transport = registry(Map.of(
                 "ballerinax/aws", "[\"1.0.1\"]",
                 "ballerinax/aws/1.0.1", "{\"modules\":\"aws, aws.auth\"}"));
-        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build());
+        String suggestion = suggestion(result);
         Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
     }
 
@@ -494,7 +509,9 @@ public class ClientTest {
         FakeTransport transport = registry(Map.of(
                 "ballerinax/aws", "[\"1.0.1\"]",
                 "ballerinax/aws/1.0.1", modules()));
-        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build());
+        String suggestion = suggestion(result);
         Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
     }
 
@@ -504,7 +521,9 @@ public class ClientTest {
         FakeTransport transport = registry(Map.of(
                 "ballerinax/aws", "[\"1.0.1\"]",
                 "ballerinax/aws/1.0.1", "{\"modules\":[{\"name\":\"aws\"},{\"name\":42}]}"));
-        String suggestion = suggestion(CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build()));
+        Result<CentralClient.ResolvedVersion> result =
+                CentralClient.resolveLatestVersion(AWS_AUTH, fast(transport).build());
+        String suggestion = suggestion(result);
         Assert.assertTrue(suggestion.contains("Central could not say which modules it publishes"), suggestion);
         Assert.assertFalse(suggestion.contains("publishes no 'auth' module"), suggestion);
     }
@@ -518,7 +537,7 @@ public class ClientTest {
         Failure.PackageNotFound failure = (Failure.PackageNotFound) result.failure();
         Assert.assertEquals(failure.qualified(), "ballerinax/aws.auth");
         Assert.assertTrue(failure.suggestion().contains("tried ballerinax/aws"), failure.suggestion());
-        Assert.assertTrue(failure.suggestion().contains("`bal discover search <keyword>`"), failure.suggestion());
+        Assert.assertTrue(failure.suggestion().contains("'bal discover search <keyword>'"), failure.suggestion());
     }
 
     @Test
@@ -619,28 +638,28 @@ public class ClientTest {
     @Test
     public void aRequestWithNoAnswerNamesTheHostOrTheProxyAndWhatToCheck() {
         Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"), null)
-                .describeText(), "error: Could not reach api.central.ballerina.io: connection refused (3 attempts).\n"
+                .describeText(), ERROR + "could not reach api.central.ballerina.io: connection refused (3 attempts)\n"
                 + "  Check your network connection, and the [proxy] table in ~/home/Settings.toml if your network "
                 + "needs a proxy, then run the same command again.");
         Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNCONNECTED, "connection refused"), OPEN_PROXY)
-                .describeText(), "error: Could not connect to the proxy 127.0.0.1:3128 set in ~/home/Settings.toml: "
-                + "connection refused (3 attempts).\n  Check that the proxy is running and that host and port under "
+                .describeText(), ERROR + "could not connect to the proxy 127.0.0.1:3128 set in ~/home/Settings.toml: "
+                + "connection refused (3 attempts)\n  Check that the proxy is running and that host and port under "
                 + "[proxy] in ~/home/Settings.toml are right, then run the same command again.");
         Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNRESOLVED, "x"), null).describeText(),
-                "error: Could not resolve the host api.central.ballerina.io.\n  Check your network connection, and "
+                ERROR + "could not resolve the host api.central.ballerina.io\n  Check your network connection, and "
                         + "the [proxy] table in ~/home/Settings.toml if your network needs a proxy, then run the same "
                         + "command again.");
         Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.UNRESOLVED, "x"),
                         new ProxySettings("no-such-proxy.invalid", 3128, "", "")).describeText(),
-                "error: Could not resolve the proxy host no-such-proxy.invalid.\n  Check host under [proxy] in "
+                ERROR + "could not resolve the proxy host no-such-proxy.invalid\n  Check host under [proxy] in "
                         + "~/home/Settings.toml, then run the same command again.");
         Assert.assertEquals(failing(failed(HttpTransport.Reply.Problem.TLS, "its certificate has expired"), null)
-                .describeText(), "error: Could not open a secure connection to api.central.ballerina.io: its "
-                + "certificate has expired.\n  Check the system clock, and any proxy or firewall that intercepts "
+                .describeText(), ERROR + "could not open a secure connection to api.central.ballerina.io: its "
+                + "certificate has expired\n  Check the system clock, and any proxy or firewall that intercepts "
                 + "HTTPS, then run the same command again.");
         Assert.assertEquals(failing(tunnel(502), OPEN_PROXY).describeText(),
-                "error: The proxy 127.0.0.1:3128 set in ~/home/Settings.toml could not connect to "
-                        + "api.central.ballerina.io: HTTP 502 (3 attempts).\n  The proxy answered but could not "
+                ERROR + "the proxy 127.0.0.1:3128 set in ~/home/Settings.toml could not connect to "
+                        + "api.central.ballerina.io: HTTP 502 (3 attempts)\n  The proxy answered but could not "
                         + "reach api.central.ballerina.io; run the same command again later, or check that the proxy "
                         + "allows it.");
     }
@@ -648,7 +667,7 @@ public class ClientTest {
     @Test
     public void aProxyAskingForCredentialsSaysWhetherTheyWereMissingOrWrongAndIsNotRetried() {
         Failure.Upstream missing = (Failure.Upstream) failing(FakeTransport.status(407), OPEN_PROXY);
-        Assert.assertEquals(missing.describeText(), "error: The proxy 127.0.0.1:3128 requires authentication.\n"
+        Assert.assertEquals(missing.describeText(), ERROR + "the proxy 127.0.0.1:3128 requires authentication\n"
                 + "  Set both username and password under [proxy] in ~/home/Settings.toml, then run the same command "
                 + "again.");
         Assert.assertEquals(missing.attempts(), 1);
@@ -656,8 +675,8 @@ public class ClientTest {
 
         Failure.Upstream wrong = (Failure.Upstream) failing(
                 failed(HttpTransport.Reply.Problem.PROXY_REJECTED, "No credentials provided"), AUTHENTICATING_PROXY);
-        Assert.assertEquals(wrong.describeText(), "error: The proxy 127.0.0.1:3128 rejected the username and "
-                + "password in the [proxy] table of ~/home/Settings.toml.\n  Correct username and password under "
+        Assert.assertEquals(wrong.describeText(), ERROR + "the proxy 127.0.0.1:3128 rejected the username and "
+                + "password in the [proxy] table of ~/home/Settings.toml\n  Correct username and password under "
                 + "[proxy] in ~/home/Settings.toml, then run the same command again.");
         Assert.assertEquals(wrong.attempts(), 1);
         Assert.assertEquals(failing(FakeTransport.status(407), AUTHENTICATING_PROXY).describeText(),
@@ -667,13 +686,13 @@ public class ClientTest {
     @Test
     public void anAnswerFromCentralIsBlamedOnCentralAndATimeoutNamesTheSettingsFile() {
         Failure.Upstream status = (Failure.Upstream) failing(FakeTransport.status(503), OPEN_PROXY);
-        Assert.assertEquals(status.describeText(), "error: Central answered " + URL + " with HTTP 503 (3 attempts).\n"
+        Assert.assertEquals(status.describeText(), ERROR + "Central answered " + URL + " with HTTP 503 (3 attempts)\n"
                 + "  Central returned an error; run the same command again later.");
         Assert.assertTrue(status.reached());
         Assert.assertEquals(status.status(), Integer.valueOf(503));
 
         Failure.Upstream malformed = (Failure.Upstream) failing(FakeTransport.ok("{"), null);
-        Assert.assertTrue(malformed.describeText().startsWith("error: Central answered " + URL
+        Assert.assertTrue(malformed.describeText().startsWith(ERROR + "Central answered " + URL
                 + " with a body that is not JSON: "), malformed.describeText());
         Assert.assertTrue(malformed.reached());
         Assert.assertNull(malformed.status());

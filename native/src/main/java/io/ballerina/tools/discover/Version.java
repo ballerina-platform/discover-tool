@@ -90,7 +90,7 @@ public final class Version {
         String trimmed = input.trim();
         if (!PATTERN.matcher(trimmed).matches() || isTraversal(trimmed)) {
             return Result.err(new Failure.Validation(
-                    "Invalid version '" + input + "'.",
+                    "invalid version '" + input + "'",
                     "Pass a published version such as '6.0.0', or omit it to resolve the latest."));
         }
         return Result.ok(new Version(trimmed));

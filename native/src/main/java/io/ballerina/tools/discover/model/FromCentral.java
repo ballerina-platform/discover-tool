@@ -674,7 +674,7 @@ public final class FromCentral {
                 .map(module -> module.id().substring(prefix.length()))
                 .toList();
         Command command = Command.overview(new Coordinate(qualified, pin).target(null));
-        String dropped = "drop --module for the default module: " + Failure.quoted(command.text()) + ".";
+        String dropped = "drop --module for the default module.";
         String suggestion;
         if (candidates.isEmpty()) {
             suggestion = qualified.qualified() + " publishes no submodules, so " + dropped;

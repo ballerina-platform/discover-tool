@@ -91,7 +91,7 @@ public class DiscoverToolTest {
         Run run = run("ballerinax/kafka", "nosuchbucket");
         Assert.assertEquals(run.exitCode(), Failure.USAGE);
         Assert.assertEquals(run.stdout(), "");
-        Assert.assertTrue(run.stderr().contains("\"kind\":\"validation\""), run.stderr());
+        Assert.assertTrue(run.stderr().contains("\"kind\":\"usage\""), run.stderr());
         Assert.assertTrue(run.stderr().endsWith("}\n"));
         Assert.assertEquals(run.stderr().lines().count(), 1L, run.stderr());
     }

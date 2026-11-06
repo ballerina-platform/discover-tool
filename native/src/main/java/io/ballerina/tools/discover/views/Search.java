@@ -59,7 +59,7 @@ public final class Search {
     private static final String KEYWORD_SEPARATOR = "\\s+";
 
     /** How a failure suggests searching the package for a name. */
-    public static final String SEARCH_FOR_IT = "Search the package for it: ";
+    public static final String SEARCH_FOR_IT = "Search the package for it.";
 
     private static final Map<Surface.Scope, DiscoverResult.Search.Kind> CONTAINER_KINDS = Map.of(
             Surface.Scope.CLIENT, DiscoverResult.Search.Kind.CLIENTS,
@@ -83,13 +83,13 @@ public final class Search {
      */
     public static Failure.Validation misuse(Command search, List<String> keywords, String filter) {
         if (keywords.isEmpty()) {
-            return new Failure.Validation("The search needs at least one keyword.",
+            return new Failure.Validation("the search needs at least one keyword",
                     "Write " + Failure.quoted(search.with("<keyword>").text()) + ".");
         }
         if (filter != null) {
             String fixed = search.with(keywords).with(filter).text();
-            return new Failure.Validation("The --filter option narrows a listing, and a search is not one.",
-                    "Add its keyword to the search instead: " + Failure.quoted(fixed) + ".", fixed);
+            return new Failure.Validation("the --filter option narrows a listing, and a search is not one",
+                    "Add its keyword to the search instead.", fixed);
         }
         return null;
     }
@@ -131,7 +131,7 @@ public final class Search {
         }
         int shown = groups.stream().mapToInt(group -> group.hits().size()).sum();
         return Result.ok(new DiscoverResult.Search(options.keywords(), List.copyOf(groups), counts, shown,
-                all.size(), window.paging(), window.next(command), loaded.overview().text(), loaded.warning()));
+                all.size(), window.paging(), window.next(command), loaded.overview().text()));
     }
 
     // A hit and the group it lists under.

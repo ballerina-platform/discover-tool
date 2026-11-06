@@ -26,6 +26,7 @@ import io.ballerina.tools.discover.Loader;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
 import io.ballerina.tools.discover.Version;
+import io.ballerina.tools.discover.Warning;
 import io.ballerina.tools.discover.central.CentralRepository;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.render.DiscoverResult;
@@ -58,12 +59,13 @@ import java.util.stream.Stream;
  * <ul>
  *   <li>stdout — the requested document, and nothing else: no progress, no banner. A usage request is a request
  *       like any other, so {@code --help} is that document
- *   <li>stderr — on failure, one {@link Failure} and nothing else, in the run's output mode: one JSON object,
- *       or {@code error: <message>} with the suggestion indented below it
+ *   <li>stderr — any warning, each its own report, and on failure one {@link Failure}, in the run's output mode: one
+ *       JSON object a report, or {@code bal discover: error: <message>} with the suggestion and the command that
+ *       fixes it indented below it
  *   <li>exit 0 — success, and stdout is COMPLETE
- *   <li>any other exit — a failure, one code per action the caller takes next ({@link Failure#exitCode()}). A usage
- *       error — the command line is malformed, or, once the package is read, names more than the noun takes — is
- *       followed, in text mode, by the synopsis and a pointer to {@code --help}
+ *   <li>exit 2 — a usage error ({@link Failure#exitCode()}): the command line is malformed, or what it names matches
+ *       several things; in text mode it is followed by the synopsis and a pointer to {@code --help}
+ *   <li>exit 1 — any other failure
  * </ul>
  *
  * <p>{@code bal discover <noun> [name ...] -p <org>/<name>[:<version>]} is one picocli subcommand per noun; see
@@ -82,6 +84,10 @@ public final class Cli {
     private static final String PLACEHOLDER_VERSION = "<version>";
 
     private static final String WRITE_VERSION = "To read a specific version, write it after the package: ";
+
+    private static final String WRITE_VERSION_AFTER = "To read a specific version, write it after the package.";
+
+    private static final String INVALID_ARGUMENTS = "invalid arguments";
 
     /** What is typed for a noun out of habit: the old grammar's bucket names, and plurals. */
     private static final Map<String, String> NOUN_ALIASES = Map.ofEntries(
@@ -202,15 +208,19 @@ public final class Cli {
         String repeated = Invocation.repeatedFlag(grammar.root(), call.noun() == null ? null
                 : grammar.nouns().get(call.noun()));
         if (repeated != null) {
-            return new Failure.Validation(repeated + " is given both before the noun and after it.",
+            return new Failure.Validation(repeated + " is given both before the noun and after it",
                     "Pass " + repeated + " once.");
         }
         if (!call.rest().isEmpty()) {
+            String flag = firstFlag(call.rest(), literal);
+            if (flag != null) {
+                return unknownFlag(flag, null);
+            }
             String first = call.rest().get(0);
             return first.contains(PATH_SEPARATOR) ? oldForm(call) : unknownNoun(first, call);
         }
         if (call.noun() == null) {
-            return new Failure.Validation("Name what to read: " + String.join(", ", Command.NOUNS) + ".",
+            return new Failure.Validation("name what to read: " + String.join(", ", Command.NOUNS),
                     "For a package's overview, write " + Failure.quoted(Command.PREFIX + Command.PACKAGE + " "
                             + PLACEHOLDER_PACKAGE) + ".");
         }
@@ -219,8 +229,7 @@ public final class Cli {
             return option;
         }
         if (!MEMBER_NOUNS.contains(call.noun()) && !call.owners().isEmpty()) {
-            return new Failure.Validation("Unknown option '" + call.owners().get(0).flag() + "'.",
-                    UsageRenderer.knownFlags(grammar.spec(call.noun())));
+            return unknownFlag(call.owners().get(0).flag(), call.noun());
         }
         Failure.Validation output = rejectInvalidOutput(call.output());
         if (output != null) {
@@ -237,13 +246,13 @@ public final class Cli {
             String pkg = call.names().isEmpty() ? call.pkg() : call.names().get(0);
             String command = call.paged(Command.overview(new Command.Target(pkg, call.module()))
                     .filtered(call.filter())).text();
-            return new Failure.Validation("package takes the package as its name, not after -p.",
-                    "Run " + Failure.quoted(command) + ".", command);
+            return new Failure.Validation("package takes the package as its name, not after -p",
+                    "Write the package as the name.", command);
         }
         if (call.names().isEmpty()) {
-            return new Failure.Validation("package needs the package to read.",
+            return new Failure.Validation("package needs the package to read",
                     "Write " + Failure.quoted(Command.PREFIX + Command.PACKAGE + " " + PLACEHOLDER_PACKAGE)
-                            + ", e.g. bal discover package ballerinax/github.");
+                            + ", e.g. 'bal discover package ballerinax/github'.");
         }
         return tooManyNames(call);
     }
@@ -313,26 +322,25 @@ public final class Cli {
         String command = call.paged(call.withNames(others).command(new Command.Target(target, call.module())))
                 .text();
         String where = call.pkg() == null ? "name it with -p" : "-p names the package already";
-        return new Failure.Validation("'" + pkg + "' is a package, not a " + call.noun() + " name; " + where + ".",
-                "Run " + Failure.quoted(command) + ".", command);
+        return new Failure.Validation("'" + pkg + "' is a package, not a " + call.noun() + " name; " + where,
+                "Name the package with -p.", command);
     }
 
     // Never a package the caller did not give: the search that finds one, or the command's shape.
     private static Failure.Validation missingPackage(Invocation call) {
-        String message = call.noun() + " needs the package it reads: -p " + Commands.PACKAGE_LABEL + ".";
+        String message = call.noun() + " needs the package it reads: -p " + Commands.PACKAGE_LABEL;
         Command shape = Command.of(call.noun(), call.echoed())
                 .in(new Command.Target(Command.placeholder(PLACEHOLDER_PACKAGE), call.module()));
         String write = "Write " + Failure.quoted((call.owner() == null ? shape : shape.ownedBy(call.owner())).text());
         if (call.names().isEmpty() || Command.README.equals(call.noun())) {
-            return new Failure.Validation(message, write + "; to find the package, "
+            return new Failure.Validation(message, write + "; find the package with "
                     + Failure.quoted(Command.of(Command.SEARCH, Command.placeholder(PLACEHOLDER_KEYWORD)).text())
                     + ".");
         }
         String name = Containers.searchKeyword(call.echoed().get(0)).orElse(call.echoed().get(0));
         String search = Command.of(Command.SEARCH, name).text();
-        return new Failure.Validation(message,
-                write + "; to find the package that declares '" + name + "': " + Failure.quoted(search) + ".",
-                search);
+        return new Failure.Validation(message, "Search Central for the package that declares '" + name
+                + "', then " + Character.toLowerCase(write.charAt(0)) + write.substring(1) + ".", search);
     }
 
     private static Failure.Validation severalOwnerFlags(Invocation call) {
@@ -340,8 +348,8 @@ public final class Cli {
                 .map(owner -> new Failure.Match(owner.flag() + " " + owner.name(),
                         call.paged(call.ownedBy(owner).command()).text()))
                 .toList();
-        return new Failure.Validation("A " + call.noun() + " has one container; pass one of "
-                + String.join(", ", Command.OWNER_FLAGS) + ".", "Keep the one that declares it:", rows);
+        return new Failure.Validation("a " + call.noun() + " has one container; pass one of "
+                + String.join(", ", Command.OWNER_FLAGS), "Keep the one that declares it:", rows);
     }
 
     private static Failure.Validation tooManyNames(Invocation call) {
@@ -367,14 +375,14 @@ public final class Cli {
             fixed = call.withNames(names.subList(0, max)).command();
         }
         String command = call.paged(fixed).text();
-        return new Failure.Validation(tooMany(call.noun(), names.size()), "Run " + Failure.quoted(command) + ".",
+        return new Failure.Validation(tooMany(call.noun(), names.size()), "Drop the names it does not take.",
                 command);
     }
 
     private static String tooMany(String noun, int given) {
         String takes = Command.RESOURCE.equals(noun) ? "a path and its accessor"
                 : Command.README.equals(noun) ? "one section, a title in quotes" : "one name";
-        return noun + " takes " + takes + "; got " + given + ".";
+        return noun + " takes " + takes + "; got " + given;
     }
 
     // `client C m` read as the member it names: a resource when a path or an accessor follows, else the method,
@@ -393,10 +401,28 @@ public final class Cli {
                 .filter(name -> name.startsWith(Command.FLAG_START) && name.length() > 1)
                 .findFirst()
                 .orElse(null);
-        return unknown == null
-                ? null
-                : new Failure.Validation("Unknown option '" + unknown + "'.",
-                        UsageRenderer.knownFlags(grammar.spec(call.noun())));
+        return unknown == null ? null : unknownFlag(unknown, call.noun());
+    }
+
+    private static Failure.Validation unknownFlag(String flag, String noun) {
+        return new Failure.Validation("unknown option '" + flag + "'", helpSuggestion(noun));
+    }
+
+    // The first word of `words` that is a flag, leaving out the last `literal` words, which follow `--`.
+    private static String firstFlag(List<String> words, int literal) {
+        return words.subList(0, Math.max(0, words.size() - literal)).stream()
+                .filter(word -> word.startsWith(Command.FLAG_START) && word.length() > 1)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** The suggestion of a usage error that only the help answers: where {@code noun}'s help is. */
+    static String helpSuggestion(String noun) {
+        return "Run " + Failure.quoted(helpCommand(noun)) + " for the usage.";
+    }
+
+    static String helpCommand(String noun) {
+        return Command.PREFIX + (noun == null ? "" : noun + " ") + Commands.HELP_FLAG;
     }
 
     // The package-first form this tool once took: the command to run now, with the old bucket mapped.
@@ -418,8 +444,8 @@ public final class Cli {
         Command mapped = oldBucket(bucket, selectors);
         String command = call.paged(mapped.in(new Command.Target(pkg, call.module())).filtered(call.filter()))
                 .text();
-        return new Failure.Validation("'" + typed + "' is not a noun; name the package with -p.",
-                "Run " + Failure.quoted(command) + ".", command);
+        return new Failure.Validation("'" + typed + "' is not a noun; name the package with -p",
+                "Name the noun first and the package with -p.", command);
     }
 
     private static Command oldBucket(String bucket, List<String> selectors) {
@@ -443,9 +469,8 @@ public final class Cli {
     private static Failure.Validation unknownNoun(String token, Invocation call) {
         String search = Command.of(Command.SEARCH, token)
                 .in(call.pkg() == null ? null : new Command.Target(call.pkg(), call.module())).text();
-        return new Failure.Validation("'" + token + "' is not a noun. The nouns are " + String.join(", ",
-                Command.NOUNS) + ".", "To find what is named '" + token + "': " + Failure.quoted(search) + ".",
-                search);
+        return new Failure.Validation("'" + token + "' is not a noun; the nouns are " + String.join(", ",
+                Command.NOUNS), "Search for what is named '" + token + "'.", search);
     }
 
     // An old bucket name or a plural typed as the noun: the same command with the noun it meant. Read off argv
@@ -457,7 +482,7 @@ public final class Cli {
         if (noun == null) {
             return null;
         }
-        String message = "'" + argv.get(at) + "' is not a noun; the noun is " + noun + ".";
+        String message = "'" + argv.get(at) + "' is not a noun; the noun is " + noun;
         List<String> fixed = new ArrayList<>(argv);
         fixed.set(at, noun);
         Failure.Validation fixedNoun = fixedNoun(probe, fixed, noun, message);
@@ -479,14 +504,14 @@ public final class Cli {
         }
         Failure.Validation further = misuse(probe, call, literalWords(fixed));
         if (further != null) {
-            return new Failure.Validation(message + " " + further.message(), further.suggestion(), further.command(),
+            return new Failure.Validation(message + "; " + further.message(), further.suggestion(), further.command(),
                     further.qualified(), further.version(), further.owners());
         }
         if (call.coordinate() == null) {
             return null;
         }
         String command = call.paged(call.command()).text();
-        return new Failure.Validation(message, "Run " + Failure.quoted(command) + ".", command);
+        return new Failure.Validation(message, "Write " + noun + " in its place.", command);
     }
 
     private static int literalWords(List<String> argv) {
@@ -523,7 +548,7 @@ public final class Cli {
         }
         Result<DiscoverResult> found = SearchCentral.render(keywords, call.page(), http.withRefresh(call.refresh()));
         if (!found.isOk()) {
-            return fail(found.failure(), streams, json);
+            return usage.report(found.failure());
         }
         TextRenderer.Context where = new TextRenderer.Context(null, null,
                 List.of(Command.SEARCH, String.join(" ", keywords)), null, null, null);
@@ -537,9 +562,7 @@ public final class Cli {
         Result<Coordinate> coordinate = Coordinate.parse(call.coordinate(),
                 corrected -> call.paged(call.command(new Command.Target(corrected, call.module()))).text());
         if (!coordinate.isOk()) {
-            return coordinate.failure() instanceof Failure.Validation invalid
-                    ? usage.error(invalid)
-                    : fail(coordinate.failure(), streams, json);
+            return usage.report(coordinate.failure());
         }
         QualifiedName qualified = coordinate.value().qualified();
         Version version = coordinate.value().version();
@@ -556,7 +579,11 @@ public final class Cli {
                 resolved, projectDir, List.of(CentralRepository.INSTANCE), call.module(), version);
         Result<LoadedPackage> loaded = Loader.loadPackage(qualified, options);
         if (!loaded.isOk()) {
-            return fail(loaded.failure().retargeted(pinned::retargeted), streams, json);
+            return usage.report(loaded.failure().retargeted(pinned::retargeted));
+        }
+        String warning = loaded.value().warning();
+        if (warning != null) {
+            streams.errorOut().accept(new Warning(Warning.STALE_CACHE, warning).describe(json) + "\n");
         }
 
         Failure.Validation meant = memberMeant(loaded.value(), call);
@@ -566,10 +593,10 @@ public final class Cli {
         }
         Result<DiscoverResult> answer = answer(loaded.value(), call);
         if (!answer.isOk()) {
-            return fail(readAt(answer.failure(), loaded.value()), streams, json);
+            return usage.report(readAt(answer.failure(), loaded.value()));
         }
         if (call.page() != Command.FIRST_PAGE && answer.value().paging() == null) {
-            return fail(readAt(notPaged(pinned), loaded.value()), streams, json);
+            return usage.report(readAt(notPaged(pinned), loaded.value()));
         }
         String read = loaded.value().version().text();
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), call.module(), call.trail(),
@@ -589,7 +616,7 @@ public final class Cli {
         String command = call.paged(Containers.memberMeant(loaded, ask, call.owner(), call.names())
                 .filtered(call.filter())).text();
         return new Failure.Validation(tooMany(call.noun(), call.names().size()),
-                "Run " + Failure.quoted(command) + ".", command);
+                "Name the container with its flag and the member alone.", command);
     }
 
     private static Result<DiscoverResult> answer(LoadedPackage loaded, Invocation call) {
@@ -656,9 +683,8 @@ public final class Cli {
 
     private static Failure.Validation notPaged(Invocation call) {
         String command = call.command().text();
-        return new Failure.Validation(
-                "This answer has only one page, so --page does not apply.",
-                "Drop --page: " + Failure.quoted(command) + ".", command);
+        return new Failure.Validation("this answer has only one page, so --page does not apply", "Drop --page.",
+                command);
     }
 
     /**
@@ -698,7 +724,7 @@ public final class Cli {
 
     private static Failure.Validation validate(Invocation call) {
         if (call.filter() != null && call.filter().isBlank()) {
-            return new Failure.Validation("The --filter option needs a keyword.",
+            return new Failure.Validation("the --filter option needs a keyword",
                     "Write --filter <keyword>, or drop it to list everything.");
         }
         Failure.Validation page = pageBeforeFirst(call.page(), call.command().text());
@@ -723,16 +749,16 @@ public final class Cli {
         if (page >= Command.FIRST_PAGE) {
             return null;
         }
-        return new Failure.Validation("Page " + page + " is out of range: pages are numbered from 1.",
-                "Drop --page for the first page: " + Failure.quoted(firstPage) + ".", firstPage);
+        return new Failure.Validation("page " + page + " is out of range: pages are numbered from 1",
+                "Drop --page for the first page.", firstPage);
     }
 
     private static Failure.Validation versionFlag(Invocation call) {
-        String message = "Unknown option '" + Commands.VERSION_FLAG + "'.";
+        String message = "unknown option '" + Commands.VERSION_FLAG + "'";
         Result<Coordinate> coordinate = call.coordinate() == null ? null : Coordinate.parse(call.coordinate());
         if (coordinate == null || !coordinate.isOk() || call.noun() == null) {
             return new Failure.Validation(message, "To read a specific version, write " + PLACEHOLDER_PACKAGE + ":"
-                    + PLACEHOLDER_VERSION);
+                    + PLACEHOLDER_VERSION + ".");
         }
         return writtenVersion(message, call, coordinate.value().qualified(), call.version());
     }
@@ -740,11 +766,12 @@ public final class Cli {
     private static Failure.Validation writtenVersion(String message, Invocation call, QualifiedName qualified,
             String version) {
         if (!Version.isComplete(version)) {
-            return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION);
+            return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION
+                    + ".");
         }
         String command = call.paged(call.at(new Coordinate(qualified, Version.parse(version).value())).command())
                 .text();
-        return new Failure.Validation(message, WRITE_VERSION + Failure.quoted(command) + ".", command);
+        return new Failure.Validation(message, WRITE_VERSION_AFTER, command);
     }
 
     private static Failure.Validation rejectInvalidOutput(String output) {
@@ -752,7 +779,7 @@ public final class Cli {
             return null;
         }
         return new Failure.Validation(
-                "'" + output + "' is not a valid " + Commands.OUTPUT_FLAG + " value.",
+                "'" + output + "' is not a valid " + Commands.OUTPUT_FLAG + " value",
                 "Pass " + Commands.OUTPUT_FLAG + " " + Commands.JSON_OUTPUT + " or " + Commands.OUTPUT_FLAG + " "
                         + Commands.TEXT_OUTPUT + ".");
     }
@@ -774,7 +801,7 @@ public final class Cli {
         }
         List<String> others = new ArrayList<>(names);
         others.remove(misplaced);
-        return writtenVersion("'" + misplaced + "' looks like a version.", call.withNames(others),
+        return writtenVersion("'" + misplaced + "' looks like a version", call.withNames(others),
                 coordinate.value().qualified(), misplaced);
     }
 
@@ -782,14 +809,15 @@ public final class Cli {
     private static Failure.Validation describeParseError(CommandLine.ParameterException cause) {
         if (cause instanceof CommandLine.UnmatchedArgumentException unmatched) {
             List<String> tokens = unmatched.getUnmatched();
-            return new Failure.Validation(
-                    "Unknown option '" + (tokens.isEmpty() ? "" : tokens.get(0)) + "'.",
-                    UsageRenderer.knownFlags(cause.getCommandLine().getCommandSpec()));
+            String noun = cause.getCommandLine().getCommandSpec().parent() == null
+                    ? null
+                    : cause.getCommandLine().getCommandSpec().name();
+            return unknownFlag(tokens.isEmpty() ? "" : tokens.get(0), noun);
         }
         if (cause instanceof CommandLine.OverwrittenOptionException overwritten
                 && overwritten.getOverwritten() instanceof CommandLine.Model.OptionSpec option) {
             return new Failure.Validation(
-                    option.longestName() + " is given more than once.", "Pass " + option.longestName() + " once.");
+                    option.longestName() + " is given more than once", "Pass " + option.longestName() + " once.");
         }
         if (cause instanceof CommandLine.MissingParameterException missing) {
             return missing.getMissing().stream()
@@ -802,11 +830,11 @@ public final class Cli {
         if (cause.getArgSpec() instanceof CommandLine.Model.OptionSpec option && cause.getValue() != null) {
             if (option.type() == boolean.class) {
                 return new Failure.Validation(
-                        option.longestName() + " takes no value.",
+                        option.longestName() + " takes no value",
                         "Write " + option.longestName() + ".");
             }
             return new Failure.Validation(
-                    "'" + cause.getValue() + "' is not a valid " + option.longestName() + " value.",
+                    "'" + cause.getValue() + "' is not a valid " + option.longestName() + " value",
                     "Write " + option.longestName() + " " + option.paramLabel() + ".");
         }
         return null;
@@ -816,18 +844,14 @@ public final class Cli {
         String name = option.longestName();
         String label = option.paramLabel();
         return new Failure.Validation(
-                "The " + name + " option needs a value.",
+                "the " + name + " option needs a value",
                 "Write " + name + " " + label + " or " + name + "=" + label + ".");
     }
 
     private static String firstLine(String message) {
-        String line = message == null ? "Invalid arguments" : message.split("\n", -1)[0];
-        return line.endsWith(".") ? line : line + ".";
-    }
-
-    private static int fail(Failure failure, Streams streams, boolean json) {
-        streams.errorOut().accept(failure.describe(json) + "\n");
-        return failure.exitCode();
+        String line = message == null || message.isEmpty() ? INVALID_ARGUMENTS : message.split("\n", -1)[0];
+        String bare = line.endsWith(".") ? line.substring(0, line.length() - 1) : line;
+        return bare.isEmpty() ? INVALID_ARGUMENTS : Character.toLowerCase(bare.charAt(0)) + bare.substring(1);
     }
 
     /**
@@ -841,23 +865,29 @@ public final class Cli {
      */
     private record UsageErrors(Commands.Grammar grammar, String noun, Streams streams, boolean json) {
 
-        int error(Failure.Validation failure) {
-            return write(failure, true);
+        /** A failure in the run's output mode: a usage error as {@link #error} writes it, any other as it is. */
+        int report(Failure failure) {
+            if (Failure.USAGE_KIND.equals(failure.coreKind())) {
+                return error(failure);
+            }
+            streams.errorOut().accept(failure.describe(json) + "\n");
+            return failure.exitCode();
+        }
+
+        int error(Failure failure) {
+            if (json) {
+                streams.errorOut().accept(failure.describe() + "\n");
+                return failure.exitCode();
+            }
+            boolean pointsToHelp = failure.suggestion().equals(helpSuggestion(noun));
+            streams.errorOut().accept(failure.describeText(!pointsToHelp) + "\n"
+                    + UsageRenderer.usageLine(grammar, noun) + "\n"
+                    + "Try " + Failure.quoted(helpCommand(noun)) + " for more information.\n");
+            return failure.exitCode();
         }
 
         int helpError(String message) {
-            return write(new Failure.Validation(message, "Run `" + help() + "` for usage."), false);
-        }
-
-        private String help() {
-            return Command.PREFIX + (noun == null ? "" : noun + " ") + Commands.HELP_FLAG;
-        }
-
-        private int write(Failure.Validation failure, boolean pointToHelp) {
-            String usage = json ? "" : "\n" + UsageRenderer.usageLine(grammar, noun)
-                    + (pointToHelp ? "\nRun `" + help() + "` for details." : "");
-            streams.errorOut().accept(failure.describe(json) + usage + "\n");
-            return failure.exitCode();
+            return error(new Failure.Validation(message, helpSuggestion(noun)));
         }
     }
 }

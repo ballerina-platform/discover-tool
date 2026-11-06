@@ -20,24 +20,19 @@ package io.ballerina.tools.discover.cli;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Model.OptionSpec;
 
 public class UsageRendererTest {
 
     @Test
-    public void aHiddenFlagIsNeverListedAndOneOrNoFlagIsStillASentence() {
-        Assert.assertEquals(UsageRenderer.knownFlags(CommandSpec.create()), "This command takes no flags.");
-
-        CommandSpec one = CommandSpec.create()
-                .addOption(OptionSpec.builder("--page").arity("1").build())
-                .addOption(OptionSpec.builder("--all").hidden(true).build());
-        Assert.assertEquals(UsageRenderer.knownFlags(one), "The only known flag is --page.");
-
-        CommandSpec two = CommandSpec.create()
-                .addOption(OptionSpec.builder("-h", "--help").usageHelp(true).build())
-                .addOption(OptionSpec.builder("--all").hidden(true).build())
-                .addOption(OptionSpec.builder("--page").arity("1").build());
-        Assert.assertEquals(UsageRenderer.knownFlags(two), "Known flags are --page and --help/-h.");
+    public void aUsageErrorsSynopsisIsOneLineNamingThePackageAndContainerFlagsItTakes() {
+        Commands.Grammar grammar = Commands.Grammar.create();
+        Assert.assertEquals(UsageRenderer.usageLine(grammar, null),
+                "Usage: bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]] "
+                        + "[--client|--class|--service <name>] [options]");
+        Assert.assertEquals(UsageRenderer.usageLine(grammar, "package"),
+                "Usage: bal discover package <org>/<name>[:<version>] [options]");
+        Assert.assertEquals(UsageRenderer.usageLine(grammar, "method"),
+                "Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] "
+                        + "[options]");
     }
 }

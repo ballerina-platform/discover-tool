@@ -120,9 +120,20 @@ public class ViewsTest {
                 + (view.isOk() ? view.value() : ""));
         Assert.assertTrue(view.failure() instanceof Failure.SymbolNotFound, view.failure().describe());
         Failure.SymbolNotFound failure = (Failure.SymbolNotFound) view.failure();
-        Assert.assertTrue(failure.candidates().isEmpty(), "a miss never guesses: " + failure.candidates());
-        Assert.assertTrue(failure.suggestion().contains("`" + failure.command() + "`"), failure.suggestion());
+        Assert.assertFalse(failure.suggestion().contains("`"), failure.suggestion());
         return failure;
+    }
+
+    // A name that matches nothing at a level: every name there when they fit, else the listing of the level.
+    private static void assertMissAt(Failure.SymbolNotFound failure, String message, String listing) {
+        Assert.assertEquals(failure.message(), message);
+        if (failure.candidates().isEmpty()) {
+            Assert.assertEquals(failure.command(), listing, failure.describeText());
+        } else {
+            Assert.assertNull(failure.command(), failure.describeText());
+            Assert.assertTrue(failure.candidates().size() <= Containers.MAX_ENTRIES, failure.describeText());
+            Assert.assertTrue(failure.suggestion().startsWith("Name one of the "), failure.suggestion());
+        }
     }
 
     private static void assertMiss(Failure.SymbolNotFound failure, String message, String suggestion,
@@ -405,9 +416,8 @@ public class ViewsTest {
         Assert.assertEquals(signature(github, "resource", "gists/public", "get").path(), "gists/public");
         // A method asked as a container fails with the method's own command.
         assertMiss(miss(http, "client", "getStatusCodeRecord"),
-                "'getStatusCodeRecord' is not a client in " + http.label() + ".",
-                "It is a method of Response: `bal discover method getStatusCodeRecord -p ballerina/http --class "
-                        + "Response`.",
+                "'getStatusCodeRecord' is not a client in " + http.label(),
+                "It is a method of Response.",
                 "bal discover method getStatusCodeRecord -p ballerina/http --class Response");
     }
 
@@ -419,7 +429,7 @@ public class ViewsTest {
             Result<DiscoverResult> answer = Asked.of(kafka, "method", typed);
             Failure.Ambiguous failure = (Failure.Ambiguous) answer.failure();
             Assert.assertEquals(failure.message(), "'commit' is declared by Caller and Consumer in "
-                    + kafka.label() + ".");
+                    + kafka.label());
             Assert.assertEquals(failure.matchesKey(), Failure.OWNERS);
             Assert.assertEquals(failure.matches(), List.of(
                     new Failure.Match("Caller", "bal discover method commit -p ballerinax/kafka --client Caller"),
@@ -432,10 +442,11 @@ public class ViewsTest {
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
         Failure.Ambiguous failure = (Failure.Ambiguous) Asked.of(kafka, "class", "close").failure();
         Assert.assertEquals(failure.message(), "'close' is not a class in " + kafka.label()
-                + "; it is a method of Consumer and Producer.");
+                + "; it is a method of Consumer and Producer");
         Assert.assertEquals(failure.matches().stream().map(Failure.Match::name).toList(),
                 List.of("Consumer", "Producer"));
-        Assert.assertEquals(failure.describeText(), "error: " + failure.message() + "\n  Name the one you mean:\n"
+        Assert.assertEquals(failure.describeText(), "bal discover: error: " + failure.message()
+                + "\n  Name the one you mean:\n"
                 + "    Consumer  bal discover method close -p ballerinax/kafka --client Consumer\n"
                 + "    Producer  bal discover method close -p ballerinax/kafka --client Producer");
     }
@@ -443,69 +454,63 @@ public class ViewsTest {
     @Test
     public void aNameAskedInTheWrongBucketFailsWithTheCommandOfTheBucketThatHoldsIt() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        assertMiss(miss(http, "client", "Response"), "'Response' is not a client in " + http.label() + ".",
-                "It is a class: `bal discover class Response -p ballerina/http`.",
+        assertMiss(miss(http, "client", "Response"), "'Response' is not a client in " + http.label(),
+                "It is a class.",
                 "bal discover class Response -p ballerina/http");
         assertMiss(miss(http, "method", "toStringValue", "--client", "Cookie"),
-                "'Cookie' is a class, not a client, in " + http.label() + ".",
-                "Run `bal discover method toStringValue -p ballerina/http --class Cookie`.",
+                "'Cookie' is a class, not a client, in " + http.label(),
+                "Name it with --class.",
                 "bal discover method toStringValue -p ballerina/http --class Cookie");
-        assertMiss(miss(http, "class", "Client"), "'Client' is not a class in " + http.label() + ".",
-                "It is a client: `bal discover client Client -p ballerina/http`.",
+        assertMiss(miss(http, "class", "Client"), "'Client' is not a class in " + http.label(),
+                "It is a client.",
                 "bal discover client Client -p ballerina/http");
         assertMiss(miss(http, "client", "ClientConfiguration"),
-                "'ClientConfiguration' is not a client in " + http.label() + ".",
-                "It is a record: `bal discover type ClientConfiguration -p ballerina/http`.",
+                "'ClientConfiguration' is not a client in " + http.label(),
+                "It is a record.",
                 "bal discover type ClientConfiguration -p ballerina/http");
-        assertMiss(miss(http, "class", "Listener"), "'Listener' is not a class in " + http.label() + ".",
-                "It is a listener: `bal discover type Listener -p ballerina/http`.",
+        assertMiss(miss(http, "class", "Listener"), "'Listener' is not a class in " + http.label(),
+                "It is a listener.",
                 "bal discover type Listener -p ballerina/http");
-        assertMiss(miss(http, "class", "HTTP_1_1"), "'HTTP_1_1' is not a class in " + http.label() + ".",
-                "It is a member of the enum HttpVersion: `bal discover type HttpVersion -p ballerina/http`.",
+        assertMiss(miss(http, "class", "HTTP_1_1"), "'HTTP_1_1' is not a class in " + http.label(),
+                "It is a member of the enum HttpVersion.",
                 "bal discover type HttpVersion -p ballerina/http");
-        assertMiss(miss(http, "function", "Client"), "'Client' is not a function in " + http.label() + ".",
-                "It is a client: `bal discover client Client -p ballerina/http`.",
+        assertMiss(miss(http, "function", "Client"), "'Client' is not a function in " + http.label(),
+                "It is a client.",
                 "bal discover client Client -p ballerina/http");
     }
 
     @Test
     public void aContainerThatIsNotThereFailsWithTheSearchAndTheBucketsListing() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        assertMiss(miss(http, "client", "client"),
-                "'client' is not a client, nor a member of any client, in " + http.label() + ".",
-                "Search the package for it: `bal discover search client -p ballerina/http`; or list the clients: "
-                        + "`bal discover client -p ballerina/http`.", "bal discover search client -p ballerina/http");
-        assertMiss(miss(http, "function", "nosuch"), "'nosuch' is not a function in " + http.label() + ".",
-                "List the functions: `bal discover function -p ballerina/http`.",
+        assertMissAt(miss(http, "client", "client"),
+                "'client' is not a client, nor a member of any client, in " + http.label(),
+                "bal discover client -p ballerina/http");
+        assertMissAt(miss(http, "function", "nosuch"), "'nosuch' is not a function in " + http.label(),
                         "bal discover function -p ballerina/http");
         // A name nothing in the bucket declares, whether as a container, a member or a path.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        assertMiss(miss(github, "client", "gist"),
-                "'gist' is not a client, nor a member of any client, in " + github.label() + ".",
-                "Search the package for it: `bal discover search gist -p ballerinax/github`; or list the clients: "
-                        + "`bal discover client -p ballerinax/github`.",
-                "bal discover search gist -p ballerinax/github");
+        assertMissAt(miss(github, "client", "gist"),
+                "'gist' is not a client, nor a member of any client, in " + github.label(),
+                "bal discover client -p ballerinax/github");
     }
 
     @Test
     public void aMethodThatIsNotThereFailsWithItsContainersMethods() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         for (String typed : new String[] {"gett", "GET"}) {
-            assertMiss(miss(http, "method", typed, "--client", "Client"),
-                    "'" + typed + "' is not a method of Client in " + http.label() + ".",
-                    "List its methods: `bal discover method -p ballerina/http --client Client`.",
+            assertMissAt(miss(http, "method", typed, "--client", "Client"),
+                    "'" + typed + "' is not a method of Client in " + http.label(),
                     "bal discover method -p ballerina/http --client Client");
         }
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
         for (String typed : new String[] {"sendd", "Send", "end"}) {
-            assertMiss(miss(kafka, "method", typed, "--client", "Producer"),
-                    "'" + typed + "' is not a method of Producer in " + kafka.label() + ".",
-                    "List its methods: `bal discover method -p ballerinax/kafka --client Producer`.",
+            assertMissAt(miss(kafka, "method", typed, "--client", "Producer"),
+                    "'" + typed + "' is not a method of Producer in " + kafka.label(),
                     "bal discover method -p ballerinax/kafka --client Producer");
         }
         // Without a container, no container declares it: the package's search for it is the next command.
-        assertMiss(miss(kafka, "method", "sendd"), "'sendd' is not a method in " + kafka.label() + ".",
-                "Search the package for it: `bal discover search sendd -p ballerinax/kafka`.",
+        assertMiss(miss(kafka, "method", "sendd"), "'sendd' is not a method in " + kafka.label(),
+                "Search the package for it.",
                 "bal discover search sendd -p ballerinax/kafka");
     }
 
@@ -513,23 +518,20 @@ public class ViewsTest {
     public void aPathIsTypedWholeAndExactlyAsPrintedOrItFailsAtTheLevelItReached() {
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
         String resources = "bal discover resource -p ballerinax/github --client Client";
-        assertMiss(miss(github, "resource", "caches", "--client", "Client"),
-                "'caches' is not a resource path of Client in " + github.label() + ".",
-                "List its resource methods: `" + resources + "`.", resources);
+        assertMissAt(miss(github, "resource", "caches", "--client", "Client"),
+                "'caches' is not a resource path of Client in " + github.label(), resources);
         String under = "bal discover resource %s -p ballerinax/github --client Client";
         for (String spelling : new String[] {"repos/actions", "repos/[owner]/[repo]", "repos/{owner}/{repo}",
                 "repos/owner/repo", "repos/*/*"}) {
-            assertMiss(miss(github, "resource", spelling, "--client", "Client"),
-                    "'" + spelling + "' is not a resource path of Client in " + github.label() + ".",
-                    "List what is under repos: `" + under.formatted("repos") + "`.", under.formatted("repos"));
+            assertMissAt(miss(github, "resource", spelling, "--client", "Client"),
+                    "'" + spelling + "' is not a resource path of Client in " + github.label(),
+                    under.formatted("repos"));
         }
-        assertMiss(miss(github, "resource", "repos/:owner/:repo/caches", "--client", "Client"),
-                "'repos/:owner/:repo/caches' is not a resource path of Client in " + github.label() + ".",
-                "List what is under repos/:owner/:repo: `" + under.formatted("repos/:owner/:repo") + "`.",
+        assertMissAt(miss(github, "resource", "repos/:owner/:repo/caches", "--client", "Client"),
+                "'repos/:owner/:repo/caches' is not a resource path of Client in " + github.label(),
                 under.formatted("repos/:owner/:repo"));
-        assertMiss(miss(github, "resource", "gists/public", "head", "--client", "Client"),
-                "'gists/public head' is not a resource method of Client in " + github.label() + ".",
-                "List what is under gists/public: `" + under.formatted("gists/public") + "`.",
+        assertMissAt(miss(github, "resource", "gists/public", "head", "--client", "Client"),
+                "'gists/public head' is not a resource method of Client in " + github.label(),
                 under.formatted("gists/public"));
         // Left out, the one container that declares the path is settled, and the miss is the same.
         for (List<String> typed : List.of(List.of("gists/public", "head"), List.of("head", "gists/public"))) {
@@ -539,13 +541,12 @@ public class ViewsTest {
             Assert.assertFalse(leftOut.isOk(), typed.toString());
             Failure.SymbolNotFound failure = (Failure.SymbolNotFound) leftOut.failure();
             Assert.assertEquals(failure.message(), "'" + String.join(" ", typed) + "' is not a resource method of "
-                    + "Client in " + github.label() + ".");
-            Assert.assertEquals(failure.command(), under.formatted("gists/public"), typed.toString());
+                    + "Client in " + github.label());
+            Assert.assertEquals(failure.candidates(), List.of("gists/public get"), typed.toString());
         }
         // A path split across two names is read as a path and an accessor, and is neither.
-        assertMiss(miss(github, "resource", "repos/:owner/:repo", "issues", "--client", "Client"),
-                "'repos/:owner/:repo issues' is not a resource method of Client in " + github.label() + ".",
-                "List what is under repos/:owner/:repo: `" + under.formatted("repos/:owner/:repo") + "`.",
+        assertMissAt(miss(github, "resource", "repos/:owner/:repo", "issues", "--client", "Client"),
+                "'repos/:owner/:repo issues' is not a resource method of Client in " + github.label(),
                 under.formatted("repos/:owner/:repo"));
         // A keyword segment is printed plain, and Ballerina's own spelling of it names the same segment.
         for (String typed : List.of("gists/public", "gists/'public")) {
@@ -697,9 +698,8 @@ public class ViewsTest {
                 String listing = methods
                         ? "bal discover method -p " + pkg + " --client " + container.name()
                         : "bal discover client " + container.name() + " -p " + pkg;
-                assertMiss(miss(loaded, "method", "zzznosuchthing", "--client", container.name()),
-                        "'zzznosuchthing' is not a method of " + container.name() + " in " + loaded.label() + ".",
-                        (methods ? "List its methods: `" : "List its members: `") + listing + "`.", listing);
+                assertMissAt(miss(loaded, "method", "zzznosuchthing", "--client", container.name()),
+                        "'zzznosuchthing' is not a method of " + container.name() + " in " + loaded.label(), listing);
             }
         }
     }
@@ -974,13 +974,14 @@ public class ViewsTest {
         Result<DiscoverResult> answer =
                 Types.render(loaded, new Types.Options(List.of("SHARED_MEMBER"), null, 1));
         Assert.assertFalse(answer.isOk());
-        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) answer.failure();
+        Failure.Ambiguous failure = (Failure.Ambiguous) answer.failure();
         Assert.assertEquals(failure.message(),
-                "'SHARED_MEMBER' is a member of the enums Alpha and Beta in " + loaded.label() + ".");
-        Assert.assertEquals(failure.suggestion(),
-                "Open the enum you mean, e.g. `bal discover type Alpha -p ballerinax/kafka`.");
-        Assert.assertNull(failure.command(), "two fixes, so no one command");
-        Assert.assertTrue(failure.candidates().isEmpty());
+                "'SHARED_MEMBER' is a member of the enums Alpha and Beta in " + loaded.label());
+        Assert.assertEquals(failure.suggestion(), "Open the enum you mean:");
+        Assert.assertEquals(failure.matches(), List.of(
+                new Failure.Match("Alpha", "bal discover type Alpha -p ballerinax/kafka"),
+                new Failure.Match("Beta", "bal discover type Beta -p ballerinax/kafka")));
+        Assert.assertEquals(failure.exitCode(), Failure.USAGE);
     }
 
     @Test
@@ -1098,8 +1099,7 @@ public class ViewsTest {
                 new Types.Options(List.of(), null, 9));
         Assert.assertFalse(page.isOk());
         Assert.assertEquals(page.failure(), new Failure.PageNotFound(
-                "Page 9 is out of range: this listing has 67 entries on 2 pages.",
-                "Pass a page from 1 to 2, e.g. `bal discover type -p ballerinax/kafka --page 2`.",
+                "page 9 is out of range: this listing has 67 entries on 2 pages", "Pass a page from 1 to 2.",
                 "bal discover type -p ballerinax/kafka --page 2", 9, 2));
     }
 
@@ -1144,8 +1144,8 @@ public class ViewsTest {
     @Test
     public void aBucketWithNothingInItStillFailsANameAnotherBucketHolds() {
         LoadedPackage twilio = FixtureCorpus.loadedFixture("ballerinax__twilio");
-        assertMiss(miss(twilio, "class", "Client"), "'Client' is not a class in " + twilio.label() + ".",
-                "It is a client: `bal discover client Client -p ballerinax/twilio`.",
+        assertMiss(miss(twilio, "class", "Client"), "'Client' is not a class in " + twilio.label(),
+                "It is a client.",
                 "bal discover client Client -p ballerinax/twilio");
         as(DiscoverResult.EmptyBucket.class, render(twilio, "class", "nosuch"));
     }
@@ -1217,14 +1217,12 @@ public class ViewsTest {
     @Test
     public void aNameTypedInAnotherCaseIsNotTheName() {
         LoadedPackage twilio = FixtureCorpus.loadedFixture("ballerinax__twilio");
-        assertMiss(miss(twilio, "method", "createaccount", "--client", "Client"),
-                "'createaccount' is not a method of Client in " + twilio.label() + ".",
-                "List its methods: `bal discover method -p ballerinax/twilio --client Client`.",
+        assertMissAt(miss(twilio, "method", "createaccount", "--client", "Client"),
+                "'createaccount' is not a method of Client in " + twilio.label(),
                 "bal discover method -p ballerinax/twilio --client Client");
         LoadedPackage log = FixtureCorpus.loadedFixture("ballerina__log");
-        assertMiss(miss(log, "function", "printinfo"),
-                "'printinfo' is not a function in " + log.label() + ".",
-                "List the functions: `bal discover function -p ballerina/log`.",
+        assertMissAt(miss(log, "function", "printinfo"),
+                "'printinfo' is not a function in " + log.label(),
                         "bal discover function -p ballerina/log");
     }
 

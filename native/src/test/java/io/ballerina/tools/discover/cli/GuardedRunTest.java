@@ -47,7 +47,7 @@ public class GuardedRunTest {
         String err = stderrOf(() -> {
             throw new OutOfMemoryError("Java heap space");
         }, List.of("package", "ballerina/http"), code);
-        Assert.assertEquals(code[0], Failure.INTERNAL_ERROR);
+        Assert.assertEquals(code[0], Failure.RUNTIME);
         Assert.assertTrue(err.contains("\"kind\":\"internal\""), err);
         Assert.assertTrue(err.contains("Java heap space"), err);
         Assert.assertEquals(err.lines().count(), 1L, err);
@@ -59,8 +59,18 @@ public class GuardedRunTest {
         String err = stderrOf(() -> {
             throw new IllegalStateException("broken");
         }, List.of("package", "ballerina/http", "--output-format", "text"), code);
-        Assert.assertEquals(code[0], Failure.INTERNAL_ERROR);
-        Assert.assertTrue(err.startsWith("error: Unexpected internal failure: broken."), err);
+        Assert.assertEquals(code[0], Failure.RUNTIME);
+        Assert.assertTrue(err.startsWith("bal discover: error: unexpected internal failure: broken\n"), err);
+    }
+
+    @Test
+    public void anExceptionWithNoMessageNamesNoClass() {
+        int[] code = new int[1];
+        String err = stderrOf(() -> {
+            throw new IllegalStateException();
+        }, List.of("package", "ballerina/http"), code);
+        Assert.assertTrue(err.contains("\"message\":\"unexpected internal failure\""), err);
+        Assert.assertFalse(err.contains("IllegalStateException"), err);
     }
 
     @Test

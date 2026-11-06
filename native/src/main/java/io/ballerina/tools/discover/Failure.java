@@ -31,9 +31,9 @@ import java.util.function.UnaryOperator;
  * Failures are values, not thrown classes.
  *
  * <p>The question every failure has to answer is "what does the agent reading this do next". The exit code
- * ({@link #exitCode()}) answers it coarsely, one code per next action; {@link #kind()} and {@link #describe()}
- * carry the rest. A sealed hierarchy makes every switch exhaustive with no {@code default}, so a new failure mode
- * fails the build until someone names it and decides what it tells the caller.
+ * ({@link #exitCode()}) answers it coarsely, from the failure's core kind (usage or runtime); {@link #kind()} and
+ * {@link #describe()} carry the rest. A sealed hierarchy makes every switch exhaustive with no {@code default}, so a
+ * new failure mode fails the build until someone names it and decides what it tells the caller.
  *
  * @since 0.1.0
  */
@@ -53,7 +53,7 @@ public sealed interface Failure {
      * @param message what was wrong with the arguments
      * @param suggestion what to do instead
      * @param command the caller's command with the fix applied, ready to run, or {@code null} when there is no one
-     *     fix; the suggestion quotes it
+     *     fix
      * @param qualified the {@code org/name} the arguments were for, or {@code null} when no package was reached
      * @param version the version that was read, or {@code null} when none was reached
      * @param owners when the command names several containers and must name one, each of them with the command that
@@ -111,7 +111,7 @@ public sealed interface Failure {
      * @param module the {@code --module} that was looked for, or {@code null} for the package's default module
      * @param suggestion what to try instead
      * @param command the caller's command with the fix applied, ready to run, or {@code null} when there is no one
-     *     fix; the suggestion quotes it
+     *     fix
      * @param candidates the submodules the package does publish, when a {@code --module} was not found
      */
     record PackageNotFound(String qualified, String version, String module, String suggestion, Command command,
@@ -210,10 +210,10 @@ public sealed interface Failure {
      * @param version the version that was searched, or {@code null} when unknown
      * @param module the {@code --module} that was searched, or {@code null} for the package's default module
      * @param requested the name (or names) the caller asked for
-     * @param message what was not found, as one sentence
+     * @param message what was not found, lowercase-first, with no closing period
      * @param suggestion what to try next
-     * @param command the command the suggestion quotes, ready to run, or {@code null} when it quotes none
-     * @param candidates every entry of a listing no command prints — a readme's sections — or empty
+     * @param command the one command that fixes it, ready to run, or {@code null} when there is none
+     * @param candidates every name at the level the lookup reached when there are few enough to list, or empty
      */
     record SymbolNotFound(String qualified, String version, String module, List<String> requested, String message,
             String suggestion, String command, List<String> candidates) implements Failure { }
@@ -251,23 +251,23 @@ public sealed interface Failure {
     /** The exit code of an answer. */
     int ANSWERED = 0;
 
-    /** The package, version, module, name or page does not exist; the request itself was well formed. */
-    int NOT_FOUND = 1;
+    /** Any failure but a usage error: a name, page, package, version or module not found, or Central failing. */
+    int RUNTIME = 1;
 
-    /** The command line is malformed. */
+    /** The command line is malformed, or what it names matches more than one thing. */
     int USAGE = 2;
 
-    /** What was named matches more than one thing. */
-    int AMBIGUOUS = 3;
+    /** The run was interrupted (SIGINT). */
+    int INTERRUPTED = 130;
 
-    /** Central could not be reached in time; the same command may work on a retry. */
-    int UNAVAILABLE = 4;
+    /** The core kind of {@link #USAGE}. */
+    String USAGE_KIND = "usage";
 
-    /** Central answered with an error status, or with a body this tool cannot read. */
-    int BAD_ANSWER = 5;
+    /** The core kind of {@link #RUNTIME}. */
+    String RUNTIME_KIND = "runtime";
 
-    /** A defect in this tool. */
-    int INTERNAL_ERROR = 6;
+    /** The program name every text-mode report starts with. */
+    String PROGRAM = "bal discover";
 
     /**
      * A defect in this tool: something in the pipeline threw.
@@ -280,18 +280,27 @@ public sealed interface Failure {
     String INTERNAL_SUGGESTION = "This is a defect in bal discover, not in the arguments. Report it with the "
             + "command that produced it.";
 
+    /** The headline of an {@link Internal} failure whose cause says nothing. */
+    String INTERNAL_MESSAGE = "unexpected internal failure";
+
     /**
      * The route left when Central's payload itself is unreadable: a resolved version's {@code .bala} carries the
      * same signatures Central serves, but only if some build already pulled it. It forbids writing the call from a
      * remembered API — the failure this tool exists to prevent, and measurably what a blocked agent does otherwise.
      */
     String OFFLINE_FALLBACK = "read the resolved version's sources under "
-            + "`~/.ballerina/repositories/central.ballerina.io/bala/<org>/<name>/`, which exist if a "
+            + "'~/.ballerina/repositories/central.ballerina.io/bala/<org>/<name>/', which exist if a "
             + "build already pulled the package — those are the signatures Central publishes. Never "
             + "fall back to a remembered signature.";
 
+    /** How far a failure's suggestion and command sit under its headline. */
+    String INDENT = "  ";
+
     /** How far a failure's listed details (candidates, matches, issues) sit under its suggestion. */
     String DETAIL_INDENT = "    ";
+
+    /** What leads the command that fixes a failure, in text mode. */
+    String TRY = "Try: ";
 
     /** The spaces between an owner's name column and its command. */
     int COLUMN_GAP = 2;
@@ -314,12 +323,12 @@ public sealed interface Failure {
      * disk — so reporting the drift and getting on with the work are not alternatives.
      */
     String SCHEMA_DRIFT_SUGGESTION = "Central's answer no longer matches what this tool reads, so no change "
-            + "of arguments will help. Report the `issues` paths, then " + OFFLINE_FALLBACK;
+            + "of arguments will help. Report the 'issues' paths, then " + OFFLINE_FALLBACK;
 
     /** The discriminator an agent branches on, and the JSON field of the same name. */
     default String kind() {
         return switch (this) {
-            case Validation ignored -> "validation";
+            case Validation ignored -> USAGE_KIND;
             case PackageNotFound ignored -> "package-not-found";
             case PageNotFound ignored -> "page-not-found";
             case Upstream ignored -> "upstream";
@@ -332,55 +341,79 @@ public sealed interface Failure {
     }
 
     /**
-     * The process exit code: one per action the caller takes next. An {@link Upstream} that may pass
-     * ({@link Upstream#isTransient()}) is worth a retry like a {@link Timeout}; any other status, or a body this tool
-     * cannot read, is an answer that the same request will get again.
+     * The core kind {@link #kind()} falls under, which decides the exit code: {@value #USAGE_KIND} for a malformed
+     * command line or a name that matches several things, {@value #RUNTIME_KIND} for everything else.
      */
+    default String coreKind() {
+        return this instanceof Validation || this instanceof Ambiguous ? USAGE_KIND : RUNTIME_KIND;
+    }
+
+    /** The process exit code, decided by {@link #coreKind()}. */
     default int exitCode() {
-        return switch (this) {
-            case PackageNotFound ignored -> NOT_FOUND;
-            case PageNotFound ignored -> NOT_FOUND;
-            case SymbolNotFound ignored -> NOT_FOUND;
-            case Validation ignored -> USAGE;
-            case Ambiguous ignored -> AMBIGUOUS;
-            case Timeout ignored -> UNAVAILABLE;
-            case Upstream f -> f.isTransient() ? UNAVAILABLE : BAD_ANSWER;
-            case SchemaDrift ignored -> BAD_ANSWER;
-            case Internal ignored -> INTERNAL_ERROR;
-        };
+        return USAGE_KIND.equals(coreKind()) ? USAGE : RUNTIME;
     }
 
     String suggestion();
 
-    /** What went wrong, as one full sentence: the {@code message} of either output mode. */
+    /** What went wrong, the {@code message} of either output mode: lowercase-first, with no closing period. */
     default String headline() {
         return switch (this) {
             case Validation f -> f.message();
             case PageNotFound f -> f.message();
-            case PackageNotFound f -> (f.module() == null ? "Package" : "Module") + " not found on Central: "
-                    + coordinate(f.qualified(), f.version(), f.module()) + ".";
-            case Upstream f -> f.message() + (f.attempts() > 1 ? " (" + f.attempts() + " attempts)." : ".");
-            case Timeout f -> "Central did not answer " + f.url() + " within " + seconds(f.budgetMs()) + ".";
+            case PackageNotFound f -> (f.module() == null ? "package" : "module") + " not found on Central: "
+                    + coordinate(f.qualified(), f.version(), f.module());
+            case Upstream f -> f.message() + (f.attempts() > 1 ? " (" + f.attempts() + " attempts)" : "");
+            case Timeout f -> "Central did not answer " + f.url() + " within " + seconds(f.budgetMs());
             case SchemaDrift f -> "Central's answer for " + coordinate(f.qualified(), f.version(), f.module())
-                    + " has a shape this tool does not understand; Central's docs format may have changed.";
+                    + " has a shape this tool does not understand; Central's docs format may have changed";
             case SymbolNotFound f -> f.message();
             case Ambiguous f -> f.message();
-            case Internal f -> "Unexpected internal failure: " + f.message() + (f.message().endsWith(".") ? "" : ".");
+            case Internal f -> f.message().isEmpty() ? INTERNAL_MESSAGE : INTERNAL_MESSAGE + ": " + f.message();
         };
     }
 
-    /** The failure as text-mode stderr: {@code error: <headline>}, then indented detail lines, no final newline. */
+    /** The command that fixes it, ready to run, or {@code null} when no one command does. */
+    default String fixCommand() {
+        return switch (this) {
+            case Validation f -> f.command();
+            case PageNotFound f -> f.command();
+            case PackageNotFound f -> f.command() == null ? null : f.command().text();
+            case SymbolNotFound f -> f.command();
+            default -> null;
+        };
+    }
+
+    /**
+     * The failure as text-mode stderr: {@code bal discover: error: <headline>}, the suggestion indented below it,
+     * {@code Try: <command>} below that when one command fixes it, then any listed details; no final newline.
+     */
     default String describeText() {
+        return describeText(true);
+    }
+
+    /** {@link #describeText()}, leaving the suggestion out when {@code suggestion} is false. */
+    default String describeText(boolean suggestion) {
         List<String> lines = new ArrayList<>();
-        lines.add("error: " + headline());
-        lines.add("  " + suggestion());
+        lines.add(PROGRAM + ": error: " + headline());
+        if (suggestion) {
+            lines.add(INDENT + suggestion());
+        }
+        String command = fixCommand();
+        if (command != null) {
+            lines.add(INDENT + TRY + command);
+        }
         if (this instanceof SchemaDrift f) {
-            lines.add("  issues:");
+            lines.add(INDENT + "issues:");
             f.issues().forEach(issue -> lines.add(DETAIL_INDENT + issue.path() + ": " + issue.message()));
         }
-        if (this instanceof SymbolNotFound f && !f.candidates().isEmpty()) {
-            lines.add("  candidates:");
-            f.candidates().forEach(candidate -> lines.add(DETAIL_INDENT + candidate));
+        List<String> candidates = switch (this) {
+            case SymbolNotFound f -> f.candidates();
+            case PackageNotFound f -> f.candidates();
+            default -> List.of();
+        };
+        if (!candidates.isEmpty()) {
+            lines.add(INDENT + "candidates:");
+            candidates.forEach(candidate -> lines.add(DETAIL_INDENT + candidate));
         }
         List<Match> matches = switch (this) {
             case Ambiguous f -> f.matches();
@@ -409,6 +442,7 @@ public sealed interface Failure {
     /** The one line a failing run writes to stderr in JSON mode, with {@link #headline()} as its message. */
     default String describe() {
         JsonObject json = new JsonObject();
+        json.addProperty("severity", "error");
         json.addProperty("kind", kind());
         json.addProperty("message", headline());
         switch (this) {
@@ -517,18 +551,15 @@ public sealed interface Failure {
     default Failure retargeted(UnaryOperator<Command> rewrite) {
         if (this instanceof PackageNotFound f && f.command() != null) {
             Command fixed = rewrite.apply(f.command());
-            return new PackageNotFound(f.qualified(), f.version(), f.module(),
-                    rewritten(f.suggestion(), f.command().text(), fixed.text()), fixed, f.candidates());
+            return new PackageNotFound(f.qualified(), f.version(), f.module(), f.suggestion(), fixed,
+                    f.candidates());
         }
         return this;
     }
 
-    private static String rewritten(String suggestion, String command, String replacement) {
-        return suggestion.replace(quoted(command), quoted(replacement));
-    }
-
+    /** A command quoted inside a suggestion's prose, when it is not the one {@code command} carries. */
     static String quoted(String command) {
-        return "`" + command + "`";
+        return "'" + command + "'";
     }
 
     private static void coordinates(JsonObject json, String qualified, String version, String module) {

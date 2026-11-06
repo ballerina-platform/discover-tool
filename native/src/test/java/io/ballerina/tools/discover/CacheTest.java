@@ -55,6 +55,9 @@ import java.util.stream.Stream;
  */
 public class CacheTest {
 
+    private static final String STALE_WARNING_JSON = "{\"severity\":\"warning\",\"kind\":\"stale-cache\",\"message\":"
+            + "\"Central could not be reached; using the cached copy, which may not be the latest version\"}\n";
+
     private static final String SLUG = "ballerinax__kafka";
     private static final String PKG = "ballerinax/kafka";
     private static final String VERSION = "4.6.5";
@@ -264,7 +267,7 @@ public class CacheTest {
                 ? FakeTransport.ok("{\"docsData\":{\"modules\":[]}}")
                 : FakeTransport.ok("[\"" + VERSION + "\"]"));
         int exitCode = Cli.run(List.of("package", PKG), capture.streams(), options(transport, cache).build());
-        Assert.assertEquals(exitCode, Failure.BAD_ANSWER);
+        Assert.assertEquals(exitCode, Failure.RUNTIME);
         Assert.assertFalse(Files.exists(docsEntry(root).getParent()), "no directory, let alone an entry");
     }
 
@@ -424,9 +427,8 @@ public class CacheTest {
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
-        // A bucket, not the bare package: kafka's client bucket is a roster (3 clients), and off a TTY the warning
-        // travels as that answer's own `warning` field. See aBarePackageWarningFlowsThroughBothRenderers below for
-        // the bare-package path.
+        // A bucket, not the bare package: kafka's client bucket is a roster (3 clients). See
+        // aBarePackageWarningIsItsOwnReportInBothModes below for the bare-package path.
         Cli.run(List.of("client", "-p", PKG), new Capture().streams(),
                 options(new CountingCentral().transport(), cache).clock(() -> now[0]).build());
 
@@ -440,10 +442,8 @@ public class CacheTest {
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
-        Assert.assertTrue(offline.stdout().contains(
-                "\"warning\":\"Central could not be reached; using the cached copy, "
-                        + "which may not be the latest version\""),
-                offline.stdout());
+        Assert.assertEquals(offline.stderr(), STALE_WARNING_JSON);
+        Assert.assertFalse(offline.stdout().contains("warning"), offline.stdout());
     }
 
     @Test
@@ -471,17 +471,13 @@ public class CacheTest {
                 options(transport, cache).clock(() -> now[0]).maxAttempts(1).build());
 
         Assert.assertEquals(exitCode, 0);
-        Assert.assertTrue(capture.stdout().contains(
-                "\"warning\":\"Central could not be reached; using the cached copy, "
-                        + "which may not be the latest version\""),
-                capture.stdout());
+        Assert.assertEquals(capture.stderr(), STALE_WARNING_JSON);
     }
 
     @Test
-    public void aBarePackageWarningFlowsThroughBothRenderers() {
-        // The bare package's own path, this time: a stale cache plus a dead registry, threaded through its
-        // overview and out through both `JsonRenderer` and `TextRenderer`, not the hand-built `DiscoverResult` the
-        // renderer unit tests use.
+    public void aBarePackageWarningIsItsOwnReportInBothModes() {
+        // The bare package's own path, this time: a stale cache plus a dead registry. The warning leaves the answer
+        // and is written to stderr, in the run's mode.
         Path root = freshRoot();
         DocsCache cache = cacheAt(root);
         long[] now = {1_000_000};
@@ -498,16 +494,16 @@ public class CacheTest {
         int jsonExit = Cli.run(List.of("package", PKG), json.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
         Assert.assertEquals(jsonExit, 0);
-        Assert.assertTrue(json.stdout().contains(
-                "\"warning\":\"Central could not be reached; using the cached copy, "
-                        + "which may not be the latest version\""),
-                json.stdout());
+        Assert.assertEquals(json.stderr(), STALE_WARNING_JSON);
+        Assert.assertFalse(json.stdout().contains("warning"), json.stdout());
 
         Capture text = new Capture();
         int textExit = Cli.run(List.of("package", PKG, "--output-format", "text"), text.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
         Assert.assertEquals(textExit, 0);
-        Assert.assertTrue(text.stdout().contains("\n\nWarning: Central could not be reached"), text.stdout());
+        Assert.assertEquals(text.stderr(), "bal discover: warning: Central could not be reached; using the cached "
+                + "copy, which may not be the latest version\n");
+        Assert.assertFalse(text.stdout().contains("Warning"), text.stdout());
     }
 
     @Test
@@ -516,7 +512,7 @@ public class CacheTest {
         Capture capture = new Capture();
         int exitCode = Cli.run(List.of("package", PKG), capture.streams(),
                 options(FakeTransport.always(FakeTransport.status(503)), cache).maxAttempts(1).build());
-        Assert.assertEquals(exitCode, Failure.UNAVAILABLE);
+        Assert.assertEquals(exitCode, Failure.RUNTIME);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertTrue(capture.stderr().contains("\"kind\":\"upstream\""));
     }
@@ -676,8 +672,8 @@ public class CacheTest {
         Assert.assertEquals(capture.stdout(), "");
         JsonObject failure = JsonParser.parseString(capture.stderr()).getAsJsonObject();
         Assert.assertEquals(failure.get("kind").getAsString(), "package-not-found");
-        Assert.assertTrue(failure.get("suggestion").getAsString()
-                .contains("`bal discover package ballerinax/aws --module auth`"), capture.stderr());
+        Assert.assertEquals(failure.get("command").getAsString(), "bal discover package ballerinax/aws --module auth",
+                capture.stderr());
         Assert.assertNull(cache.readDocs(AWS_AUTH_DOCS), "a module page must not be cached as a package's");
     }
 
@@ -691,7 +687,7 @@ public class CacheTest {
 
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("package", "ballerinax/aws.auth"), capture.streams(), http),
-                Failure.UNAVAILABLE);
+                Failure.RUNTIME);
         Assert.assertEquals(capture.stdout(), "");
         Assert.assertEquals(transport.urls(),
                 List.of(CentralClient.CENTRAL_BASE_URL + "docs/ballerinax/aws.auth/1.0.2"));
@@ -816,7 +812,7 @@ public class CacheTest {
         HttpOptions down = options(FakeTransport.always(FakeTransport.status(503)), cache).maxAttempts(1).build();
         Capture refreshed = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "-p", PKG, "--refresh"), refreshed.streams(), down),
-                Failure.UNAVAILABLE);
+                Failure.RUNTIME);
         Assert.assertTrue(refreshed.stderr().contains("\"kind\":\"upstream\""), refreshed.stderr());
         Assert.assertEquals(readEntry(root), before, "a failed refresh must leave the cached payload in place");
 
@@ -852,7 +848,7 @@ public class CacheTest {
         up[0] = false;
         List<String> refresh = new ArrayList<>(argv);
         refresh.add("--refresh");
-        Assert.assertEquals(Cli.run(refresh, new Capture().streams(), http), Failure.UNAVAILABLE);
+        Assert.assertEquals(Cli.run(refresh, new Capture().streams(), http), Failure.RUNTIME);
         Assert.assertEquals(cache.readModuleDocs(key), before, "a failed refresh must leave the module page");
 
         Capture offline = new Capture();

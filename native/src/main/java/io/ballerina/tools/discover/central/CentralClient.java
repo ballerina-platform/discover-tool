@@ -88,7 +88,7 @@ public final class CentralClient {
 
     private static final String RUN_AGAIN = "then run the same command again.";
 
-    private static final String SEARCH_HINT = "`bal discover search <keyword>` lists what Central publishes.";
+    private static final String SEARCH_HINT = "'bal discover search <keyword>' lists what Central publishes.";
 
     /**
      * How long Central's answer to "what is the latest version" is believed.
@@ -212,7 +212,7 @@ public final class CentralClient {
             case HttpTransport.Reply.TimedOut ignored -> new Outcome.TimedOut();
             case HttpTransport.Reply.Failed failed -> failed.problem() == HttpTransport.Reply.Problem.BAD_URL
                     ? new Outcome.Broken(new Failure.Internal(
-                            "Could not make a request to " + url + ": " + failed.message(),
+                            "could not make a request to " + url + ": " + failed.message(),
                             Failure.INTERNAL_SUGGESTION))
                     : Outcome.Spent.of(noAnswer(failed, url, options), isRetryable(failed));
             case HttpTransport.Reply.Answered answered -> answer(answered, url, options);
@@ -238,8 +238,19 @@ public final class CentralClient {
         } catch (RuntimeException malformed) {
             // Upstream serving something that is not JSON is not a transient condition.
             return Outcome.Spent.of(new Report("Central answered " + url + " with a body that is not JSON: "
-                    + malformed.getMessage(), null, true, Failure.UPSTREAM_REJECTED_SUGGESTION), false);
+                    + parseProblem(malformed), null, true, Failure.UPSTREAM_REJECTED_SUGGESTION), false);
         }
+    }
+
+    // The innermost cause's own words, never a class name, without a closing period.
+    private static String parseProblem(Throwable malformed) {
+        String message = "";
+        for (Throwable cause = malformed; cause != null; cause = cause.getCause()) {
+            if (cause.getMessage() != null && !cause.getMessage().isBlank()) {
+                message = cause.getMessage().strip();
+            }
+        }
+        return message.endsWith(".") ? message.substring(0, message.length() - 1) : message;
     }
 
     // Through a proxy, only the CONNECT's answer is the proxy's; a status inside the tunnel is Central's.
@@ -250,15 +261,15 @@ public final class CentralClient {
         String through = proxy == null ? "" : " through the proxy " + address(proxy);
         return switch (failed.problem()) {
             case UNCONNECTED -> proxy == null
-                    ? Report.unanswered("Could not reach " + host + ": " + failed.message(), network(file))
-                    : Report.unanswered("Could not connect to the proxy " + address(proxy) + " set in " + file + ": "
+                    ? Report.unanswered("could not reach " + host + ": " + failed.message(), network(file))
+                    : Report.unanswered("could not connect to the proxy " + address(proxy) + " set in " + file + ": "
                             + failed.message(), "Check that the proxy is running and that host and port under "
                             + "[proxy] in " + file + " are right, " + RUN_AGAIN);
             case UNRESOLVED -> proxy == null
-                    ? Report.unanswered("Could not resolve the host " + host, network(file))
-                    : Report.unanswered("Could not resolve the proxy host " + proxy.host(),
+                    ? Report.unanswered("could not resolve the host " + host, network(file))
+                    : Report.unanswered("could not resolve the proxy host " + proxy.host(),
                             "Check host under [proxy] in " + file + ", " + RUN_AGAIN);
-            case TLS -> Report.unanswered("Could not open a secure connection to " + host + through + ": "
+            case TLS -> Report.unanswered("could not open a secure connection to " + host + through + ": "
                     + failed.message(), "Check the system clock, and any proxy or firewall that intercepts HTTPS, "
                     + RUN_AGAIN);
             case TUNNEL -> new Report(theProxy(proxy) + (proxy == null ? "" : " set in " + file)
@@ -268,7 +279,7 @@ public final class CentralClient {
                                     + "later, or check that the proxy allows it."
                             : "The proxy refused to connect to " + host + "; check that the proxy allows it.");
             case PROXY_REJECTED -> rejected(options);
-            case OTHER -> Report.unanswered("Could not reach " + host + through + ": " + failed.message(),
+            case OTHER -> Report.unanswered("could not reach " + host + through + ": " + failed.message(),
                     network(file));
             case BAD_URL -> throw new IllegalStateException("a malformed URL is not a network failure");
         };
@@ -278,7 +289,7 @@ public final class CentralClient {
         ProxySettings proxy = options.proxy();
         if (proxy != null && proxy.authenticates() && options.basicProxyAuthDisabled()) {
             String property = HttpOptions.TUNNELING_DISABLED_SCHEMES;
-            return new Report("The proxy " + address(proxy) + " requires authentication, and the username and "
+            return new Report("the proxy " + address(proxy) + " requires authentication, and the username and "
                     + "password in the [proxy] table of " + options.settingsFile() + " were not sent: the "
                     + property + " system property disables Basic", PROXY_AUTHENTICATION_REQUIRED, false,
                     "Remove Basic from the " + property + " system property, " + RUN_AGAIN);
@@ -286,7 +297,7 @@ public final class CentralClient {
         if (proxy != null && proxy.authenticates()) {
             return rejected(options);
         }
-        return new Report((proxy == null ? "A proxy" : "The proxy " + address(proxy))
+        return new Report((proxy == null ? "a proxy" : "the proxy " + address(proxy))
                 + " requires authentication", PROXY_AUTHENTICATION_REQUIRED, false,
                 "Set both username and password under [proxy] in " + options.settingsFile()
                         + ", " + RUN_AGAIN);
@@ -306,7 +317,7 @@ public final class CentralClient {
     }
 
     private static String theProxy(ProxySettings proxy) {
-        return proxy == null ? "The proxy" : "The proxy " + address(proxy);
+        return proxy == null ? "the proxy" : "the proxy " + address(proxy);
     }
 
     private static String address(ProxySettings proxy) {
@@ -369,7 +380,7 @@ public final class CentralClient {
         }
 
         if (last == null) {
-            return Result.err(new Failure.Internal("No request was made to " + url, Failure.INTERNAL_SUGGESTION));
+            return Result.err(new Failure.Internal("no request was made to " + url, Failure.INTERNAL_SUGGESTION));
         }
         return Result.err(toFailure(last, url, made, options));
     }
@@ -455,12 +466,12 @@ public final class CentralClient {
             return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
                     + qualified.qualified() + "' is not a package, but " + parent.qualified() + " is, and Central "
                     + "could not say which modules it publishes. If '" + submodule + "' is one of them, read it with "
-                    + Failure.quoted(command.text()) + ".", command);
+                    + "--module.", command);
         }
         if (listed.get().contains(qualified.name())) {
             return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
                     + qualified.qualified() + "' is not a package: it is the '" + submodule + "' module of the "
-                    + parent.qualified() + " package. Read it with " + Failure.quoted(command.text()) + ".", command);
+                    + parent.qualified() + " package. Read it with --module.", command);
         }
         return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), null, "'"
                 + qualified.qualified() + "' is not a package, and " + parent.qualified() + " publishes no '"
@@ -685,7 +696,7 @@ public final class CentralClient {
         Command command = Command.overview(new Coordinate(qualified, pin).target(null));
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), submodule, qualified.qualified()
                 + " publishes no '" + submodule + "' module at this version. Drop --module to read its default "
-                + "module: " + Failure.quoted(command.text()) + ".", command);
+                + "module.", command);
     }
 
     private static boolean isNotFound(Result<?> response) {
@@ -732,7 +743,7 @@ public final class CentralClient {
                         + " after the package: " + coordinate
                 : "Central does not publish '" + qualified.qualified() + "' at " + version.text() + ", the version "
                         + resolved.lock() + " locks" + listed + ". Fix the " + qualified.qualified() + " entry "
-                        + "there, or delete the file and run `bal build` to regenerate it; or write a published "
+                        + "there, or delete the file and run 'bal build' to regenerate it; or write a published "
                         + "version after the package: " + coordinate;
         return new Failure.PackageNotFound(qualified.qualified(), version.text(), null, suggestion);
     }

@@ -1,1 +1,1 @@
-{"kind":"validation","message":"Name what to read: package, search, client, service, class, function, type, method, resource, readme.","suggestion":"For a package's overview, write `bal discover package <org>/<name>`."}
+{"severity":"error","kind":"usage","message":"name what to read: package, search, client, service, class, function, type, method, resource, readme","suggestion":"For a package's overview, write 'bal discover package <org>/<name>'."}
