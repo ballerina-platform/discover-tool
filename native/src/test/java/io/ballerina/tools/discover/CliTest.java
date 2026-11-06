@@ -450,10 +450,13 @@ public class CliTest {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(List.of(flag), capture.streams(), never()), 0, flag);
             Assert.assertEquals(capture.stderr(), "", flag);
-            Assert.assertTrue(capture.stdout().matches("\\d+\\.\\d+\\.\\d+\n"), capture.stdout());
+            Assert.assertEquals(capture.stdout(), releaseVersion() + "\n");
         }
+        // The version is the root's alone: a noun, or the bare coordinate that stands for package, takes none.
         for (List<String> argv : List.of(List.of("client", "-p", "ballerina/http", "-V"),
-                List.of("package", "ballerina/http", "--version", "2.15.7"))) {
+                List.of("package", "ballerina/http", "--version", "2.15.7"), List.of("package", "ballerina/http", "-V"),
+                List.of("ballerina/http", "-V"), List.of("-V", "ballerina/http"), List.of("-V", "client", "-p",
+                        "ballerina/http"))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(), never()), 2, argv.toString());
             Assert.assertEquals(capture.stdout(), "");
@@ -464,6 +467,13 @@ public class CliTest {
         Assert.assertEquals(valued.field("message"), "--version takes no value");
     }
 
+    // The version the build stamps: the project's, without a snapshot or timestamp suffix.
+    private static String releaseVersion() {
+        String project = System.getProperty("project.version");
+        Assert.assertNotNull(project, "the test task sets project.version");
+        return project.replaceFirst("(-SNAPSHOT|-\\d{8}-\\d{6}-\\w+)$", "");
+    }
+
     @Test
     public void aSwitchGivenAValueIsAUsageErrorEvenWhenTheValueIsABoolean() {
         for (String value : List.of("true", "false")) {
@@ -471,6 +481,7 @@ public class CliTest {
             Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerinax/kafka", "--refresh=" + value),
                     capture.streams(), never()), 2, value);
             Assert.assertEquals(capture.field("message"), "--refresh takes no value");
+            Assert.assertEquals(capture.field("command"), "bal discover client -p ballerinax/kafka --refresh");
         }
     }
 
@@ -485,7 +496,9 @@ public class CliTest {
         Capture abbreviated = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerina/graphql", "-m", "subgraph"),
                 abbreviated.streams(), never()), 2);
-        Assert.assertEquals(abbreviated.field("message"), "unknown option '-m'");
+        Assert.assertEquals(abbreviated.field("message"), "unknown option '-m'; --module has no short form");
+        Assert.assertEquals(abbreviated.field("command"),
+                "bal discover client -p ballerina/graphql --module subgraph");
     }
 
     @Test
@@ -1841,24 +1854,32 @@ public class CliTest {
 
     @Test
     public void anOptionGivenTwiceOrAFlagGivenAValueIsAUsageErrorInTheToolsOwnWords() {
-        record Case(List<String> argv, String message, String suggestion) { }
+        record Case(List<String> argv, String message, String suggestion, String command) {
+
+            Case(List<String> argv, String message, String suggestion) {
+                this(argv, message, suggestion, null);
+            }
+        }
         for (Case each : List.of(
                 new Case(List.of("package", "ballerina/io", "--output-format", "MODE", "--output-format", "MODE"),
                         "--output-format is given more than once", "Pass --output-format once."),
                 new Case(List.of("package", "ballerina/io", "--page", "1", "--page", "2"),
                         "--page is given more than once", "Pass --page once."),
                 new Case(List.of("package", "ballerina/io", "--refresh=yes"), "--refresh takes no value",
-                        "Write --refresh."))) {
+                        "Write --refresh without a value.", "bal discover package ballerina/io --refresh"))) {
             Capture json = new Capture();
             List<String> jsonArgv = each.argv().stream().map(word -> word.replace("MODE", "json")).toList();
             Assert.assertEquals(Cli.run(jsonArgv, json.streams(), never()), 2, jsonArgv.toString());
             Assert.assertEquals(json.field("message"), each.message(), json.stderr());
             Assert.assertEquals(json.field("suggestion"), each.suggestion(), json.stderr());
+            Assert.assertEquals(json.failure().has("command") ? json.field("command") : null, each.command(),
+                    json.stderr());
 
             Capture text = new Capture();
             List<String> textArgv = each.argv().stream().map(word -> word.replace("MODE", "text")).toList();
             Assert.assertEquals(Cli.run(textArgv, text.streams(), never(), null, true), 2, textArgv.toString());
             Assert.assertEquals(text.stderr(), "bal discover: error: " + each.message() + "\n  " + each.suggestion()
+                    + (each.command() == null ? "" : "\n  Try: " + each.command())
                     + "\nUsage: bal discover package <org>/<name>[:<version>] [options]\n"
                     + "Try 'bal discover package --help' for more information.\n");
         }

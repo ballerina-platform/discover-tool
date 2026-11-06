@@ -26,6 +26,7 @@ import io.ballerina.tools.discover.LoadedPackage;
 import io.ballerina.tools.discover.Loader;
 import io.ballerina.tools.discover.QualifiedName;
 import io.ballerina.tools.discover.Result;
+import io.ballerina.tools.discover.Texts;
 import io.ballerina.tools.discover.Version;
 import io.ballerina.tools.discover.Warning;
 import io.ballerina.tools.discover.central.CentralRepository;
@@ -100,6 +101,9 @@ public final class Cli {
 
     private static final String PLACEHOLDER_KEYWORD = "<keyword>";
 
+    /** The short form {@code --module} had before the CLI tool guide reserved {@code -m}. */
+    private static final String RETIRED_MODULE_SHORT = "-m";
+
 
     private static final String PATH_SEPARATOR = "/";
 
@@ -156,9 +160,12 @@ public final class Cli {
 
         Commands.Grammar grammar = Commands.Grammar.create();
         boolean json = jsonOutput(argv, interactive, grammar);
-        Failure.Validation valued = valuedSwitch(grammar, argv);
-        if (valued != null) {
-            return new UsageErrors(grammar, typedNoun(grammar, argv), streams, json).error(valued);
+        Failure.Validation flag = valuedSwitch(grammar, argv);
+        if (flag == null) {
+            flag = retiredModuleShort(grammar, argv);
+        }
+        if (flag != null) {
+            return new UsageErrors(grammar, typedNoun(grammar, argv), streams, json).error(flag);
         }
         Failure.Validation misnamed = misnamedNoun(argv);
         if (misnamed != null) {
@@ -188,14 +195,18 @@ public final class Cli {
             streams.out().accept(nounName == null ? Usage.root() : Usage.noun(nounName));
             return Failure.ANSWERED;
         }
-        if (parsed.isVersionHelpRequested()) {
-            streams.out().accept(ToolVersion.text() + "\n");
-            return Failure.ANSWERED;
-        }
         Invocation typed = Invocation.of(grammar.root(), nounName, nounName == null ? null : grammar.nouns()
                 .get(nounName));
         Invocation call = typed.asBareCoordinate() ? typed.asPackageOverview() : typed;
         UsageErrors usage = new UsageErrors(grammar, call.noun(), streams, json);
+        if (parsed.isVersionHelpRequested() && call.noun() == null && call.rest().isEmpty()) {
+            streams.out().accept(ToolVersion.text() + "\n");
+            return Failure.ANSWERED;
+        }
+        // The version is the root's alone, so a noun, or a bare coordinate standing for package, takes no -V.
+        if (parsed.isVersionHelpRequested() && call.noun() != null) {
+            return usage.error(unknownFlag(versionSpelling(argv), call.noun()));
+        }
         Failure.Validation misuse = misuse(grammar, call, literalWords(argv));
         if (misuse != null) {
             return usage.error(misuse);
@@ -413,6 +424,10 @@ public final class Cli {
 
     private static Failure.Validation unknownFlag(String flag, String noun) {
         return new Failure.Validation("unknown option '" + flag + "'", helpSuggestion(noun));
+    }
+
+    private static String versionSpelling(List<String> argv) {
+        return argv.contains(Commands.VERSION_SHORT) ? Commands.VERSION_SHORT : Commands.VERSION_FLAG;
     }
 
     // The first word of `words` that is a flag, leaving out the last `literal` words, which follow `--`.
@@ -801,17 +816,39 @@ public final class Cli {
     // a boolean's own spelling as one.
     private static Failure.Validation valuedSwitch(Commands.Grammar grammar, List<String> argv) {
         Set<String> switches = optionNames(grammar, option -> option.arity().max() == 0);
-        for (String token : argv) {
-            if (Command.END_OF_OPTIONS.equals(token)) {
-                return null;
-            }
+        for (int i = 0; i < argv.size() && !Command.END_OF_OPTIONS.equals(argv.get(i)); i++) {
+            String token = argv.get(i);
             int equals = token.indexOf('=');
             if (token.startsWith(Command.FLAG_START) && equals > 0 && switches.contains(token.substring(0, equals))) {
                 String name = token.substring(0, equals);
-                return new Failure.Validation(name + " takes no value", "Write " + name + ".");
+                return new Failure.Validation(name + " takes no value", "Write " + name + " without a value.",
+                        typedCommand(argv, i, name));
             }
         }
         return null;
+    }
+
+    // The short form --module once had: the same command with the long form, since the flag was this tool's own.
+    private static Failure.Validation retiredModuleShort(Commands.Grammar grammar, List<String> argv) {
+        Set<String> takesValue = valueOptions(grammar);
+        for (int i = 0; i < argv.size() && !Command.END_OF_OPTIONS.equals(argv.get(i)); i++) {
+            String token = argv.get(i);
+            if (takesValue.contains(token)) {
+                i++;
+            } else if (RETIRED_MODULE_SHORT.equals(token)) {
+                return new Failure.Validation("unknown option '" + token + "'; " + Command.MODULE_FLAG
+                        + " has no short form", "Write " + Command.MODULE_FLAG + " in its place.",
+                        typedCommand(argv, i, Command.MODULE_FLAG));
+            }
+        }
+        return null;
+    }
+
+    // The command as typed, with the word at `at` replaced.
+    private static String typedCommand(List<String> argv, int at, String replacement) {
+        List<String> words = new ArrayList<>(argv);
+        words.set(at, replacement);
+        return Command.PREFIX + words.stream().map(Texts::shellWord).collect(Collectors.joining(" "));
     }
 
     // A complete version typed as a name: it belongs after the package.
