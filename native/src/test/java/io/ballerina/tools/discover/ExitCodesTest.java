@@ -27,16 +27,20 @@ import org.testng.annotations.Test;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * One exit code per core kind: every failure kind, and each cause that splits one, run end to end in both output
- * modes; only a failure worth retrying says to.
+ * modes; only a retryable kind (unavailable, timeout) says to run it again later.
  */
 public class ExitCodesTest {
 
     private static final String KAFKA = "ballerinax/kafka";
 
     private static final String LATER = "again later";
+
+    /** The kinds whose failure may not recur unchanged; every other kind needs a different command or a fix. */
+    private static final Set<String> RETRYABLE_KINDS = Set.of("unavailable", "timeout");
 
     private static final String KAFKA_VERSION = "4.6.5";
 
@@ -130,23 +134,23 @@ public class ExitCodesTest {
                 new Case("page-not-found", Failure.RUNTIME,
                         List.of("client", "Client", "-p", "ballerinax/twilio", "--page", "99"), twilio),
                 new Case("usage", Failure.USAGE, List.of("client", "-p", KAFKA, "--page", "0"), CliTest.never()),
-                new Case("usage", Failure.USAGE, List.of("readme", "1", "-p", KAFKA, "--filter", "zzznope"),
-                        kafka),
-                new Case("usage", Failure.USAGE, overview, CliTest.never(), malformedLock()),
+                new Case("filter-no-match", Failure.RUNTIME,
+                        List.of("readme", "1", "-p", KAFKA, "--filter", "zzznope"), kafka),
+                new Case("invalid-lock", Failure.RUNTIME, overview, CliTest.never(), malformedLock()),
                 new Case("ambiguous", Failure.USAGE, List.of("method", "close", "-p", KAFKA), kafka),
                 new Case("ambiguous", Failure.USAGE, List.of("class", "close", "-p", KAFKA), kafka),
                 new Case("ambiguous", Failure.USAGE, List.of("readme", "Kafka", "-p", KAFKA), kafka),
-                Case.retryable("upstream", overview,
+                Case.retryable("unavailable", overview,
                         failed(HttpTransport.Reply.Problem.UNCONNECTED, null)),
-                Case.retryable("upstream", overview,
+                Case.retryable("unavailable", overview,
                         failed(HttpTransport.Reply.Problem.UNRESOLVED, null)),
-                Case.retryable("upstream", List.of("package", KAFKA + ".sub"), parentUnreachable()),
+                Case.retryable("unavailable", List.of("package", KAFKA + ".sub"), parentUnreachable()),
                 Case.retryable("timeout", overview,
                         failing(new HttpTransport.Reply.TimedOut())),
-                Case.retryable("upstream", overview, failing(FakeTransport.status(429))),
-                Case.retryable("upstream", overview, failing(FakeTransport.status(500))),
-                Case.retryable("upstream", overview, failing(FakeTransport.status(503))),
-                Case.retryable("upstream", overview,
+                Case.retryable("unavailable", overview, failing(FakeTransport.status(429))),
+                Case.retryable("unavailable", overview, failing(FakeTransport.status(500))),
+                Case.retryable("unavailable", overview, failing(FakeTransport.status(503))),
+                Case.retryable("unavailable", overview,
                         failed(HttpTransport.Reply.Problem.TUNNEL, 502)),
                 new Case("upstream", Failure.RUNTIME, overview, failing(FakeTransport.status(403))),
                 new Case("upstream", Failure.RUNTIME, overview, failing(FakeTransport.status(407))),
@@ -184,8 +188,9 @@ public class ExitCodesTest {
         Assert.assertFalse(message.endsWith("."), label + " -> " + message);
         Assert.assertTrue(message.startsWith("Central") || !Character.isUpperCase(message.charAt(0)),
                 label + " -> " + message);
+        Assert.assertEquals(RETRYABLE_KINDS.contains(run.kind()), run.retry(), label);
         Assert.assertFalse(capture.field("suggestion").contains(LATER) && !run.retry(),
-                "only a failure worth retrying says to: " + label + " -> " + capture.stderr());
+                "only a retryable kind says to run it again later: " + label + " -> " + capture.stderr());
     }
 
     private static void assertText(Case run) {
@@ -215,17 +220,19 @@ public class ExitCodesTest {
                 new Kind(new Failure.Validation("m", "s"), "usage", 2),
                 new Kind(new Failure.Ambiguous("a/b", "1.0.0", null, List.of("x"), "m", "s", Failure.OWNERS,
                         List.of()), "ambiguous", 2),
-                new Kind(new Failure.Upstream("u", 1, "m", "s", null, false), "upstream", 1),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", null, false), "unavailable", 1),
                 new Kind(new Failure.Timeout("u", 1, "s"), "timeout", 1),
-                new Kind(new Failure.Upstream("u", 1, "m", "s", 500, true), "upstream", 1),
-                new Kind(new Failure.Upstream("u", 1, "m", "s", 429, true), "upstream", 1),
-                new Kind(new Failure.Upstream("u", 1, "m", "s", 502, false), "upstream", 1),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", 500, true), "unavailable", 1),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", 429, true), "unavailable", 1),
+                new Kind(new Failure.Upstream("u", 1, "m", "s", 502, false), "unavailable", 1),
                 new Kind(new Failure.Upstream("u", 1, "m", "s", 404, true), "upstream", 1),
                 new Kind(new Failure.Upstream("u", 1, "m", "s", 403, false), "upstream", 1),
                 new Kind(new Failure.Upstream("u", 1, "m", "s", null, true), "upstream", 1),
                 new Kind(new Failure.Upstream("u", 1, "m", "s", 407, false), "upstream", 1),
                 new Kind(new Failure.SchemaDrift("a/b", "1.0.0", null, List.of(), "s"), "schema-drift", 1),
-                new Kind(new Failure.Internal("m", "s"), "internal", 1));
+                new Kind(new Failure.Internal("m", "s"), "internal", 1),
+                new Kind(new Failure.InvalidLock("a/b", "1.0", "Dependencies.toml"), "invalid-lock", 1),
+                new Kind(new Failure.FilterNoMatch("a/b", "1.0.0", null, "m", "c"), "filter-no-match", 1));
         for (Kind kind : kinds) {
             Assert.assertEquals(kind.failure().kind(), kind.kind());
             Assert.assertEquals(kind.failure().exitCode(), kind.code(), kind.failure().toString());
