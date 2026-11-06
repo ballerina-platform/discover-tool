@@ -415,10 +415,21 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--nonesuch"), capture.streams(), never()), 2);
         String suggestion = capture.field("suggestion");
-        for (String flag : List.of("--refresh", "--output", "--filter", "--page", "--module/-m", "--help/-h")) {
+        for (String flag : List.of("--refresh", "--output-format", "--filter", "--page", "--module/-m", "--help/-h")) {
             Assert.assertTrue(suggestion.contains(flag), flag + " missing from: " + suggestion);
         }
         Assert.assertFalse(suggestion.contains("--version"), suggestion);
+    }
+
+    @Test
+    public void theRenamedOutputFlagIsUnknown() {
+        Capture capture = new Capture();
+        Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--output", "json"), capture.streams(),
+                never()), 2);
+        Assert.assertEquals(capture.stdout(), "");
+        Assert.assertEquals(capture.field("kind"), "validation");
+        Assert.assertTrue(capture.field("message").contains("'--output'"), capture.stderr());
+        Assert.assertTrue(capture.field("suggestion").contains("--output-format"), capture.stderr());
     }
 
     @Test
@@ -610,7 +621,7 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(
                 List.of("type", "-p", "ballerina/graphql:" + GRAPHQL_VERSION, "--module", "subgraph",
-                        "--output", "json"),
+                        "--output-format", "json"),
                 capture.streams(), options(graphqlCentral())), 0, capture.stderr());
         String carried = "bal discover type FederatedEntity -p ballerina/graphql:" + GRAPHQL_VERSION
                 + " --module subgraph";
@@ -708,7 +719,7 @@ public class CliTest {
 
         Capture text = new Capture();
         Assert.assertEquals(Cli.run(List.of("type", "Nope", "-p", "ballerina/graphql", "--module", "subgraph",
-                "--output", "text"), text.streams(), options(graphqlCentral())), 1);
+                "--output-format", "text"), text.streams(), options(graphqlCentral())), 1);
         Assert.assertTrue(text.stderr().startsWith("error: 'Nope' is not a type in ballerina/graphql:"
                 + GRAPHQL_VERSION + ", module subgraph.\n"), text.stderr());
 
@@ -743,7 +754,7 @@ public class CliTest {
     @Test
     public void anEnumMemberIsAnsweredByItsEnumWithANoteSayingSo() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("type", "HTTP_1_1", "-p", "ballerina/http", "--output", "json"),
+        Assert.assertEquals(Cli.run(List.of("type", "HTTP_1_1", "-p", "ballerina/http", "--output-format", "json"),
                 capture.streams(), centralFor("ballerina__http", "2.16.6")), 0, capture.stderr());
         JsonObject answer = JsonParser.parseString(capture.stdout()).getAsJsonObject();
         Assert.assertEquals(answer.get("name").getAsString(), "HttpVersion");
@@ -764,7 +775,7 @@ public class CliTest {
     private static String text(HttpOptions http, String... argv) {
         Capture capture = new Capture();
         List<String> withOutput = new java.util.ArrayList<>(List.of(argv));
-        withOutput.addAll(List.of("--output", "text"));
+        withOutput.addAll(List.of("--output-format", "text"));
         Assert.assertEquals(Cli.run(withOutput, capture.streams(), http), 0, capture.stderr());
         return capture.stdout();
     }
@@ -772,8 +783,8 @@ public class CliTest {
     @Test
     public void aRosterAndAResourceListingAreAlphabetical() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerina/http", "--output", "json"), capture.streams(),
-                centralFor("ballerina__http", "2.16.6")), 0, capture.stderr());
+        Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerina/http", "--output-format", "json"),
+                capture.streams(), centralFor("ballerina__http", "2.16.6")), 0, capture.stderr());
         List<String> names = new java.util.ArrayList<>();
         JsonParser.parseString(capture.stdout()).getAsJsonObject().getAsJsonArray("containers")
                 .forEach(each -> names.add(each.getAsJsonObject().get("name").getAsString()));
@@ -1648,12 +1659,12 @@ public class CliTest {
     @Test
     public void outputOverridesTheTtyDefaultInEitherDirection() {
         Capture asText = new Capture();
-        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka", "--output", "text"), asText.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka", "--output-format", "text"), asText.streams(),
                 centralFor("ballerinax__kafka", "4.6.5")), 0, asText.stderr());
         Assert.assertEquals(asText.stdout(), KAFKA_OVERVIEW);
 
         Capture asJson = new Capture();
-        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka", "--output", "json"), asJson.streams(),
+        Assert.assertEquals(Cli.run(List.of("package", "ballerinax/kafka", "--output-format", "json"), asJson.streams(),
                 centralFor("ballerinax__kafka", "4.6.5"), null, true), 0, asJson.stderr());
         Assert.assertTrue(asJson.stdout().contains("\"clients\":{"), asJson.stdout());
     }
@@ -1662,7 +1673,8 @@ public class CliTest {
     public void anInvalidOutputValueIsAValidationFailure() {
         Capture capture = new Capture();
         Assert.assertEquals(
-                Cli.run(List.of("package", "ballerinax/kafka", "--output", "xml"), capture.streams(), never()), 2);
+                Cli.run(List.of("package", "ballerinax/kafka", "--output-format", "xml"), capture.streams(), never()),
+                2);
         Assert.assertEquals(capture.field("kind"), "validation");
         Assert.assertTrue(capture.field("message").contains("xml"), capture.stderr());
     }
@@ -1756,14 +1768,15 @@ public class CliTest {
         for (Case each : List.of(
                 new Case(List.of("nosuchnoun", "-p", "ballerina/http"), true, false),
                 new Case(List.of("nosuchnoun", "-p", "ballerina/http"), false, true),
-                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--output", "json"), true, true),
-                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--output", "text"), false, false),
-                new Case(List.of("package", "ballerina/http", "--nonesuch", "--output", "text"), false, false),
-                new Case(List.of("package", "ballerina/http", "--output=text", "--nonesuch"), false, false),
-                new Case(List.of("package", "ballerina/http", "--nonesuch", "--output", "xml"), true, false),
-                new Case(List.of("package", "ballerina/http", "--output", "xml"), false, true),
-                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--filter", "--output", "text"), false, true),
-                new Case(List.of("package", "ballerina/http", "-m", "--output", "text"), false, true))) {
+                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--output-format", "json"), true, true),
+                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--output-format", "text"), false, false),
+                new Case(List.of("package", "ballerina/http", "--nonesuch", "--output-format", "text"), false, false),
+                new Case(List.of("package", "ballerina/http", "--output-format=text", "--nonesuch"), false, false),
+                new Case(List.of("package", "ballerina/http", "--nonesuch", "--output-format", "xml"), true, false),
+                new Case(List.of("package", "ballerina/http", "--output-format", "xml"), false, true),
+                new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--filter", "--output-format", "text"),
+                        false, true),
+                new Case(List.of("package", "ballerina/http", "-m", "--output-format", "text"), false, true))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never(), null, each.interactive()), 2,
                     each.toString());
@@ -1787,8 +1800,8 @@ public class CliTest {
     public void anOptionGivenTwiceOrAFlagGivenAValueIsAUsageErrorInTheToolsOwnWords() {
         record Case(List<String> argv, String message, String suggestion) { }
         for (Case each : List.of(
-                new Case(List.of("package", "ballerina/io", "--output", "MODE", "--output", "MODE"),
-                        "--output is given more than once.", "Pass --output once."),
+                new Case(List.of("package", "ballerina/io", "--output-format", "MODE", "--output-format", "MODE"),
+                        "--output-format is given more than once.", "Pass --output-format once."),
                 new Case(List.of("package", "ballerina/io", "--page", "1", "--page", "2"),
                         "--page is given more than once.", "Pass --page once."),
                 new Case(List.of("package", "ballerina/io", "--refresh=yes"), "--refresh takes no value.",
@@ -1803,7 +1816,7 @@ public class CliTest {
             List<String> textArgv = each.argv().stream().map(word -> word.replace("MODE", "text")).toList();
             Assert.assertEquals(Cli.run(textArgv, text.streams(), never(), null, true), 2, textArgv.toString());
             Assert.assertEquals(text.stderr(), "error: " + each.message() + "\n  " + each.suggestion() + "\n"
-                    + "Usage: bal discover package <org>/<name>[:<version>] [--output json|text] "
+                    + "Usage: bal discover package <org>/<name>[:<version>] [--output-format json|text] "
                     + "[--filter <keyword>] [--page <n>] [-m <module>] [--refresh]\n"
                     + "Run `bal discover package --help` for details.\n");
         }
@@ -1812,7 +1825,7 @@ public class CliTest {
     @Test
     public void aTextFailureIndentsItsSuggestionUnderTheMessage() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("type", "NoSuchType", "-p", "ballerinax/kafka", "--output", "text"),
+        Assert.assertEquals(Cli.run(List.of("type", "NoSuchType", "-p", "ballerinax/kafka", "--output-format", "text"),
                 capture.streams(), centralFor("ballerinax__kafka", "4.6.5")), 1);
         Assert.assertEquals(capture.stdout(), "");
         FixtureCorpus.matchesSnapshot(

@@ -176,7 +176,7 @@ public class ExitCodesTest {
 
     private static void assertText(Case run) {
         List<String> argv = new ArrayList<>(run.argv());
-        argv.addAll(List.of("--output", "text"));
+        argv.addAll(List.of("--output-format", "text"));
         CliTest.Capture capture = new CliTest.Capture();
         String label = String.join(" ", argv);
         Assert.assertEquals(Cli.run(argv, capture.streams(), run.http(), run.projectDir()), run.code(),

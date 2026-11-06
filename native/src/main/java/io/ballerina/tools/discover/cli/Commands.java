@@ -52,7 +52,7 @@ final class Commands {
 
     static final String HELP_FLAG = "--help";
     static final String HELP_SHORT = "-h";
-    static final String OUTPUT_FLAG = "--output";
+    static final String OUTPUT_FLAG = "--output-format";
     static final String REFRESH_FLAG = "--refresh";
     static final String MODULE_SHORT = "-m";
 

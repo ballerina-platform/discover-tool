@@ -138,9 +138,10 @@ public final class Cli {
     }
 
     /**
-     * @param interactive whether stdout is an interactive terminal — the {@code --output} default in the absence
-     *     of the flag. Discovered by {@link DiscoverTool} from {@code System.console()}, never read here: a test
-     *     drives both defaults without a real terminal, the same reason the cache and the transport are injected.
+     * @param interactive whether stdout is an interactive terminal — the {@code --output-format} default in the
+     *     absence of the flag. Discovered by {@link DiscoverTool} from {@code System.console()}, never read here: a
+     *     test drives both defaults without a real terminal, the same reason the cache and the transport are
+     *     injected.
      */
     public static int run(
             List<String> argv, Streams streams, HttpOptions http, String projectDir, boolean interactive) {
@@ -661,8 +662,8 @@ public final class Cli {
     }
 
     /**
-     * The run's output mode: a valid {@code --output} in argv, else JSON unless stdout is a terminal. Read off argv,
-     * not the parsed flag, so a parse failure is still written in the mode the caller asked for.
+     * The run's output mode: a valid {@code --output-format} in argv, else JSON unless stdout is a terminal. Read off
+     * argv, not the parsed flag, so a parse failure is still written in the mode the caller asked for.
      */
     public static boolean jsonOutput(List<String> argv, boolean interactive) {
         return jsonOutput(argv, interactive, Commands.Grammar.create());
@@ -751,8 +752,9 @@ public final class Cli {
             return null;
         }
         return new Failure.Validation(
-                "'" + output + "' is not a valid --output value.",
-                "Pass --output " + Commands.JSON_OUTPUT + " or --output " + Commands.TEXT_OUTPUT + ".");
+                "'" + output + "' is not a valid " + Commands.OUTPUT_FLAG + " value.",
+                "Pass " + Commands.OUTPUT_FLAG + " " + Commands.JSON_OUTPUT + " or " + Commands.OUTPUT_FLAG + " "
+                        + Commands.TEXT_OUTPUT + ".");
     }
 
     // A complete version typed as a name: it belongs after the package.

@@ -58,7 +58,7 @@ public class GuardedRunTest {
         int[] code = new int[1];
         String err = stderrOf(() -> {
             throw new IllegalStateException("broken");
-        }, List.of("package", "ballerina/http", "--output", "text"), code);
+        }, List.of("package", "ballerina/http", "--output-format", "text"), code);
         Assert.assertEquals(code[0], Failure.INTERNAL_ERROR);
         Assert.assertTrue(err.startsWith("error: Unexpected internal failure: broken."), err);
     }

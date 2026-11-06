@@ -100,7 +100,7 @@ public class ServiceAnswersTest {
 
     private static JsonObject json(HttpOptions http, String... argv) {
         List<String> withOutput = new ArrayList<>(List.of(argv));
-        withOutput.add("--output");
+        withOutput.add("--output-format");
         withOutput.add("json");
         return JsonParser.parseString(run(http, withOutput.toArray(new String[0]))).getAsJsonObject();
     }
@@ -119,7 +119,8 @@ public class ServiceAnswersTest {
                 Assert.assertFalse(container.has("unconfirmedReason"), container.toString());
             }
         }
-        String text = run(central("ballerina__http", false), "service", "-p", "ballerina/http", "--output", "text");
+        String text = run(central("ballerina__http", false), "service", "-p", "ballerina/http", "--output-format",
+                "text");
         Assert.assertTrue(text.contains("http:Listener\n  Service"), text);
         Assert.assertTrue(text.contains("http:Listener — unverified (package source unavailable)\n"
                 + "  InterceptableService      1 method\n"

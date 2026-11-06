@@ -33,7 +33,7 @@ import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
- * {@link DiscoverResult} → the human-oriented text {@code --output text} prints at an interactive terminal.
+ * {@link DiscoverResult} → the human-oriented text {@code --output-format text} prints at an interactive terminal.
  *
  * <p>Every answer has the same frame: a header naming where the caller is ({@code ballerinax/github · client ·
  * Client}) and a count line, then the entries one per line in aligned columns, grouped under plain headings, then

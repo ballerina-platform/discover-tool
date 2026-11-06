@@ -36,7 +36,7 @@ import java.util.List;
  * @param pkg the {@code -p} value, or {@code null}
  * @param coordinate the package as it is read: {@code package}'s name, or {@code pkg}
  * @param owners the container flags given, in the order they are declared
- * @param output the {@code --output} value, or {@code null}
+ * @param output the {@code --output-format} value, or {@code null}
  * @param filter the {@code --filter} value, or {@code null}
  * @param page the {@code --page} value
  * @param module the {@code --module} value, or {@code null}

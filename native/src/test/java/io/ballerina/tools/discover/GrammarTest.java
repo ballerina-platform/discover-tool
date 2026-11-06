@@ -117,7 +117,7 @@ public class GrammarTest {
         JsonObject leading = answer("ballerinax__kafka", "-p", KAFKA, "method", "send");
         Assert.assertEquals(leading, answer("ballerinax__kafka", "method", "send", "-p", KAFKA));
         CliTest.Capture text = new CliTest.Capture();
-        Assert.assertEquals(Cli.run(List.of("--output", "text", "--package=" + KAFKA, "client", "Producer"),
+        Assert.assertEquals(Cli.run(List.of("--output-format", "text", "--package=" + KAFKA, "client", "Producer"),
                 text.streams(), central("ballerinax__kafka")), 0, text.stderr());
         Assert.assertTrue(text.stdout().contains("Producer"), text.stdout());
         Assert.assertFalse(text.stdout().startsWith("{"), text.stdout());
@@ -207,9 +207,9 @@ public class GrammarTest {
                 {List.of(KAFKA), List.of("package", KAFKA)},
                 {List.of(KAFKA + ":" + FixtureCorpus.FIXTURE_VERSION.text()),
                         List.of("package", KAFKA + ":" + FixtureCorpus.FIXTURE_VERSION.text())},
-                {List.of(KAFKA, "--output", "json"), List.of("package", KAFKA, "--output", "json")},
-                {List.of(KAFKA, "--output", "text"), List.of("package", KAFKA, "--output", "text")},
-                {List.of("--output", "text", KAFKA), List.of("--output", "text", "package", KAFKA)},
+                {List.of(KAFKA, "--output-format", "json"), List.of("package", KAFKA, "--output-format", "json")},
+                {List.of(KAFKA, "--output-format", "text"), List.of("package", KAFKA, "--output-format", "text")},
+                {List.of("--output-format", "text", KAFKA), List.of("--output-format", "text", "package", KAFKA)},
                 {List.of(KAFKA, "--refresh"), List.of("package", KAFKA, "--refresh")}};
     }
 
@@ -265,7 +265,8 @@ public class GrammarTest {
             Assert.assertTrue(json.field("message").startsWith(noun + " needs the package it reads: -p "),
                     json.stderr());
             CliTest.Capture text = new CliTest.Capture();
-            Assert.assertEquals(Cli.run(List.of(noun, "--output", "text"), text.streams(), CliTest.never()), USAGE);
+            Assert.assertEquals(Cli.run(List.of(noun, "--output-format", "text"), text.streams(), CliTest.never()),
+                    USAGE);
             Assert.assertTrue(text.stderr().contains("\nUsage: bal discover " + noun + " "), text.stderr());
             Assert.assertTrue(text.stderr().contains(" -p <org>/<name>[:<version>] "), text.stderr());
             Assert.assertTrue(text.stderr().endsWith("Run `bal discover " + noun + " --help` for details.\n"),
@@ -373,7 +374,7 @@ public class GrammarTest {
     public void aFlagGivenBeforeAndAfterTheNounIsAUsageError() {
         for (List<String> argv : List.of(List.of("-p", "a/b", "client", "-p", "c/d"),
                 List.of("--page", "2", "client", "-p", "a/b", "--page", "3"),
-                List.of("--output", "json", "client", "-p", "a/b", "--output", "text"))) {
+                List.of("--output-format", "json", "client", "-p", "a/b", "--output-format", "text"))) {
             CliTest.Capture repeated = failure(USAGE, null, argv.toArray(String[]::new));
             Assert.assertTrue(repeated.field("message").endsWith(" is given both before the noun and after it."),
                     repeated.stderr());

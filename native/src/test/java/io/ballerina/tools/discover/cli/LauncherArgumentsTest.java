@@ -55,8 +55,8 @@ public class LauncherArgumentsTest {
 
     @Test
     public void anOptionWithItsValueAttachedReachesTheTool() {
-        Assert.assertEquals(handedOver("discover", "--output=json", "client", "--client=Producer"),
-                List.of("--output=json", "client", "--client=Producer"));
+        Assert.assertEquals(handedOver("discover", "--output-format=json", "client", "--client=Producer"),
+                List.of("--output-format=json", "client", "--client=Producer"));
     }
 
     @Test

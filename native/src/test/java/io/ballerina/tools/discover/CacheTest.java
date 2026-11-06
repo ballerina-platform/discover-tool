@@ -504,7 +504,7 @@ public class CacheTest {
                 json.stdout());
 
         Capture text = new Capture();
-        int textExit = Cli.run(List.of("package", PKG, "--output", "text"), text.streams(),
+        int textExit = Cli.run(List.of("package", PKG, "--output-format", "text"), text.streams(),
                 options(blip, cache).clock(() -> now[0]).maxAttempts(1).build());
         Assert.assertEquals(textExit, 0);
         Assert.assertTrue(text.stdout().contains("\n\nWarning: Central could not be reached"), text.stdout());
