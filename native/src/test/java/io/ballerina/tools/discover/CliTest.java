@@ -677,7 +677,7 @@ public class CliTest {
     }
 
     @Test
-    public void aMalformedLockIsAValidationFailureNamingTheLockAndTheCoordinate() {
+    public void aMalformedLockIsARuntimeFailureNamingTheLockAndTheCoordinate() {
         for (String locked : List.of("2 15", "1.6", "2.15.7..")) {
             Path projectDir = tempDir();
             write(projectDir.resolve("Ballerina.toml"), "[package]\norg = \"acme\"\nname = \"app\"\n");
@@ -685,14 +685,20 @@ public class CliTest {
                     "[[package]]\norg = \"ballerina\"\nname = \"http\"\nversion = \"" + locked + "\"\n");
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(List.of("package", "ballerina/http"), capture.streams(), never(),
-                    projectDir.toString()), Failure.USAGE, locked);
-            Assert.assertEquals(capture.field("kind"), "usage", locked);
+                    projectDir.toString()), Failure.RUNTIME, locked);
+            Assert.assertEquals(capture.field("kind"), "invalid-lock", locked);
+            Assert.assertEquals(capture.field("qualified"), "ballerina/http", locked);
+            Assert.assertEquals(capture.field("locked"), locked);
             Path lock = projectDir.resolve("Dependencies.toml");
             Assert.assertEquals(capture.field("message"), lock + " locks ballerina/http at '" + locked
                     + "', which is not a complete version");
-            Assert.assertEquals(capture.field("suggestion"), "Fix the ballerina/http entry in " + lock + ", or "
-                    + "delete the file and run 'bal build' to regenerate it; or write a version after the package: "
+            Assert.assertEquals(capture.field("suggestion"), "Fix the ballerina/http entry in " + lock + ", "
+                    + "delete the file and run 'bal build' to regenerate it, or write a version after the package, "
                     + "ballerina/http:<version>.");
+            Capture text = new Capture();
+            Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--output-format", "text"),
+                    text.streams(), never(), projectDir.toString()), Failure.RUNTIME, locked);
+            Assert.assertFalse(text.stderr().contains("Usage:"), "a runtime failure prints no usage: " + text.stderr());
         }
     }
 
@@ -1480,7 +1486,7 @@ public class CliTest {
         int exitCode = Cli.run(List.of("package", "ballerina/graphql", "--module", "subgraph"), capture.streams(),
                 options(transport));
         Assert.assertEquals(exitCode, Failure.RUNTIME);
-        Assert.assertEquals(capture.field("kind"), "upstream", capture.stderr());
+        Assert.assertEquals(capture.field("kind"), "unavailable", capture.stderr());
     }
 
     @Test

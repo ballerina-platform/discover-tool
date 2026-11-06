@@ -514,7 +514,7 @@ public class CacheTest {
                 options(FakeTransport.always(FakeTransport.status(503)), cache).maxAttempts(1).build());
         Assert.assertEquals(exitCode, Failure.RUNTIME);
         Assert.assertEquals(capture.stdout(), "");
-        Assert.assertTrue(capture.stderr().contains("\"kind\":\"upstream\""));
+        Assert.assertTrue(capture.stderr().contains("\"kind\":\"unavailable\""));
     }
 
     @Test
@@ -813,7 +813,7 @@ public class CacheTest {
         Capture refreshed = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "-p", PKG, "--refresh"), refreshed.streams(), down),
                 Failure.RUNTIME);
-        Assert.assertTrue(refreshed.stderr().contains("\"kind\":\"upstream\""), refreshed.stderr());
+        Assert.assertTrue(refreshed.stderr().contains("\"kind\":\"unavailable\""), refreshed.stderr());
         Assert.assertEquals(readEntry(root), before, "a failed refresh must leave the cached payload in place");
 
         Capture offline = new Capture();

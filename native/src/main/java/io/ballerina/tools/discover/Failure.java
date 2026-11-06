@@ -81,6 +81,40 @@ public sealed interface Failure {
     }
 
     /**
+     * The project's {@code Dependencies.toml} locks the package at something that is not a complete version.
+     *
+     * @param qualified the {@code org/name} the lock names
+     * @param locked the version as the lock writes it
+     * @param lock the lock file, as the caller would write its path
+     */
+    record InvalidLock(String qualified, String locked, String lock) implements Failure {
+
+        @Override
+        public String suggestion() {
+            return "Fix the " + qualified + " entry in " + lock + ", delete the file and run 'bal build' to "
+                    + "regenerate it, or write a version after the package, " + qualified + ":<version>.";
+        }
+    }
+
+    /**
+     * A readme section asked with a {@code --filter} keyword it does not mention.
+     *
+     * @param qualified the {@code org/name} whose readme was read
+     * @param version the version that was read
+     * @param module the {@code --module} that was read, or {@code null} for the package's default module
+     * @param message which section, and the keyword it does not mention
+     * @param command the same command without {@code --filter}, ready to run
+     */
+    record FilterNoMatch(String qualified, String version, String module, String message, String command)
+            implements Failure {
+
+        @Override
+        public String suggestion() {
+            return "Drop --filter to read the section anyway.";
+        }
+    }
+
+    /**
      * A page past the end of a paged listing: the request is well formed, and the listing has fewer pages.
      *
      * @param message which page was asked for and how many there are
@@ -264,6 +298,12 @@ public sealed interface Failure {
     String RUNTIME_KIND = "runtime";
 
     /**
+     * The kind of an {@link Upstream} failure worth running unchanged later: no answer came back, or Central was
+     * throttling or overloaded. With {@code timeout} it is the only retryable kind, so the kind alone tells.
+     */
+    String UNAVAILABLE_KIND = "unavailable";
+
+    /**
      * A defect in this tool: something in the pipeline threw.
      *
      * @param message what was thrown
@@ -325,12 +365,14 @@ public sealed interface Failure {
             case Validation ignored -> USAGE_KIND;
             case PackageNotFound ignored -> "package-not-found";
             case PageNotFound ignored -> "page-not-found";
-            case Upstream ignored -> "upstream";
+            case Upstream f -> f.isTransient() ? UNAVAILABLE_KIND : "upstream";
             case Timeout ignored -> "timeout";
             case SchemaDrift ignored -> "schema-drift";
             case SymbolNotFound ignored -> "symbol-not-found";
             case Ambiguous ignored -> "ambiguous";
             case Internal ignored -> "internal";
+            case InvalidLock ignored -> "invalid-lock";
+            case FilterNoMatch ignored -> "filter-no-match";
         };
     }
 
@@ -363,6 +405,9 @@ public sealed interface Failure {
             case SymbolNotFound f -> f.message();
             case Ambiguous f -> f.message();
             case Internal f -> f.message().isEmpty() ? INTERNAL_MESSAGE : INTERNAL_MESSAGE + ": " + f.message();
+            case InvalidLock f -> f.lock() + " locks " + f.qualified() + " at '" + f.locked()
+                    + "', which is not a complete version";
+            case FilterNoMatch f -> f.message();
         };
     }
 
@@ -373,11 +418,13 @@ public sealed interface Failure {
             case PageNotFound f -> f.command();
             case PackageNotFound f -> f.command() == null ? null : f.command().text();
             case SymbolNotFound f -> f.command();
+            case FilterNoMatch f -> f.command();
             case Ambiguous ignored -> null;
             case Upstream ignored -> null;
             case Timeout ignored -> null;
             case SchemaDrift ignored -> null;
             case Internal ignored -> null;
+            case InvalidLock ignored -> null;
         };
     }
 
@@ -517,6 +564,17 @@ public sealed interface Failure {
                 matches(json, f.matchesKey(), f.matches());
             }
             case Internal f -> json.addProperty("suggestion", f.suggestion());
+            case InvalidLock f -> {
+                json.addProperty("qualified", f.qualified());
+                json.addProperty("lock", f.lock());
+                json.addProperty("locked", f.locked());
+                json.addProperty("suggestion", f.suggestion());
+            }
+            case FilterNoMatch f -> {
+                coordinates(json, f.qualified(), f.version(), f.module());
+                json.addProperty("suggestion", f.suggestion());
+                command(json, f.command());
+            }
         }
         return json.toString();
     }

@@ -85,7 +85,7 @@ public class FailureTest {
         Failure upstream = new Failure.Upstream("https://x.test/a", 3,
                 "Central answered https://x.test/a with HTTP 503", "Retry.", 503, true)
                 .about("ballerina/http", "2.15.7");
-        Assert.assertEquals(upstream.describe(), "{\"severity\":\"error\",\"kind\":\"upstream\",\"message\":"
+        Assert.assertEquals(upstream.describe(), "{\"severity\":\"error\",\"kind\":\"unavailable\",\"message\":"
                 + "\"Central answered https://x.test/a with HTTP 503 (3 attempts)\",\"qualified\":\"ballerina/http\","
                 + "\"version\":\"2.15.7\",\"url\":\"https://x.test/a\",\"attempts\":3,\"suggestion\":\"Retry.\","
                 + "\"status\":503,\"reached\":true}");

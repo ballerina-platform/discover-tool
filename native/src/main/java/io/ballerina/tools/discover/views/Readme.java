@@ -289,9 +289,10 @@ public final class Readme {
         Section section = found.get(0);
         if (filter != null && !matches(section, filter)) {
             String unfiltered = command(loaded.target(), requested).text();
-            return Result.err(new Failure.Validation(
+            return Result.err(new Failure.FilterNoMatch(loaded.qualified().qualified(), loaded.version().text(),
+                    loaded.module(),
                     "section " + requested + " (\"" + section.title() + "\") does not mention \"" + filter + "\"",
-                    "Drop --filter to read it anyway.", unfiltered));
+                    unfiltered));
         }
         return Result.ok(toResult(section, sections.size(), loaded));
     }
