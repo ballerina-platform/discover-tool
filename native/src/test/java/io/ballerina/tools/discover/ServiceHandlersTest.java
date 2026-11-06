@@ -121,7 +121,7 @@ public class ServiceHandlersTest {
 
     private static JsonObject json(HttpOptions http, String... argv) {
         List<String> withOutput = new ArrayList<>(List.of(argv));
-        withOutput.add("--output");
+        withOutput.add("--output-format");
         withOutput.add("json");
         return JsonParser.parseString(run(http, withOutput.toArray(new String[0]))).getAsJsonObject();
     }
@@ -269,7 +269,7 @@ public class ServiceHandlersTest {
     @Test
     public void bothRenderingsListTheHandlersFromThePublishedBala() {
         HttpOptions http = central(true);
-        String text = run(http, "service", "-p", "ballerinax/kafka", "--output", "text");
+        String text = run(http, "service", "-p", "ballerinax/kafka", "--output-format", "text");
         Assert.assertTrue(text.contains("Methods to implement (2)\n\nremote function onConsumerRecord("), text);
         Assert.assertTrue(text.contains("  required\n"), text);
         Assert.assertTrue(text.contains("remote function onError(kafka:Error kafkaError) returns error?\n  optional"),
@@ -303,8 +303,8 @@ public class ServiceHandlersTest {
     public void aHandlerNameThatMatchesNothingListsTheMethodsToImplement() {
         HttpOptions http = central(true);
         StringBuilder err = new StringBuilder();
-        int code = Cli.run(List.of("method", "nosuch", "-p", "ballerinax/kafka", "--service", "Service", "--output",
-                "json"),
+        int code = Cli.run(List.of("method", "nosuch", "-p", "ballerinax/kafka", "--service", "Service",
+                "--output-format", "json"),
                 new Cli.Streams(out -> { }, err::append), http);
         Assert.assertEquals(code, 1, err.toString());
         JsonObject failure = JsonParser.parseString(err.toString()).getAsJsonObject();
@@ -318,15 +318,15 @@ public class ServiceHandlersTest {
         HttpOptions http = central(true);
         JsonObject answer = json(http, "method", "onError", "-p", "ballerinax/kafka", "--service", "Service");
         Assert.assertEquals(answer.getAsJsonArray("handlers").size(), 1);
-        String text = run(http, "method", "onError", "-p", "ballerinax/kafka", "--service", "Service", "--output",
-                "text");
+        String text = run(http, "method", "onError", "-p", "ballerinax/kafka", "--service", "Service",
+                "--output-format", "text");
         Assert.assertTrue(text.contains("Methods to implement (1)"), text);
     }
 
     @Test
     public void aPackageWithoutTheFileAnswersAsBefore() {
         HttpOptions http = central(false);
-        String text = run(http, "service", "-p", "ballerinax/kafka", "--output", "text");
+        String text = run(http, "service", "-p", "ballerinax/kafka", "--output-format", "text");
         Assert.assertTrue(text.contains("Service declares no methods; a service of this type declares its own "
                 + "resource or remote methods."), text);
         Assert.assertTrue(text.contains("Readme sections that declare one"), text);
@@ -341,7 +341,7 @@ public class ServiceHandlersTest {
                         : url.matches(".*/registry/packages/[^/]+/[^/]+") ? FakeTransport.ok("[\"4.6.6\"]")
                         : FakeTransport.status(404))).baseDelayMs(1).sleeper(millis -> {
         }).build();
-        Assert.assertTrue(run(http, "service", "-p", "ballerinax/kafka", "--output", "text")
+        Assert.assertTrue(run(http, "service", "-p", "ballerinax/kafka", "--output-format", "text")
                 .contains("Service declares no methods; a service of this type declares its own resource or "
                         + "remote methods."));
     }

@@ -111,7 +111,8 @@ public class SelectionCarryTest {
 
     @Test
     public void aLaterPageCountsWhatIsLeftNotWhatWasShownInText() {
-        Run text = run("ballerinax__twilio", "bal discover client Client -p ballerinax/twilio --page 2 --output text");
+        Run text = run("ballerinax__twilio",
+                "bal discover client Client -p ballerinax/twilio --page 2 --output-format text");
         Assert.assertTrue(text.out().contains("\n... 119 more (page 2 of 5)\n"
                 + "Next: bal discover method <name> -p ballerinax/twilio --client Client\n"
                 + "Next: bal discover client Client -p ballerinax/twilio --page 3\n"), text.out());
@@ -137,7 +138,7 @@ public class SelectionCarryTest {
     public void anAutoSelectedContainerIsNamedInBothRenderings() {
         JsonObject service = answer("ballerinax__kafka", "bal discover service -p ballerinax/kafka");
         Assert.assertEquals(service.get("container").getAsString(), "Service", service.toString());
-        Run text = run("ballerinax__kafka", "bal discover service -p ballerinax/kafka --output text");
+        Run text = run("ballerinax__kafka", "bal discover service -p ballerinax/kafka --output-format text");
         Assert.assertTrue(text.out().startsWith("ballerinax/kafka:0.0.0-fixture · service · Service\n"), text.out());
 
         JsonObject groups = answer("ballerinax__github", "bal discover client -p ballerinax/github");
@@ -347,7 +348,7 @@ public class SelectionCarryTest {
         normal.addAll(strings(third, "normal"));
         Assert.assertEquals(normal.stream().distinct().count(), 30L, "a page repeated or skipped an entry");
 
-        Run text = run(http, HTTP + " --page 2 --output text");
+        Run text = run(http, HTTP + " --page 2 --output-format text");
         Assert.assertTrue(text.out().contains("\n\nRemote methods (->)\n  "), text.out());
         Assert.assertTrue(text.out().contains("\n\nMethods (.)\n  "), text.out());
         Assert.assertTrue(text.out().contains("\n... 11 more (page 2 of 3)\nNext: bal discover method <name> -p "
@@ -402,7 +403,7 @@ public class SelectionCarryTest {
         Assert.assertEquals(remote.stream().distinct().count(), 111L, "a page repeated or skipped an entry");
         Assert.assertEquals(normal, List.of("close"));
 
-        Run text = run("ballerinax__redis", command + " --output text");
+        Run text = run("ballerinax__redis", command + " --output-format text");
         Assert.assertTrue(text.out().startsWith(
                 "ballerinax/redis:0.0.0-fixture · client · Client\n111 remote methods, 1 method\n"), text.out());
     }
@@ -436,7 +437,7 @@ public class SelectionCarryTest {
         Assert.assertEquals(documented.size(), 102);
         Assert.assertEquals(documented.stream().distinct().count(), 102L, "a page repeated or skipped a name");
 
-        Run text = run("ballerinax__redis", command + " --output text");
+        Run text = run("ballerinax__redis", command + " --output-format text");
         Assert.assertTrue(text.out().contains("\nMentioned only in their documentation (40 of 102)\n"), text.out());
         Assert.assertTrue(text.out().endsWith(
                 "\n... 62 more that mention it only in their documentation (page 1 of 3)\n"
@@ -561,7 +562,7 @@ public class SelectionCarryTest {
         Assert.assertEquals(entries.stream().distinct().count(), (long) entries.size(), "a group repeated");
         Assert.assertEquals(second.getAsJsonObject("counts"), first.getAsJsonObject("counts"));
 
-        Run text = run("ballerinax__github", first.get("next").getAsString() + " --output text");
+        Run text = run("ballerinax__github", first.get("next").getAsString() + " --output-format text");
         Assert.assertTrue(text.out().contains("\n1 resource path here, 64 path groups\n"), text.out());
     }
 }

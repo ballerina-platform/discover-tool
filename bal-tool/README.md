@@ -74,7 +74,7 @@ request in this order.
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `-p, --package <org>/<package>[:<version>]` | The package to read, on every noun but `package`; on `search` only to search one package. |
 | `--client`, `--class`, `--service <name>` | The container a `method` or `resource` is declared by; optional when exactly one declares it. |
-| `--output json\|text`  | Override the default: text when stdout is a terminal, JSON otherwise.                                  |
+| `--output-format json\|text` | Override the default: text when stdout is a terminal, JSON otherwise. |
 | `--filter <keyword>`   | Narrow a listing to entries whose name, path, parameter or type contains the keyword. Filtering is local to the fetched payload; nothing is sent to Central. On `package` it runs `search <keyword>`. |
 | `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is a `validation` failure. |
 | `-m, --module <module>` | Target a submodule instead of the default module, on every noun including `readme`. The package's overview lists the submodules it has. |
@@ -595,7 +595,7 @@ error: 'close' is declared by Consumer and Producer in ballerinax/kafka:4.6.5.
   Name the one you mean with --client, --class, --service:
     Consumer  bal discover method close -p ballerinax/kafka --client Consumer
     Producer  bal discover method close -p ballerinax/kafka --client Producer
-Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] [--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
+Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] [--output-format json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
 Run `bal discover method --help` for details.
 ```
 
@@ -838,7 +838,7 @@ and `suggestion` say the rest:
 | 6    | an internal error: a defect in `bal discover`                                     | `internal`                              |
 
 A failure is written in the same mode as an answer would have been: JSON off a terminal, text at one, either
-forced with `--output` (honoured even when the rest of the arguments fail to parse). In JSON it is one object
+forced with `--output-format` (honoured even when the rest of the arguments fail to parse). In JSON it is one object
 carrying `kind`, `message` (the one-sentence headline text mode prints after `error:`) and `suggestion`. Its
 `qualified` is always `org/name` (an `upstream` or `timeout` failure carries it once the request was for a
 package), and `version` (when one was reached) and `module` (when `--module` was passed) are keys of their own.
@@ -859,12 +859,12 @@ readme's sections, the matches) indented below it; a usage error then ends with 
 $ bal discover package ballerina/http:2.15
 error: '2.15' in 'ballerina/http:2.15' is not a complete version.
   Write it in full, ballerina/http:<major>.<minor>.<patch>, or drop it to read the version your project locks or Central's latest: ballerina/http
-Usage: bal discover package <org>/<name>[:<version>] [--output json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
+Usage: bal discover package <org>/<name>[:<version>] [--output-format json|text] [--filter <keyword>] [--page <n>] [-m <module>] [--refresh]
 Run `bal discover package --help` for details.
 ```
 
 A usage error is a `validation` failure. Most are found before anything is looked up: an unknown option, an
-option with a missing or invalid value (`--output xml`, `--page x`, `--page 0`, `--refresh=yes`), given twice, or
+option with a missing or invalid value (`--output-format xml`, `--page x`, `--page 0`, `--refresh=yes`), given twice, or
 given both before the noun and after it, no noun, a malformed package name or incomplete version, `--version`, a
 version typed as a name, an unknown noun, more names than a noun takes, more than one container flag, a `type`
 name with `--filter`, a `search` with no keyword, with `--filter`, or (across Central) with `--module`, and the

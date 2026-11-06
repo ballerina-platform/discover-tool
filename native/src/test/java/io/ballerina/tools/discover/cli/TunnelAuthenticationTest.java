@@ -80,7 +80,7 @@ public class TunnelAuthenticationTest {
 
     private static Run tool(ConnectProxy proxy, String password, List<String> jvmOptions)
             throws IOException, InterruptedException {
-        return fork(proxy.port(), password, jvmOptions, ForkedRun.TOOL, "package", "ballerina/http", "--output",
+        return fork(proxy.port(), password, jvmOptions, ForkedRun.TOOL, "package", "ballerina/http", "--output-format",
                 "json");
     }
 

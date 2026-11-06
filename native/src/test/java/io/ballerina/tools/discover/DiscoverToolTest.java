@@ -130,7 +130,7 @@ public class DiscoverToolTest {
         new DiscoverTool(System.out, System.err).printUsage(sb);
         Assert.assertTrue(sb.toString().startsWith("  bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]]"),
                 sb.toString());
-        for (String flag : List.of("--refresh", "--output", "--filter", "--page", "-m", "--help")) {
+        for (String flag : List.of("--refresh", "--output-format", "--filter", "--page", "-m", "--help")) {
             Assert.assertTrue(sb.toString().contains(flag), flag + " missing from: " + sb);
         }
     }

@@ -46,8 +46,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - List containers, service types, methods, resource paths and declarations alphabetically
 - Add a ready-to-run next command to every listing entry, the bare package's buckets included: `command`, or
   `commands` keyed by accessor on resource rows, plus a `next` command when a listing continues
-- Add JSON output (one line per answer) and aligned human-readable text output, selected by `--output json|text` and
-  defaulting to text on a terminal and JSON otherwise
+- Add JSON output (one line per answer) and aligned human-readable text output, selected by
+  `--output-format json|text` and defaulting to text on a terminal and JSON otherwise
 - Report failures on stderr in the run's output mode: a single-line JSON object, or `error: <message>` with the
   suggestion indented below it; a usage error (a malformed command line, rejected before anything is looked up)
   exits 2 and, in text, ends with the synopsis and a pointer to `--help`, and every other failure exits 1; every
