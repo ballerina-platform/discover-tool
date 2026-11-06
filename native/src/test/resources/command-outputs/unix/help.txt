@@ -1,6 +1,7 @@
 Read a Ballerina package's API off Central; trust it over memory or the web
 
-Usage: bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]] [options]
+Usage: bal discover <noun> [<name> ...] -p <org>/<name>[:<version>] [options]
+       bal discover package <org>/<name>[:<version>] [options]
 
 Commands:
   package <org>/<name>[:<version>]  a package's overview
@@ -13,19 +14,22 @@ Commands:
   method [<name>]                   a container's methods, or one's signature
   resource [<path> [<accessor>]]    resource paths, or one method's signature
   readme [<n>|"<title>"]            the readme, or one section of it
+  Every noun but package needs -p; search takes it only to search one package.
+  bal discover <org>/<name> is short for bal discover package <org>/<name>.
+  Options may come before or after the noun.
   Run 'bal discover <noun> --help' for a noun's options and examples.
 
 Options:
+  -p, --package <org>/<name>[:<version>]
+                              read this package, as bal pull names it
   --client|--class|--service <name>
                               name the container of a method or resource
   --filter <keyword>          narrow a listing to the names that match a keyword
   -h, --help                  print this help
   --module <name>             read this submodule by name, e.g. httpscerr
   --output-format json|text   set the format (default: text on a TTY, else json)
-  -p, --package <org>/<name>[:<version>]
-                              read this package, as bal pull names it
   --page <n>                  show page n, 40 entries a page (default: 1)
-  --refresh                   ignore the cached copy and fetch it again
+  --refresh                   refetch when a name should exist but is not found
   -V, --version               print the tool's version
 
 Examples:
@@ -33,8 +37,9 @@ Examples:
   bal discover search kafka send
   # What a package offers
   bal discover package ballerinax/kafka
-  # One call, fully addressed
+  # A method's signature, its container named
   bal discover method send -p ballerinax/kafka --client Producer
+  # A resource method's signature: the path, then its accessor
   bal discover resource gists/public get -p ballerinax/github --client Client
   # A record, enum or error
   bal discover type ConnectionConfig -p ballerinax/github

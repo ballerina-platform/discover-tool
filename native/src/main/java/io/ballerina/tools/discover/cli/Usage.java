@@ -55,14 +55,9 @@ final class Usage {
      * One example: what it shows, then the command.
      *
      * @param comment what it shows, one line
-     * @param commands the commands that show it
+     * @param command the command that shows it
      */
-    private record Example(String comment, List<String> commands) {
-
-        Example(String comment, String command) {
-            this(comment, List.of(command));
-        }
-    }
+    private record Example(String comment, String command) { }
 
     /**
      * What one noun reads.
@@ -134,18 +129,25 @@ final class Usage {
     private static final String DESCRIPTION =
             "Read a Ballerina package's API off Central; trust it over memory or the web";
 
-    private static final String MORE = "Run 'bal discover <noun> --help' for a noun's options and examples.";
+    /** What the root's synopsis cannot say, under its list of commands. */
+    private static final List<String> NOTES = List.of(
+            "Every noun but package needs -p; search takes it only to search one package.",
+            Command.PREFIX + "<org>/<name> is short for " + Command.PREFIX + Command.PACKAGE + " <org>/<name>.",
+            "Options may come before or after the noun.",
+            "Run 'bal discover <noun> --help' for a noun's options and examples.");
+
+    /** The options a noun parses but turns down, so its help does not offer them. */
+    private static final Map<String, Set<String>> NOT_TAKEN = Map.of(Command.SEARCH, Set.of(Command.FILTER_FLAG));
 
     private static final List<Example> SESSION = List.of(
             new Example("Find a package or a symbol on Central", example(Command.SEARCH, "kafka send")),
             new Example("What a package offers", example(Command.PACKAGE, "ballerinax/kafka")),
-            new Example("One call, fully addressed", List.of(example(Command.METHOD, "send" + PRODUCER),
-                    example(Command.RESOURCE, "gists/public get" + GITHUB_CLIENT))),
+            new Example("A method's signature, its container named", example(Command.METHOD, "send" + PRODUCER)),
+            new Example("A resource method's signature: the path, then its accessor",
+                    example(Command.RESOURCE, "gists/public get" + GITHUB_CLIENT)),
             new Example("A record, enum or error", example(Command.TYPE, "ConnectionConfig" + GITHUB)),
             new Example("One version; without one, ./Dependencies.toml's lock, else the latest",
                     example(Command.CLIENT, "Client -p ballerina/http:2.15.7")));
-
-    private static final String SHARED_OPTIONS = "every option 'bal discover --help' lists";
 
     private static final String OWNER_ROW = "name the container of a method or resource";
 
@@ -157,34 +159,37 @@ final class Usage {
     /** The whole usage text: what the tool is, the commands, the options, and how to walk it. */
     static String root() {
         Commands.Grammar grammar = Commands.Grammar.create();
+        StringBuilder notes = new StringBuilder();
+        NOTES.forEach(note -> notes.append(UsageRenderer.INDENT).append(note).append("\n"));
         return DESCRIPTION + "\n\n"
                 + UsageRenderer.synopsis(grammar, null)
+                + UsageRenderer.alternativeSynopsis(grammar, Command.PACKAGE)
                 + "\nCommands:\n" + UsageRenderer.table(Command.NOUNS.stream()
                         .map(noun -> new UsageRenderer.Row(noun + label(noun), NOUNS.get(noun).summary()))
                         .toList(), COMMAND_COLUMN)
-                + UsageRenderer.INDENT + MORE + "\n"
-                + "\nOptions:\n" + UsageRenderer.table(UsageRenderer.optionRows(grammar, null, OWNER_ROW),
+                + notes
+                + "\nOptions:\n" + UsageRenderer.table(UsageRenderer.optionRows(grammar, null, OWNER_ROW, Set.of()),
                         UsageRenderer.OPTION_COLUMN)
                 + examples(SESSION);
     }
 
-    /** One noun's usage text: what it reads, its synopsis, its own options, and examples. */
+    /** One noun's usage text: what it reads, its synopsis, every option it takes, and examples. */
     static String noun(String noun) {
         Commands.Grammar grammar = Commands.Grammar.create();
         Noun about = NOUNS.get(noun);
-        List<UsageRenderer.Row> own = UsageRenderer.ownOptionRows(grammar, noun, OWN_OWNER_ROW);
+        List<UsageRenderer.Row> options = UsageRenderer.optionRows(grammar, noun, OWN_OWNER_ROW,
+                NOT_TAKEN.getOrDefault(noun, Set.of()));
         return about.description() + "\n\n"
                 + UsageRenderer.synopsis(grammar, noun)
-                + "\nOptions:\n" + UsageRenderer.table(own, UsageRenderer.OPTION_COLUMN)
-                + UsageRenderer.INDENT + (own.isEmpty() ? "" : "and ") + SHARED_OPTIONS + "\n"
+                + "\nOptions:\n" + UsageRenderer.table(options, UsageRenderer.OPTION_COLUMN)
                 + examples(about.examples());
     }
 
     private static String examples(List<Example> examples) {
         StringBuilder text = new StringBuilder("\nExamples:\n");
         for (Example example : examples) {
-            text.append(UsageRenderer.INDENT).append("# ").append(example.comment()).append("\n");
-            example.commands().forEach(command -> text.append(UsageRenderer.INDENT).append(command).append("\n"));
+            text.append(UsageRenderer.INDENT).append("# ").append(example.comment()).append("\n")
+                    .append(UsageRenderer.INDENT).append(example.command()).append("\n");
         }
         return text.toString();
     }
@@ -194,9 +199,12 @@ final class Usage {
         return NOUNS.get(noun).label();
     }
 
-    /** The flags {@code noun}'s synopsis writes as required: the package, except where it is optional. */
+    /**
+     * The flags {@code noun}'s synopsis writes as required: the package, except where it is optional. The root's
+     * synopsis is every noun's but {@code package}, which has a synopsis line of its own.
+     */
     static Set<String> requiredFlags(String noun) {
-        return noun == null || Command.PACKAGE.equals(noun) || Command.SEARCH.equals(noun)
+        return Command.PACKAGE.equals(noun) || Command.SEARCH.equals(noun)
                 ? Set.of()
                 : Set.of(Command.PACKAGE_FLAG);
     }
