@@ -2,7 +2,7 @@
 org = "ballerina"
 name = "tool_discover"
 version = "0.1.0-SNAPSHOT"
-distribution = "2201.13.2"
+distribution = "2201.14.0"
 authors = ["Ballerina"]
 keywords = ["discover", "search", "copilot"]
 repository = "https://github.com/ballerina-platform/discover-tool"

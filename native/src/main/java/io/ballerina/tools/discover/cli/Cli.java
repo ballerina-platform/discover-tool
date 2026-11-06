@@ -139,7 +139,7 @@ public final class Cli {
 
     /**
      * @param interactive whether stdout is an interactive terminal — the {@code --output-format} default in the
-     *     absence of the flag. Discovered by {@link DiscoverTool} from {@code System.console()}, never read here: a
+     *     absence of the flag. Discovered by {@link DiscoverTool} from {@link Terminal}, never read here: a
      *     test drives both defaults without a real terminal, the same reason the cache and the transport are
      *     injected.
      */

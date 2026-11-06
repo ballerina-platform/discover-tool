@@ -17,6 +17,13 @@
  */
 
 import org.apache.tools.ant.taskdefs.condition.Os
+import org.gradle.process.ExecOperations
+
+import javax.inject.Inject
+
+abstract class BallerinaExecHelper {
+    @Inject abstract ExecOperations getExecOperations()
+}
 
 plugins {
     id 'io.ballerina.plugin'
@@ -32,7 +39,7 @@ def ballerinaTomlFilePlaceHolder = new File("${project.rootDir}/config/resources
 def balToolTomlFilePlaceHolder = new File("${project.rootDir}/config/resources/BalTool.toml")
 def ballerinaTomlFile = new File("$project.projectDir/Ballerina.toml")
 def balToolTomlFile = new File("$project.projectDir/BalTool.toml")
-def distributionPath = "${project.buildDir}/jballerina-tools-${ballerinaLangVersion}"
+def distributionPath = layout.buildDirectory.dir("jballerina-tools-${ballerinaLangVersion}").get().asFile.path
 def distributionBinPath = "${distributionPath}/bin"
 
 def stripBallerinaExtensionVersion(String extVersion) {
@@ -53,6 +60,7 @@ ballerina {
     packageOrganization = packageOrg
     module = packageName
     langVersion = ballerinaLangVersion
+    platform = 'java25'
 }
 
 configurations {
@@ -77,9 +85,10 @@ tasks.register('updateTomlFiles') {
 }
 
 tasks.register('commitTomlFiles')  {
+    def execHelper = project.objects.newInstance(BallerinaExecHelper)
     onlyIf { project.hasProperty('autoCommitToml') }
     doLast {
-        project.exec {
+        execHelper.execOperations.exec {
             ignoreExitValue true
             if (Os.isFamily(Os.FAMILY_WINDOWS)) {
                 commandLine 'cmd', '/c', 'git commit -m \"[Automated] Update the native jar version\" Ballerina.toml BalTool.toml'
