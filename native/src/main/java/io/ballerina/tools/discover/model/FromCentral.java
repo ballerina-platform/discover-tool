@@ -673,21 +673,19 @@ public final class FromCentral {
         List<String> candidates = submodulesOf(docs, qualified).stream()
                 .map(module -> module.id().substring(prefix.length()))
                 .toList();
-        Command command = Command.overview(new Coordinate(qualified, pin).target(null));
-        String dropped = "drop --module for the default module.";
-        String suggestion;
+        String dropped = "drop --module for the default module";
         if (candidates.isEmpty()) {
-            suggestion = qualified.qualified() + " publishes no submodules, so " + dropped;
-        } else if (candidates.contains(submodule)) {
-            suggestion = "Central's page for '" + submodule + "'" + (version == null ? "" : " at " + version.text())
-                    + " cannot be confirmed as a submodule of this package. Pass another of its submodules ("
-                    + String.join(", ", candidates) + "), or " + dropped;
-        } else {
-            suggestion = qualified.qualified() + " publishes these submodules: " + String.join(", ", candidates)
-                    + ". Pass one of them to --module, or " + dropped;
+            Command command = Command.overview(new Coordinate(qualified, pin).target(null));
+            return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), submodule,
+                    qualified.qualified() + " publishes no submodules, so " + dropped + ".", command, candidates);
         }
-        return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version),
-                submodule, suggestion, command, candidates);
+        String suggestion = candidates.contains(submodule)
+                ? "Pass another of its submodules to --module, or " + dropped + "; Central's page for '" + submodule
+                        + "'" + (version == null ? "" : " at " + version.text())
+                        + " cannot be confirmed as one of them."
+                : "Pass one of its submodules to --module, or " + dropped + ".";
+        return new Failure.PackageNotFound(qualified.qualified(), Version.textOf(version), submodule, suggestion,
+                null, candidates);
     }
 
     /**

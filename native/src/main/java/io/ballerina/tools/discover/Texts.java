@@ -93,11 +93,20 @@ public final class Texts {
 
     /** {@code A}, {@code A and B}, {@code A, B and C}. */
     public static String and(List<String> items) {
+        return joined(items, " and ");
+    }
+
+    /** {@code A}, {@code A or B}, {@code A, B or C}. */
+    public static String or(List<String> items) {
+        return joined(items, " or ");
+    }
+
+    private static String joined(List<String> items, String last) {
         if (items.size() < 2) {
             return String.join("", items);
         }
-        int last = items.size() - 1;
-        return String.join(", ", items.subList(0, last)) + " and " + items.get(last);
+        int end = items.size() - 1;
+        return String.join(", ", items.subList(0, end)) + last + items.get(end);
     }
 
     /**

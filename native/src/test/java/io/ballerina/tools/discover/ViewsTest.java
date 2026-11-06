@@ -43,6 +43,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 /**
  * Every bucket's answers, snapshotted in both renderings, plus the composition rules that decide their shape.
@@ -124,16 +125,38 @@ public class ViewsTest {
         return failure;
     }
 
-    // A name that matches nothing at a level: every name there when they fit, else the listing of the level.
+    // A name that matches nothing at a level with too many names to list, or none: the listing of the level.
     private static void assertMissAt(Failure.SymbolNotFound failure, String message, String listing) {
         Assert.assertEquals(failure.message(), message);
-        if (failure.candidates().isEmpty()) {
-            Assert.assertEquals(failure.command(), listing, failure.describeText());
-        } else {
-            Assert.assertNull(failure.command(), failure.describeText());
-            Assert.assertTrue(failure.candidates().size() <= Containers.MAX_ENTRIES, failure.describeText());
-            Assert.assertTrue(failure.suggestion().startsWith("Name one of the "), failure.suggestion());
-        }
+        Assert.assertEquals(failure.candidates(), List.of(), failure.describeText());
+        Assert.assertEquals(failure.command(), listing, failure.describeText());
+    }
+
+    // A name that matches nothing at a level with few enough names to list: every one of them, and no command.
+    private static void assertMissAmong(Failure.SymbolNotFound failure, String message, int names) {
+        Assert.assertEquals(failure.message(), message);
+        Assert.assertEquals(failure.candidates().size(), names, failure.describeText());
+        Assert.assertNull(failure.command(), failure.describeText());
+        Assert.assertTrue(failure.suggestion().startsWith("Name one of the "), failure.suggestion());
+    }
+
+    @Test
+    public void aMissListsUpToTheEntryCeilingOfCandidatesAndPastItTheListing() {
+        LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
+        List<String> ceiling = IntStream.range(0, Containers.MAX_ENTRIES).mapToObj(i -> "name" + i).toList();
+        List<String> over = IntStream.rangeClosed(0, Containers.MAX_ENTRIES).mapToObj(i -> "name" + i).toList();
+        String listing = "bal discover client -p ballerinax/kafka";
+
+        Failure.SymbolNotFound listed = (Failure.SymbolNotFound) kafka.missAmong(List.of("x"), "m", "clients",
+                listing, ceiling, null);
+        Assert.assertEquals(listed.candidates(), ceiling);
+        Assert.assertNull(listed.command());
+
+        Failure.SymbolNotFound pointed = (Failure.SymbolNotFound) kafka.missAmong(List.of("x"), "m", "clients",
+                listing, over, null);
+        Assert.assertEquals(pointed.candidates(), List.of());
+        Assert.assertEquals(pointed.command(), listing);
+        Assert.assertEquals(pointed.suggestion(), "List the clients.");
     }
 
     private static void assertMiss(Failure.SymbolNotFound failure, String message, String suggestion,
@@ -446,7 +469,7 @@ public class ViewsTest {
         Assert.assertEquals(failure.matches().stream().map(Failure.Match::name).toList(),
                 List.of("Consumer", "Producer"));
         Assert.assertEquals(failure.describeText(), "bal discover: error: " + failure.message()
-                + "\n  Name the one you mean:\n"
+                + "\n  Name the one you mean.\n"
                 + "    Consumer  bal discover method close -p ballerinax/kafka --client Consumer\n"
                 + "    Producer  bal discover method close -p ballerinax/kafka --client Producer");
     }
@@ -482,36 +505,36 @@ public class ViewsTest {
     @Test
     public void aContainerThatIsNotThereFailsWithTheSearchAndTheBucketsListing() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        assertMissAt(miss(http, "client", "client"),
-                "'client' is not a client, nor a member of any client, in " + http.label(),
-                "bal discover client -p ballerina/http");
-        assertMissAt(miss(http, "function", "nosuch"), "'nosuch' is not a function in " + http.label(),
-                        "bal discover function -p ballerina/http");
+        assertMissAmong(miss(http, "client", "client"),
+                "'client' is not a client, nor a member of any client, in " + http.label(), 10);
+        assertMissAmong(miss(http, "function", "nosuch"), "'nosuch' is not a function in " + http.label(), 7);
         // A name nothing in the bucket declares, whether as a container, a member or a path.
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        assertMissAt(miss(github, "client", "gist"),
-                "'gist' is not a client, nor a member of any client, in " + github.label(),
-                "bal discover client -p ballerinax/github");
+        assertMissAmong(miss(github, "client", "gist"),
+                "'gist' is not a client, nor a member of any client, in " + github.label(), 1);
     }
 
     @Test
     public void aMethodThatIsNotThereFailsWithItsContainersMethods() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         for (String typed : new String[] {"gett", "GET"}) {
-            assertMissAt(miss(http, "method", typed, "--client", "Client"),
-                    "'" + typed + "' is not a method of Client in " + http.label(),
-                    "bal discover method -p ballerina/http --client Client");
+            assertMissAmong(miss(http, "method", typed, "--client", "Client"),
+                    "'" + typed + "' is not a method of Client in " + http.label(), 19);
         }
         LoadedPackage kafka = FixtureCorpus.loadedFixture("ballerinax__kafka");
         for (String typed : new String[] {"sendd", "Send", "end"}) {
-            assertMissAt(miss(kafka, "method", typed, "--client", "Producer"),
-                    "'" + typed + "' is not a method of Producer in " + kafka.label(),
-                    "bal discover method -p ballerinax/kafka --client Producer");
+            assertMissAmong(miss(kafka, "method", typed, "--client", "Producer"),
+                    "'" + typed + "' is not a method of Producer in " + kafka.label(), 5);
         }
-        // Without a container, no container declares it: the package's search for it is the next command.
-        assertMiss(miss(kafka, "method", "sendd"), "'sendd' is not a method in " + kafka.label(),
-                "Search the package for it.",
-                "bal discover search sendd -p ballerinax/kafka");
+        // Without a container, no container declares it: every method the package's containers declare.
+        Failure.SymbolNotFound unowned = miss(kafka, "method", "sendd");
+        Assert.assertEquals(unowned.message(), "'sendd' is not a method in " + kafka.label());
+        Assert.assertEquals(unowned.suggestion(), "Name one of the methods below, or search the package with "
+                + "'bal discover search sendd -p ballerinax/kafka'.");
+        Assert.assertNull(unowned.command());
+        Assert.assertTrue(unowned.candidates().containsAll(List.of("send", "poll", "close")),
+                unowned.candidates().toString());
+        Assert.assertEquals(unowned.candidates(), unowned.candidates().stream().distinct().toList());
     }
 
     @Test
@@ -530,9 +553,8 @@ public class ViewsTest {
         assertMissAt(miss(github, "resource", "repos/:owner/:repo/caches", "--client", "Client"),
                 "'repos/:owner/:repo/caches' is not a resource path of Client in " + github.label(),
                 under.formatted("repos/:owner/:repo"));
-        assertMissAt(miss(github, "resource", "gists/public", "head", "--client", "Client"),
-                "'gists/public head' is not a resource method of Client in " + github.label(),
-                under.formatted("gists/public"));
+        assertMissAmong(miss(github, "resource", "gists/public", "head", "--client", "Client"),
+                "'gists/public head' is not a resource method of Client in " + github.label(), 1);
         // Left out, the one container that declares the path is settled, and the miss is the same.
         for (List<String> typed : List.of(List.of("gists/public", "head"), List.of("head", "gists/public"))) {
             List<String> words = new ArrayList<>(List.of("resource"));
@@ -698,8 +720,14 @@ public class ViewsTest {
                 String listing = methods
                         ? "bal discover method -p " + pkg + " --client " + container.name()
                         : "bal discover client " + container.name() + " -p " + pkg;
-                assertMissAt(miss(loaded, "method", "zzznosuchthing", "--client", container.name()),
-                        "'zzznosuchthing' is not a method of " + container.name() + " in " + loaded.label(), listing);
+                Failure.SymbolNotFound missed = miss(loaded, "method", "zzznosuchthing", "--client", container.name());
+                String message = "'zzznosuchthing' is not a method of " + container.name() + " in " + loaded.label();
+                int names = container.standalone().size();
+                if (names == 0 || names > Containers.MAX_ENTRIES) {
+                    assertMissAt(missed, message, listing);
+                } else {
+                    assertMissAmong(missed, message, names);
+                }
             }
         }
     }
@@ -1222,9 +1250,7 @@ public class ViewsTest {
                 "'createaccount' is not a method of Client in " + twilio.label(),
                 "bal discover method -p ballerinax/twilio --client Client");
         LoadedPackage log = FixtureCorpus.loadedFixture("ballerina__log");
-        assertMissAt(miss(log, "function", "printinfo"),
-                "'printinfo' is not a function in " + log.label(),
-                        "bal discover function -p ballerina/log");
+        assertMissAmong(miss(log, "function", "printinfo"), "'printinfo' is not a function in " + log.label(), 11);
     }
 
     @Test

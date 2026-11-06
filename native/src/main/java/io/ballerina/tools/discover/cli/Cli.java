@@ -356,7 +356,7 @@ public final class Cli {
                         call.paged(call.ownedBy(owner).command()).text()))
                 .toList();
         return new Failure.Validation("a " + call.noun() + " has one container; pass one of "
-                + String.join(", ", Command.OWNER_FLAGS), "Keep the one that declares it:", rows);
+                + String.join(", ", Command.OWNER_FLAGS), "Keep the one that declares it.", rows);
     }
 
     private static Failure.Validation tooManyNames(Invocation call) {
