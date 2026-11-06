@@ -42,11 +42,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The command's contract, under the package-first grammar: {@code bal discover <org>/<name> [bucket] [name ...]}.
+ * The command's contract: {@code bal discover <noun> [name ...] -p <org>/<name>[:<version>]}.
  *
  * <p>stdout carries the requested document and nothing else, stderr carries one JSON failure, and the exit code
  * says only whether stdout is complete, and if not, whether the command line itself was malformed (2). Every
- * mistyped or version-skewed call must fail LOUDLY as {@code validation} rather than resolving as something else
+ * mistyped or version-skewed call must fail LOUDLY as {@code usage} rather than resolving as something else
  * and reporting a Central failure the agent will retry.
  *
  * <p>Every bucket wired into {@link Cli} is covered here, {@code readme} included: it is not built on
@@ -501,7 +501,7 @@ public class CliTest {
     }
 
     @Test
-    public void anIncompleteVersionIsAValidationFailureThatFetchesNothing() {
+    public void anIncompleteVersionIsAUsageFailureThatFetchesNothing() {
         for (String coordinate : List.of("ballerina/http:2.15", "ballerina/http:latest")) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(List.of("client", "-p", coordinate), capture.streams(), never()), 2,
@@ -1698,7 +1698,7 @@ public class CliTest {
     }
 
     @Test
-    public void anInvalidOutputValueIsAValidationFailure() {
+    public void anInvalidOutputValueIsAUsageFailure() {
         Capture capture = new Capture();
         Assert.assertEquals(
                 Cli.run(List.of("package", "ballerinax/kafka", "--output-format", "xml"), capture.streams(), never()),
