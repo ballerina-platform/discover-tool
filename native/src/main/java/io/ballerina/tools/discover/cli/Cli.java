@@ -18,6 +18,7 @@
 
 package io.ballerina.tools.discover.cli;
 
+import io.ballerina.projects.util.ProjectUtils;
 import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Failure;
@@ -48,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -80,10 +82,6 @@ import java.util.stream.Stream;
 public final class Cli {
 
     private static final String PLACEHOLDER_PACKAGE = "<org>/<name>";
-
-    private static final String PLACEHOLDER_VERSION = "<version>";
-
-    private static final String WRITE_VERSION = "To read a specific version, write it after the package: ";
 
     private static final String WRITE_VERSION_AFTER = "To read a specific version, write it after the package.";
 
@@ -158,6 +156,10 @@ public final class Cli {
 
         Commands.Grammar grammar = Commands.Grammar.create();
         boolean json = jsonOutput(argv, interactive, grammar);
+        Failure.Validation valued = valuedSwitch(grammar, argv);
+        if (valued != null) {
+            return new UsageErrors(grammar, typedNoun(grammar, argv), streams, json).error(valued);
+        }
         Failure.Validation misnamed = misnamedNoun(argv);
         if (misnamed != null) {
             return new UsageErrors(grammar, null, streams, json).error(misnamed);
@@ -186,6 +188,10 @@ public final class Cli {
             streams.out().accept(nounName == null ? Usage.root() : Usage.noun(nounName));
             return Failure.ANSWERED;
         }
+        if (parsed.isVersionHelpRequested()) {
+            streams.out().accept(ToolVersion.text() + "\n");
+            return Failure.ANSWERED;
+        }
         Invocation typed = Invocation.of(grammar.root(), nounName, nounName == null ? null : grammar.nouns()
                 .get(nounName));
         Invocation call = typed.asBareCoordinate() ? typed.asPackageOverview() : typed;
@@ -202,9 +208,6 @@ public final class Cli {
 
     // What makes the command line itself unusable, before anything is fetched; null when it is well formed.
     private static Failure.Validation misuse(Commands.Grammar grammar, Invocation call, int literal) {
-        if (call.version() != null) {
-            return versionFlag(call);
-        }
         String repeated = Invocation.repeatedFlag(grammar.root(), call.noun() == null ? null
                 : grammar.nouns().get(call.noun()));
         if (repeated != null) {
@@ -234,6 +237,10 @@ public final class Cli {
         Failure.Validation output = rejectInvalidOutput(call.output());
         if (output != null) {
             return output;
+        }
+        Failure.Validation module = rejectInvalidModule(call.module());
+        if (module != null) {
+            return module;
         }
         if (Command.SEARCH.equals(call.noun()) && call.pkg() == null) {
             return null;
@@ -697,9 +704,14 @@ public final class Cli {
 
     // Every flag spelling that takes a value, at the root or under any noun.
     private static Set<String> valueOptions(Commands.Grammar grammar) {
+        return optionNames(grammar, option -> option.arity().min() > 0);
+    }
+
+    // Every spelling of the options `kept` keeps, at the root or under any noun.
+    private static Set<String> optionNames(Commands.Grammar grammar, Predicate<CommandLine.Model.OptionSpec> kept) {
         return Stream.concat(Stream.of(grammar.line()), grammar.line().getSubcommands().values().stream())
                 .flatMap(line -> line.getCommandSpec().options().stream())
-                .filter(option -> option.arity().min() > 0)
+                .filter(kept)
                 .flatMap(option -> Arrays.stream(option.names()))
                 .collect(Collectors.toSet());
     }
@@ -753,22 +765,8 @@ public final class Cli {
                 "Drop --page for the first page.", firstPage);
     }
 
-    private static Failure.Validation versionFlag(Invocation call) {
-        String message = "unknown option '" + Commands.VERSION_FLAG + "'";
-        Result<Coordinate> coordinate = call.coordinate() == null ? null : Coordinate.parse(call.coordinate());
-        if (coordinate == null || !coordinate.isOk() || call.noun() == null) {
-            return new Failure.Validation(message, "To read a specific version, write " + PLACEHOLDER_PACKAGE + ":"
-                    + PLACEHOLDER_VERSION + ".");
-        }
-        return writtenVersion(message, call, coordinate.value().qualified(), call.version());
-    }
-
     private static Failure.Validation writtenVersion(String message, Invocation call, QualifiedName qualified,
             String version) {
-        if (!Version.isComplete(version)) {
-            return new Failure.Validation(message, WRITE_VERSION + qualified.qualified() + ":" + PLACEHOLDER_VERSION
-                    + ".");
-        }
         String command = call.paged(call.at(new Coordinate(qualified, Version.parse(version).value())).command())
                 .text();
         return new Failure.Validation(message, WRITE_VERSION_AFTER, command);
@@ -782,6 +780,38 @@ public final class Cli {
                 "'" + output + "' is not a valid " + Commands.OUTPUT_FLAG + " value",
                 "Pass " + Commands.OUTPUT_FLAG + " " + Commands.JSON_OUTPUT + " or " + Commands.OUTPUT_FLAG + " "
                         + Commands.TEXT_OUTPUT + ".");
+    }
+
+    // Checked locally, before anything is fetched: a module name Ballerina itself would reject names nothing.
+    private static Failure.Validation rejectInvalidModule(String module) {
+        if (module == null || !module.isEmpty() && ProjectUtils.validateModuleName(module)) {
+            return null;
+        }
+        return new Failure.Validation("'" + module + "' is not a valid " + Command.MODULE_FLAG + " value",
+                "Pass a submodule's name, e.g. " + Command.MODULE_FLAG + " httpscerr.");
+    }
+
+    // The noun the command line names, read before it is parsed, or null.
+    private static String typedNoun(Commands.Grammar grammar, List<String> argv) {
+        int at = firstWord(argv, valueOptions(grammar));
+        return at >= 0 && Command.NOUNS.contains(argv.get(at)) ? argv.get(at) : null;
+    }
+
+    // A switch written with a value, `--refresh=true`: a switch takes none. Read off argv, since picocli accepts
+    // a boolean's own spelling as one.
+    private static Failure.Validation valuedSwitch(Commands.Grammar grammar, List<String> argv) {
+        Set<String> switches = optionNames(grammar, option -> option.arity().max() == 0);
+        for (String token : argv) {
+            if (Command.END_OF_OPTIONS.equals(token)) {
+                return null;
+            }
+            int equals = token.indexOf('=');
+            if (token.startsWith(Command.FLAG_START) && equals > 0 && switches.contains(token.substring(0, equals))) {
+                String name = token.substring(0, equals);
+                return new Failure.Validation(name + " takes no value", "Write " + name + ".");
+            }
+        }
+        return null;
     }
 
     // A complete version typed as a name: it belongs after the package.
@@ -828,11 +858,6 @@ public final class Cli {
                     .orElse(null);
         }
         if (cause.getArgSpec() instanceof CommandLine.Model.OptionSpec option && cause.getValue() != null) {
-            if (option.type() == boolean.class) {
-                return new Failure.Validation(
-                        option.longestName() + " takes no value",
-                        "Write " + option.longestName() + ".");
-            }
             return new Failure.Validation(
                     "'" + cause.getValue() + "' is not a valid " + option.longestName() + " value",
                     "Write " + option.longestName() + " " + option.paramLabel() + ".");

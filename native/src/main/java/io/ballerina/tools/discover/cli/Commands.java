@@ -33,7 +33,7 @@ import java.util.Map;
  *
  * <p>A noun says what comes back and its names say which one: a name means one thing, no name a listing. The
  * package is a flag, not a position, so every noun takes its names the same way; {@code package} alone takes the
- * coordinate as its name. {@code --module}/{@code -m} applies uniformly across every noun including
+ * coordinate as its name. {@code --module} applies uniformly across every noun including
  * {@code readme}: {@link Cli} reads it once before any noun is answered, since which module a coordinate resolves
  * to is a fact about the package lookup, not about any one noun.
  *
@@ -49,12 +49,12 @@ final class Commands {
     }
 
     static final String VERSION_FLAG = "--version";
+    static final String VERSION_SHORT = "-V";
 
     static final String HELP_FLAG = "--help";
     static final String HELP_SHORT = "-h";
     static final String OUTPUT_FLAG = "--output-format";
     static final String REFRESH_FLAG = "--refresh";
-    static final String MODULE_SHORT = "-m";
 
     static final String JSON_OUTPUT = "json";
     static final String TEXT_OUTPUT = "text";
@@ -62,6 +62,8 @@ final class Commands {
     static final String PACKAGE_LABEL = "<org>/<name>[:<version>]";
 
     static final String OWNER_LABEL = "<name>";
+
+    static final String PACKAGE_DESCRIPTION = "read this package, as bal pull names it";
 
 
     /**
@@ -96,39 +98,26 @@ final class Commands {
     /** The flags every noun takes. */
     static final class Flags {
 
-        @CommandLine.Option(names = {HELP_SHORT, HELP_FLAG}, usageHelp = true, description = "This text.")
+        @CommandLine.Option(names = {HELP_SHORT, HELP_FLAG}, usageHelp = true, description = "print this help")
         boolean help;
 
         @CommandLine.Option(names = OUTPUT_FLAG, paramLabel = JSON_OUTPUT + "|" + TEXT_OUTPUT,
-                description = "Override the TTY-detected default: human text at an interactive terminal, JSON "
-                        + "otherwise.")
+                description = "set the format (default: text on a TTY, else json)")
         String output;
 
         @CommandLine.Option(names = Command.FILTER_FLAG, paramLabel = "<keyword>",
-                description = "Narrow a listing to entries whose name, path, parameter or type matches this "
-                        + "keyword. Filtering is local; nothing is sent to Central. On package it searches the "
-                        + "package's names, as search does.")
+                description = "narrow a listing to the names that match a keyword")
         String filter;
 
         @CommandLine.Option(names = Command.PAGE_FLAG, paramLabel = "<n>", defaultValue = "1",
-                description = "Show page <n> (counting from 1) of a listing longer than " + Containers.MAX_ENTRIES
-                        + " entries. A page past the last one, or against an answer that has only one page, is an "
-                        + "error.")
+                description = "show page n, " + Containers.MAX_ENTRIES + " entries a page (default: 1)")
         int page;
 
-        @CommandLine.Option(names = {Command.MODULE_FLAG, MODULE_SHORT}, paramLabel = "<module>",
-                description = "Target this submodule instead of the package's default module, the same "
-                        + "everywhere including readme. The submodule's name only (for example httpscerr), not "
-                        + "<org>/<name>.<submodule>.")
+        @CommandLine.Option(names = Command.MODULE_FLAG, paramLabel = "<name>",
+                description = "read this submodule by name, e.g. httpscerr")
         String module;
 
-        // Hidden and never valid: declared only so the CLI can say the version goes in the coordinate.
-        @CommandLine.Option(names = VERSION_FLAG, hidden = true, arity = "0..1", paramLabel = "<version>")
-        String version;
-
-        @CommandLine.Option(names = REFRESH_FLAG,
-                description = "Ignore any cached copy and rewrite it. Worth passing only when a name should "
-                        + "exist and does not.")
+        @CommandLine.Option(names = REFRESH_FLAG, description = "ignore the cached copy and fetch it again")
         boolean refresh;
     }
 
@@ -136,8 +125,7 @@ final class Commands {
     static final class Package {
 
         @CommandLine.Option(names = {Command.PACKAGE_FLAG, Command.PACKAGE_LONG_FLAG}, paramLabel = PACKAGE_LABEL,
-                description = "The package to read, as bal pull names it. With no version, the one your project's "
-                        + "Dependencies.toml locks, else Central's latest.")
+                description = PACKAGE_DESCRIPTION)
         String pkg;
     }
 
@@ -145,15 +133,15 @@ final class Commands {
     static final class Owners {
 
         @CommandLine.Option(names = Command.CLIENT_FLAG, paramLabel = OWNER_LABEL,
-                description = "The client that declares it.")
+                description = "name the client that declares it")
         String client;
 
         @CommandLine.Option(names = Command.CLASS_FLAG, paramLabel = OWNER_LABEL,
-                description = "The class that declares it.")
+                description = "name the class that declares it")
         String classOwner;
 
         @CommandLine.Option(names = Command.SERVICE_FLAG, paramLabel = OWNER_LABEL,
-                description = "The service type that declares it.")
+                description = "name the service type that declares it")
         String service;
 
         List<Command.Owner> given() {
@@ -186,6 +174,10 @@ final class Commands {
 
         @CommandLine.Mixin
         Owners owners = new Owners();
+
+        @CommandLine.Option(names = {VERSION_SHORT, VERSION_FLAG}, versionHelp = true,
+                description = "print the tool's version")
+        boolean version;
 
         @CommandLine.Parameters(arity = "0..*", paramLabel = "<noun>")
         List<String> rest;

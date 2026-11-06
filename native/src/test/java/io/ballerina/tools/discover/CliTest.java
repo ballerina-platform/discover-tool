@@ -143,14 +143,14 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of(), capture.streams(), never()), 0);
         Assert.assertEquals(capture.stderr(), "");
-        Assert.assertTrue(capture.stdout().startsWith("Usage: bal discover"));
+        Assert.assertTrue(capture.stdout().contains("\nUsage: bal discover "));
     }
 
     @Test
     public void helpIsTheSameAsNoArguments() {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("--help"), capture.streams(), never()), 0);
-        Assert.assertTrue(capture.stdout().startsWith("Usage: bal discover"));
+        Assert.assertTrue(capture.stdout().contains("\nUsage: bal discover "));
         Assert.assertEquals(Cli.run(List.of("-h"), capture.streams(), never()), 0);
     }
 
@@ -159,7 +159,7 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(
                 Cli.run(List.of("package", "ballerinax/github", "--help"), capture.streams(), never()), 0);
-        Assert.assertTrue(capture.stdout().startsWith("Usage: bal discover"));
+        Assert.assertTrue(capture.stdout().contains("\nUsage: bal discover "));
     }
 
     @Test
@@ -438,23 +438,47 @@ public class CliTest {
     }
 
     @Test
-    public void theVersionFlagIsUnknownAndPointsAtTheCoordinate() {
-        record Case(List<String> argv, String suggestion) { }
-        for (Case each : List.of(
-                new Case(List.of("package", "ballerina/http", "--version", "2.15.7"),
-                        "To read a specific version, write it after the package."),
-                new Case(List.of("client", "-p", "ballerina/http", "--version=2.15.7"),
-                        "To read a specific version, write it after the package."),
-                new Case(List.of("package", "ballerina/http:2.15.6", "--version"),
-                        "To read a specific version, write it after the package: ballerina/http:<version>."),
-                new Case(List.of("--version"), "To read a specific version, write <org>/<name>:<version>."))) {
+    public void theToolsVersionIsPrintedOnStdoutAtTheRootOnly() {
+        for (String flag : List.of("-V", "--version")) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never()), 2, each.argv().toString());
-            Assert.assertEquals(capture.stdout(), "");
-            Assert.assertEquals(capture.field("kind"), "usage");
-            Assert.assertEquals(capture.field("message"), "unknown option '--version'");
-            Assert.assertEquals(capture.field("suggestion"), each.suggestion(), each.argv().toString());
+            Assert.assertEquals(Cli.run(List.of(flag), capture.streams(), never()), 0, flag);
+            Assert.assertEquals(capture.stderr(), "", flag);
+            Assert.assertTrue(capture.stdout().matches("\\d+\\.\\d+\\.\\d+\n"), capture.stdout());
         }
+        for (List<String> argv : List.of(List.of("client", "-p", "ballerina/http", "-V"),
+                List.of("package", "ballerina/http", "--version", "2.15.7"))) {
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(argv, capture.streams(), never()), 2, argv.toString());
+            Assert.assertEquals(capture.stdout(), "");
+            Assert.assertTrue(capture.field("message").startsWith("unknown option '-"), capture.stderr());
+        }
+        Capture valued = new Capture();
+        Assert.assertEquals(Cli.run(List.of("--version=2.15.7"), valued.streams(), never()), 2);
+        Assert.assertEquals(valued.field("message"), "--version takes no value");
+    }
+
+    @Test
+    public void aSwitchGivenAValueIsAUsageErrorEvenWhenTheValueIsABoolean() {
+        for (String value : List.of("true", "false")) {
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerinax/kafka", "--refresh=" + value),
+                    capture.streams(), never()), 2, value);
+            Assert.assertEquals(capture.field("message"), "--refresh takes no value");
+        }
+    }
+
+    @Test
+    public void aModuleNameBallerinaWouldRejectIsAUsageErrorBeforeAnythingIsFetched() {
+        for (String module : List.of("bad!name", "a b", "")) {
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerina/graphql", "--module", module),
+                    capture.streams(), never()), 2, module);
+            Assert.assertEquals(capture.field("message"), "'" + module + "' is not a valid --module value");
+        }
+        Capture abbreviated = new Capture();
+        Assert.assertEquals(Cli.run(List.of("client", "-p", "ballerina/graphql", "-m", "subgraph"),
+                abbreviated.streams(), never()), 2);
+        Assert.assertEquals(abbreviated.field("message"), "unknown option '-m'");
     }
 
     @Test
@@ -462,7 +486,7 @@ public class CliTest {
         Capture capture = new Capture();
         Assert.assertEquals(Cli.run(List.of("package", "ballerina/http", "--module"), capture.streams(), never()), 2);
         Assert.assertEquals(capture.field("message"), "the --module option needs a value");
-        Assert.assertEquals(capture.field("suggestion"), "Write --module <module> or --module=<module>.");
+        Assert.assertEquals(capture.field("suggestion"), "Write --module <name> or --module=<name>.");
     }
 
     @Test
@@ -516,8 +540,6 @@ public class CliTest {
     public void aFixIsTheCallersWholeCommandWithItApplied() {
         record Case(List<String> argv, String command) { }
         for (Case each : List.of(
-                new Case(List.of("client", "Producer", "-p", "ballerinax/kafka", "--version", "4.6.5"),
-                        "bal discover client Producer -p ballerinax/kafka:4.6.5"),
                 new Case(List.of("method", "4.6.5", "-p", "ballerinax/kafka", "--client", "Producer", "--filter",
                         "send"), "bal discover method -p ballerinax/kafka:4.6.5 --client Producer --filter send"),
                 new Case(List.of("client", "-p", "ballerinax/kafka@4.6.5", "--module", "sub", "--page", "2"),
@@ -570,7 +592,7 @@ public class CliTest {
                 List.of("client", "-p", "ballerinax/github", "-h"))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(argv, capture.streams(), never()), 0, String.join(" ", argv));
-            Assert.assertTrue(capture.stdout().startsWith("Usage: bal discover"), String.join(" ", argv));
+            Assert.assertTrue(capture.stdout().contains("\nUsage: bal discover "), String.join(" ", argv));
         }
     }
 
@@ -804,13 +826,14 @@ public class CliTest {
     }
 
     @Test
-    public void aProjectIsFoundByWalkingUpFromWhereTheProcessStands() {
+    public void aProjectIsReadOnlyFromTheDirectoryTheProcessStandsInNeverAParent() {
         Path projectDir = tempDir();
         write(projectDir.resolve("Ballerina.toml"), "[package]\nname = \"app\"\n");
         Path nested = projectDir.resolve("modules").resolve("deep");
         mkdirs(nested);
-        Assert.assertEquals(DependenciesToml.discoverProject(nested), projectDir);
-        Assert.assertNull(DependenciesToml.discoverProject(tempDir()));
+        Assert.assertEquals(DependenciesToml.projectAt(projectDir), projectDir);
+        Assert.assertNull(DependenciesToml.projectAt(nested));
+        Assert.assertNull(DependenciesToml.projectAt(tempDir()));
     }
 
     @Test
@@ -1781,7 +1804,7 @@ public class CliTest {
                 new Case(List.of("package", "ballerina/http", "--output-format", "xml"), false, true),
                 new Case(List.of("nosuchnoun", "-p", "ballerina/http", "--filter", "--output-format", "text"),
                         false, true),
-                new Case(List.of("package", "ballerina/http", "-m", "--output-format", "text"), false, true))) {
+                new Case(List.of("package", "ballerina/http", "--module", "--output-format", "text"), false, true))) {
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), never(), null, each.interactive()), 2,
                     each.toString());

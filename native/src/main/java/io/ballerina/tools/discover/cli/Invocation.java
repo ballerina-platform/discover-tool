@@ -40,13 +40,11 @@ import java.util.List;
  * @param filter the {@code --filter} value, or {@code null}
  * @param page the {@code --page} value
  * @param module the {@code --module} value, or {@code null}
- * @param version the {@code --version} value, which is never valid, or {@code null}
  * @param refresh whether {@code --refresh} was given
  * @since 0.1.0
  */
 record Invocation(String noun, List<String> names, List<String> rest, String pkg, String coordinate,
-        List<Command.Owner> owners, String output, String filter, int page, String module, String version,
-        boolean refresh) {
+        List<Command.Owner> owners, String output, String filter, int page, String module, boolean refresh) {
 
     static Invocation of(Commands.Root root, String noun, Commands.Noun values) {
         Commands.Flags top = root.flags;
@@ -58,7 +56,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
                 owners(root, values),
                 either(own.output, top.output), either(own.filter, top.filter),
                 own.page != Command.FIRST_PAGE ? own.page : top.page, either(own.module, top.module),
-                either(own.version, top.version), own.refresh || top.refresh);
+                own.refresh || top.refresh);
     }
 
     /** Whether the line is one package coordinate and nothing else: the package overview, written without its noun. */
@@ -70,7 +68,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
     Invocation asPackageOverview() {
         String named = rest.get(0);
         return new Invocation(Command.PACKAGE, List.of(named), List.of(), pkg, named, owners, output, filter, page,
-                module, version, refresh);
+                module, refresh);
     }
 
     // The container flags typed before the noun, then after it.
@@ -176,12 +174,12 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
             written.set(0, text);
         }
         return new Invocation(noun, List.copyOf(written), rest, pkg == null ? null : text, text, owners,
-                output, filter, page, module, version, refresh);
+                output, filter, page, module, refresh);
     }
 
     Invocation withNames(List<String> others) {
         return new Invocation(noun, List.copyOf(others), rest, pkg, coordinate, owners, output, filter, page,
-                module, version, refresh);
+                module, refresh);
     }
 
     /** The container flag given, or {@code null}; {@link Cli} rejects more than one. */
@@ -192,7 +190,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
     /** This command with only {@code kept} of its container flags. */
     Invocation ownedBy(Command.Owner kept) {
         return new Invocation(noun, names, rest, pkg, coordinate, List.of(kept), output, filter, page, module,
-                version, refresh);
+                refresh);
     }
 
     /** The scope the container flag names, or {@code null} without one. */

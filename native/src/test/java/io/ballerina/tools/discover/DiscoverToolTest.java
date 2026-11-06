@@ -83,7 +83,7 @@ public class DiscoverToolTest {
         Run help = run();
         Assert.assertEquals(help.exitCode(), 0);
         Assert.assertEquals(help.stderr(), "");
-        Assert.assertTrue(help.stdout().startsWith("Usage: bal discover"));
+        Assert.assertTrue(help.stdout().contains("\nUsage: bal discover "));
     }
 
     @Test
@@ -119,20 +119,17 @@ public class DiscoverToolTest {
         // `bal help discover` reads this, so it must not be a second, drifting copy.
         StringBuilder sb = new StringBuilder();
         new DiscoverTool(System.out, System.err).printLongDesc(sb);
-        Assert.assertTrue(sb.toString().startsWith("Usage: bal discover"));
+        Assert.assertTrue(sb.toString().contains("\nUsage: bal discover "));
         Assert.assertEquals(sb.toString(), usage("--help"));
     }
 
     @Test
     @SuppressWarnings("deprecation")
-    public void theOneLineUsageNamesEveryFlag() {
+    public void theOneLineUsageIsTheRootSynopsis() {
         StringBuilder sb = new StringBuilder();
         new DiscoverTool(System.out, System.err).printUsage(sb);
-        Assert.assertTrue(sb.toString().startsWith("  bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]]"),
-                sb.toString());
-        for (String flag : List.of("--refresh", "--output-format", "--filter", "--page", "-m", "--help")) {
-            Assert.assertTrue(sb.toString().contains(flag), flag + " missing from: " + sb);
-        }
+        Assert.assertEquals(sb.toString(),
+                "  bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]] [options]\n");
     }
 
     @Test

@@ -33,15 +33,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   that matches nothing is still an answer
 - Group large resource listings by path segment, up to four levels below the top level
 - Add a drill-down from a listing to a single method's or resource's signature, together with the types it names
-- Add the `--module`/`-m` flag to target a submodule, across every bucket, read from the submodule's own Ballerina
-  Central page; the bare package lists its submodules, and a submodule named as the package (e.g.
-  `ballerinax/aws.auth`) fails with the `--module` command that reads it
+- Add the `--module` flag, with no short form, to target a submodule, across every bucket, read from the
+  submodule's own Ballerina Central page; the bare package lists its submodules, and a submodule named as the
+  package (e.g. `ballerinax/aws.auth`) fails with the `--module` command that reads it
 - Add the `--filter` flag to narrow a bucket listing by keyword
 - Read one exact version of a package from the coordinate, `<org>/<package>:<version>`, written as complete SemVer;
   it outranks the version a project locks, and is carried into every command the answer prints
 - Name the version every answer was read at: a leading `version` key in JSON, and `org/name:version` in the text
   header, whether it was written, locked or Central's latest
-- State in `--help` which version is read without one, and the exit codes
+- Lay out `--help` as the Ballerina CLI tool guide asks: a one-line description, the synopsis, the nouns, every
+  option on one line with its default, and commented examples, within 80 columns; the exit codes are in the README
+- Add `-V`/`--version`, printing the tool's version and exiting 0
+- Read the version a project locks from the `Dependencies.toml` of the project in the current directory only,
+  never a parent's
+- Reject a switch given a value (`--refresh=true`) and a `--module` that is not a valid module name as usage
+  errors, before anything is fetched
 - Cap every listing at 40 entries, with `--page` to page through any longer one; a text listing that continues also
   ends with the `--filter <keyword>` command that narrows it
 - List containers, service types, methods, resource paths and declarations alphabetically
@@ -61,7 +67,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Write the stale-cache warning (Central could not be reached, so the cached copy was read) to stderr as its own
   report, `{"severity":"warning","kind":"stale-cache",…}` or `bal discover: warning: <message>`, never in the answer
 - Carry the caller's whole command with the fix applied as `command` in a failure that has one fix, printed as the
-  `Try:` line in text: a version given as `--version` or a positional, a mistyped coordinate, a module path, a
+  `Try:` line in text: a version given as a positional, a mistyped coordinate, a module path, a
   `--module` the package does not publish, a selector nothing reads, a name asked in the wrong bucket, `--page` on
   an answer that does not page
 - Answer a version Central does not publish with the published versions nearest it, a misspelled package with or

@@ -115,7 +115,7 @@ public class DiscoverTool implements BLauncherCmd {
         Cli.Streams streams = new Cli.Streams(outStream::print, errStream::print);
 
         boolean interactive = Terminal.stdoutIsTerminal();
-        int code = guarded(() -> Cli.run(argv, streams, http, discoverProject(), interactive), argv, interactive,
+        int code = guarded(() -> Cli.run(argv, streams, http, projectDirectory(), interactive), argv, interactive,
                 errStream);
 
         outStream.flush();
@@ -209,12 +209,12 @@ public class DiscoverTool implements BLauncherCmd {
         return value == null ? "" : value;
     }
 
-    private static String discoverProject() {
+    private static String projectDirectory() {
         String cwd = property("user.dir");
         if (cwd.isEmpty()) {
             return null;
         }
-        Path project = DependenciesToml.discoverProject(Path.of(cwd));
+        Path project = DependenciesToml.projectAt(Path.of(cwd));
         return project == null ? null : project.toString();
     }
 

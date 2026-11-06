@@ -78,25 +78,18 @@ public final class DependenciesToml {
     }
 
     /**
-     * The Ballerina project a directory sits in, found by walking up for a {@code Ballerina.toml}.
+     * The Ballerina project {@code dir} is the root of, or {@code null}: only the directory itself is looked at,
+     * never a parent, so the version read is the one the project in the current directory locks.
      *
      * <p>Pure over the path it is given, so a test can drive it against a temporary tree; the process's actual
      * directory is read once, by {@code DiscoverTool}, which is the only class allowed to.
-     *
-     * @return the project root, or {@code null} when the directory is not inside one
      */
-    public static Path discoverProject(Path from) {
-        if (from == null) {
+    public static Path projectAt(Path dir) {
+        if (dir == null) {
             return null;
         }
-        Path current = from.toAbsolutePath();
-        while (current != null) {
-            if (Files.isRegularFile(current.resolve("Ballerina.toml"))) {
-                return current;
-            }
-            current = current.getParent();
-        }
-        return null;
+        Path root = dir.toAbsolutePath();
+        return Files.isRegularFile(root.resolve(ProjectConstants.BALLERINA_TOML)) ? root : null;
     }
 
     public static Path lockFile(String projectDir) {
