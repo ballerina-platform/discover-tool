@@ -114,10 +114,7 @@ public class DiscoverTool implements BLauncherCmd {
         HttpOptions http = builder.build();
         Cli.Streams streams = new Cli.Streams(outStream::print, errStream::print);
 
-        // Pre-JDK 22, System.console() is null if EITHER stream is redirected, so a terminal with redirected
-        // stdin is under-detected. That is the safe direction: a human gets JSON (recoverable with
-        // --output-format text) rather than an agent's parser getting prose.
-        boolean interactive = System.console() != null;
+        boolean interactive = Terminal.stdoutIsTerminal();
         int code = guarded(() -> Cli.run(argv, streams, http, discoverProject(), interactive), argv, interactive,
                 errStream);
 

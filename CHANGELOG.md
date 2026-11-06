@@ -47,7 +47,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Add a ready-to-run next command to every listing entry, the bare package's buckets included: `command`, or
   `commands` keyed by accessor on resource rows, plus a `next` command when a listing continues
 - Add JSON output (one line per answer) and aligned human-readable text output, selected by
-  `--output-format json|text` and defaulting to text on a terminal and JSON otherwise
+  `--output-format json|text` and defaulting to text when stdout is a terminal and JSON otherwise, whatever stdin
+  is
 - Report failures on stderr in the run's output mode: a single-line JSON object, or `error: <message>` with the
   suggestion indented below it; a usage error (a malformed command line, rejected before anything is looked up)
   exits 2 and, in text, ends with the synopsis and a pointer to `--help`, and every other failure exits 1; every
@@ -63,3 +64,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Name what failed when a request to Central gets no answer — the host, or the proxy and the `Settings.toml` that
   sets it, and the cause — with `reached` in the JSON failure telling an answer from Central from none
 - Cache Central responses under `$XDG_CACHE_HOME`, falling back to a live fetch on any cache failure
+- Run on Ballerina 2201.14.0 and Java 25; the tool's bala is published for the `java25` platform

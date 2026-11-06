@@ -957,7 +957,7 @@ bal tool pull discover
 
 ### Prerequisites
 
-- OpenJDK 21, with `JAVA_HOME` pointing at it.
+- OpenJDK 25, with `JAVA_HOME` pointing at it (Ballerina 2201.14.0 runs on it).
 - A GitHub token with `read:packages`, exported as `packagePAT` (and your login as `packageUser`).
   `org.ballerinalang:ballerina-cli`, which provides the `BLauncherCmd` interface `bal` discovers the tool
   through, is published only to ballerina-platform's GitHub Packages, which needs authentication even for a
@@ -974,7 +974,7 @@ export packagePAT="$(gh auth token)"
 | Path | What it is |
 |---|---|
 | `native/` | The tool itself (`io.ballerina.tools.discover`): Central client and cache, the model built from Central's docs payload, the views, and the JSON/text renderers. |
-| `bal-tool/` | Packs `native`'s jar into the `ballerina/tool_discover` bala (platform `java21`) with `io.ballerina.plugin`, the way `openapi-tools` packs `bal openapi`. |
+| `bal-tool/` | Packs `native`'s jar into the `ballerina/tool_discover` bala (platform `java25`) with `io.ballerina.plugin`, the way `openapi-tools` packs `bal openapi`. |
 | `config/resources/` | The `Ballerina.toml`/`BalTool.toml` templates for the bala. `BalTool.toml` declares the tool id `discover`, the name `bal` dispatches on. |
 | `native/src/test/resources/fixtures/` | Recorded Central payloads; the whole test suite runs against them, offline. |
 | `native/src/test/resources/snapshots/` | Per fixture, the `.bal` API document and every bucket's bare listing as `.buckets.txt`/`.buckets.json`. |
