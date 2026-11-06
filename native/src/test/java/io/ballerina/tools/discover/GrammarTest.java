@@ -26,7 +26,9 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The noun-first grammar: every noun with and without a name, the container flags, and every usage error.
@@ -316,8 +318,8 @@ public class GrammarTest {
             Assert.assertTrue(text.contains("\n\nUsage: bal discover " + noun), text);
             Assert.assertTrue(text.indexOf("\nUsage: ") < text.indexOf("\nOptions:\n")
                     && text.indexOf("\nOptions:\n") < text.indexOf("\nExamples:\n  # "), text);
-            Assert.assertFalse(text.contains("\n  --refresh "), "shared options are the root's: " + noun);
-            Assert.assertTrue(text.contains("every option 'bal discover --help' lists\n"), text);
+            Assert.assertTrue(text.contains("\n  --refresh "), "every option a noun takes is on its page: " + noun);
+            Assert.assertFalse(text.contains("bal discover --help"), text);
             Assert.assertFalse(text.contains("Exit codes"), text);
             text.lines().forEach(line -> Assert.assertTrue(line.length() <= 80, noun + ": " + line));
         }
@@ -329,6 +331,48 @@ public class GrammarTest {
         Assert.assertTrue(method.stdout().contains("\nUsage: bal discover method [<name>] -p <org>/<name>"
                 + "[:<version>]\n                    [--client|--class|--service <name>] [options]\n"),
                 method.stdout());
+    }
+
+    @Test
+    public void everyOptionANounsHelpListsIsOneTheNounTakes() {
+        Map<String, List<String>> values = Map.of(Command.FILTER_FLAG, List.of("send"),
+                Command.PAGE_FLAG, List.of("1"), Command.MODULE_FLAG, List.of("nosuch"),
+                "--output-format", List.of("json"), "--refresh", List.of(), "--help", List.of());
+        for (String noun : Command.NOUNS) {
+            CliTest.Capture help = new CliTest.Capture();
+            Assert.assertEquals(Cli.run(List.of(noun, "--help"), help.streams(), CliTest.never()), 0, noun);
+            String options = help.stdout().substring(help.stdout().indexOf("\nOptions:\n"),
+                    help.stdout().indexOf("\nExamples:\n"));
+            List<String> listed = options.lines()
+                    .filter(line -> line.startsWith("  -"))
+                    .map(line -> line.strip().split("[ ,|]")[0])
+                    .map(flag -> flag.equals("-h") ? "--help" : flag)
+                    .filter(flag -> !flag.equals(Command.PACKAGE_FLAG) && !Command.OWNER_FLAGS.contains(flag))
+                    .toList();
+            Assert.assertEquals(listed.size(), values.size() - (Command.SEARCH.equals(noun) ? 1 : 0),
+                    noun + " lists " + listed);
+            String slug = Command.RESOURCE.equals(noun) ? "ballerinax__github" : "ballerinax__kafka";
+            for (String flag : listed) {
+                Assert.assertTrue(values.containsKey(flag), noun + " lists an option this test does not know: " + flag);
+                List<String> argv = new ArrayList<>(optionBase(noun));
+                argv.add(flag);
+                argv.addAll(values.get(flag));
+                CliTest.Capture run = new CliTest.Capture();
+                int code = Cli.run(argv, run.streams(), central(slug));
+                Assert.assertNotEquals(code, USAGE, String.join(" ", argv) + " -> " + run.stderr());
+            }
+        }
+    }
+
+    // The listing each noun answers, so an option is tried where it applies.
+    private static List<String> optionBase(String noun) {
+        return switch (noun) {
+            case Command.PACKAGE -> List.of(noun, KAFKA);
+            case Command.SEARCH -> List.of(noun, "send", "-p", KAFKA);
+            case Command.METHOD -> List.of(noun, "-p", KAFKA, "--client", "Producer");
+            case Command.RESOURCE -> List.of(noun, "-p", GITHUB, "--client", "Client");
+            default -> List.of(noun, "-p", KAFKA);
+        };
     }
 
     @DataProvider(name = "packageAsName")

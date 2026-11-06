@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * The synopsis and the option rows, rendered from {@link Commands}' picocli model rather than hand-written.
@@ -48,7 +47,9 @@ final class UsageRenderer {
 
     private static final int GAP = 2;
 
-    private static final String USAGE = "Usage: " + Command.PREFIX;
+    private static final String USAGE_LEAD = "Usage: ";
+
+    private static final String USAGE = USAGE_LEAD + Command.PREFIX;
 
     private static final String OPTIONS_SLOT = "[options]";
 
@@ -58,6 +59,12 @@ final class UsageRenderer {
     /** The {@code Usage:} line for {@code noun}'s {@code --help}, or the root's when null, wrapped. */
     static String synopsis(Commands.Grammar grammar, String noun) {
         return wrap(USAGE, slots(grammar, noun), USAGE.length());
+    }
+
+    /** {@code noun}'s synopsis as a further line under another's {@code Usage:}, aligned with it. */
+    static String alternativeSynopsis(Commands.Grammar grammar, String noun) {
+        String lead = " ".repeat(USAGE_LEAD.length()) + Command.PREFIX;
+        return wrap(lead, slots(grammar, noun), USAGE.length());
     }
 
     /** The same synopsis on one line, for the end of a usage error. */
@@ -90,20 +97,11 @@ final class UsageRenderer {
 
     /**
      * Every option {@code noun} takes, the container flags as one row described by {@code owners}: the required
-     * ones first, then the rest by long name.
+     * ones first, then the rest by long name. {@code turnedDown} names the options it parses but rejects.
      */
-    static List<Row> optionRows(Commands.Grammar grammar, String noun, String owners) {
-        return rows(visible(grammar.spec(noun)), Usage.requiredFlags(noun), owners);
-    }
-
-    /** The options {@code noun} takes that the root's help does not describe: the package, and the containers. */
-    static List<Row> ownOptionRows(Commands.Grammar grammar, String noun, String owners) {
-        Set<String> shared = grammar.spec(null).options().stream()
-                .map(OptionSpec::shortestName)
-                .filter(name -> !Command.PACKAGE_FLAG.equals(name) && !Command.OWNER_FLAGS.contains(name))
-                .collect(Collectors.toSet());
+    static List<Row> optionRows(Commands.Grammar grammar, String noun, String owners, Set<String> turnedDown) {
         return rows(visible(grammar.spec(noun)).stream()
-                .filter(option -> !shared.contains(option.shortestName()))
+                .filter(option -> !turnedDown.contains(option.longestName()))
                 .toList(), Usage.requiredFlags(noun), owners);
     }
 

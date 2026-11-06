@@ -129,7 +129,7 @@ public class DiscoverToolTest {
         StringBuilder sb = new StringBuilder();
         new DiscoverTool(System.out, System.err).printUsage(sb);
         Assert.assertEquals(sb.toString(),
-                "  bal discover <noun> [<name> ...] [-p <org>/<name>[:<version>]] [options]\n");
+                "  bal discover <noun> [<name> ...] -p <org>/<name>[:<version>] [options]\n");
     }
 
     @Test

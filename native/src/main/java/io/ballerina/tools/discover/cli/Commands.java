@@ -117,7 +117,7 @@ final class Commands {
                 description = "read this submodule by name, e.g. httpscerr")
         String module;
 
-        @CommandLine.Option(names = REFRESH_FLAG, description = "ignore the cached copy and fetch it again")
+        @CommandLine.Option(names = REFRESH_FLAG, description = "refetch when a name should exist but is not found")
         boolean refresh;
     }
 
