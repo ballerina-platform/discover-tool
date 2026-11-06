@@ -257,17 +257,11 @@ public sealed interface Failure {
     /** The command line is malformed, or what it names matches more than one thing. */
     int USAGE = 2;
 
-    /** The run was interrupted (SIGINT). */
-    int INTERRUPTED = 130;
-
     /** The core kind of {@link #USAGE}. */
     String USAGE_KIND = "usage";
 
     /** The core kind of {@link #RUNTIME}. */
     String RUNTIME_KIND = "runtime";
-
-    /** The program name every text-mode report starts with. */
-    String PROGRAM = "bal discover";
 
     /**
      * A defect in this tool: something in the pipeline threw.
@@ -379,7 +373,11 @@ public sealed interface Failure {
             case PageNotFound f -> f.command();
             case PackageNotFound f -> f.command() == null ? null : f.command().text();
             case SymbolNotFound f -> f.command();
-            default -> null;
+            case Ambiguous ignored -> null;
+            case Upstream ignored -> null;
+            case Timeout ignored -> null;
+            case SchemaDrift ignored -> null;
+            case Internal ignored -> null;
         };
     }
 
@@ -394,7 +392,7 @@ public sealed interface Failure {
     /** {@link #describeText()}, leaving the suggestion out when {@code suggestion} is false. */
     default String describeText(boolean suggestion) {
         List<String> lines = new ArrayList<>();
-        lines.add(PROGRAM + ": error: " + headline());
+        lines.add(Command.PROGRAM + ": error: " + headline());
         if (suggestion) {
             lines.add(INDENT + suggestion());
         }
@@ -555,6 +553,21 @@ public sealed interface Failure {
                     f.candidates());
         }
         return this;
+    }
+
+    /**
+     * What {@code failure} says went wrong: its innermost non-blank message, cut to its first line, without a
+     * closing period; empty when no cause says anything. Never a class name.
+     */
+    static String causeText(Throwable failure) {
+        String message = "";
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause.getMessage() != null && !cause.getMessage().isBlank()) {
+                message = cause.getMessage();
+            }
+        }
+        String line = message.strip().lines().findFirst().orElse("").strip();
+        return line.endsWith(".") ? line.substring(0, line.length() - 1) : line;
     }
 
     /** A command quoted inside a suggestion's prose, when it is not the one {@code command} carries. */

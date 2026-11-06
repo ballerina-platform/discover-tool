@@ -35,7 +35,7 @@ public record Warning(String kind, String message) {
     /** The warning as one line of stderr in the run's output mode, without a final newline. */
     public String describe(boolean json) {
         if (!json) {
-            return Failure.PROGRAM + ": warning: " + message;
+            return Command.PROGRAM + ": warning: " + message;
         }
         JsonObject report = new JsonObject();
         report.addProperty("severity", "warning");

@@ -142,7 +142,7 @@ public class DiscoverTool implements BLauncherCmd {
         } catch (RuntimeException | Error cause) {
             // Nothing throws by design; a defect, or an exhausted heap, still reaches the caller as a failure in
             // the run's own mode.
-            Failure failure = new Failure.Internal(messageOf(cause), Failure.INTERNAL_SUGGESTION);
+            Failure failure = new Failure.Internal(Failure.causeText(cause), Failure.INTERNAL_SUGGESTION);
             errStream.print(failure.describe(Cli.jsonOutput(argv, interactive)) + "\n");
             return failure.exitCode();
         }
@@ -165,12 +165,6 @@ public class DiscoverTool implements BLauncherCmd {
             }
         }
         return file.toString();
-    }
-
-    // The cause's own words, without a closing period; empty when it has none, never its class name.
-    private static String messageOf(Throwable cause) {
-        String message = cause.getMessage() == null ? "" : cause.getMessage().strip();
-        return message.endsWith(".") ? message.substring(0, message.length() - 1) : message;
     }
 
     private static Path ballerinaHome() {

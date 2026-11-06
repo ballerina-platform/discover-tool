@@ -43,7 +43,10 @@ import java.util.Optional;
  */
 public record Command(String noun, List<String> names, Target target, Owner owner, String filter, int page) {
 
-    public static final String PREFIX = "bal discover ";
+    /** The program name every text-mode report starts with. */
+    public static final String PROGRAM = "bal discover";
+
+    public static final String PREFIX = PROGRAM + " ";
 
     public static final String PACKAGE = "package";
     public static final String SEARCH = "search";

@@ -32,7 +32,7 @@ import java.util.List;
  * <p>NOTHING HERE MAY THROW OR REPORT. Cache trouble is never the caller's problem: an unwritable
  * directory, a foreign owner, a full disk and a corrupt entry all have to come out as "no cached copy",
  * with no byte on stdout, no byte on stderr and no non-zero exit. An unusable {@code BAL_DISCOVER_CACHE_DIR}
- * failing the run as {@code validation} would loop an agent on argument errors it can never fix.
+ * failing the run as {@code usage} would loop an agent on argument errors it can never fix.
  *
  * <p>WHAT IS CACHED IS THE RAW PAYLOAD, not the IR and not the rendered string. The IR and the rendering are
  * our code, so an IR entry's key would need a build identity in it. The raw payload is not derived from our

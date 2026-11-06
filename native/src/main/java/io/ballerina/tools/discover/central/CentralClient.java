@@ -238,19 +238,8 @@ public final class CentralClient {
         } catch (RuntimeException malformed) {
             // Upstream serving something that is not JSON is not a transient condition.
             return Outcome.Spent.of(new Report("Central answered " + url + " with a body that is not JSON: "
-                    + parseProblem(malformed), null, true, Failure.UPSTREAM_REJECTED_SUGGESTION), false);
+                    + Failure.causeText(malformed), null, true, Failure.UPSTREAM_REJECTED_SUGGESTION), false);
         }
-    }
-
-    // The innermost cause's own words, never a class name, without a closing period.
-    private static String parseProblem(Throwable malformed) {
-        String message = "";
-        for (Throwable cause = malformed; cause != null; cause = cause.getCause()) {
-            if (cause.getMessage() != null && !cause.getMessage().isBlank()) {
-                message = cause.getMessage().strip();
-            }
-        }
-        return message.endsWith(".") ? message.substring(0, message.length() - 1) : message;
     }
 
     // Through a proxy, only the CONNECT's answer is the proxy's; a status inside the tunnel is Central's.

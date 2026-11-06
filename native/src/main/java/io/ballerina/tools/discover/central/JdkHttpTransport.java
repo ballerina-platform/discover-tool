@@ -18,6 +18,8 @@
 
 package io.ballerina.tools.discover.central;
 
+import io.ballerina.tools.discover.Failure;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -343,12 +345,6 @@ public final class JdkHttpTransport implements HttpTransport {
     }
 
     private static Optional<String> messageIn(Throwable failure) {
-        String message = null;
-        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-            if (cause.getMessage() != null && !cause.getMessage().isEmpty()) {
-                message = cause.getMessage();
-            }
-        }
-        return Optional.ofNullable(message);
+        return Optional.of(Failure.causeText(failure)).filter(message -> !message.isEmpty());
     }
 }

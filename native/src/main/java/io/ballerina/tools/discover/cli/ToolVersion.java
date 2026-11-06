@@ -48,6 +48,10 @@ final class ToolVersion {
         } catch (IOException unreadable) {
             throw new UncheckedIOException(unreadable);
         }
-        return properties.getProperty(KEY);
+        String version = properties.getProperty(KEY);
+        if (version == null || version.isBlank()) {
+            throw new IllegalStateException(RESOURCE + " in the tool's jar has no '" + KEY + "'");
+        }
+        return version.strip();
     }
 }
