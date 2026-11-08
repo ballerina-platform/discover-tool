@@ -87,7 +87,7 @@ public class CentralSearchTest {
 
     @Test
     public void everyRowCarriesTheCommandThatOpensIt() {
-        JsonObject answer = search(central(), "search", "kafka", "send");
+        JsonObject answer = search(central(), "search", "kafka send");
         JsonObject packages = answer.getAsJsonObject("packages");
         Assert.assertEquals(packages.get("shown").getAsInt(), 2);
         Assert.assertEquals(packages.get("total").getAsInt(), 12);
@@ -116,7 +116,7 @@ public class CentralSearchTest {
                         "listener method"));
         Assert.assertEquals(symbols.get(3).getAsJsonObject().get("module").getAsString(), "subgraph");
         Assert.assertEquals(answer.get("pages").getAsInt(), 3);
-        Assert.assertEquals(answer.get("next").getAsString(), "bal discover search kafka send --page 2");
+        Assert.assertEquals(answer.get("next").getAsString(), "bal discover search \"kafka send\" --page 2");
     }
 
     @Test

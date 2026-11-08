@@ -21,7 +21,6 @@ package io.ballerina.tools.discover;
 import io.ballerina.tools.discover.views.SearchCentral;
 
 import java.math.BigInteger;
-import java.util.List;
 import java.util.Locale;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
@@ -115,7 +114,7 @@ public record Coordinate(QualifiedName qualified, Version version) {
             }
         }
         if (input.indexOf('/') < 0 && QualifiedName.parse(ORG_PLACEHOLDER + "/" + input).isOk()) {
-            String search = SearchCentral.command(List.of(input));
+            String search = SearchCentral.command(input);
             return Result.err(new Failure.Validation(
                     "invalid package name '" + input + "': a package is named with its organization, <org>/"
                             + input,

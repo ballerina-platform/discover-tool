@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * {@code bal discover search <keywords...>} — Ballerina Central's package search and symbol search, one page of each,
+ * {@code bal discover search <query>} — Ballerina Central's package search and symbol search, one page of each,
  * every row with the {@code bal discover} command that opens it.
  *
  * <p>The ranking is Central's, so the same keywords can rank differently as Central changes; what this tool adds is
@@ -85,7 +85,6 @@ public final class SearchCentral {
     private static final String AND = " AND ";
     private static final String MODULE_SEPARATOR = ".";
     private static final Pattern WORD_SEPARATOR = Pattern.compile("-");
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private SearchCentral() {
     }
@@ -94,19 +93,16 @@ public final class SearchCentral {
      * The failure for a search with no keyword, with {@code --module} or with {@code --filter}, or {@code null};
      * checked before Central is asked.
      */
-    public static Failure.Validation misuse(List<String> keywords, String module, String filter) {
-        if (!keywords.isEmpty() && module != null) {
-            String typed = command(keywords);
+    public static Failure.Validation misuse(String query, String module, String filter) {
+        if (!Search.keywords(query).isEmpty() && module != null) {
             return new Failure.Validation("--module reads one package's submodule, and a search covers all of "
-                    + "Central", "Drop --module.", typed);
+                    + "Central", "Drop --module.", command(query));
         }
-        return Search.misuse(Command.of(Command.SEARCH), keywords, filter);
+        return Search.misuse(Command.of(Command.SEARCH), query, filter);
     }
 
-    public static Result<DiscoverResult> render(List<String> keywords, int page, HttpOptions http) {
-        List<String> terms = keywords.stream().flatMap(keyword -> Arrays.stream(WHITESPACE.split(keyword.trim())))
-                .filter(term -> !term.isEmpty())
-                .toList();
+    public static Result<DiscoverResult> render(String query, int page, HttpOptions http) {
+        List<String> terms = Search.keywords(query);
         Result<CentralSearch.Window<CentralSearch.PackageRow>> packages = CentralSearch.packages(
                 String.join(" ", terms), PACKAGES_PER_PAGE, (page - 1) * PACKAGES_PER_PAGE, http);
         if (!packages.isOk()) {
@@ -121,7 +117,7 @@ public final class SearchCentral {
         int symbolTotal = symbols.value().total();
         int pages = Math.max(1, Math.max(pagesOf(packageTotal, PACKAGES_PER_PAGE), pagesOf(symbolTotal,
                 SYMBOLS_PER_PAGE)));
-        Command command = Command.of(Command.SEARCH, keywords);
+        Command command = Command.of(Command.SEARCH, Search.query(terms));
         if (page > pages) {
             String fixed = command.paged(pages).text();
             return Result.err(new Failure.PageNotFound("page " + page + " is out of range: Central's answer has "
@@ -141,13 +137,13 @@ public final class SearchCentral {
         DiscoverResult.Paging paging = pages == 1
                 ? null
                 : new DiscoverResult.Paging(page, pages, packageTotal + symbolTotal - seen);
-        return Result.ok(new DiscoverResult.CentralSearch(keywords, packageHits, packageTotal, symbolHits,
+        return Result.ok(new DiscoverResult.CentralSearch(terms, packageHits, packageTotal, symbolHits,
                 symbolTotal, paging, page < pages ? command.paged(page + 1).text() : null));
     }
 
-    /** {@code bal discover search} with {@code keywords}, each a shell word. */
-    public static String command(List<String> keywords) {
-        return Command.of(Command.SEARCH, keywords).text();
+    /** {@code bal discover search} with {@code query}'s keywords as one shell word. */
+    public static String command(String query) {
+        return Command.of(Command.SEARCH, Search.query(Search.keywords(query))).text();
     }
 
     private static int pagesOf(int total, int size) {

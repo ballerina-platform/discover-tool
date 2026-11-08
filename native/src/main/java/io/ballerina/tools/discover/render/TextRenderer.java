@@ -69,7 +69,9 @@ public final class TextRenderer {
 
     private static final List<String> NAME_PLACEHOLDERS = List.of(NAME_PLACEHOLDER);
 
-    private static final String SEARCH_PLACEHOLDER = "<keyword>";
+    private static final String FILTER_PLACEHOLDER = "<keyword>";
+
+    private static final String QUERY_PLACEHOLDER = "<query>";
 
     private static final String ROW_PLACEHOLDER = "<row>";
 
@@ -142,7 +144,7 @@ public final class TextRenderer {
         Command turned = next == null ? null : Command.parse(next).orElse(null);
         return turned == null || turned.page() == Command.FIRST_PAGE
                 ? null
-                : turned.paged(Command.FIRST_PAGE).filtered(Command.placeholder(SEARCH_PLACEHOLDER)).text();
+                : turned.paged(Command.FIRST_PAGE).filtered(Command.placeholder(FILTER_PLACEHOLDER)).text();
     }
 
     private static void fill(Layout layout, DiscoverResult result, Context where) {
@@ -233,7 +235,7 @@ public final class TextRenderer {
         }
         layout.inlinedNext.forEach(layout::next);
         if (pkg != null && !overview.sections().isEmpty()) {
-            layout.next(Command.of(Command.SEARCH, Command.placeholder(SEARCH_PLACEHOLDER)).in(pkg).text());
+            layout.next(Command.of(Command.SEARCH, Command.placeholder(QUERY_PLACEHOLDER)).in(pkg).text());
         }
     }
 

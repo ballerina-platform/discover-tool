@@ -226,6 +226,11 @@ public class CliTest {
                         "bal discover method send -p ballerinax/kafka --client Producer"),
                 new Case(List.of("client", "Client", "gists/public", "get", "-p", "ballerinax/github"),
                         "bal discover resource gists/public get -p ballerinax/github --client Client"),
+                new Case(List.of("search", "kafka", "send"), "bal discover search \"kafka send\""),
+                new Case(List.of("search", "kafka", "send", "--page", "2"),
+                        "bal discover search \"kafka send\" --page 2"),
+                new Case(List.of("search", "send", "close", "-p", "ballerinax/kafka"),
+                        "bal discover search \"send close\" -p ballerinax/kafka"),
                 new Case(List.of("class", "Cookie", "isValid", "-p", "ballerina/http", "--filter", "x"),
                         "bal discover method isValid -p ballerina/http --class Cookie --filter x"),
                 new Case(List.of("type", "Error", "Response", "-p", "ballerina/http"),
@@ -1699,7 +1704,7 @@ public class CliTest {
             "Readme  bal discover readme -p ballerinax/kafka  11 sections",
             "",
             "Next: bal discover <noun> <name> -p ballerinax/kafka",
-            "Next: bal discover search <keyword> -p ballerinax/kafka",
+            "Next: bal discover search <query> -p ballerinax/kafka",
             "");
 
     @Test
