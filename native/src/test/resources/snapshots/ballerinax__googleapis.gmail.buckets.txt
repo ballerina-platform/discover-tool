@@ -25,7 +25,7 @@ ballerinax/googleapis.gmail · client · Client
   users/:userId/threads/:id/trash                    post
   users/:userId/threads/:id/untrash                  post
 
-Next: bal discover resource <path> <accessor> -p ballerinax/googleapis.gmail --client Client
+Next: bal discover resource <path> -p ballerinax/googleapis.gmail --client Client --accessor <accessor>
 == service ==
 ballerinax/googleapis.gmail · service
 ballerinax/googleapis.gmail has no service types.

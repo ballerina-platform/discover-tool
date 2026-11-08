@@ -315,7 +315,7 @@ public class DiscoverResultRenderingTest {
         DiscoverResult result = new DiscoverResult.PathGroups("Client",
                 List.of(resource("ballerinax/github", "repos/:owner/:repo", "get", "patch", "delete")),
                 List.of(new DiscoverResult.PathGroups.Group("repos/actions", 38,
-                        "bal discover resource repos/actions get -p ballerinax/github --client Client")),
+                        "bal discover resource repos/actions -p ballerinax/github --client Client")),
                 new DiscoverResult.PathGroups.Counts(1, 1), 2, null, null, null);
         Assert.assertEquals(TextRenderer.render(result), lines(
                 "Client",
@@ -327,8 +327,8 @@ public class DiscoverResultRenderingTest {
                 "Path groups (resource methods in each)",
                 "  repos/actions  38",
                 "",
-                "Next: bal discover resource <path> <accessor> -p ballerinax/github --client Client",
-                "Next: bal discover resource <group> get -p ballerinax/github --client Client"));
+                "Next: bal discover resource <path> -p ballerinax/github --client Client --accessor <accessor>",
+                "Next: bal discover resource <group> -p ballerinax/github --client Client"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
         Assert.assertEquals(json.get("container").getAsString(), "Client");
@@ -351,15 +351,15 @@ public class DiscoverResultRenderingTest {
                 client + " --page 2", null);
         String text = TextRenderer.render(result);
         Assert.assertTrue(text.startsWith("Client\n45 resource paths here, 3 path groups\n"), text);
-        Assert.assertTrue(text.endsWith("\n... 8 more (page 1 of 2)\nNext: bal discover resource <path> <accessor> "
-                + "-p pkg --client Client\nNext: " + client + " --page 2"), text);
+        Assert.assertTrue(text.endsWith("\n... 8 more (page 1 of 2)\nNext: bal discover resource <path> "
+                + "-p pkg --client Client --accessor <accessor>\nNext: " + client + " --page 2"), text);
         Assert.assertEquals(JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject()
                 .getAsJsonObject("counts").toString(), "{\"resources\":45,\"groups\":3}");
     }
 
     @Test
     public void everyResourceRowCarriesOneCommandPerAccessorAndNeverAFlatCall() {
-        String client = "bal discover resource %s -p ballerinax/github --client Client";
+        String client = "bal discover resource %s -p ballerinax/github --client Client --accessor %s";
         DiscoverResult result = new DiscoverResult.ResourceList(null,
                 List.of(
                         resource("ballerinax/github", "gists", "get", "post"),
@@ -373,16 +373,16 @@ public class DiscoverResultRenderingTest {
                 "  gists/:gistId  get, delete",
                 "  gists/starred  get",
                 "",
-                "Next: " + client.formatted("<path> <accessor>")));
+                "Next: " + client.formatted("<path>", "<accessor>")));
 
         JsonArray resources = JsonParser.parseString(JsonRenderer.render(result))
                 .getAsJsonObject().getAsJsonArray("resources");
         Assert.assertEquals(resources.get(1).toString(),
                 "{\"path\":\"gists/:gistId\",\"accessors\":[\"get\",\"delete\"],\"commands\":{"
-                        + "\"get\":\"" + client.formatted("gists/:gistId get") + "\","
-                        + "\"delete\":\"" + client.formatted("gists/:gistId delete") + "\"}}");
+                        + "\"get\":\"" + client.formatted("gists/:gistId", "get") + "\","
+                        + "\"delete\":\"" + client.formatted("gists/:gistId", "delete") + "\"}}");
         Assert.assertEquals(resources.get(2).getAsJsonObject().getAsJsonObject("commands").toString(),
-                "{\"get\":\"" + client.formatted("gists/starred get") + "\"}");
+                "{\"get\":\"" + client.formatted("gists/starred", "get") + "\"}");
         for (int i = 0; i < resources.size(); i++) {
             Assert.assertFalse(resources.get(i).getAsJsonObject().has("command"), resources.get(i).toString());
         }
@@ -390,7 +390,7 @@ public class DiscoverResultRenderingTest {
 
     @Test
     public void aRowWhoseCommandTheSharedShapeCannotSpellCarriesItsOwn() {
-        String client = "bal discover resource %s -p ballerinax/github --client Client";
+        String client = "bal discover resource %s -p ballerinax/github --client Client --accessor %s";
         DiscoverResult result = new DiscoverResult.ResourceList(null,
                 List.of(resource("ballerinax/github", "gists/starred", "get"),
                         resource("ballerinax/github", "gists/'public", "get"),
@@ -400,10 +400,10 @@ public class DiscoverResultRenderingTest {
                 "3 resource paths",
                 "",
                 "  gists/starred   get",
-                "  gists/'public   get        " + client.formatted("\"gists/'public\" get"),
-                "  gists/'private  get, post  " + client.formatted("\"gists/'private\" <accessor>"),
+                "  gists/'public   get        " + client.formatted("\"gists/'public\"", "get"),
+                "  gists/'private  get, post  " + client.formatted("\"gists/'private\"", "<accessor>"),
                 "",
-                "Next: " + client.formatted("<path> <accessor>")));
+                "Next: " + client.formatted("<path>", "<accessor>")));
     }
 
     @Test
@@ -655,7 +655,7 @@ public class DiscoverResultRenderingTest {
                 "Methods (.)",
                 "  getCookieStore",
                 "",
-                "Next: bal discover resource <path> <accessor> -p " + HTTP + " --client Client",
+                "Next: bal discover resource <path> -p " + HTTP + " --client Client --accessor <accessor>",
                 "Next: bal discover method <name> -p " + HTTP + " --client Client"));
 
         JsonObject json = JsonParser.parseString(JsonRenderer.render(result)).getAsJsonObject();
@@ -750,8 +750,8 @@ public class DiscoverResultRenderingTest {
     private static DiscoverResult.ResourceList.Resource resource(String pkg, String path, String... accessors) {
         Map<String, String> commands = new LinkedHashMap<>();
         for (String accessor : accessors) {
-            commands.put(accessor, Command.of("resource", path, accessor).in(new Command.Target(pkg, null))
-                    .ownedBy("client", "Client").text());
+            commands.put(accessor, Command.of("resource", path).in(new Command.Target(pkg, null))
+                    .ownedBy("client", "Client").accessedBy(accessor).text());
         }
         return new DiscoverResult.ResourceList.Resource(path, List.of(accessors), commands);
     }

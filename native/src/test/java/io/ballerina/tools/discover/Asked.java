@@ -50,7 +50,7 @@ final class Asked {
         String flag = scope.commandFlag();
         return member.length == 1
                 ? of(loaded, "method", member[0], flag, container)
-                : of(loaded, "resource", member[0], member[1], flag, container);
+                : of(loaded, "resource", member[0], "--accessor", member[1], flag, container);
     }
 
     /** {@link #of} with the line split on spaces, for a command whose names hold none. */

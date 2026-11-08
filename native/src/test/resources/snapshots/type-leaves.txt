@@ -886,7 +886,7 @@ Methods (.)
   getCircuitBreakerCurrentState
   getCookieStore
 
-Next: bal discover resource <path> <accessor> -p ballerina/http --client Client
+Next: bal discover resource <path> -p ballerina/http --client Client --accessor <accessor>
 Next: bal discover method <name> -p ballerina/http --client Client
 == ballerina__graphql type ID ==
 ballerina/graphql · type · ID

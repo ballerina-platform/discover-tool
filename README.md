@@ -14,36 +14,37 @@ bal discover --help
 ## Usage
 
 ```
-bal discover <noun> [name ...] -p <org>/<package>[:<version>] [--client|--class|--service <name>] [flags]
+bal discover <noun> [name] -p <org>/<package>[:<version>] [--client|--class|--service <name>] [flags]
 bal discover package <org>/<package>[:<version>]
-bal discover search <keyword> ...
+bal discover search <query>
 ```
 
 The first word says what comes back, a name after it says which one: a name means one thing, no name means a
-listing. Every noun but `package` takes the package with `-p`, and every command the tool prints is written in
-that one order: the noun, its names, `-p`, the container flag, then the other flags. You may type a flag before
-the noun too (`bal discover -p ballerinax/kafka method send`). `bal discover package
-<org>/<package>` is the package's overview: its clients, service types, classes and functions with their member
-counts, one line for its types by kind, one for its readme's sections, and its submodules, each with the command
-that opens it.
+listing. A noun takes at most one name; what narrows it further is a flag (a container's `--client`, a resource
+path's `--accessor`), and more than one name is a usage error. Every noun but `package` takes the package with
+`-p`, and every command the tool prints is written in that one order: the noun, its name, `-p`, the container
+flag, `--accessor`, then the other flags. You may type a flag before the noun too
+(`bal discover -p ballerinax/kafka method send`). `bal discover package <org>/<package>` is the package's
+overview: its clients, service types, classes and functions with their member counts, one line for its types by
+kind, one for its readme's sections, and its submodules, each with the command that opens it.
 The noun may be left out for this one: `bal discover <org>/<package>` is the same command.
 
 `<org>/<package>` always names a package, never a module of one: `bal discover package ballerinax/aws.auth` fails
 with the command that reads that module, `bal discover package ballerinax/aws --module auth`. To find a package in
-the first place, `bal discover search <keyword> ...` asks Central (see Searching, below). A version goes in the
+the first place, `bal discover search <query>` asks Central (see Searching, below). A version goes in the
 coordinate, the form `bal pull` takes: `bal discover package ballerina/http:2.15.7` (see Which version is read,
 below).
 
 | Noun                               | What it answers                                                                          |
 | ---------------------------------- | ---------------------------------------------------------------------------------------- |
 | `package <org>/<package>`          | The package's overview.                                                                   |
-| `search <keyword> ...`             | Central's packages and symbols; with `-p`, every name in one package that holds each keyword (see Searching, below). |
+| `search <query>`                   | Central's packages and symbols; with `-p`, every name in one package that holds each of the query's keywords (see Searching, below). |
 | `client [<name>]`                  | Objects reached with `->`: the clients, or one client's resource paths, remote methods and methods. |
 | `service [<name>]`                 | Service object types, under the listener(s) that accept them; the rest are listed apart. |
 | `class [<name>]`                   | Plain objects reached with `.`.                                                           |
 | `function [<name>]`                | Module-level functions, or one function's signature.                                      |
 | `method [<name>]`                  | A container's remote and plain methods, or one method's signature; `init` is the constructor. |
-| `resource [<path> [<accessor>]]`   | A container's resource paths, the paths under one, or one resource method's signature (`client->path.accessor(...)`). |
+| `resource [<path>]`                | A container's resource paths, the paths under one, or one resource method's signature (`client->path.accessor(...)`): a path with one accessor answers with it, and `--accessor <name>` picks one of several. |
 | `type [<name>]`                    | Every type the module declares: records, enums, errors, type aliases, constants, module variables, annotations, listeners, and the classes, clients and service types the nouns above also list. `type <Name>` opens any of them. |
 | `readme [<n>\|"<title>"]`          | The module's README, verbatim, or one section of it.                                      |
 
@@ -63,8 +64,8 @@ its other methods included, with the types it uses, and an enum member (`HTTP_1_
 declares it (`HttpVersion`) and a note naming it.
 
 `method` and `resource` name their container with `--client`, `--class` or `--service`
-(`resource gists/public get -p ballerinax/github --client Client`). The flag may be left out when exactly one
-container declares what is named (`method send -p ballerinax/kafka` answers as `--client Producer`); when several
+(`resource gists/:gistId/star -p ballerinax/github --client Client --accessor put`). The flag may be left out when
+exactly one container declares what is named (`method send -p ballerinax/kafka` answers as `--client Producer`); when several
 do, the failure lists each one's command, and a flag naming a container of another kind fails with the command
 that has the right one. Every command the tool prints names the container. Every name is typed as the listings
 print it, or in Ballerina's own escaped spelling of the same identifier (`'public`, `code\-scanning`): anything
@@ -76,6 +77,7 @@ request in this order.
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `-p, --package <org>/<package>[:<version>]` | The package to read, on every noun but `package`; on `search` only to search one package. |
 | `--client`, `--class`, `--service <name>` | The container a `method` or `resource` is declared by; optional when exactly one declares it. |
+| `--accessor <name>`    | On `resource` only: the method of the path, by its accessor (`get`, `post`, ...); optional when the path has one. |
 | `--output-format json\|text` | Override the default: text when stdout is a terminal, JSON otherwise. |
 | `--filter <keyword>`   | Narrow a listing to entries whose name, path, parameter or type contains the keyword. Filtering is local to the fetched payload; nothing is sent to Central. On `package` it runs `search <keyword>`. |
 | `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is an error. |
@@ -112,7 +114,7 @@ Types   bal discover type -p ballerinax/kafka    14 records, 3 enums, 3 errors, 
 Readme  bal discover readme -p ballerinax/kafka  11 sections
 
 Next: bal discover <noun> <name> -p ballerinax/kafka
-Next: bal discover search <keyword> -p ballerinax/kafka
+Next: bal discover search <query> -p ballerinax/kafka
 
 $ bal discover package ballerinax/kafka | cat
 {"qualified":"ballerinax/kafka","version":"4.6.5","clients":{"entries":[{"name":"Caller","remote":3,"command":"bal discover client Caller -p ballerinax/kafka"},{"name":"Consumer","remote":24,"command":"bal discover client Consumer -p ballerinax/kafka"},{"name":"Producer","remote":5,"command":"bal discover client Producer -p ballerinax/kafka"}],"shown":3,"total":3,"command":"bal discover client -p ballerinax/kafka"},"serviceTypes":{"entries":[{"name":"Service","command":"bal discover service Service -p ballerinax/kafka"}],"shown":1,"total":1,"command":"bal discover service -p ballerinax/kafka"},"classes":{"entries":[{"name":"AvroDeserializer","normal":1,"command":"bal discover class AvroDeserializer -p ballerinax/kafka"},{"name":"AvroSerializer","normal":1,"command":"bal discover class AvroSerializer -p ballerinax/kafka"},{"name":"Deserializer","normal":1,"command":"bal discover class Deserializer -p ballerinax/kafka"},{"name":"Serializer","normal":1,"command":"bal discover class Serializer -p ballerinax/kafka"}],"shown":4,"total":4,"command":"bal discover class -p ballerinax/kafka"},"types":{"counts":{"records":14,"enums":3,"errors":3,"aliases":8,"constants":29,"annotations":1,"listeners":1},"command":"bal discover type -p ballerinax/kafka"},"readme":{"sections":11,"command":"bal discover readme -p ballerinax/kafka"}}
@@ -168,7 +170,7 @@ Readme  bal discover readme -p ballerinax/postgresql:1.19.1  25 sections
 
 Next: bal discover <noun> <name> -p ballerinax/postgresql:1.19.1
 Next: bal discover method <name> -p ballerinax/postgresql:1.19.1 --client Client
-Next: bal discover search <keyword> -p ballerinax/postgresql:1.19.1
+Next: bal discover search <query> -p ballerinax/postgresql:1.19.1
 ```
 
 Every JSON answer is exactly one line, however long, so cutting the output with `head` or `tail` never
@@ -369,8 +371,16 @@ ballerinax/github:6.0.0 · resource · Client · gists
   gists/public                       get
   gists/starred                      get
 
-Next: bal discover resource <path> <accessor> -p ballerinax/github --client Client
+Next: bal discover resource <path> -p ballerinax/github --client Client --accessor <accessor>
 ```
+
+A path with one accessor answers with that method's signature (`resource gists/public`); a path with several is
+listed with each of them, and `--accessor` picks one (`resource gists/:gistId/star --accessor put`). An accessor
+the path does not declare fails with the path's accessors as its candidates. The path is matched whole, exactly
+as listed, so a dotted segment stays part of the path: `bal discover resource reactions.get -p ballerinax/slack`
+is slack's `reactions\.get` path (accessor `get`), the root path is `.`, and http's rest-parameter path is
+`:...path`. The older form with the accessor as a second word (`resource gists/public get`) is a usage error whose
+command is the same request with `--accessor get`.
 
 Operations that end exactly at a grouped prefix are listed beside its groups rather than as a group of their
 own, and a group deeper than the top is named by its full path:
@@ -391,7 +401,7 @@ Path groups (resource methods in each)
   repos/:owner/:repo/notifications              2
 
 ... 25 more (page 1 of 2)
-Next: bal discover resource <path> <accessor> -p ballerinax/github --client Client
+Next: bal discover resource <path> -p ballerinax/github --client Client --accessor <accessor>
 Next: bal discover resource <group> -p ballerinax/github --client Client
 Next: bal discover resource repos -p ballerinax/github --client Client --page 2
 Next: bal discover resource repos -p ballerinax/github --client Client --filter <keyword>
@@ -408,7 +418,7 @@ rather than a guess at one:
 
 ```
 $ bal discover resource gists -p ballerinax/github --client Client --filter star | cat
-{"qualified":"ballerinax/github","version":"6.0.0","container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover resource gists/:gistId/star get -p ballerinax/github --client Client","put":"bal discover resource gists/:gistId/star put -p ballerinax/github --client Client","delete":"bal discover resource gists/:gistId/star delete -p ballerinax/github --client Client"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover resource gists/starred get -p ballerinax/github --client Client"}}],"shown":2,"total":2}
+{"qualified":"ballerinax/github","version":"6.0.0","container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor get","put":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor put","delete":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover resource gists/starred -p ballerinax/github --client Client --accessor get"}}],"shown":2,"total":2}
 ```
 
 Everything else that opens exactly one thing — a method, a group, a container, a submodule, a readme section —
@@ -694,8 +704,10 @@ Next: bal discover readme <n> -p ballerinax/kafka
 
 ## Searching
 
-`bal discover search <keyword> -p <org>/<package> ...` finds names inside one package, locally, with nothing sent
-to Central. Each keyword is matched as a case-insensitive substring, and a name matches when every keyword does.
+`bal discover search <query> -p <org>/<package>` finds names inside one package, locally, with nothing sent to
+Central. The query is one argument, quoted when it holds several keywords (`search "producer send"`), and typing
+them unquoted is a usage error whose command quotes them. Each keyword is matched as a case-insensitive substring,
+and a name matches when every keyword does.
 The names are a container's, a listener's, a function's or a type's own name, a method's own name (not its
 container's), a resource method's path and accessor (`repos/:owner/:repo/issues post`), a readme section's
 title and a submodule's name, all read without Ballerina's escapes. It reads names only, never parameters or
@@ -718,7 +730,7 @@ Remote methods
 Next: bal discover method <name> -p ballerinax/kafka:4.6.5 --client <container>
 ```
 
-`bal discover search <keyword> ...` asks Central: its package search (what `bal search` asks) and its symbol
+`bal discover search <query>` asks Central: its package search (what `bal search` asks) and its symbol
 search across every package, 10 packages and 25 symbols a page, each row with the `bal discover` command that
 opens it, pinned to the version Central matched. Symbols must match every keyword (the query joins them with
 Central's `AND`); packages are ranked on the keywords as typed, since Central's package search has no such
@@ -732,7 +744,7 @@ a client or a class; a row of a kind no noun lists (a `configurable`), or one mi
 command needs, opens the package. Each row is printed as the words that follow `bal discover`.
 
 ```
-$ bal discover search kafka send
+$ bal discover search "kafka send"
 search · kafka send
 8 packages, 33 symbols
 
@@ -750,7 +762,7 @@ Symbols (25 of 33)
 
 ... 8 more (page 1 of 2)
 Next: bal discover <row>
-Next: bal discover search kafka send --page 2
+Next: bal discover search "kafka send" --page 2
 ```
 
 ## Output
@@ -799,8 +811,8 @@ first (alphabetical among equals), because it is read to choose where to go next
 No listing shows more than **40 entries**. Over that:
 
 - resource paths selected by a path (or by nothing) **group** by their next literal path segment, up to four
-  literal levels below the top; path parameters never form a group of their own, and a group carries the
-  accessor the listing was narrowed by into its `command`;
+  literal levels below the top; path parameters never form a group of their own, and a group's `command` opens
+  every resource method under it;
 - everything else **pages** with `--page <n>`: a roster of containers, a level of groups (the paths ending
   there first, then the groups, with `counts` giving both across every page), methods of one call form
   (alphabetically), resource paths that cannot be grouped — selected by `--filter`, or already four literal
@@ -831,8 +843,12 @@ for `code\-scanning`), so a printed path needs no shell quoting; the code an ans
 spelling (`resource function get gists/'public(...)`). A name is matched as it is printed, or in Ballerina's
 escaped spelling of the same segment: case-sensitive, a parameter only as `:owner` (not `[owner]`, `{owner}` or
 `owner`), and a path whole, from its first segment, in one argument joined by `/`.
-A path that matches nothing fails, suggesting the listing under the deepest prefix it did match.
-`resource` takes a path and its accessor (read in either order) and `method` a method's name, `init` for the
+A dot is part of a segment, never a separator (`reactions.get`, `guilds/:guildId/widget.json`, `Users/.search`),
+the root path is `.`, and a rest parameter is `:...path`.
+A path that matches nothing fails with the paths under the deepest prefix it did match as its candidates, and an
+`--accessor` the path does not declare fails with the path's accessors as its candidates: each candidate is the
+value to type in the slot that missed.
+`resource` takes a path, its method by `--accessor`, and `method` a method's name, `init` for the
 constructor, so a path and a method of one name are never confused. More names than a noun takes is a usage
 error naming the command that reads them, never silently dropped.
 
@@ -905,7 +921,9 @@ A usage error is a `usage` failure. Most are found before anything is looked up:
 option with a missing or invalid value (`--output-format xml`, `--page x`, `--page 0`, `--refresh=true`,
 `--module 'bad!name'`), given twice, or given both before the noun and after it, no noun, a malformed package name
 or incomplete version, `--version` after a noun, a version typed as a name, an unknown noun, more names than a noun takes, more than one container flag, a `type`
-name with `--filter`, a `search` with no keyword, with `--filter`, or (across Central) with `--module`, and the
+name with `--filter`, a `search` with no query, with its keywords unquoted (`search kafka send`, whose `command`
+is `search "kafka send"`), with `--filter`, or (across Central) with `--module`, an `--accessor` with no path or
+on a noun other than `resource`, and the
 old package-first form (`bal discover ballerinax/kafka client Producer`), whose `command` is the same request in
 the new order. A package typed as a name (`bal discover client ballerinax/kafka`) is moved to `-p`; a noun with no
 `-p` at all is never given a package it did not name: its `command` is the Central search for the name
@@ -913,7 +931,8 @@ the new order. A package typed as a name (`bal discover client ballerinax/kafka`
 the noun it meant. An unknown noun's `command` searches for the word, since it is most often a name typed without
 its noun (`bal discover close -p ballerinax/kafka`). One is found once the package is read: more names than a
 `method` or `resource` takes, read against it (`method Producer send` is `method send --client Producer`,
-`resource gists public get` is `resource gists/public get`); it names the command to run, and in text ends with
+`resource gists/public get` is `resource gists/public --accessor get` when `get` is one of that path's accessors,
+and otherwise a usage error with no command); it names the command to run, and in text ends with
 that noun's synopsis. A readme section asked with a `--filter` keyword it does not mention is not a usage error:
 it is `filter-no-match` (exit 1), whose `command` reads the section without `--filter`. `-m`, the short form
 `--module` once had, is answered with the same command spelled `--module`.
@@ -1071,15 +1090,20 @@ check 0 package ballerinax/kafka
 check 0 client -p ballerina/http                     # several clients: a roster
 check 0 function -p ballerinax/kafka                 # an empty noun is an answer
 check 0 resource gists -p ballerinax/github --client Client
-check 0 resource gists/public get -p ballerinax/github --client Client
-check 0 resource "gists/'public" get -p ballerinax/github  # Ballerina's spelling; the one container answers
+check 0 resource gists/:gistId/star -p ballerinax/github --client Client --accessor put
+check 0 resource "gists/'public" -p ballerinax/github  # Ballerina's spelling; its one accessor answers
+check 2 resource gists/public get -p ballerinax/github  # the accessor is a flag: --accessor get
+check 1 resource gists/public -p ballerinax/github --accessor put  # an accessor the path does not declare
+check 0 resource reactions.get -p ballerinax/slack   # a dot is part of the path
+check 2 method send -p ballerinax/kafka --accessor get  # --accessor is resource's alone
 check 0 method send -p ballerinax/kafka              # the one container declaring it answers
 check 2 method close -p ballerinax/kafka             # two containers declare it
 check 1 method send -p ballerinax/kafka --class Producer  # a container flag of the wrong kind
 check 0 search send -p ballerinax/kafka              # names inside one package
 check 0 package ballerinax/kafka --filter send       # the same search
-check 2 search -p ballerinax/kafka                   # a search needs a keyword
-check 0 search kafka send                            # Central's packages and symbols
+check 2 search -p ballerinax/kafka                   # a search needs a query
+check 0 search "kafka send"                          # Central's packages and symbols
+check 2 search kafka send                            # the query is one argument
 check 1 resource zzz -p ballerinax/github --client Client  # a path that matches nothing fails
 check 1 client Response -p ballerina/http            # a class asked as a client
 check 0 client Client -p ballerina/http --filter zzz # a search that finds nothing is an answer

@@ -27,11 +27,14 @@ public class UsageRendererTest {
     public void aUsageErrorsSynopsisIsOneLineNamingThePackageAndContainerFlagsItTakes() {
         Commands.Grammar grammar = Commands.Grammar.create();
         Assert.assertEquals(UsageRenderer.usageLine(grammar, null),
-                "Usage: bal discover <noun> [<name> ...] -p <org>/<name>[:<version>] [options]");
+                "Usage: bal discover <noun> [<name>] -p <org>/<name>[:<version>] [options]");
         Assert.assertEquals(UsageRenderer.usageLine(grammar, "package"),
                 "Usage: bal discover package <org>/<name>[:<version>] [options]");
         Assert.assertEquals(UsageRenderer.usageLine(grammar, "method"),
                 "Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] "
+                        + "[options]");
+        Assert.assertEquals(UsageRenderer.usageLine(grammar, "resource"),
+                "Usage: bal discover resource [<path>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] "
                         + "[options]");
         Assert.assertEquals(UsageRenderer.usageLine(grammar, "search"),
                 "Usage: bal discover search <query> [-p <org>/<name>[:<version>]] [options]");

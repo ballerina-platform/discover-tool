@@ -125,7 +125,7 @@ public class ViewsAgreeTest {
                 container.memberNames().forEach(name -> selectors.add(with(List.of(noun, name), owner)));
                 container.operations().stream().limit(OPERATIONS_PER_CONTAINER).forEach(operation ->
                         selectors.add(with(List.of("resource", String.join("/", operation.segments()),
-                                operation.fn().accessor()), owner)));
+                                "--accessor", operation.fn().accessor()), owner)));
                 for (List<String> selector : selectors) {
                     DiscoverResult answer = expectAnswer(Asked.of(context, selector.toArray(String[]::new)),
                             String.join(" ", selector));
@@ -314,8 +314,8 @@ public class ViewsAgreeTest {
         // FIELDS are the call's named arguments — and no signature line spells those out, so the answer must
         // carry the record.
         LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__github");
-        DiscoverResult view = expectAnswer(Asked.of(context, "resource", "repos/:owner/:repo/actions/caches", "delete",
-                "--client", "Client"), "caches delete");
+        DiscoverResult view = expectAnswer(Asked.of(context, "resource", "repos/:owner/:repo/actions/caches",
+                "--accessor", "delete", "--client", "Client"), "caches delete");
         Assert.assertTrue(view instanceof DiscoverResult.Signature, view.toString());
         DiscoverResult.Signature signature = (DiscoverResult.Signature) view;
         Assert.assertTrue(signature.declaration().contains(

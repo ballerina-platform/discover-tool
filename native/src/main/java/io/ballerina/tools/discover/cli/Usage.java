@@ -38,7 +38,7 @@ import java.util.Set;
 final class Usage {
 
     /** What follows {@code bal discover} in the root's synopsis. */
-    static final String ROOT_LABEL = "<noun> [<name> ...]";
+    static final String ROOT_LABEL = "<noun> [<name>]";
 
     private static final String KAFKA = " -p ballerinax/kafka";
 
@@ -49,6 +49,8 @@ final class Usage {
     private static final String GITHUB_CLIENT = GITHUB + " --client Client";
 
     private static final String KAFKA_SEND = "\"kafka send\"";
+
+    private static final String STAR_PUT = "gists/:gistId/star" + GITHUB + " " + Command.ACCESSOR_FLAG + " put";
 
     /** Where the root's command descriptions start: past the longest noun and its names. */
     private static final int COMMAND_COLUMN = 36;
@@ -113,14 +115,16 @@ final class Usage {
                             new Example("The constructor", example(Command.METHOD, "init" + PRODUCER)),
                             new Example("No container flag: the one container that declares it",
                                     example(Command.METHOD, "send" + KAFKA)))),
-            Command.RESOURCE, new Noun(" [<path> [<accessor>]]", "resource paths, or one method's signature",
+            Command.RESOURCE, new Noun(" [<path>]", "resource paths, or one method's signature",
                     "Show a container's resource paths, or one resource method's signature",
                     List.of(new Example("The resource paths, grouped by segment when there are many",
                                     example(Command.RESOURCE, GITHUB_CLIENT.strip())),
                             new Example("The paths under one; a path parameter is written :name",
                                     example(Command.RESOURCE, "gists" + GITHUB_CLIENT)),
-                            new Example("One resource method's signature: the path, then its accessor",
-                                    example(Command.RESOURCE, "gists/public get" + GITHUB_CLIENT)))),
+                            new Example("A path with one method answers with its signature",
+                                    example(Command.RESOURCE, "gists/public" + GITHUB_CLIENT)),
+                            new Example("One method of a path that has several, by its accessor",
+                                    example(Command.RESOURCE, STAR_PUT)))),
             Command.README, new Noun(" [<n>|\"<title>\"]", "the readme, or one section of it",
                     "Show the readme, or one section of it by number or title",
                     List.of(new Example("The readme, or its sections when it is long",
@@ -145,8 +149,8 @@ final class Usage {
             new Example("Find a package or a symbol on Central", example(Command.SEARCH, KAFKA_SEND)),
             new Example("What a package offers", example(Command.PACKAGE, "ballerinax/kafka")),
             new Example("A method's signature, its container named", example(Command.METHOD, "send" + PRODUCER)),
-            new Example("A resource method's signature: the path, then its accessor",
-                    example(Command.RESOURCE, "gists/public get" + GITHUB_CLIENT)),
+            new Example("A resource method's signature: its path, then its accessor",
+                    example(Command.RESOURCE, STAR_PUT)),
             new Example("A record, enum or error", example(Command.TYPE, "ConnectionConfig" + GITHUB)),
             new Example("One version; without one, ./Dependencies.toml's lock, else the latest",
                     example(Command.CLIENT, "Client -p ballerina/http:2.15.7")));

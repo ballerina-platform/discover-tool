@@ -227,7 +227,9 @@ public class RegisterTest {
                 boolean reachable = text.contains(command) || shapes.stream().anyMatch(shape -> shape.contains("<")
                         && command.equals(shape.substring(0, shape.indexOf('<')) + literal
                                 + shape.substring(shape.lastIndexOf('>') + 1)))
-                        || row.length > 2 && accessorSlotOnItsRow(text, row[2], command);
+                        || row.length > 2 && (shapes.stream().anyMatch(shape -> command.equals(
+                                shape.replace("<path>", row[2]).replace("<accessor>", row[3])))
+                                || accessorSlotOnItsRow(text, row[2], row[3], command));
                 Assert.assertTrue(reachable, label + "\nmissing: " + command);
             }
             String next = nextOf(answer.result());
@@ -237,8 +239,9 @@ public class RegisterTest {
         }
     }
 
-    private static boolean accessorSlotOnItsRow(String text, String path, String command) {
-        String slotted = command.substring(0, command.lastIndexOf(' ')) + " <accessor>";
+    private static boolean accessorSlotOnItsRow(String text, String path, String accessor, String command) {
+        String flag = " --accessor ";
+        String slotted = command.replace(flag + accessor, flag + "<accessor>");
         return text.lines().anyMatch(line -> isRowFor(line, path) && line.endsWith(slotted));
     }
 
@@ -322,7 +325,7 @@ public class RegisterTest {
 
     private static void addResourceCommands(List<String[]> commands, DiscoverResult.ResourceList.Resource resource) {
         resource.commands().forEach((accessor, command) ->
-                commands.add(new String[] {resource.path() + " " + accessor, command, resource.path()}));
+                commands.add(new String[] {resource.path() + " " + accessor, command, resource.path(), accessor}));
     }
 
     private static String nextOf(DiscoverResult result) {

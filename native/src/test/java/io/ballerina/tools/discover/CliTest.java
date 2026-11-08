@@ -225,7 +225,7 @@ public class CliTest {
                 new Case(List.of("client", "Producer", "send", "-p", "ballerinax/kafka"),
                         "bal discover method send -p ballerinax/kafka --client Producer"),
                 new Case(List.of("client", "Client", "gists/public", "get", "-p", "ballerinax/github"),
-                        "bal discover resource gists/public get -p ballerinax/github --client Client"),
+                        "bal discover resource gists/public -p ballerinax/github --client Client --accessor get"),
                 new Case(List.of("search", "kafka", "send"), "bal discover search \"kafka send\""),
                 new Case(List.of("search", "kafka", "send", "--page", "2"),
                         "bal discover search \"kafka send\" --page 2"),
@@ -259,16 +259,21 @@ public class CliTest {
                         "bal discover method send -p ballerinax/kafka --client Producer"),
                 new Case("ballerinax__kafka", List.of("method", "send", "extra", "-p", "ballerinax/kafka",
                         "--client", "Producer"), "bal discover method send -p ballerinax/kafka --client Producer"),
-                new Case("ballerinax__github", List.of("resource", "gists", "public", "get", "-p",
-                        "ballerinax/github"), "bal discover resource gists/public get -p ballerinax/github"),
+                new Case("ballerinax__github", List.of("resource", "gists/public", "get", "-p", "ballerinax/github",
+                        "--client", "Client"),
+                        "bal discover resource gists/public -p ballerinax/github --client Client --accessor get"),
+                new Case("ballerinax__github", List.of("resource", "gists/'public", "get", "-p", "ballerinax/github"),
+                        "bal discover resource gists/public -p ballerinax/github --client Client --accessor get"),
+                new Case("ballerinax__github", List.of("resource", "gists/:gistId/star", "put", "-p",
+                        "ballerinax/github", "--client", "Client", "--filter", "x"),
+                        "bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor put "
+                                + "--filter x"),
                 new Case("ballerinax__github", List.of("resource", "Client", "gists/public", "get", "-p",
-                        "ballerinax/github"), "bal discover resource gists/public get -p ballerinax/github --client "
-                        + "Client"),
-                new Case("ballerinax__github", List.of("resource", "gists/public", "get", "extra", "-p",
-                        "ballerinax/github", "--client", "Client"),
-                        "bal discover resource gists/public get -p ballerinax/github --client Client"),
-                new Case("ballerinax__github", List.of("resource", "no", "such", "get", "-p", "ballerinax/github"),
-                        "bal discover resource -p ballerinax/github"))) {
+                        "ballerinax/github"), "bal discover resource gists/public -p ballerinax/github --client "
+                        + "Client --accessor get"),
+                new Case("ballerina__http", List.of("resource", ":...path", "post", "-p", "ballerina/http",
+                        "--client", "Client"),
+                        "bal discover resource :...path -p ballerina/http --client Client --accessor post"))) {
             String label = String.join(" ", each.argv());
             Capture capture = new Capture();
             Assert.assertEquals(Cli.run(each.argv(), capture.streams(), centralFor(each.slug(), version)), 2,
@@ -283,10 +288,31 @@ public class CliTest {
     }
 
     @Test
+    public void aResourceGivenWordsThatAreNotOnePathAndAnAccessorIsAPlainUsageError() {
+        String version = FixtureCorpus.FIXTURE_VERSION.text();
+        for (List<String> names : List.of(List.of("gists/public", "nope"), List.of("gists", "public", "get"),
+                List.of("gists/public", "get", "extra"), List.of("repos", ":owner"), List.of("gists/:gistId", "put"))) {
+            List<String> argv = new ArrayList<>(List.of("resource"));
+            argv.addAll(names);
+            argv.addAll(List.of("-p", "ballerinax/github", "--client", "Client"));
+            String label = String.join(" ", argv);
+            Capture capture = new Capture();
+            Assert.assertEquals(Cli.run(argv, capture.streams(), centralFor("ballerinax__github", version)),
+                    Failure.USAGE, label + ": " + capture.stderr());
+            Assert.assertEquals(capture.field("kind"), "usage", label);
+            Assert.assertEquals(capture.field("message"), "resource takes one path, its method a flag; got "
+                    + names.size(), label);
+            Assert.assertEquals(capture.field("suggestion"),
+                    "Write the path alone, and its method with --accessor <accessor>.", label);
+            Assert.assertFalse(capture.failure().has("command"), "no word is guessed to be the accessor: " + label);
+        }
+    }
+
+    @Test
     public void theHeaderSpellsATypedEscapedPathAsItIsPrinted() {
         Capture capture = new Capture();
-        Assert.assertEquals(Cli.run(List.of("resource", "gists/'public", "get", "-p", "ballerinax/github", "--client",
-                "Client"),
+        Assert.assertEquals(Cli.run(List.of("resource", "gists/'public", "--accessor", "get", "-p", "ballerinax/github",
+                "--client", "Client"),
                 capture.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text()), null,
                 true), 0, capture.stderr());
         Assert.assertTrue(capture.stdout().startsWith("ballerinax/github:" + FixtureCorpus.FIXTURE_VERSION.text()
@@ -323,27 +349,22 @@ public class CliTest {
 
     @Test
     public void aResourceAndAMethodOfOneNameAreAskedApartByTheirNouns() {
-        for (List<String> selectors : List.of(List.of(":...path", "get"), List.of("get", ":...path"))) {
-            List<String> argv = new ArrayList<>(List.of("resource"));
-            argv.addAll(selectors);
-            argv.addAll(List.of("-p", "ballerina/http", "--client", "Client"));
-            JsonObject json = JsonParser.parseString(
-                    run(argv, "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
-                    .getAsJsonObject();
-            Assert.assertEquals(json.get("kind").getAsString(), "resource", String.join(" ", argv));
-            Assert.assertEquals(json.get("accessor").getAsString(), "get", String.join(" ", argv));
-        }
+        List<String> argv = List.of("resource", ":...path", "--accessor", "get", "-p", "ballerina/http", "--client",
+                "Client");
+        JsonObject json = JsonParser.parseString(
+                run(argv, "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout())
+                .getAsJsonObject();
+        Assert.assertEquals(json.get("kind").getAsString(), "resource", String.join(" ", argv));
+        Assert.assertEquals(json.get("accessor").getAsString(), "get", String.join(" ", argv));
         JsonObject method = JsonParser.parseString(run(List.of("method", "get", "-p", "ballerina/http", "--client",
                 "Client"), "ballerina__http", FixtureCorpus.FIXTURE_VERSION.text(), false).stdout()).getAsJsonObject();
         Assert.assertEquals(method.get("kind").getAsString(), "remote");
     }
 
     @Test
-    public void aPathAndAccessorThatResolveNothingFailAtThePathTheyReached() {
-        String under = "bal discover resource %s -p ballerinax/github --client Client";
-        for (List<String> selectors : List.of(List.of("gists/'public", "head"), List.of("gists/'public", "GET"),
-                List.of("head", "gists/'public"), List.of("gists", "gett"), List.of("gists", "zzz"),
-                List.of("gists", "starred"), List.of("gists", ":gistId"), List.of("gists", "public"))) {
+    public void aPathThatResolvesNothingFailsWithThePathsUnderTheLevelItReached() {
+        for (List<String> selectors : List.of(List.of("gists/nope"), List.of("gists/nope", "--accessor", "get"),
+                List.of("gists/public/nope"))) {
             List<String> argv = new ArrayList<>(List.of("resource"));
             argv.addAll(selectors);
             argv.addAll(List.of("-p", "ballerinax/github", "--client", "Client"));
@@ -353,48 +374,51 @@ public class CliTest {
                     centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1, label);
             Assert.assertEquals(capture.stdout(), "", label);
             Assert.assertEquals(capture.field("kind"), "symbol-not-found", label);
-            // Few enough resource methods under what was reached to list them all.
-            String reached = selectors.contains("gists") ? "gists" : "gists/public";
             Assert.assertFalse(capture.failure().has("command"), capture.stderr());
-            Assert.assertTrue(capture.failure().has("candidates"), capture.stderr());
-            capture.failure().getAsJsonArray("candidates").forEach(candidate ->
-                    Assert.assertTrue(candidate.getAsString().startsWith(reached + "/")
-                            || candidate.getAsString().startsWith(reached + " "), capture.stderr()));
+            String reached = selectors.get(0).substring(0, selectors.get(0).lastIndexOf('/'));
+            Assert.assertTrue(capture.field("suggestion").contains("resource paths under " + reached),
+                    capture.stderr());
+            capture.failure().getAsJsonArray("candidates").forEach(candidate -> {
+                Assert.assertTrue(candidate.getAsString().startsWith(reached), capture.stderr());
+                Assert.assertFalse(candidate.getAsString().contains(" "), "a candidate is a path: " + capture.stderr());
+            });
         }
         Capture ordered = new Capture();
-        Assert.assertEquals(Cli.run(List.of("resource", "gists", "nope", "-p", "ballerinax/github", "--client",
+        Assert.assertEquals(Cli.run(List.of("resource", "gists/nope", "-p", "ballerinax/github", "--client",
                 "Client"), ordered.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())),
                 1);
-        // In the listing's order: by path, then each path's accessors as declared.
-        Assert.assertEquals(ordered.failure().getAsJsonArray("candidates").get(0).getAsString(), "gists get",
-                ordered.stderr());
-        Assert.assertEquals(ordered.failure().getAsJsonArray("candidates").get(1).getAsString(), "gists post",
-                ordered.stderr());
-        Capture split = new Capture();
-        Assert.assertEquals(Cli.run(List.of("resource", "repos", ":owner", "-p", "ballerinax/github", "--client",
-                "Client"), split.streams(), centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())),
-                1);
-        Assert.assertEquals(split.field("message"),
-                "'repos :owner' is not a resource method of Client in ballerinax/github:"
+        JsonArray candidates = ordered.failure().getAsJsonArray("candidates");
+        Assert.assertEquals(candidates.get(0).getAsString(), "gists", "each path once, in the listing's order");
+        Assert.assertEquals(candidates.get(1).getAsString(), "gists/:gistId", ordered.stderr());
+        Assert.assertEquals(ordered.field("message"),
+                "'gists/nope' is not a resource path of Client in ballerinax/github:"
                         + FixtureCorpus.FIXTURE_VERSION.text());
-        Assert.assertEquals(split.field("command"), under.formatted("repos"));
     }
 
     @Test
-    public void aPathWithAnAccessorItDoesNotDeclareFailsWithThatPathsListing() {
-        for (List<String> selectors : List.of(List.of("user/keys/:keyId", "post"),
-                List.of("post", "user/keys/:keyId"))) {
-            List<String> argv = new ArrayList<>(List.of("resource"));
-            argv.addAll(selectors);
-            argv.addAll(List.of("-p", "ballerinax/github", "--client", "Client"));
+    public void anAccessorThePathDoesNotDeclareFailsWithThePathsAccessors() {
+        record Case(String path, String accessor, String candidates) { }
+        for (Case each : List.of(new Case("user/keys/:keyId", "post", "[\"get\",\"delete\"]"),
+                new Case("gists/'public", "head", "[\"get\"]"), new Case("gists/'public", "GET", "[\"get\"]"),
+                new Case("gists", "put", "[\"get\",\"post\"]"))) {
             Capture capture = new Capture();
-            Assert.assertEquals(Cli.run(argv, capture.streams(),
-                    centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1);
-            Assert.assertEquals(capture.field("suggestion"),
-                    "Name one of the resource methods under user/keys/:keyId below.");
-            Assert.assertEquals(capture.failure().getAsJsonArray("candidates").toString(),
-                    "[\"user/keys/:keyId get\",\"user/keys/:keyId delete\"]");
+            Assert.assertEquals(Cli.run(List.of("resource", each.path(), "--accessor", each.accessor(), "-p",
+                    "ballerinax/github", "--client", "Client"), capture.streams(),
+                    centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1, capture.stderr());
+            String path = each.path().replace("'", "");
+            Assert.assertEquals(capture.field("kind"), "symbol-not-found");
+            Assert.assertEquals(capture.field("message"), "'" + each.accessor() + "' is not an accessor of " + path
+                    + " on Client in ballerinax/github:" + FixtureCorpus.FIXTURE_VERSION.text());
+            Assert.assertEquals(capture.field("suggestion"), "Name one of the accessors of " + path + " below.");
+            Assert.assertEquals(capture.failure().getAsJsonArray("candidates").toString(), each.candidates());
+            Assert.assertFalse(capture.failure().has("command"), capture.stderr());
         }
+        Capture prefix = new Capture();
+        Assert.assertEquals(Cli.run(List.of("resource", "repos", "--accessor", "get", "-p", "ballerinax/github",
+                "--client", "Client"), prefix.streams(),
+                centralFor("ballerinax__github", FixtureCorpus.FIXTURE_VERSION.text())), 1, prefix.stderr());
+        Assert.assertEquals(prefix.field("command"), "bal discover resource repos -p ballerinax/github --client Client",
+                "a path that declares no method itself lists the paths under it");
     }
 
     @Test
@@ -413,8 +437,9 @@ public class CliTest {
     }
 
     @Test
-    public void aPathAndItsAccessorAreBothReadInEitherOrderButNeverAsOneArgument() {
-        for (List<String> selectors : List.of(List.of("gists/'public", "get"), List.of("get", "gists/public"))) {
+    public void aResourceMethodIsItsPathWithItsAccessorFlagOrItsPathAloneWhenItHasOne() {
+        for (List<String> selectors : List.of(List.of("gists/'public", "--accessor", "get"), List.of("gists/public"),
+                List.of("--accessor", "get", "gists/public"))) {
             List<String> argv = new ArrayList<>(List.of("resource"));
             argv.addAll(selectors);
             argv.addAll(List.of("-p", "ballerinax/github", "--client", "Client"));
@@ -970,7 +995,7 @@ public class CliTest {
 
     @Test
     public void aResourceSignatureNamesItsPathAndAccessorInJson() {
-        List<String> argv = List.of("resource", "repos/:owner/:repo/actions/caches", "delete", "-p",
+        List<String> argv = List.of("resource", "repos/:owner/:repo/actions/caches", "--accessor", "delete", "-p",
                 "ballerinax/github", "--client", "Client");
         JsonObject json = JsonParser.parseString(run(argv, "ballerinax__github", "6.0.0", false).stdout())
                 .getAsJsonObject();
@@ -1352,8 +1377,8 @@ public class CliTest {
         List<List<String>> unpaged = List.of(
                 List.of("package", "ballerinax/github", "--page", "5"),
                 List.of("readme", "-p", "ballerinax/github", "--page", "5"),
-                List.of("resource", "gists/'public", "get", "-p", "ballerinax/github", "--client", "Client", "--page",
-                        "2"));
+                List.of("resource", "gists/'public", "--accessor", "get", "-p", "ballerinax/github", "--client",
+                        "Client", "--page", "2"));
         for (List<String> argv : unpaged) {
             Capture capture = new Capture();
             int exitCode = Cli.run(argv, capture.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
@@ -1367,7 +1392,7 @@ public class CliTest {
         Capture quoted = new Capture();
         Cli.run(unpaged.get(2), quoted.streams(), centralFor(github, FixtureCorpus.FIXTURE_VERSION.text()));
         Assert.assertEquals(quoted.field("command"),
-                "bal discover resource gists/public get -p ballerinax/github --client Client");
+                "bal discover resource gists/public -p ballerinax/github --client Client --accessor get");
 
         Capture oneGroupedPage = new Capture();
         Assert.assertEquals(Cli.run(List.of("client", "Client", "-p", "ballerinax/github", "--page", "2"),

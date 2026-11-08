@@ -28,14 +28,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The argument grammar, declared once: {@code bal discover <noun> [name ...] -p <org>/<name>[:<version>] [flags]},
+ * The argument grammar, declared once: {@code bal discover <noun> [name] -p <org>/<name>[:<version>] [flags]},
  * one picocli subcommand per noun.
  *
- * <p>A noun says what comes back and its names say which one: a name means one thing, no name a listing. The
- * package is a flag, not a position, so every noun takes its names the same way; {@code package} alone takes the
- * coordinate as its name. {@code --module} applies uniformly across every noun including
- * {@code readme}: {@link Cli} reads it once before any noun is answered, since which module a coordinate resolves
- * to is a fact about the package lookup, not about any one noun.
+ * <p>A noun says what comes back and its one name says which one: a name means one thing, no name a listing. The
+ * package is a flag, not a position, so every noun takes its name the same way; {@code package} alone takes the
+ * coordinate as its name, and {@code search} its query. What narrows a name further is a flag too: the container
+ * with {@code --client}, a resource path's method with {@code --accessor}. {@code --module} applies uniformly
+ * across every noun including {@code readme}: {@link Cli} reads it once before any noun is answered, since which
+ * module a coordinate resolves to is a fact about the package lookup, not about any one noun.
  *
  * <p>The root takes the same flags and a free positional list only so the old package-first form
  * ({@code bal discover ballerinax/kafka client Producer}) and a mistyped noun parse, and {@link Cli} can answer
@@ -61,7 +62,7 @@ final class Commands {
 
     static final String PACKAGE_LABEL = "<org>/<name>[:<version>]";
 
-    static final String OWNER_LABEL = "<name>";
+    static final String NAME_LABEL = "<name>";
 
     static final String PACKAGE_DESCRIPTION = "read this package, as bal pull names it";
 
@@ -80,7 +81,8 @@ final class Commands {
             for (String name : Command.NOUNS) {
                 Noun noun = switch (name) {
                     case Command.PACKAGE -> new PackageNoun();
-                    case Command.METHOD, Command.RESOURCE -> new MemberNoun();
+                    case Command.METHOD -> new MemberNoun();
+                    case Command.RESOURCE -> new ResourceNoun();
                     default -> new ScopedNoun();
                 };
                 nouns.put(name, noun);
@@ -132,15 +134,15 @@ final class Commands {
     /** The container a method or resource is declared by. */
     static final class Owners {
 
-        @CommandLine.Option(names = Command.CLIENT_FLAG, paramLabel = OWNER_LABEL,
+        @CommandLine.Option(names = Command.CLIENT_FLAG, paramLabel = NAME_LABEL,
                 description = "name the client that declares it")
         String client;
 
-        @CommandLine.Option(names = Command.CLASS_FLAG, paramLabel = OWNER_LABEL,
+        @CommandLine.Option(names = Command.CLASS_FLAG, paramLabel = NAME_LABEL,
                 description = "name the class that declares it")
         String classOwner;
 
-        @CommandLine.Option(names = Command.SERVICE_FLAG, paramLabel = OWNER_LABEL,
+        @CommandLine.Option(names = Command.SERVICE_FLAG, paramLabel = NAME_LABEL,
                 description = "name the service type that declares it")
         String service;
 
@@ -159,6 +161,14 @@ final class Commands {
         }
     }
 
+    /** The method a resource path declares, by its accessor. */
+    static final class Accessor {
+
+        @CommandLine.Option(names = Command.ACCESSOR_FLAG, paramLabel = NAME_LABEL,
+                description = "name the resource method of the path, e.g. get")
+        String accessor;
+    }
+
     /**
      * What the caller typed before or instead of a noun. No minimum arity: picocli 4.0.1 lets a variable-arity
      * positional with a minimum consume an unrecognised flag as its value.
@@ -175,6 +185,9 @@ final class Commands {
         @CommandLine.Mixin
         Owners owners = new Owners();
 
+        @CommandLine.Mixin
+        Accessor accessor = new Accessor();
+
         @CommandLine.Option(names = {VERSION_SHORT, VERSION_FLAG}, versionHelp = true,
                 description = "print the tool's version")
         boolean version;
@@ -189,7 +202,7 @@ final class Commands {
         @CommandLine.Mixin
         Flags flags = new Flags();
 
-        @CommandLine.Parameters(arity = "0..*", paramLabel = "[<name> ...]")
+        @CommandLine.Parameters(arity = "0..*", paramLabel = "[<name>]")
         List<String> names;
 
         List<String> names() {
@@ -202,6 +215,11 @@ final class Commands {
         /** The container flags given. */
         List<Command.Owner> owners() {
             return List.of();
+        }
+
+        /** The {@code --accessor} value, or {@code null}. */
+        String accessor() {
+            return null;
         }
     }
 
@@ -232,7 +250,7 @@ final class Commands {
     }
 
     @CommandLine.Command
-    static final class MemberNoun extends ScopedNoun {
+    static class MemberNoun extends ScopedNoun {
 
         @CommandLine.Mixin
         Owners owners = new Owners();
@@ -240,6 +258,18 @@ final class Commands {
         @Override
         List<Command.Owner> owners() {
             return owners.given();
+        }
+    }
+
+    @CommandLine.Command
+    static final class ResourceNoun extends MemberNoun {
+
+        @CommandLine.Mixin
+        Accessor accessor = new Accessor();
+
+        @Override
+        String accessor() {
+            return accessor.accessor;
         }
     }
 }

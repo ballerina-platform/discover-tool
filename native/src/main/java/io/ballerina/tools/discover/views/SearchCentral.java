@@ -172,7 +172,7 @@ public final class SearchCentral {
                         ? hit.overview("resource method", parent, symbol)
                         : new DiscoverResult.CentralSearch.SymbolHit(qualified, row.version(), module,
                                 "resource method", parent, null, path, parts[0],
-                                hit.located(Command.of(Command.RESOURCE, path, parts[0])
+                                hit.located(Command.of(Command.RESOURCE, path).accessedBy(parts[0])
                                         .ownedBy(bucket.get(), parent)));
             }
             String method = row.remote() ? "remote method"

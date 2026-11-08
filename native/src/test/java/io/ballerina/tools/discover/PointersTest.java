@@ -144,7 +144,7 @@ public class PointersTest {
                 .ifPresent(name -> narrowings.add(new String[] {verb, container.name(), "--filter",
                         name.substring(1, name.length() - 1)}));
         container.operations().stream().findFirst().ifPresent(operation -> narrowings.add(new String[] {
-                "resource", operation.segments().get(0), operation.fn().accessor(), "--" + verb, container.name()}));
+                "resource", operation.segments().get(0), "--" + verb, container.name()}));
         if (!container.standalone().isEmpty()) {
             narrowings.add(new String[] {"method", "--" + verb, container.name()});
         }

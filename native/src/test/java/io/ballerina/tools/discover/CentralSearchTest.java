@@ -104,7 +104,8 @@ public class CentralSearchTest {
                 .toList();
         Assert.assertEquals(commands, List.of(
                 "bal discover method send -p ballerinax/kafka:1.0.0 --client Producer",
-                "bal discover resource repos/:owner/:repo/import get -p ballerinax/github:1.0.0 --client Client",
+                "bal discover resource repos/:owner/:repo/import -p ballerinax/github:1.0.0 --client Client "
+                        + "--accessor get",
                 "bal discover method init -p ballerinax/kafka:1.0.0 --client Producer",
                 "bal discover type FederatedEntity -p ballerina/graphql:1.0.0 --module subgraph",
                 "bal discover function println -p ballerina/io:1.0.0",
@@ -141,7 +142,8 @@ public class CentralSearchTest {
         commands.put("method", "method getStatus -p ballerina/workflow:1.0.0 --class DurableAgent");
         commands.put("client", "client Caller -p ballerina/smpp:1.0.0");
         commands.put("remote method", "method fetchOutgoingCallerId -p ballerinax/twilio:5.0.2 --client Client");
-        commands.put("resource method", "resource status get -p luheerathantheva/newcon:0.1.0 --client Client");
+        commands.put("resource method",
+                "resource status -p luheerathantheva/newcon:0.1.0 --client Client --accessor get");
         commands.put("configurable", "package ballerina/etl:0.8.1");
         commands.put("constant", "type TAG_ANCHOR_POINT_ANNOTATION_UNITS -p ballerinax/health.dicom:0.1.0");
         commands.put("decimal type", "type Id -p ballerinax/smartsheet:1.0.2");
@@ -204,7 +206,7 @@ public class CentralSearchTest {
         Assert.assertEquals(commands, List.of("bal discover package acme/pkg:1.0.0",
                 "bal discover package acme/pkg:1.0.0",
                 "bal discover package acme/pkg:1.0.0", "bal discover package acme/pkg:1.0.0",
-                "bal discover resource :...path get -p acme/pkg:1.0.0 --client Client"));
+                "bal discover resource :...path -p acme/pkg:1.0.0 --client Client --accessor get"));
     }
 
     @Test

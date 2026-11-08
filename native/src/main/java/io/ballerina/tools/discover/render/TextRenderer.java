@@ -40,7 +40,7 @@ import java.util.stream.Stream;
  * a footer holding the notes, how much was left out and the {@code Next:} commands. Where the JSON rendering
  * gives every row its own {@code command} (a resource row its {@code commands}, one per accessor), a large
  * listing prints the shared shape of those commands once in the footer instead; a row whose command does not fit
- * that shape (a name that needs shell quoting, a group opened without the listing's accessor) carries its own.
+ * that shape (a name that needs shell quoting) carries its own.
  * No colour and no wrapping, so the output stays as greppable as the JSON.
  *
  * @since 0.1.0
@@ -58,11 +58,16 @@ public final class TextRenderer {
 
     private static final String NAME_PLACEHOLDER = "<name>";
 
+    private static final String PATH_PLACEHOLDER = "<path>";
+
+    private static final String ACCESSOR_PLACEHOLDER = "<accessor>";
+
     private static final String CONTAINER_PLACEHOLDER = "<container>";
 
     /** How a search group's rows read in the shared command shape its {@code Next:} line prints. */
     private static final Map<DiscoverResult.Search.Kind, List<String>> SEARCH_PLACEHOLDERS = Map.of(
-            DiscoverResult.Search.Kind.RESOURCES, List.of(CONTAINER_PLACEHOLDER, "<accessor>", "<path>"),
+            DiscoverResult.Search.Kind.RESOURCES,
+            List.of(CONTAINER_PLACEHOLDER, ACCESSOR_PLACEHOLDER, PATH_PLACEHOLDER),
             DiscoverResult.Search.Kind.REMOTE, List.of(CONTAINER_PLACEHOLDER, NAME_PLACEHOLDER),
             DiscoverResult.Search.Kind.METHODS, List.of(CONTAINER_PLACEHOLDER, NAME_PLACEHOLDER),
             DiscoverResult.Search.Kind.README, List.of("<n>"));
@@ -74,8 +79,6 @@ public final class TextRenderer {
     private static final String QUERY_PLACEHOLDER = "<query>";
 
     private static final String ROW_PLACEHOLDER = "<row>";
-
-    private static final String ACCESSOR_PLACEHOLDER = "<accessor>";
 
     private static final String BUCKET_PLACEHOLDER = "<noun>";
 
@@ -724,14 +727,14 @@ public final class TextRenderer {
     }
 
     private static Drill resourceDrill(List<DiscoverResult.ResourceList.Resource> resources) {
-        List<List<String>> literals = new ArrayList<>();
+        List<List<List<String>>> literals = new ArrayList<>();
         List<List<String>> commands = new ArrayList<>();
         for (DiscoverResult.ResourceList.Resource resource : resources) {
-            literals.add(resource.commands().keySet().stream().map(accessor -> resource.path() + " " + accessor)
+            literals.add(resource.commands().keySet().stream().map(accessor -> List.of(resource.path(), accessor))
                     .toList());
             commands.add(List.copyOf(resource.commands().values()));
         }
-        return Drill.ofRows(literals, commands, "<path> <accessor>");
+        return Drill.shaped(literals, commands, List.of(PATH_PLACEHOLDER, ACCESSOR_PLACEHOLDER));
     }
 
     // A row's own command: its one unfit command, or with several, the first with its accessor as a placeholder.
@@ -743,6 +746,7 @@ public final class TextRenderer {
         return resource.commands().entrySet().stream()
                 .filter(command -> command.getValue().equals(first))
                 .map(command -> Drill.shapeOf(first, command.getKey(), ACCESSOR_PLACEHOLDER))
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(first);
     }
@@ -833,17 +837,7 @@ public final class TextRenderer {
     private record Drill(String pattern, List<List<String>> unfit) {
 
         static Drill of(List<String> literals, List<String> commands, String placeholder) {
-            return ofRows(literals.stream().map(List::of).toList(),
-                    commands.stream()
-                            .map(command -> command == null ? List.<String>of() : List.of(command))
-                            .toList(),
-                    placeholder);
-        }
-
-        /** Each row with any number of commands, {@code literals} naming each one in the same order. */
-        static Drill ofRows(List<List<String>> literals, List<List<String>> commands, String placeholder) {
-            return shaped(literals.stream().map(row -> row.stream().map(List::of).toList()).toList(), commands,
-                    List.of(placeholder));
+            return ofParts(literals.stream().map(List::of).toList(), commands, List.of(placeholder));
         }
 
         /** Each row with one command naming several literals, each swapped for its own placeholder, in order. */
@@ -855,7 +849,11 @@ public final class TextRenderer {
                     placeholders);
         }
 
-        private static Drill shaped(List<List<List<String>>> literals, List<List<String>> commands,
+        /**
+         * Each row with any number of commands, each naming several literals, each swapped for its own placeholder,
+         * in order.
+         */
+        static Drill shaped(List<List<List<String>>> literals, List<List<String>> commands,
                 List<String> placeholders) {
             Map<String, Integer> shapes = new LinkedHashMap<>();
             for (int row = 0; row < commands.size(); row++) {
@@ -897,11 +895,11 @@ public final class TextRenderer {
             return shapeOf(command, List.of(literal), List.of(placeholder));
         }
 
-        // The literal is the container a member command names with its flag, or a run of the command's names; a
-        // literal the shell would see quoted is never shaped, since a reader fills the placeholder in as shown.
+        // The literal is the container a member command names with its flag, a resource method's accessor, or one
+        // of the command's names; a literal the shell would see quoted is never shaped, since a reader fills the
+        // placeholder in as shown.
         private static Command reshaped(Command command, String literal, String placeholder) {
-            List<String> words = List.of(literal.split(" "));
-            if (words.stream().anyMatch(word -> !Texts.shellWord(word).equals(word))) {
+            if (!Texts.shellWord(literal).equals(literal)) {
                 return null;
             }
             if (CONTAINER_PLACEHOLDER.equals(placeholder)) {
@@ -910,18 +908,16 @@ public final class TextRenderer {
                         ? command.ownedBy(owner.kind(), Command.placeholder(placeholder))
                         : null;
             }
-            List<String> names = command.names();
-            for (int at = names.size() - words.size(); at >= 0; at--) {
-                if (names.subList(at, at + words.size()).equals(words)) {
-                    List<String> labels = List.of(placeholder.split(" "));
-                    List<String> shaped = new ArrayList<>(names.subList(0, at));
-                    (labels.size() == words.size() ? labels : List.of(placeholder))
-                            .forEach(label -> shaped.add(Command.placeholder(label)));
-                    shaped.addAll(names.subList(at + words.size(), names.size()));
-                    return command.withNames(shaped);
-                }
+            if (ACCESSOR_PLACEHOLDER.equals(placeholder)) {
+                return literal.equals(command.accessor()) ? command.accessedBy(Command.placeholder(placeholder)) : null;
             }
-            return null;
+            int at = command.names().lastIndexOf(literal);
+            if (at < 0) {
+                return null;
+            }
+            List<String> shaped = new ArrayList<>(command.names());
+            shaped.set(at, Command.placeholder(placeholder));
+            return command.withNames(shaped);
         }
 
         List<String> unfit(int row) {

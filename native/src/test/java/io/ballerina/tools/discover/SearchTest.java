@@ -70,7 +70,7 @@ public class SearchTest {
         Assert.assertEquals(first.name(), "repos/:owner/:repo/issues");
         Assert.assertEquals(first.detail(), "post");
         Assert.assertEquals(first.command(),
-                "bal discover resource repos/:owner/:repo/issues post -p ballerinax/github --client Client");
+                "bal discover resource repos/:owner/:repo/issues -p ballerinax/github --client Client --accessor post");
     }
 
     @Test
