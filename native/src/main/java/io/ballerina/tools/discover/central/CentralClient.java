@@ -88,7 +88,7 @@ public final class CentralClient {
 
     private static final String RUN_AGAIN = "then run the same command again.";
 
-    private static final String SEARCH_HINT = "'bal discover search <keyword>' lists what Central publishes.";
+    private static final String SEARCH_HINT = "'bal discover search <query>' lists what Central publishes.";
 
     /**
      * How long Central's answer to "what is the latest version" is believed.

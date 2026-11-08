@@ -73,7 +73,7 @@ public class DiscoverResultRenderingTest {
                 "Readme  bal discover readme -p ballerinax/kafka  11 sections",
                 "",
                 "Next: bal discover <noun> <name> -p ballerinax/kafka",
-                "Next: bal discover search <keyword> -p ballerinax/kafka"));
+                "Next: bal discover search <query> -p ballerinax/kafka"));
     }
 
     @Test

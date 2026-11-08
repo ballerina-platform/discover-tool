@@ -39,7 +39,7 @@ public class SearchTest {
 
     private static DiscoverResult.Search search(String slug, int page, String... keywords) {
         Result<DiscoverResult> answer = Search.render(FixtureCorpus.loadedFixture(slug),
-                new Search.Options(List.of(keywords), page));
+                new Search.Options(String.join(" ", keywords), page));
         Assert.assertTrue(answer.isOk(), answer.isOk() ? "" : answer.failure().describe());
         return (DiscoverResult.Search) answer.value();
     }
@@ -132,7 +132,7 @@ public class SearchTest {
         CliTest.Capture filtered = new CliTest.Capture();
         Assert.assertEquals(Cli.run(List.of("search", "send", "-p", "ballerinax/kafka", "--filter", "x"),
                 filtered.streams(), CliTest.never()), 2);
-        Assert.assertEquals(filtered.field("command"), "bal discover search send x -p ballerinax/kafka");
+        Assert.assertEquals(filtered.field("command"), "bal discover search \"send x\" -p ballerinax/kafka");
     }
 
     @Test

@@ -184,6 +184,7 @@ public class GrammarTest {
                         "bal discover readme \"Data serialization\" -p " + KAFKA},
                 {List.of(KAFKA, "search", "send", "--page", "2"), "bal discover search send -p " + KAFKA
                         + " --page 2"},
+                {List.of(KAFKA, "search", "send", "close"), "bal discover search \"send close\" -p " + KAFKA},
                 {List.of(KAFKA, "type", "TopicPartition"), "bal discover type TopicPartition -p " + KAFKA},
                 {List.of(KAFKA, "4.6.6", "client", "Producer"), "bal discover client Producer -p " + KAFKA + ":4.6.6"},
                 {List.of(KAFKA, "clients", "Producer"), "bal discover client Producer -p " + KAFKA},
@@ -404,7 +405,7 @@ public class GrammarTest {
         CliTest.Capture bare = failure(USAGE, null, "client");
         Assert.assertFalse(bare.failure().has("command"), bare.stderr());
         Assert.assertFalse(bare.stderr().contains("github"), bare.stderr());
-        Assert.assertTrue(bare.field("suggestion").contains("'bal discover search <keyword>'"), bare.stderr());
+        Assert.assertTrue(bare.field("suggestion").contains("'bal discover search <query>'"), bare.stderr());
         Assert.assertTrue(failure(USAGE, null, "resource", "gists/public", "get").field("suggestion")
                 .endsWith("then write 'bal discover resource gists/public get -p <org>/<name>'."));
     }

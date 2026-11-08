@@ -81,7 +81,7 @@ public class PointersTest {
     private static List<DiscoverResult> answersOf(LoadedPackage context) {
         List<DiscoverResult> answers = new ArrayList<>();
         answers.add(Overview.of(context));
-        answers.add(expect(Search.render(context, new Search.Options(List.of("e"), 1))));
+        answers.add(expect(Search.render(context, new Search.Options("e", 1))));
         for (Surface.Scope scope : Surface.Scope.values()) {
             answers.add(expect(Asked.of(context, scope.commandNoun())));
             answers.add(expect(Asked.of(context, scope.commandNoun(), "--filter", "config")));

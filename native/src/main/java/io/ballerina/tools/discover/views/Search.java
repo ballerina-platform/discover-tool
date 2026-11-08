@@ -36,18 +36,19 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * {@code search} inside one package — every name it declares and every readme section title, matched locally
  * against what is already loaded; nothing is sent to Central.
  *
- * <p><b>THE MATCHING RULE.</b> Each keyword is matched as a case-insensitive substring of a symbol's name, and a
- * symbol matches when every keyword does. The name is a container's, a function's or a type's own name, a method's
- * own name (not its container's), a resource method's path and accessor ({@code repos/:owner/:repo/issues post}),
- * a readme section's title, and a submodule's name: the names inside another module are not searched, so a module
- * named for the keywords is listed as the place to search next. Names are read without Ballerina's escapes, as every
- * answer prints them. Unlike a selector this is a keyword search, so it is lenient by design; unlike
- * {@code --filter}, it reads names only, never parameters, types or documentation.
+ * <p><b>THE MATCHING RULE.</b> The query's words are its keywords. Each keyword is matched as a case-insensitive
+ * substring of a symbol's name, and a symbol matches when every keyword does. The name is a container's, a function's
+ * or a type's own name, a method's own name (not its container's), a resource method's path and accessor
+ * ({@code repos/:owner/:repo/issues post}), a readme section's title, and a submodule's name: the names inside
+ * another module are not searched, so a module named for the keywords is listed as the place to search next. Names
+ * are read without Ballerina's escapes, as every answer prints them. Unlike a selector this is a keyword search, so it
+ * is lenient by design; unlike {@code --filter}, it reads names only, never parameters, types or documentation.
  *
  * <p>Matches are grouped by kind in {@link DiscoverResult.Search.Kind} order and paged as one sequence under the
  * entry ceiling. No match is an answer, not a failure: it points back at the package's overview.
@@ -56,7 +57,7 @@ import java.util.Map;
  */
 public final class Search {
 
-    private static final String KEYWORD_SEPARATOR = "\\s+";
+    private static final Pattern KEYWORD_SEPARATOR = Pattern.compile("\\s+");
 
     /** How a failure suggests searching the package for a name. */
     public static final String SEARCH_FOR_IT = "Search the package for it.";
@@ -70,35 +71,48 @@ public final class Search {
     }
 
     /**
-     * @param keywords the keywords as typed, one or more
+     * @param query the query as typed, its keywords separated by spaces
      * @param page {@code --page}, 1-indexed
      */
-    public record Options(List<String> keywords, int page) { }
+    public record Options(String query, int page) { }
+
+    /** The keywords of {@code query}: its words. */
+    public static List<String> keywords(String query) {
+        return query == null ? List.of() : Arrays.stream(KEYWORD_SEPARATOR.split(query.trim()))
+                .filter(keyword -> !keyword.isEmpty())
+                .toList();
+    }
+
+    /** {@code keywords} as the one query a printed command writes. */
+    public static String query(List<String> keywords) {
+        return String.join(" ", keywords);
+    }
 
     /**
      * The failure for a search with no keyword, or with {@code --filter}, or {@code null}; checked before anything is
      * fetched. Shared by this search and Central's.
      *
-     * @param search the command that searches, without keywords: {@code bal discover search -p ballerinax/kafka}
+     * @param search the command that searches, without a query: {@code bal discover search -p ballerinax/kafka}
+     * @param query the query, or {@code null} when none was given
      */
-    public static Failure.Validation misuse(Command search, List<String> keywords, String filter) {
+    public static Failure.Validation misuse(Command search, String query, String filter) {
+        List<String> keywords = keywords(query);
         if (keywords.isEmpty()) {
-            return new Failure.Validation("the search needs at least one keyword",
-                    "Write " + Failure.quoted(search.with("<keyword>").text()) + ".");
+            return new Failure.Validation("the search needs a query of one or more keywords",
+                    "Write " + Failure.quoted(search.with(Command.placeholder("<query>")).text()) + ".");
         }
         if (filter != null) {
-            String fixed = search.with(keywords).with(filter).text();
+            List<String> more = new ArrayList<>(keywords);
+            more.addAll(keywords(filter));
+            String fixed = search.with(query(more)).text();
             return new Failure.Validation("the --filter option narrows a listing, and a search is not one",
-                    "Add its keyword to the search instead.", fixed);
+                    "Add its keyword to the query instead.", fixed);
         }
         return null;
     }
 
     public static Result<DiscoverResult> render(LoadedPackage loaded, Options options) {
-        List<String> keywords = options.keywords().stream()
-                .flatMap(typed -> Arrays.stream(typed.trim().split(KEYWORD_SEPARATOR)))
-                .filter(keyword -> !keyword.isEmpty())
-                .toList();
+        List<String> keywords = keywords(options.query());
         Map<DiscoverResult.Search.Kind, List<DiscoverResult.Search.Hit>> found = new EnumMap<>(
                 DiscoverResult.Search.Kind.class);
         for (DiscoverResult.Search.Kind kind : DiscoverResult.Search.Kind.values()) {
@@ -110,7 +124,7 @@ public final class Search {
         collectSubmodules(loaded, keywords, found);
 
         List<DiscoverResult.Search.Hit> all = found.values().stream().flatMap(List::stream).toList();
-        Command command = loaded.command(Command.SEARCH).with(options.keywords());
+        Command command = loaded.command(Command.SEARCH, query(keywords));
         Result<Containers.Page> page = Containers.Page.of(options.page(), all.size(), command);
         if (!page.isOk()) {
             return page.cast();
@@ -130,7 +144,7 @@ public final class Search {
             }
         }
         int shown = groups.stream().mapToInt(group -> group.hits().size()).sum();
-        return Result.ok(new DiscoverResult.Search(options.keywords(), List.copyOf(groups), counts, shown,
+        return Result.ok(new DiscoverResult.Search(keywords, List.copyOf(groups), counts, shown,
                 all.size(), window.paging(), window.next(command), loaded.overview().text()));
     }
 

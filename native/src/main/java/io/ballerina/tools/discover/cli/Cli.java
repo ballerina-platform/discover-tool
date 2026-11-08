@@ -99,7 +99,7 @@ public final class Cli {
     /** The nouns whose names are a member of a container, which a container flag names. */
     private static final Set<String> MEMBER_NOUNS = Set.of(Command.METHOD, Command.RESOURCE);
 
-    private static final String PLACEHOLDER_KEYWORD = "<keyword>";
+    private static final String PLACEHOLDER_QUERY = "<query>";
 
     /** The short form {@code --module} had before the CLI tool guide reserved {@code -m}. */
     private static final String RETIRED_MODULE_SHORT = "-m";
@@ -112,10 +112,10 @@ public final class Cli {
             Set.of("get", "post", "put", "delete", "patch", "head", "options", "default");
 
 
-    /** How many names each noun takes; {@code search} takes any number of keywords. */
+    /** How many names each noun takes; {@code search} takes its keywords as one query. */
     private static final Map<String, Integer> MAX_NAMES = Map.of(
-            Command.PACKAGE, 1, Command.CLIENT, 1, Command.SERVICE, 1, Command.CLASS, 1, Command.FUNCTION, 1,
-            Command.TYPE, 1, Command.METHOD, 1, Command.RESOURCE, 2, Command.README, 1);
+            Command.PACKAGE, 1, Command.SEARCH, 1, Command.CLIENT, 1, Command.SERVICE, 1, Command.CLASS, 1,
+            Command.FUNCTION, 1, Command.TYPE, 1, Command.METHOD, 1, Command.RESOURCE, 2, Command.README, 1);
 
     /** The nouns that answer with containers, and the scope each lists. */
     private static final Map<String, Surface.Scope> CONTAINER_NOUNS = Map.of(
@@ -254,7 +254,7 @@ public final class Cli {
             return module;
         }
         if (Command.SEARCH.equals(call.noun()) && call.pkg() == null) {
-            return null;
+            return tooManyNames(call);
         }
         return Command.PACKAGE.equals(call.noun()) ? packageMisuse(call) : scopedMisuse(call);
     }
@@ -296,7 +296,7 @@ public final class Cli {
     private static String misplacedPackage(Invocation call) {
         List<String> names = call.names();
         Integer max = MAX_NAMES.get(call.noun());
-        String candidate = max == null ? null : packageCandidate(names);
+        String candidate = Command.SEARCH.equals(call.noun()) ? null : packageCandidate(names);
         if (candidate == null) {
             return null;
         }
@@ -352,7 +352,7 @@ public final class Cli {
         String write = "Write " + Failure.quoted((call.owner() == null ? shape : shape.ownedBy(call.owner())).text());
         if (call.names().isEmpty() || Command.README.equals(call.noun())) {
             return new Failure.Validation(message, write + "; find the package with "
-                    + Failure.quoted(Command.of(Command.SEARCH, Command.placeholder(PLACEHOLDER_KEYWORD)).text())
+                    + Failure.quoted(Command.of(Command.SEARCH, Command.placeholder(PLACEHOLDER_QUERY)).text())
                     + ".");
         }
         String name = Containers.searchKeyword(call.echoed().get(0)).orElse(call.echoed().get(0));
@@ -384,6 +384,12 @@ public final class Cli {
         if (MEMBER_NOUNS.contains(call.noun())) {
             return null;
         }
+        if (Command.SEARCH.equals(call.noun())) {
+            Invocation quoted = call.withNames(List.of(String.join(" ", names)));
+            Command fixed = call.pkg() == null ? Command.of(Command.SEARCH, quoted.names()) : quoted.command();
+            return new Failure.Validation(tooMany(call.noun(), names.size()),
+                    "Quote the keywords as one query.", call.paged(fixed).text());
+        }
         Command fixed;
         if (CONTAINER_NOUNS.containsKey(call.noun()) && !Command.FUNCTION.equals(call.noun())) {
             fixed = call.retarget(memberOf(call.noun(), call.echoed()));
@@ -398,8 +404,12 @@ public final class Cli {
     }
 
     private static String tooMany(String noun, int given) {
-        String takes = Command.RESOURCE.equals(noun) ? "a path and its accessor"
-                : Command.README.equals(noun) ? "one section, a title in quotes" : "one name";
+        String takes = switch (noun) {
+            case Command.RESOURCE -> "a path and its accessor";
+            case Command.README -> "one section, a title in quotes";
+            case Command.SEARCH -> "one query, in quotes";
+            default -> "one name";
+        };
         return noun + " takes " + takes + "; got " + given;
     }
 
@@ -481,7 +491,7 @@ public final class Cli {
         if (CONTAINER_NOUNS.containsKey(noun) && !Command.FUNCTION.equals(noun) && selectors.size() > 1) {
             return memberOf(noun, selectors);
         }
-        if (Command.README.equals(noun) && !selectors.isEmpty()) {
+        if ((Command.README.equals(noun) || Command.SEARCH.equals(noun)) && !selectors.isEmpty()) {
             return Command.of(noun, String.join(" ", selectors));
         }
         return Command.of(noun, selectors);
@@ -560,20 +570,20 @@ public final class Cli {
 
     private static int searchCentral(Invocation call, Streams streams, HttpOptions http, boolean json,
             UsageErrors usage) {
-        List<String> keywords = call.names();
-        Failure.Validation invalid = SearchCentral.misuse(keywords, call.module(), call.filter());
+        String query = query(call);
+        Failure.Validation invalid = SearchCentral.misuse(query, call.module(), call.filter());
         if (invalid == null) {
-            invalid = pageBeforeFirst(call.page(), SearchCentral.command(keywords));
+            invalid = pageBeforeFirst(call.page(), SearchCentral.command(query));
         }
         if (invalid != null) {
             return usage.error(invalid);
         }
-        Result<DiscoverResult> found = SearchCentral.render(keywords, call.page(), http.withRefresh(call.refresh()));
+        Result<DiscoverResult> found = SearchCentral.render(query, call.page(), http.withRefresh(call.refresh()));
         if (!found.isOk()) {
             return usage.report(found.failure());
         }
-        TextRenderer.Context where = new TextRenderer.Context(null, null,
-                List.of(Command.SEARCH, String.join(" ", keywords)), null, null, null);
+        TextRenderer.Context where = new TextRenderer.Context(null, null, List.of(Command.SEARCH, query), null, null,
+                null);
         streams.out().accept((json ? JsonRenderer.render(found.value())
                 : TextRenderer.render(found.value(), where)) + "\n");
         return Failure.ANSWERED;
@@ -678,8 +688,8 @@ public final class Cli {
         return switch (call.noun()) {
             case Command.PACKAGE -> filter == null
                     ? Result.ok(Overview.of(loaded))
-                    : Search.render(loaded, new Search.Options(List.of(filter), page));
-            case Command.SEARCH -> Search.render(loaded, new Search.Options(call.names(), page));
+                    : Search.render(loaded, new Search.Options(filter, page));
+            case Command.SEARCH -> Search.render(loaded, new Search.Options(name, page));
             case Command.README -> Readme.render(loaded, new Readme.Options(name, filter, page));
             case Command.TYPE -> Types.render(loaded, new Types.Options(call.names(), filter, page));
             case Command.FUNCTION -> Containers.render(loaded, Surface.Scope.MODULE,
@@ -767,9 +777,13 @@ public final class Cli {
                     new Types.Options(call.names(), call.filter(), call.page()));
         }
         if (Command.SEARCH.equals(call.noun())) {
-            return Search.misuse(call.command(Command.SEARCH), call.names(), call.filter());
+            return Search.misuse(call.command(Command.SEARCH), query(call), call.filter());
         }
         return null;
+    }
+
+    private static String query(Invocation call) {
+        return call.names().isEmpty() ? null : call.names().get(0);
     }
 
     private static Failure.Validation pageBeforeFirst(int page, String firstPage) {

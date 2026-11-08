@@ -5,7 +5,7 @@ Usage: bal discover <noun> [<name> ...] -p <org>/<name>[:<version>] [options]
 
 Commands:
   package <org>/<name>[:<version>]  a package's overview
-  search <keyword> ...              search Central, or one package with -p
+  search <query>                    search Central, or one package with -p
   client [<name>]                   the clients, or one client's members
   service [<name>]                  the service types, or one and its methods
   class [<name>]                    the classes, or one class's members
@@ -34,7 +34,7 @@ Options:
 
 Examples:
   # Find a package or a symbol on Central
-  bal discover search kafka send
+  bal discover search "kafka send"
   # What a package offers
   bal discover package ballerinax/kafka
   # A method's signature, its container named

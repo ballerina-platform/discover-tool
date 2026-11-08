@@ -48,6 +48,8 @@ final class Usage {
 
     private static final String GITHUB_CLIENT = GITHUB + " --client Client";
 
+    private static final String KAFKA_SEND = "\"kafka send\"";
+
     /** Where the root's command descriptions start: past the longest noun and its names. */
     private static final int COMMAND_COLUMN = 36;
 
@@ -77,10 +79,10 @@ final class Usage {
                             new Example("Every name in the package that holds a keyword",
                                     example(Command.PACKAGE, "ballerinax/kafka --filter send")),
                             new Example("One version", example(Command.PACKAGE, "ballerina/http:2.15.7")))),
-            Command.SEARCH, new Noun(" <keyword> ...", "search Central, or one package with -p",
+            Command.SEARCH, new Noun(" <query>", "search Central, or one package with -p",
                     "Search Central's packages and symbols, or every name in one package with -p",
                     List.of(new Example("Central's packages and symbols that match every keyword, by rank",
-                                    example(Command.SEARCH, "kafka send")),
+                                    example(Command.SEARCH, KAFKA_SEND)),
                             new Example("Names in one package that hold every keyword, in any case",
                                     example(Command.SEARCH, "send" + KAFKA)))),
             Command.CLIENT, container("client", "clients", "Producer"),
@@ -140,7 +142,7 @@ final class Usage {
     private static final Map<String, Set<String>> NOT_TAKEN = Map.of(Command.SEARCH, Set.of(Command.FILTER_FLAG));
 
     private static final List<Example> SESSION = List.of(
-            new Example("Find a package or a symbol on Central", example(Command.SEARCH, "kafka send")),
+            new Example("Find a package or a symbol on Central", example(Command.SEARCH, KAFKA_SEND)),
             new Example("What a package offers", example(Command.PACKAGE, "ballerinax/kafka")),
             new Example("A method's signature, its container named", example(Command.METHOD, "send" + PRODUCER)),
             new Example("A resource method's signature: the path, then its accessor",
