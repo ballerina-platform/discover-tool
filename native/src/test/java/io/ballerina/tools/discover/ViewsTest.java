@@ -420,7 +420,7 @@ public class ViewsTest {
     @Test
     public void aResourceSignatureCarriesItsPathAndAccessorAndKeepsPathParametersOutOfParams() {
         DiscoverResult.Signature caches = signature(FixtureCorpus.loadedFixture("ballerinax__github"),
-                "resource", "repos/:owner/:repo/actions/caches", "delete", "--client", "Client");
+                "resource", "repos/:owner/:repo/actions/caches", "--accessor", "delete", "--client", "Client");
         Assert.assertEquals(caches.kind(), "resource");
         Assert.assertNull(caches.name());
         Assert.assertEquals(caches.accessor(), "delete");
@@ -436,7 +436,10 @@ public class ViewsTest {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         Assert.assertEquals(signature(http, "method", "toStringValue").container(), "Cookie");
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        Assert.assertEquals(signature(github, "resource", "gists/public", "get").path(), "gists/public");
+        Assert.assertEquals(signature(github, "resource", "gists/public", "--accessor", "get").path(),
+                "gists/public");
+        Assert.assertEquals(signature(github, "resource", "gists/public").path(), "gists/public",
+                "a path with one accessor answers with its signature");
         // A method asked as a container fails with the method's own command.
         assertMiss(miss(http, "client", "getStatusCodeRecord"),
                 "'getStatusCodeRecord' is not a client in " + http.label(),
@@ -553,41 +556,37 @@ public class ViewsTest {
         assertMissAt(miss(github, "resource", "repos/:owner/:repo/caches", "--client", "Client"),
                 "'repos/:owner/:repo/caches' is not a resource path of Client in " + github.label(),
                 under.formatted("repos/:owner/:repo"));
-        assertMissAmong(miss(github, "resource", "gists/public", "head", "--client", "Client"),
-                "'gists/public head' is not a resource method of Client in " + github.label(), 1);
+        assertMissAmong(miss(github, "resource", "gists/public", "--accessor", "head", "--client", "Client"),
+                "'head' is not an accessor of gists/public on Client in " + github.label(), 1);
         // Left out, the one container that declares the path is settled, and the miss is the same.
-        for (List<String> typed : List.of(List.of("gists/public", "head"), List.of("head", "gists/public"))) {
-            List<String> words = new ArrayList<>(List.of("resource"));
-            words.addAll(typed);
-            Result<DiscoverResult> leftOut = Asked.of(github, words.toArray(String[]::new));
-            Assert.assertFalse(leftOut.isOk(), typed.toString());
-            Failure.SymbolNotFound failure = (Failure.SymbolNotFound) leftOut.failure();
-            Assert.assertEquals(failure.message(), "'" + String.join(" ", typed) + "' is not a resource method of "
-                    + "Client in " + github.label());
-            Assert.assertEquals(failure.candidates(), List.of("gists/public get"), typed.toString());
-        }
-        // A path split across two names is read as a path and an accessor, and is neither.
-        assertMissAt(miss(github, "resource", "repos/:owner/:repo", "issues", "--client", "Client"),
-                "'repos/:owner/:repo issues' is not a resource method of Client in " + github.label(),
-                under.formatted("repos/:owner/:repo"));
+        Result<DiscoverResult> leftOut = Asked.of(github, "resource", "gists/public", "--accessor", "head");
+        Assert.assertFalse(leftOut.isOk());
+        Failure.SymbolNotFound failure = (Failure.SymbolNotFound) leftOut.failure();
+        Assert.assertEquals(failure.message(), "'head' is not an accessor of gists/public on Client in "
+                + github.label());
+        Assert.assertEquals(failure.candidates(), List.of("get"));
+        // An accessor is never a path segment.
+        assertMissAmong(miss(github, "resource", "repos/:owner/:repo", "--accessor", "issues", "--client", "Client"),
+                "'issues' is not an accessor of repos/:owner/:repo on Client in " + github.label(), 3);
         // A keyword segment is printed plain, and Ballerina's own spelling of it names the same segment.
         for (String typed : List.of("gists/public", "gists/'public")) {
-            Assert.assertEquals(signature(github, "resource", typed, "get", "--client", "Client").path(),
-                    "gists/public");
+            Assert.assertEquals(signature(github, "resource", typed, "--accessor", "get", "--client", "Client")
+                    .path(), "gists/public");
         }
     }
 
     @Test
     public void aRestParameterResourceIsACallShorthandNotAPathToMatch() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        DiscoverResult.Signature get = signature(http, "resource", ":...path", "get", "--client", "Client");
+        DiscoverResult.Signature get = signature(http, "resource", ":...path", "--accessor", "get", "--client",
+                "Client");
         // Quoted from what the tool prints, not re-spelled from memory: the rest-parameter form is
         // `[PathParamType... path]`, the ellipsis on the type, however Central spaced it.
         Assert.assertTrue(get.declaration().contains("resource function get [PathParamType... path]"),
                 get.declaration());
         // `get` the method is the remote one, and no path is called `foo`.
         Assert.assertEquals(signature(http, "method", "get", "--client", "Client").kind(), "remote");
-        miss(http, "resource", "foo", "get", "--client", "Client");
+        miss(http, "resource", "foo", "--accessor", "get", "--client", "Client");
     }
 
     @Test
@@ -649,8 +648,8 @@ public class ViewsTest {
     @Test
     public void aSelectorResolvesOnlyInTheSpellingTheListingsPrint() {
         LoadedPackage slack = FixtureCorpus.loadedFixture("ballerinax__slack");
-        for (List<String> selectors : List.of(List.of("chat.postMessage", "post"),
-                List.of("post", "chat.postMessage"))) {
+        for (List<String> selectors : List.of(List.of("chat.postMessage", "--accessor", "post"),
+                List.of("--accessor", "post", "chat.postMessage"), List.of("chat.postMessage"))) {
             List<String> words = new ArrayList<>(List.of("resource"));
             words.addAll(selectors);
             words.addAll(List.of("--client", "Client"));
@@ -658,16 +657,19 @@ public class ViewsTest {
             Assert.assertTrue(post.declaration().contains("resource function post chat\\.postMessage"),
                     selectors + " did not resolve:\n" + post.declaration());
         }
-        // The declaration's own escaping spells the same segment; a path and its accessor are still two arguments.
-        Assert.assertEquals(signature(slack, "resource", "chat\\.postMessage", "post", "--client", "Client")
-                .path(), "chat.postMessage");
+        // The declaration's own escaping spells the same segment, and no dot is read as the accessor's.
+        Assert.assertEquals(signature(slack, "resource", "chat\\.postMessage", "--accessor", "post", "--client",
+                "Client").path(), "chat.postMessage");
         miss(slack, "resource", "post chat.postMessage", "--client", "Client");
+        miss(slack, "resource", "chat.postMessage.post", "--client", "Client");
+        miss(slack, "resource", "chat", "--accessor", "postMessage", "--client", "Client");
 
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
-        Assert.assertTrue(resourcePaths(render(github, "resource", "repos/:owner/:repo/code-scanning/alerts", "get",
-                "--client", "Client")).stream().anyMatch(path -> path.contains("code-scanning/alerts")));
+        Assert.assertTrue(resourcePaths(render(github, "resource", "repos/:owner/:repo/code-scanning/alerts",
+                "--accessor", "get", "--client", "Client")).stream()
+                .anyMatch(path -> path.contains("code-scanning/alerts")));
         Assert.assertFalse(resourcePaths(render(github, "resource", "repos/:owner/:repo/code\\-scanning/alerts",
-                "get", "--client", "Client")).isEmpty());
+                "--accessor", "get", "--client", "Client")).isEmpty());
     }
 
     /**
@@ -702,10 +704,14 @@ public class ViewsTest {
     @Test
     public void aPathSeveralContainersHoldNamesEachContainer() {
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
-        Failure.Ambiguous several = (Failure.Ambiguous) Asked.of(http, "resource", ":...path", "get").failure();
+        Failure.Ambiguous several = (Failure.Ambiguous) Asked.of(http, "resource", ":...path", "--accessor", "get")
+                .failure();
         Assert.assertEquals(several.matches().size(), 6, several.matches().toString());
         Assert.assertTrue(ownerCommands(several).contains(
-                "bal discover resource :...path get -p ballerina/http --client Client"));
+                "bal discover resource :...path -p ballerina/http --client Client --accessor get"));
+        Assert.assertEquals(several.message(), "':...path' with --accessor get is declared by Client, ClientObject, "
+                + "FailoverClient, LoadBalanceClient, StatusCodeClient and StatusCodeClientObject in "
+                + http.label());
     }
 
     @Test
@@ -1191,18 +1197,18 @@ public class ViewsTest {
         Assert.assertEquals(row.path(), ":...path");
         Assert.assertTrue(row.accessors().containsAll(List.of("get", "post")), row.toString());
         Assert.assertEquals(row.commands().get("get"),
-                "bal discover resource :...path get -p ballerina/http --client Client");
+                "bal discover resource :...path -p ballerina/http --client Client --accessor get");
         JsonObject entry = JsonParser.parseString(JsonRenderer.render(rest)).getAsJsonObject()
                 .getAsJsonArray("documented").get(0).getAsJsonObject();
         Assert.assertEquals(entry.get("path").getAsString(), ":...path");
         Assert.assertFalse(entry.has("name"), entry.toString());
         Assert.assertEquals(entry.getAsJsonObject("commands").get("post").getAsString(),
-                "bal discover resource :...path post -p ballerina/http --client Client");
+                "bal discover resource :...path -p ballerina/http --client Client --accessor post");
         String text = TextRenderer.render(rest, new TextRenderer.Context("ballerina/http", null,
                 List.of("client", "Client"), "entity", null, null));
         Assert.assertTrue(text.contains("\nMentioned only in their documentation\n  :...path  get, post"), text);
-        Assert.assertTrue(text.endsWith("\nNext: bal discover resource <path> <accessor> -p ballerina/http --client "
-                + "Client\n"
+        Assert.assertTrue(text.endsWith("\nNext: bal discover resource <path> -p ballerina/http --client "
+                + "Client --accessor <accessor>\n"
                 + "Next: bal discover method <name> -p ballerina/http --client Client"), text);
 
         LoadedPackage github = FixtureCorpus.loadedFixture("ballerinax__github");
@@ -1212,7 +1218,7 @@ public class ViewsTest {
                 escaped.documented().entries().get(0);
         Assert.assertEquals(importRow.path(), "repos/:owner/:repo/import");
         Assert.assertEquals(importRow.commands().get("put"),
-                "bal discover resource repos/:owner/:repo/import put -p ballerinax/github --client Client");
+                "bal discover resource repos/:owner/:repo/import -p ballerinax/github --client Client --accessor put");
 
         DiscoverResult limits = render(github, "client", "Client", "--filter", "public");
         DiscoverResult.Documented documented = switch (limits) {
@@ -1352,8 +1358,8 @@ public class ViewsTest {
         Payload payload = Payload.pkg();
         payload.with("clients", Decl.client("Items", Decl.method("get").on("isResource").with("accessor", "get")
                 .with("resourcePath", "items/[string type]")));
-        DiscoverResult.Signature get = signature(fromPayload(payload), "resource", "items/:type", "get", "--client",
-                "Items");
+        DiscoverResult.Signature get = signature(fromPayload(payload), "resource", "items/:type", "--accessor", "get",
+                "--client", "Items");
         Assert.assertTrue(get.declaration().contains("resource function get items/[string 'type]()"),
                 get.declaration());
     }
@@ -1368,7 +1374,7 @@ public class ViewsTest {
         LoadedPackage loaded = fromPayload(payload);
         // The noun says which is meant, so neither is an ambiguity.
         Assert.assertEquals(signature(loaded, "method", "foo").container(), "Methods");
-        Assert.assertEquals(signature(loaded, "resource", "foo", "get").container(), "Paths");
+        Assert.assertEquals(signature(loaded, "resource", "foo", "--accessor", "get").container(), "Paths");
     }
 
     private static List<String> ownerCommands(Failure.Ambiguous failure) {

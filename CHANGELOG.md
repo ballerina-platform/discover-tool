@@ -22,8 +22,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Pair each service type with the listener it binds to in the `service` bucket — the listener's `attach` target,
   or a type that includes it, read from the package's source when Central's docs cannot say — and list the
   service types no listener accepts apart
-- Address resource functions by path and accessor, with path parameters spelled `:name` and keyword-escaped segments
-  quoted in every printed command
+- Address resource functions by path, with path parameters spelled `:name` and keyword-escaped segments
+  quoted in every printed command; a path is one argument matched whole as listed, so a dotted segment
+  (`reactions.get`), the root path `.` and a rest parameter `:...path` need no splitting rule
+- Select one method of a resource path with `--accessor <name>`, valid on `resource` alone; a path with one accessor
+  answers with its signature without it, and an accessor the path does not declare fails with the path's
+  accessors as `candidates`
+- Take at most one positional per noun: `search` takes its keywords as one quoted query (`search "kafka send"`),
+  and more names than a noun takes is a usage error (exit 2) whose `command` is the fix when there is one —
+  `search kafka send` is `search "kafka send"`, and `resource gists/public get` is
+  `resource gists/public --accessor get` when `get` is one of the path's accessors
 - Match every selector exactly as the listings print it — case-sensitive, a parameter only as `:name`, a path whole
   from its first segment, the container always named — and fail a miss as `symbol-not-found` (exit 1) that lists
   every name at the level the lookup reached as `candidates` when there are 40 or fewer, sorted as the listing

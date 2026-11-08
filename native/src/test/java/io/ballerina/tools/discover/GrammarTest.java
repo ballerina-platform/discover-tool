@@ -102,8 +102,8 @@ public class GrammarTest {
                 {"ballerinax__kafka", List.of("method", "send", "-p", KAFKA), "container", "Producer"},
                 {"ballerinax__kafka", List.of("method", "init", "-p", KAFKA, "--client", "Producer"), "kind",
                         "constructor"},
-                {"ballerinax__github", List.of("resource", "gists/public", "get", "-p", GITHUB, "--client",
-                        "Client"), "path", "gists/public"},
+                {"ballerinax__github", List.of("resource", "gists/public", "--accessor", "get", "-p", GITHUB,
+                        "--client", "Client"), "path", "gists/public"},
                 {"ballerinax__github", List.of("resource", "gists", "-p", GITHUB), "container", "Client"},
                 {"ballerinax__kafka", List.of("readme", "1", "-p", KAFKA), "section", "1"}};
     }
@@ -178,13 +178,16 @@ public class GrammarTest {
                 {List.of(KAFKA, "client", "Producer", "send"),
                         "bal discover method send -p " + KAFKA + " --client Producer"},
                 {List.of(GITHUB, "client", "Client", "gists/'public", "get", "--filter", "x"),
-                        "bal discover resource gists/public get -p " + GITHUB + " --client Client --filter x"},
+                        "bal discover resource gists/public -p " + GITHUB
+                                + " --client Client --accessor get --filter x"},
                 {List.of("ballerina/log", "funcs", "printInfo"), "bal discover function printInfo -p ballerina/log"},
                 {List.of(KAFKA, "readme", "Data", "serialization"),
                         "bal discover readme \"Data serialization\" -p " + KAFKA},
                 {List.of(KAFKA, "search", "send", "--page", "2"), "bal discover search send -p " + KAFKA
                         + " --page 2"},
                 {List.of(KAFKA, "search", "send", "close"), "bal discover search \"send close\" -p " + KAFKA},
+                {List.of(GITHUB, "resource", "gists/public", "get"), "bal discover resource gists/public -p " + GITHUB
+                        + " --accessor get"},
                 {List.of(KAFKA, "type", "TopicPartition"), "bal discover type TopicPartition -p " + KAFKA},
                 {List.of(KAFKA, "4.6.6", "client", "Producer"), "bal discover client Producer -p " + KAFKA + ":4.6.6"},
                 {List.of(KAFKA, "clients", "Producer"), "bal discover client Producer -p " + KAFKA},
@@ -338,7 +341,8 @@ public class GrammarTest {
     public void everyOptionANounsHelpListsIsOneTheNounTakes() {
         Map<String, List<String>> values = Map.of(Command.FILTER_FLAG, List.of("send"),
                 Command.PAGE_FLAG, List.of("1"), Command.MODULE_FLAG, List.of("nosuch"),
-                "--output-format", List.of("json"), "--refresh", List.of(), "--help", List.of());
+                "--output-format", List.of("json"), "--refresh", List.of(), "--help", List.of(),
+                Command.ACCESSOR_FLAG, List.of("get"));
         for (String noun : Command.NOUNS) {
             CliTest.Capture help = new CliTest.Capture();
             Assert.assertEquals(Cli.run(List.of(noun, "--help"), help.streams(), CliTest.never()), 0, noun);
@@ -350,8 +354,8 @@ public class GrammarTest {
                     .map(flag -> flag.equals("-h") ? "--help" : flag)
                     .filter(flag -> !flag.equals(Command.PACKAGE_FLAG) && !Command.OWNER_FLAGS.contains(flag))
                     .toList();
-            Assert.assertEquals(listed.size(), values.size() - (Command.SEARCH.equals(noun) ? 1 : 0),
-                    noun + " lists " + listed);
+            int notTaken = (Command.SEARCH.equals(noun) ? 1 : 0) + (Command.RESOURCE.equals(noun) ? 0 : 1);
+            Assert.assertEquals(listed.size(), values.size() - notTaken, noun + " lists " + listed);
             String slug = Command.RESOURCE.equals(noun) ? "ballerinax__github" : "ballerinax__kafka";
             for (String flag : listed) {
                 Assert.assertTrue(values.containsKey(flag), noun + " lists an option this test does not know: " + flag);
@@ -371,7 +375,7 @@ public class GrammarTest {
             case Command.PACKAGE -> List.of(noun, KAFKA);
             case Command.SEARCH -> List.of(noun, "send", "-p", KAFKA);
             case Command.METHOD -> List.of(noun, "-p", KAFKA, "--client", "Producer");
-            case Command.RESOURCE -> List.of(noun, "-p", GITHUB, "--client", "Client");
+            case Command.RESOURCE -> List.of(noun, "gists", "-p", GITHUB, "--client", "Client");
             default -> List.of(noun, "-p", KAFKA);
         };
     }
@@ -383,10 +387,11 @@ public class GrammarTest {
                 {List.of("method", "send", KAFKA), "bal discover method send -p " + KAFKA},
                 {List.of("method", "send", KAFKA + ":4.6.6", "--client", "Producer"),
                         "bal discover method send -p " + KAFKA + ":4.6.6 --client Producer"},
-                {List.of("resource", GITHUB, "gists/public", "get"), "bal discover resource gists/public get -p "
-                        + GITHUB},
-                {List.of("resource", "gists/public", "get", GITHUB), "bal discover resource gists/public get -p "
-                        + GITHUB},
+                {List.of("resource", GITHUB, "gists/public", "get"), "bal discover resource gists/public -p "
+                        + GITHUB + " --accessor get"},
+                {List.of("resource", "gists/public", "get", GITHUB), "bal discover resource gists/public -p "
+                        + GITHUB + " --accessor get"},
+                {List.of("resource", "gists/public", GITHUB), "bal discover resource gists/public -p " + GITHUB},
                 {List.of("client", KAFKA, "-p", KAFKA), "bal discover client -p " + KAFKA}};
     }
 
@@ -407,7 +412,7 @@ public class GrammarTest {
         Assert.assertFalse(bare.stderr().contains("github"), bare.stderr());
         Assert.assertTrue(bare.field("suggestion").contains("'bal discover search <query>'"), bare.stderr());
         Assert.assertTrue(failure(USAGE, null, "resource", "gists/public", "get").field("suggestion")
-                .endsWith("then write 'bal discover resource gists/public get -p <org>/<name>'."));
+                .endsWith("then write 'bal discover resource gists/public -p <org>/<name> --accessor get'."));
     }
 
     @DataProvider(name = "aliases")
@@ -421,7 +426,9 @@ public class GrammarTest {
                 {List.of("-p", KAFKA, "clients"), "bal discover client -p " + KAFKA},
                 {List.of("packages", "-p", KAFKA), "bal discover package " + KAFKA},
                 {List.of("classes", "Producer", "send", "-p", KAFKA),
-                        "bal discover method send -p " + KAFKA + " --class Producer"}};
+                        "bal discover method send -p " + KAFKA + " --class Producer"},
+                {List.of("resources", "gists/public", "get", "-p", GITHUB),
+                        "bal discover resource gists/public -p " + GITHUB + " --accessor get"}};
     }
 
     @Test(dataProvider = "aliases")
@@ -455,7 +462,8 @@ public class GrammarTest {
 
     @Test
     public void aResourceMissedWithoutItsContainerPointsAtTheDeepestRealPath() {
-        CliTest.Capture typo = failure(NOT_FOUND, "ballerinax__github", "resource", "gists/nope", "get", "-p", GITHUB);
+        CliTest.Capture typo = failure(NOT_FOUND, "ballerinax__github", "resource", "gists/nope", "--accessor", "get",
+                "-p", GITHUB);
         Assert.assertFalse(typo.failure().has("command"), typo.stderr());
         typo.failure().getAsJsonArray("candidates").forEach(candidate ->
                 Assert.assertTrue(candidate.getAsString().startsWith("gists"), typo.stderr()));
@@ -463,12 +471,13 @@ public class GrammarTest {
 
     @Test
     public void aResourceMissedAmongSeveralContainersSearchesItsFirstSegmentOrListsTheResources() {
-        // Few enough to list: every resource method any container declares, each once.
-        CliTest.Capture slash = failure(NOT_FOUND, "ballerina__http", "resource", "/", "get", "-p", "ballerina/http");
+        // Few enough to list: every resource path any container declares, each once.
+        CliTest.Capture slash = failure(NOT_FOUND, "ballerina__http", "resource", "/", "--accessor", "get", "-p",
+                "ballerina/http");
         Assert.assertFalse(slash.failure().has("command"), slash.stderr());
-        Assert.assertEquals(slash.failure().getAsJsonArray("candidates").get(0).getAsString(), ":...path get",
+        Assert.assertEquals(slash.failure().getAsJsonArray("candidates").toString(), "[\":...path\"]",
                 slash.stderr());
-        CliTest.Capture typo = failure(NOT_FOUND, "ballerina__http", "resource", ":id/nope", "get", "-p",
+        CliTest.Capture typo = failure(NOT_FOUND, "ballerina__http", "resource", ":id/nope", "--accessor", "get", "-p",
                 "ballerina/http");
         Assert.assertFalse(typo.failure().has("command"), typo.stderr());
         Assert.assertTrue(typo.field("suggestion").endsWith("search the package with "
@@ -485,8 +494,10 @@ public class GrammarTest {
     public void aPathTypedWithoutThePackageIsNeverTakenForThePackage() {
         for (String noun : List.of("resource", "client")) {
             CliTest.Capture path = failure(USAGE, null, noun, "gists/public", "get");
-            Assert.assertTrue(path.field("suggestion").endsWith("then write 'bal discover " + noun
-                    + " gists/public get -p <org>/<name>'."), path.stderr());
+            String written = "resource".equals(noun) ? " gists/public -p <org>/<name> --accessor get'."
+                    : " gists/public get -p <org>/<name>'.";
+            Assert.assertTrue(path.field("suggestion").endsWith("then write 'bal discover " + noun + written),
+                    path.stderr());
             Assert.assertEquals(path.field("command"), "bal discover search gists", path.stderr());
         }
         CliTest.Capture given = failure(NOT_FOUND, "ballerinax__github", "client", "gist/public", "-p", GITHUB);

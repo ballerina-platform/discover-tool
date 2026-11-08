@@ -25,8 +25,8 @@ import java.util.Optional;
 
 /**
  * Every command this tool prints, built in one place and written in one order:
- * {@code bal discover <noun> [name ...] -p <org>/<name>[:<version>] [--client|--class|--service <C>] [--module <m>]
- * [--filter <keyword>] [--page <n>]}.
+ * {@code bal discover <noun> [name] -p <org>/<name>[:<version>] [--client|--class|--service <C>]
+ * [--accessor <accessor>] [--module <m>] [--filter <keyword>] [--page <n>]}.
  *
  * <p>The {@code package} noun takes its coordinate as its name rather than with {@code -p}, and {@code search}
  * without a package asks Central.
@@ -37,11 +37,13 @@ import java.util.Optional;
  * @param names the names after the noun
  * @param target the package and module it is asked of, or {@code null} for a Central search
  * @param owner the container a {@code method} or {@code resource} is declared by, or {@code null}
+ * @param accessor the accessor that selects one {@code resource} method of the path, or {@code null}
  * @param filter the {@code --filter} keyword, or {@code null}
  * @param page the {@code --page} number, written only past the first page
  * @since 0.1.0
  */
-public record Command(String noun, List<String> names, Target target, Owner owner, String filter, int page) {
+public record Command(String noun, List<String> names, Target target, Owner owner, String accessor, String filter,
+        int page) {
 
     /** The program name every text-mode report starts with. */
     public static final String PROGRAM = "bal discover";
@@ -74,6 +76,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     public static final String MODULE_FLAG = "--module";
     public static final String FILTER_FLAG = "--filter";
     public static final String PAGE_FLAG = "--page";
+    public static final String ACCESSOR_FLAG = "--accessor";
 
     /** The container flags, in the order the usage lists them. */
     public static final List<String> OWNER_FLAGS = List.of(CLIENT_FLAG, CLASS_FLAG, SERVICE_FLAG);
@@ -112,7 +115,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public static Command of(String noun, List<String> names) {
-        return new Command(noun, names, null, null, null, FIRST_PAGE);
+        return new Command(noun, names, null, null, null, null, FIRST_PAGE);
     }
 
     /** {@code bal discover package <pkg> [--module <m>]}: a package's overview. */
@@ -130,7 +133,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public Command in(Target target) {
-        return new Command(noun, names, target, owner, filter, page);
+        return new Command(noun, names, target, owner, accessor, filter, page);
     }
 
     public Command with(String... more) {
@@ -144,7 +147,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public Command withNames(List<String> others) {
-        return new Command(noun, others, target, owner, filter, page);
+        return new Command(noun, others, target, owner, accessor, filter, page);
     }
 
     public Command ownedBy(String kind, String name) {
@@ -152,17 +155,22 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public Command ownedBy(Owner other) {
-        return new Command(noun, names, target, other, filter, page);
+        return new Command(noun, names, target, other, accessor, filter, page);
+    }
+
+    /** This command selecting the {@code resource} method its path declares for {@code other}, or none. */
+    public Command accessedBy(String other) {
+        return new Command(noun, names, target, owner, other, filter, page);
     }
 
     /** This command narrowed by {@code keyword}, or as it is when {@code keyword} is {@code null}. */
     public Command filtered(String keyword) {
-        return new Command(noun, names, target, owner, keyword, page);
+        return new Command(noun, names, target, owner, accessor, keyword, page);
     }
 
     /** This command on page {@code number}; the first page writes no {@code --page}. */
     public Command paged(int number) {
-        return new Command(noun, names, target, owner, filter, number);
+        return new Command(noun, names, target, owner, accessor, filter, number);
     }
 
     // A name that starts with a dash would read as a flag, so such names go last, after `--`.
@@ -180,6 +188,9 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         }
         if (owner != null) {
             flag(text, owner.flag(), owner.name());
+        }
+        if (accessor != null) {
+            flag(text, ACCESSOR_FLAG, accessor);
         }
         if (target != null && target.module() != null) {
             flag(text, MODULE_FLAG, target.module());
@@ -220,6 +231,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         String module = null;
         String filter = null;
         Owner owner = null;
+        String accessor = null;
         int page = FIRST_PAGE;
         for (int i = 1; i < words.size(); i++) {
             String word = words.get(i);
@@ -228,7 +240,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
                 break;
             }
             boolean flag = PACKAGE_FLAG.equals(word) || MODULE_FLAG.equals(word) || FILTER_FLAG.equals(word)
-                    || PAGE_FLAG.equals(word) || OWNER_KINDS.containsKey(word);
+                    || PAGE_FLAG.equals(word) || ACCESSOR_FLAG.equals(word) || OWNER_KINDS.containsKey(word);
             if (!flag) {
                 if (PACKAGE.equals(noun) && pkg == null) {
                     pkg = word;
@@ -245,6 +257,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
                 case PACKAGE_FLAG -> pkg = value;
                 case MODULE_FLAG -> module = value;
                 case FILTER_FLAG -> filter = value;
+                case ACCESSOR_FLAG -> accessor = value;
                 case PAGE_FLAG -> {
                     if (!value.chars().allMatch(Character::isDigit)) {
                         return Optional.empty();
@@ -255,7 +268,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
             }
         }
         Target target = pkg == null ? null : new Target(pkg, module);
-        return Optional.of(new Command(noun, names, target, owner, filter, page));
+        return Optional.of(new Command(noun, names, target, owner, accessor, filter, page));
     }
 
     @Override

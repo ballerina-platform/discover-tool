@@ -48,9 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * {@code client} / {@code service} / {@code class} / {@code function}, and the {@code method} and {@code resource}
@@ -63,7 +61,8 @@ import java.util.stream.Stream;
  * ({@link #listenerNote}, {@link #listenerNames}) rather than a parallel path.
  *
  * <p><b>THE NOUN SAYS WHAT COMES BACK.</b> A container noun answers with the container whole; {@code method} reads
- * only its methods and constructor, {@code resource} only its resource methods, by path and accessor.
+ * only its methods and constructor, {@code resource} only its resource methods, by path, and one of a path's methods
+ * by its {@code --accessor}.
  *
  * <p><b>A MEMBER'S CONTAINER MAY BE LEFT OUT WHEN TYPED.</b> Without a container flag, every container is searched;
  * when exactly one declares what the selectors name it answers as if it had been named, and with two or more the
@@ -162,13 +161,12 @@ public final class Containers {
      */
     private static final int MAX_GROUP_DEPTH = 4;
 
-    /** How many names a resource method is asked by: its path and its accessor. */
-    private static final int PATH_AND_ACCESSOR = 2;
+    /** Where a resource request holds the path, and after it the accessor. */
+    private static final int PATH = 0;
+
+    private static final int ACCESSOR = 1;
 
     private static final char MEMBER_ACCESS = '.';
-
-    /** Accessors a resource function may declare. Not a closed set — see {@link #isAccessor}. */
-    private static final Pattern ACCESSOR = Pattern.compile("[a-z][a-zA-Z0-9]*");
 
     private static final String VOWELS = "aeiou";
 
@@ -184,7 +182,7 @@ public final class Containers {
         /** {@code method}: a remote or plain method, or the constructor, {@code init}. */
         METHOD,
 
-        /** {@code resource}: a resource path, or a path and its accessor. */
+        /** {@code resource}: a resource path, or one method of it by its accessor. */
         RESOURCE
     }
 
@@ -192,8 +190,8 @@ public final class Containers {
      * @param ask what is asked for
      * @param container the container named — after a container noun, or a member's container flag — or
      *     {@code null} when none was
-     * @param selectors what follows the noun below the container: a function's or method's name, or a path and its
-     *     accessor
+     * @param selectors what follows the noun below the container: a function's or method's name, or a path then the
+     *     {@code --accessor} value
      * @param filter the {@code --filter} keyword, or {@code null}
      * @param page {@code --page}, 1-indexed, for any listing over the ceiling
      */
@@ -217,9 +215,11 @@ public final class Containers {
             return new Options(Ask.METHOD, container, name == null ? List.of() : List.of(name), filter, page);
         }
 
-        /** {@code resource [path [accessor]] [--client <C>]}. */
-        public static Options resource(String container, List<String> path, String filter, int page) {
-            return new Options(Ask.RESOURCE, container, path, filter, page);
+        /** {@code resource [path] [--client <C>] [--accessor <accessor>]}; an accessor is only asked with a path. */
+        public static Options resource(String container, String path, String accessor, String filter, int page) {
+            List<String> selectors = path == null ? List.of()
+                    : accessor == null ? List.of(path) : List.of(path, accessor);
+            return new Options(Ask.RESOURCE, container, selectors, filter, page);
         }
 
         public boolean filtered() {
@@ -301,34 +301,54 @@ public final class Containers {
 
     /**
      * The member command {@code names} meant, when there are more of them than a method or a resource takes: the
-     * container they start with as its flag; else for a resource, its first path and accessor, or the names before
-     * the accessor as one path, or else the listing; else for a method, its first name.
+     * container they start with as its flag; else for a method, its first name; else for a resource, its path with
+     * the word after it as {@code --accessor} when that word is one of the path's accessors, named with its container
+     * when only one declares it. Empty when the names read as no command.
      */
-    public static Command memberMeant(LoadedPackage loaded, Ask ask, Command.Owner owner, List<String> names) {
-        String noun = ask == Ask.RESOURCE ? Command.RESOURCE : Command.METHOD;
-        int takes = ask == Ask.RESOURCE ? PATH_AND_ACCESSOR : 1;
+    public static Optional<Command> memberMeant(LoadedPackage loaded, Ask ask, Command.Owner owner,
+            List<String> names) {
         Optional<Surface.Container> first = Surface.byName(containersOf(loaded), names.get(0));
         if (first.isPresent()) {
-            List<String> rest = names.subList(1, Math.min(names.size(), takes + 1));
-            return owned(loaded.command(noun).with(plainWords(rest)), first.get());
+            List<String> rest = names.subList(1, names.size());
+            return Optional.of(owned(ask == Ask.METHOD
+                    ? loaded.command(Command.METHOD, PathTree.plainSelector(rest.get(0)))
+                    : accessed(loaded, List.of(first.get()), rest), first.get()));
         }
-        Command meant = ask == Ask.METHOD
-                ? loaded.command(noun, PathTree.plainSelector(names.get(0)))
-                : declaredPath(loaded, owner, names);
-        return owner == null ? meant : meant.ownedBy(owner);
+        if (ask == Ask.METHOD) {
+            Command meant = loaded.command(Command.METHOD, PathTree.plainSelector(names.get(0)));
+            return Optional.of(owner == null ? meant : meant.ownedBy(owner));
+        }
+        if (names.size() != ACCESSOR + 1) {
+            return Optional.empty();
+        }
+        List<String> asked = List.of(names.get(PATH), names.get(ACCESSOR));
+        List<Surface.Container> declaring = containersOf(loaded).stream()
+                .filter(container -> owner == null || Identifiers.plain(container.name()).equals(owner.name()))
+                .filter(container -> !select(container, Ask.RESOURCE, asked).isEmpty())
+                .toList();
+        if (declaring.isEmpty()) {
+            return Optional.empty();
+        }
+        Command meant = resourceOf(loaded.command(Command.RESOURCE), plainWords(asked));
+        return Optional.of(declaring.size() == 1 ? owned(meant, declaring.getFirst()) : meant);
     }
 
-    private static Command declaredPath(LoadedPackage loaded, Command.Owner owner, List<String> names) {
-        List<String> words = plainWords(names);
-        List<String> joined = List.of(String.join(PathTree.SEPARATOR, words.subList(0, words.size() - 1)),
-                words.get(words.size() - 1));
-        return Stream.of(words.subList(0, PATH_AND_ACCESSOR), joined)
-                .filter(asked -> containersOf(loaded).stream()
-                        .filter(container -> owner == null || Identifiers.plain(container.name()).equals(owner.name()))
-                        .anyMatch(container -> !select(container, Ask.RESOURCE, asked).isEmpty()))
-                .findFirst()
-                .map(asked -> loaded.command(Command.RESOURCE).with(asked))
-                .orElse(loaded.command(Command.RESOURCE));
+    // `resource <path>`, with the word after the path as its --accessor when one of `owners` declares that method.
+    private static Command accessed(LoadedPackage loaded, List<Surface.Container> owners, List<String> words) {
+        Command path = resourceOf(loaded.command(Command.RESOURCE), plainWords(words.subList(0, ACCESSOR)));
+        if (words.size() <= ACCESSOR) {
+            return path;
+        }
+        List<String> asked = List.of(words.get(PATH), words.get(ACCESSOR));
+        return owners.stream().anyMatch(container -> !select(container, Ask.RESOURCE, asked).isEmpty())
+                ? path.accessedBy(words.get(ACCESSOR))
+                : path;
+    }
+
+    // `resource <path> [--accessor <a>]` from the words a resource is asked by: its path, then its accessor.
+    private static Command resourceOf(Command listing, List<String> words) {
+        Command command = words.isEmpty() ? listing : listing.with(words.get(PATH));
+        return words.size() > ACCESSOR ? command.accessedBy(words.get(ACCESSOR)) : command;
     }
 
     private static List<Surface.Container> containersOf(LoadedPackage loaded) {
@@ -341,15 +361,11 @@ public final class Containers {
         return all;
     }
 
-    // Whether one of the selectors is a whole path `container` declares, whatever the others name: the container
-    // is then settled, and what it does not hold under that path is its miss to report.
+    // Whether the path asked is a whole path `container` declares, whatever the accessor names: the container is
+    // then settled, and what it does not hold under that path is its miss to report.
     private static boolean holdsPath(Surface.Container container, List<String> selectors) {
-        if (!container.hasPaths()) {
-            return false;
-        }
-        PathTree tree = PathTree.build(container.operations());
-        return selectors.stream().anyMatch(selector ->
-                PathTree.resolve(tree, PathTree.splitPath(selector)) instanceof PathTree.Resolution.Found);
+        return container.hasPaths() && !selectors.isEmpty() && PathTree.resolve(PathTree.build(container.operations()),
+                PathTree.splitPath(selectors.get(PATH))) instanceof PathTree.Resolution.Found;
     }
 
     // Whether `container` itself declares what a member command asks for: the method or the resource it names, or
@@ -380,7 +396,7 @@ public final class Containers {
         List<String> names = owners.stream().map(Surface.Container::plainName).toList();
         String what = selectors.isEmpty()
                 ? (options.ask() == Ask.RESOURCE ? "resource methods are" : "methods are")
-                : named(String.join(" ", plainWords(selectors))) + " is";
+                : typed(selectors) + " is";
         List<Failure.Match> rows = owners.stream().map(owner -> new Failure.Match(owner.plainName(),
                         askCommand(loaded, owner, options.ask(), selectors).filtered(filterOf(options)).text()))
                 .toList();
@@ -440,8 +456,8 @@ public final class Containers {
             return noneOfItsKind(loaded, resource, what);
         }
         String token = options.selectors().get(0);
-        String typed = String.join(" ", plainWords(options.selectors()));
-        String message = named(typed) + " is not a " + what + " in " + loaded.place();
+        String message = named(PathTree.plainSelector(token)) + " is not a " + (resource ? "resource path" : what)
+                + " in " + loaded.place();
         if (options.ask() == Ask.METHOD) {
             Optional<Failure> misplaced = heldElsewhere(loaded, null, message, token, options)
                     .or(() -> dotted(loaded, message, token, options));
@@ -450,7 +466,7 @@ public final class Containers {
             }
         }
         Optional<String> keyword = searchKeyword(token);
-        String plural = what + "s";
+        String plural = resource ? "resource paths" : what + "s";
         List<String> candidates = membersOfAll(loaded, options.ask());
         if (keyword.isEmpty()) {
             String listing = loaded.command(Command.RESOURCE).text();
@@ -611,23 +627,19 @@ public final class Containers {
         return entries.stream().map(Entry::label).sorted(Texts.LOCALE_ORDER).toList();
     }
 
-    // Each resource method under `prefix`, as its path then its accessor, the way a command names it.
+    // Each resource path under `prefix`, as the path positional takes it.
     private static List<String> resourcesUnder(Surface.Container container, List<String> prefix) {
         return descend(PathTree.build(container.operations()), prefix)
-                .map(node -> resourceRows(PathTree.operationsUnder(node)))
+                .map(node -> resourcePaths(PathTree.operationsUnder(node)))
                 .orElse(List.of());
     }
 
-    // Resource methods as a command names them, in the listing's order: by path, each path's accessors as declared.
-    private static List<String> resourceRows(List<PathTree.Operation> operations) {
-        Map<String, Set<String>> accessorsByPath = new LinkedHashMap<>();
-        for (PathTree.Operation operation : operations) {
-            accessorsByPath.computeIfAbsent(PathTree.join(operation.segments()), path -> new LinkedHashSet<>())
-                    .add(operation.fn().accessor());
-        }
-        return accessorsByPath.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey(Texts.LOCALE_ORDER))
-                .flatMap(path -> path.getValue().stream().map(accessor -> path.getKey() + " " + accessor))
+    // Resource paths as the path positional takes them, each once, in the listing's order.
+    private static List<String> resourcePaths(List<PathTree.Operation> operations) {
+        return operations.stream()
+                .map(operation -> PathTree.join(operation.segments()))
+                .distinct()
+                .sorted(Texts.LOCALE_ORDER)
                 .toList();
     }
 
@@ -635,7 +647,7 @@ public final class Containers {
     private static List<String> membersOfAll(LoadedPackage loaded, Ask ask) {
         List<Surface.Container> containers = containersOf(loaded);
         if (ask == Ask.RESOURCE) {
-            return resourceRows(containers.stream().flatMap(container -> container.operations().stream()).toList());
+            return resourcePaths(containers.stream().flatMap(container -> container.operations().stream()).toList());
         }
         return containers.stream()
                 .flatMap(container -> labels(members(container, Ask.METHOD)).stream())
@@ -650,6 +662,14 @@ public final class Containers {
 
     private static String named(String token) {
         return "'" + token + "'";
+    }
+
+    // A member as typed: a method's name, or a resource path with the accessor it was asked by.
+    private static String typed(List<String> selectors) {
+        String asked = named(PathTree.plainSelector(selectors.get(PATH)));
+        return selectors.size() > ACCESSOR
+                ? asked + " with " + Command.ACCESSOR_FLAG + " " + selectors.get(ACCESSOR)
+                : asked;
     }
 
     private static String article(String noun) {
@@ -821,7 +841,7 @@ public final class Containers {
     }
 
     private static Command resourceCommand(LoadedPackage loaded, Surface.Container container, List<String> words) {
-        return owned(loaded.command(Command.RESOURCE).with(words), container);
+        return owned(resourceOf(loaded.command(Command.RESOURCE), words), container);
     }
 
     private static Command owned(Command command, Surface.Container container) {
@@ -877,7 +897,7 @@ public final class Containers {
         }
     }
 
-    // What `selectors` name on `container`: a resource path and its accessor, or a method or function by name.
+    // What `selectors` name on `container`: a resource path or one method of it, or a method or function by name.
     private static List<Entry> select(Surface.Container container, Ask ask, List<String> selectors) {
         if (selectors.isEmpty()) {
             return ask == Ask.CONTAINER ? entriesOf(container) : members(container, ask);
@@ -902,24 +922,12 @@ public final class Containers {
      */
     private record PathRequest(String accessor, List<String> tokens) { }
 
-    // A path and its accessor are read in either order; the order every `command` prints is the path first.
     private static Optional<PathRequest> pathRequest(Surface.Container container, List<String> selectors) {
-        if (!container.hasPaths()) {
+        if (!container.hasPaths() || selectors.isEmpty() || selectors.size() > ACCESSOR + 1) {
             return Optional.empty();
         }
-        if (selectors.size() == 1) {
-            return Optional.of(new PathRequest(null, PathTree.splitPath(selectors.get(0))));
-        }
-        if (selectors.size() != 2) {
-            return Optional.empty();
-        }
-        if (isAccessor(container, selectors.get(0))) {
-            return Optional.of(new PathRequest(selectors.get(0), PathTree.splitPath(selectors.get(1))));
-        }
-        if (isAccessor(container, selectors.get(1))) {
-            return Optional.of(new PathRequest(selectors.get(1), PathTree.splitPath(selectors.get(0))));
-        }
-        return Optional.empty();
+        String accessor = selectors.size() > ACCESSOR ? selectors.get(ACCESSOR) : null;
+        return Optional.of(new PathRequest(accessor, PathTree.splitPath(selectors.get(PATH))));
     }
 
     /**
@@ -936,40 +944,45 @@ public final class Containers {
         String base = none
                 ? containerCommand(loaded, container).text()
                 : askCommand(loaded, container, options.ask(), List.of()).text();
-        String typed = String.join(" ", selectors);
-        String what = options.ask() == Ask.METHOD ? "a method"
-                : selectors.size() > 1 ? "a resource method" : "a resource path";
-        String message = named(typed) + " is not " + what + " of " + container.plainName() + " in " + loaded.place();
+        String what = options.ask() == Ask.METHOD ? "a method" : "a resource path";
+        String message = named(PathTree.plainSelector(selectors.get(PATH))) + " is not " + what + " of "
+                + container.plainName() + " in " + loaded.place();
         if (none) {
             return loaded.symbolNotFound(selectors, message, "List its members.", base);
         }
-        List<String> reached = options.ask() == Ask.RESOURCE ? reached(container, selectors) : List.of();
         if (options.ask() == Ask.METHOD) {
             return loaded.missAmong(selectors, message, "methods of " + container.plainName(), base,
                     labels(members(container, Ask.METHOD)), null);
         }
+        PathTree.Resolution resolution = PathTree.resolve(PathTree.build(container.operations()),
+                PathTree.splitPath(selectors.get(PATH)));
+        if (resolution instanceof PathTree.Resolution.Found found) {
+            return accessorMiss(loaded, container, selectors, found);
+        }
+        List<String> reached = ((PathTree.Resolution.Missing) resolution).matched();
         String listing = reached.isEmpty()
                 ? base
                 : resourceCommand(loaded, container, List.of(PathTree.join(reached))).text();
-        String level = reached.isEmpty() ? "resource methods of " + container.plainName()
-                : "resource methods under " + PathTree.join(reached);
+        String level = reached.isEmpty() ? "resource paths of " + container.plainName()
+                : "resource paths under " + PathTree.join(reached);
         return loaded.missAmong(selectors, message, level, listing, resourcesUnder(container, reached), null);
     }
 
-    // The deepest path prefix a missed selector resolves before it stops matching: a whole path whose accessor
-    // missed, or the segments before the first one that matched nothing. Either selector of a pair may be the path.
-    private static List<String> reached(Surface.Container container, List<String> selectors) {
-        if (!container.hasPaths() || selectors.isEmpty()) {
-            return List.of();
+    // A path declared, asked with an accessor it does not declare: its own accessors, else the paths under it.
+    private static Failure accessorMiss(LoadedPackage loaded, Surface.Container container, List<String> selectors,
+            PathTree.Resolution.Found found) {
+        String path = PathTree.join(found.path());
+        String message = named(selectors.get(ACCESSOR)) + " is not an accessor of " + path + " on "
+                + container.plainName() + " in " + loaded.place();
+        List<String> accessors = found.node().operations().stream()
+                .map(operation -> operation.fn().accessor())
+                .toList();
+        String listing = resourceCommand(loaded, container, List.of(path)).text();
+        if (accessors.isEmpty()) {
+            return loaded.symbolNotFound(selectors, message + "; it declares no resource method itself",
+                    "List the paths under it.", listing);
         }
-        PathTree tree = PathTree.build(container.operations());
-        return selectors.stream()
-                .map(selector -> switch (PathTree.resolve(tree, PathTree.splitPath(selector))) {
-                    case PathTree.Resolution.Found found -> found.path();
-                    case PathTree.Resolution.Missing missing -> missing.matched();
-                })
-                .max(Comparator.comparingInt(List::size))
-                .orElse(List.of());
+        return loaded.missAmong(selectors, message, "accessors of " + path, listing, accessors, null);
     }
 
     private static List<Entry> selectByPath(Surface.Container container, List<String> selectors) {
@@ -979,30 +992,10 @@ public final class Containers {
             return List.of();
         }
         String accessor = request.get().accessor();
-        if (accessor == null) {
-            return PathTree.operationsUnder(found.node()).stream()
-                    .map(operation -> new Entry(operation.fn(), operation.segments()))
-                    .toList();
-        }
-        // A path AND an accessor name one operation when the path declares that accessor itself — the RFC's
-        // signature drill-down, and what every resource `commands` value prints. Only when it does not is the
-        // accessor a filter over everything beneath the path.
-        List<Entry> exact = accessorsOf(found.node().operations(), accessor);
-        return exact.isEmpty() ? accessorsOf(PathTree.operationsUnder(found.node()), accessor) : exact;
-    }
-
-    private static List<Entry> accessorsOf(List<PathTree.Operation> operations, String accessor) {
-        return operations.stream()
-                .filter(operation -> operation.fn().accessor().equals(accessor))
+        return (accessor == null ? PathTree.operationsUnder(found.node()) : found.node().operations()).stream()
+                .filter(operation -> accessor == null || operation.fn().accessor().equals(accessor))
                 .map(operation -> new Entry(operation.fn(), operation.segments()))
                 .toList();
-    }
-
-    private static boolean isAccessor(Surface.Container container, String token) {
-        if (!ACCESSOR.matcher(token).matches()) {
-            return false;
-        }
-        return container.operations().stream().anyMatch(operation -> operation.fn().accessor().equals(token));
     }
 
     private static List<Entry> entriesOf(Surface.Container container) {
@@ -1316,8 +1309,7 @@ public final class Containers {
         if (groupable && merged.size() > MAX_ENTRIES) {
             Optional<PathTree> node = descend(PathTree.build(operationsOf(callable)), prefix.get());
             if (node.isPresent()) {
-                return groupedAnswer(loaded, container, selectors, node.get(), prefix.get(), command,
-                        options.page(), note);
+                return groupedAnswer(loaded, container, node.get(), prefix.get(), command, options.page(), note);
             }
         }
 
@@ -1332,10 +1324,8 @@ public final class Containers {
                 documentedOn(window, documented, merged.size()), note));
     }
 
-    private static Result<DiscoverResult> groupedAnswer(LoadedPackage loaded,
-            Surface.Container container, List<String> selectors, PathTree node, List<String> prefix,
-            Command command, int requested, String note) {
-        String accessor = pathRequest(container, selectors).map(PathRequest::accessor).orElse(null);
+    private static Result<DiscoverResult> groupedAnswer(LoadedPackage loaded, Surface.Container container,
+            PathTree node, List<String> prefix, Command command, int requested, String note) {
         List<PathTree.Operation> terminal = new ArrayList<>();
         Map<List<String>, PathTree> literalChildren = new LinkedHashMap<>();
         collectNextLiteralChildren(node, prefix, terminal, literalChildren);
@@ -1347,8 +1337,7 @@ public final class Containers {
             String name = PathTree.join(path);
             groups.add(new DiscoverResult.PathGroups.Group(
                     name, child.total(),
-                    resourceCommand(loaded, container, groupArguments(container, name, accessor, child.total()))
-                            .text()));
+                    resourceCommand(loaded, container, List.of(name)).text()));
         });
         groups.sort(Comparator.comparingInt(DiscoverResult.PathGroups.Group::count).reversed()
                 .thenComparing(DiscoverResult.PathGroups.Group::name, Texts.LOCALE_ORDER));
@@ -1362,16 +1351,6 @@ public final class Containers {
         return Result.ok(new DiscoverResult.PathGroups(containerName(container), window.slice(here, 0),
                 window.slice(groups, here.size()), new DiscoverResult.PathGroups.Counts(here.size(), groups.size()),
                 total, window.paging(), window.next(command), note));
-    }
-
-    // A path that itself declares the accessor would answer with one signature and silently drop the rest of
-    // the group, so such a group is opened unnarrowed.
-    private static List<String> groupArguments(Surface.Container container, String name, String accessor,
-            int count) {
-        if (accessor != null && select(container, Ask.RESOURCE, List.of(name, accessor)).size() == count) {
-            return List.of(name, accessor);
-        }
-        return List.of(name);
     }
 
     private static List<DiscoverResult.ResourceList.Resource> mergedResources(LoadedPackage loaded,

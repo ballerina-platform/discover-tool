@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -71,7 +72,7 @@ import java.util.stream.Stream;
  *   <li>exit 1 — any other failure
  * </ul>
  *
- * <p>{@code bal discover <noun> [name ...] -p <org>/<name>[:<version>]} is one picocli subcommand per noun; see
+ * <p>{@code bal discover <noun> [name] -p <org>/<name>[:<version>]} is one picocli subcommand per noun; see
  * {@link Commands}.
  *
  * <p>No {@link System#exit} here, and no environment read: the cache, the transport and the project directory
@@ -112,10 +113,8 @@ public final class Cli {
             Set.of("get", "post", "put", "delete", "patch", "head", "options", "default");
 
 
-    /** How many names each noun takes; {@code search} takes its keywords as one query. */
-    private static final Map<String, Integer> MAX_NAMES = Map.of(
-            Command.PACKAGE, 1, Command.SEARCH, 1, Command.CLIENT, 1, Command.SERVICE, 1, Command.CLASS, 1,
-            Command.FUNCTION, 1, Command.TYPE, 1, Command.METHOD, 1, Command.RESOURCE, 2, Command.README, 1);
+    /** How many names a noun takes: one, its query for {@code search}; a resource's accessor is a flag. */
+    private static final int MAX_NAMES = 1;
 
     /** The nouns that answer with containers, and the scope each lists. */
     private static final Map<String, Surface.Scope> CONTAINER_NOUNS = Map.of(
@@ -245,6 +244,9 @@ public final class Cli {
         if (!MEMBER_NOUNS.contains(call.noun()) && !call.owners().isEmpty()) {
             return unknownFlag(call.owners().get(0).flag(), call.noun());
         }
+        if (!Command.RESOURCE.equals(call.noun()) && call.accessor() != null) {
+            return unknownFlag(Command.ACCESSOR_FLAG, call.noun());
+        }
         Failure.Validation output = rejectInvalidOutput(call.output());
         if (output != null) {
             return output;
@@ -286,7 +288,14 @@ public final class Cli {
         if (call.owners().size() > 1) {
             return severalOwnerFlags(call);
         }
-        return tooManyNames(call);
+        Failure.Validation tooMany = tooManyNames(call);
+        if (tooMany != null || call.accessor() == null || !call.names().isEmpty()) {
+            return tooMany;
+        }
+        String listing = call.paged(call.command().accessedBy(null)).text();
+        return new Failure.Validation(Command.ACCESSOR_FLAG + " names a method of one path, and no path is given",
+                "Write the path before " + Command.ACCESSOR_FLAG + "; list the paths with " + Failure.quoted(listing)
+                        + ".");
     }
 
     // A name that is a package coordinate: the package typed where a name goes, one name more than the noun takes
@@ -295,16 +304,16 @@ public final class Cli {
     // when it is the same package.
     private static String misplacedPackage(Invocation call) {
         List<String> names = call.names();
-        Integer max = MAX_NAMES.get(call.noun());
         String candidate = Command.SEARCH.equals(call.noun()) ? null : packageCandidate(names);
         if (candidate == null) {
             return null;
         }
         boolean resource = Command.RESOURCE.equals(call.noun());
         if (call.pkg() == null) {
-            return names.size() <= max + 1 && (!resource || names.size() > max) ? candidate : null;
+            int most = resource ? MAX_NAMES + 2 : MAX_NAMES + 1;
+            return names.size() <= most && (!resource || names.size() > MAX_NAMES) ? candidate : null;
         }
-        if (names.size() > max) {
+        if (names.size() > MAX_NAMES) {
             return null;
         }
         boolean slashed = resource || Command.README.equals(call.noun())
@@ -337,19 +346,28 @@ public final class Cli {
         List<String> others = new ArrayList<>(call.names());
         others.remove(pkg);
         String target = call.pkg() == null ? pkg : call.pkg();
-        String command = call.paged(call.withNames(others).command(new Command.Target(target, call.module())))
-                .text();
+        String command = call.paged(accessorMoved(call.withNames(others))
+                .command(new Command.Target(target, call.module()))).text();
         String where = call.pkg() == null ? "name it with -p" : "-p names the package already";
         return new Failure.Validation("'" + pkg + "' is a package, not a " + call.noun() + " name; " + where,
                 "Name the package with -p.", command);
     }
 
+    // A resource's path and the accessor typed after it, read before the package is: the accessor as its flag when
+    // it is one of the accessors resources are most often declared with.
+    private static Invocation accessorMoved(Invocation call) {
+        List<String> names = call.names();
+        boolean typedAfter = Command.RESOURCE.equals(call.noun()) && names.size() == MAX_NAMES + 1
+                && call.accessor() == null && RESOURCE_ACCESSORS.contains(names.getLast());
+        return typedAfter ? call.withNames(names.subList(0, MAX_NAMES)).withAccessor(names.getLast()) : call;
+    }
+
     // Never a package the caller did not give: the search that finds one, or the command's shape.
     private static Failure.Validation missingPackage(Invocation call) {
         String message = call.noun() + " needs the package it reads: -p " + Commands.PACKAGE_LABEL;
-        Command shape = Command.of(call.noun(), call.echoed())
-                .in(new Command.Target(Command.placeholder(PLACEHOLDER_PACKAGE), call.module()));
-        String write = "Write " + Failure.quoted((call.owner() == null ? shape : shape.ownedBy(call.owner())).text());
+        Command shape = accessorMoved(call).command(new Command.Target(Command.placeholder(PLACEHOLDER_PACKAGE),
+                call.module())).filtered(null);
+        String write = "Write " + Failure.quoted(shape.text());
         if (call.names().isEmpty() || Command.README.equals(call.noun())) {
             return new Failure.Validation(message, write + "; find the package with "
                     + Failure.quoted(Command.of(Command.SEARCH, Command.placeholder(PLACEHOLDER_QUERY)).text())
@@ -371,9 +389,8 @@ public final class Cli {
     }
 
     private static Failure.Validation tooManyNames(Invocation call) {
-        Integer max = MAX_NAMES.get(call.noun());
         List<String> names = call.names();
-        if (max == null || names.size() <= max) {
+        if (names.size() <= MAX_NAMES) {
             return null;
         }
         Failure.Validation version = rejectVersionArguments(call);
@@ -396,7 +413,7 @@ public final class Cli {
         } else if (Command.README.equals(call.noun())) {
             fixed = call.withNames(List.of(String.join(" ", names))).command();
         } else {
-            fixed = call.withNames(names.subList(0, max)).command();
+            fixed = call.withNames(names.subList(0, MAX_NAMES)).command();
         }
         String command = call.paged(fixed).text();
         return new Failure.Validation(tooMany(call.noun(), names.size()), "Drop the names it does not take.",
@@ -405,7 +422,7 @@ public final class Cli {
 
     private static String tooMany(String noun, int given) {
         String takes = switch (noun) {
-            case Command.RESOURCE -> "a path and its accessor";
+            case Command.RESOURCE -> "one path, its method a flag";
             case Command.README -> "one section, a title in quotes";
             case Command.SEARCH -> "one query, in quotes";
             default -> "one name";
@@ -417,10 +434,11 @@ public final class Cli {
     // and any word after a method dropped.
     private static Command memberOf(String noun, List<String> names) {
         List<String> member = names.subList(1, names.size());
-        boolean resource = member.get(0).contains(PATH_SEPARATOR)
-                || member.size() > 1 && RESOURCE_ACCESSORS.contains(member.get(member.size() - 1));
-        return (resource ? Command.of(Command.RESOURCE, member) : Command.of(Command.METHOD, member.get(0)))
-                .ownedBy(noun, names.get(0));
+        boolean accessed = member.size() > 1 && RESOURCE_ACCESSORS.contains(member.get(member.size() - 1));
+        Command meant = member.get(0).contains(PATH_SEPARATOR) || accessed
+                ? Command.of(Command.RESOURCE, member.get(0)).accessedBy(accessed ? member.getLast() : null)
+                : Command.of(Command.METHOD, member.get(0));
+        return meant.ownedBy(noun, names.get(0));
     }
 
     // `literal`: how many of the last names follow `--`, where a leading dash is part of the name.
@@ -494,6 +512,9 @@ public final class Cli {
         if ((Command.README.equals(noun) || Command.SEARCH.equals(noun)) && !selectors.isEmpty()) {
             return Command.of(noun, String.join(" ", selectors));
         }
+        if (Command.RESOURCE.equals(noun) && selectors.size() > MAX_NAMES) {
+            return Command.of(noun, selectors.getFirst()).accessedBy(selectors.get(MAX_NAMES));
+        }
         return Command.of(noun, selectors);
     }
 
@@ -542,7 +563,7 @@ public final class Cli {
         if (call.coordinate() == null) {
             return null;
         }
-        String command = call.paged(call.command()).text();
+        String command = call.paged(accessorMoved(call).command()).text();
         return new Failure.Validation(message, "Write " + noun + " in its place.", command);
     }
 
@@ -639,16 +660,28 @@ public final class Cli {
         return Failure.ANSWERED;
     }
 
-    // More names than a method or a resource takes, read against the package: the member command they meant.
+    // More names than a method or a resource takes, read against the package: the member command they meant, else
+    // what to write instead.
     private static Failure.Validation memberMeant(LoadedPackage loaded, Invocation call) {
-        if (!MEMBER_NOUNS.contains(call.noun()) || call.names().size() <= MAX_NAMES.get(call.noun())) {
+        if (!MEMBER_NOUNS.contains(call.noun()) || call.names().size() <= MAX_NAMES) {
             return null;
         }
-        Containers.Ask ask = Command.RESOURCE.equals(call.noun()) ? Containers.Ask.RESOURCE : Containers.Ask.METHOD;
-        String command = call.paged(Containers.memberMeant(loaded, ask, call.owner(), call.names())
-                .filtered(call.filter())).text();
-        return new Failure.Validation(tooMany(call.noun(), call.names().size()),
-                "Name the container with its flag and the member alone.", command);
+        boolean resource = Command.RESOURCE.equals(call.noun());
+        String message = tooMany(call.noun(), call.names().size());
+        Optional<Command> meant = Containers.memberMeant(loaded,
+                resource ? Containers.Ask.RESOURCE : Containers.Ask.METHOD, call.owner(), call.names());
+        if (meant.isEmpty()) {
+            return new Failure.Validation(message, "Write the path alone, and its method with "
+                    + Command.ACCESSOR_FLAG + " <accessor>.");
+        }
+        Command fixed = meant.get().accessor() != null || call.accessor() == null
+                ? meant.get()
+                : meant.get().accessedBy(call.accessor());
+        boolean pathFirst = meant.get().names().equals(List.of(PathTree.plainSelector(call.names().get(0))));
+        String suggestion = resource && pathFirst
+                ? "Name the method with " + Command.ACCESSOR_FLAG + "."
+                : "Name the container with its flag and the member alone.";
+        return new Failure.Validation(message, suggestion, call.paged(fixed.filtered(call.filter())).text());
     }
 
     private static Result<DiscoverResult> answer(LoadedPackage loaded, Invocation call) {
@@ -697,7 +730,7 @@ public final class Cli {
             case Command.METHOD -> Containers.render(loaded, call.ownerScope(),
                     Containers.Options.method(call.ownerName(), name, filter, page));
             case Command.RESOURCE -> Containers.render(loaded, call.ownerScope(),
-                    Containers.Options.resource(call.ownerName(), call.names(), filter, page));
+                    Containers.Options.resource(call.ownerName(), name, call.accessor(), filter, page));
             default -> Containers.render(loaded, CONTAINER_NOUNS.get(call.noun()),
                     Containers.Options.container(name, filter, page));
         };

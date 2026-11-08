@@ -65,8 +65,11 @@ public class SelectionCarryTest {
     }
 
     // `resource <words>` asked of github's Client.
+    // A path, or a path then its accessor.
     private static String resource(String words) {
-        return "bal discover resource " + words + " -p ballerinax/github --client Client";
+        String[] parts = words.split(" ");
+        return "bal discover resource " + parts[0] + " -p ballerinax/github --client Client"
+                + (parts.length > 1 ? " --accessor " + parts[1] : "");
     }
 
     private static Run run(String slug, String command) {
@@ -148,7 +151,7 @@ public class SelectionCarryTest {
     @Test
     public void aWrongBucketFailureNamesTheWholeCommandRunnably() {
         Run asked = run("ballerinax__github",
-                "bal discover resource \"gists/'public\" get -p ballerinax/github --class Client");
+                "bal discover resource \"gists/'public\" -p ballerinax/github --class Client --accessor get");
         Assert.assertEquals(asked.code(), 1, asked.out());
         JsonObject failure = JsonParser.parseString(asked.err()).getAsJsonObject();
         String canonical = resource("gists/public get");
@@ -183,18 +186,20 @@ public class SelectionCarryTest {
     }
 
     @Test
-    public void groupsUnderAnAccessorCountOnlyThatAccessorAndCarryItIntoTheirCommands() {
-        JsonObject groups = answer("ballerinax__github", resource("repos get"));
+    public void aGroupOpensEveryResourceMethodItCounts() {
+        JsonObject groups = answer("ballerinax__github", resource("repos"));
         JsonObject actions = groupNamed(groups.getAsJsonArray("groups"), "repos/:owner/:repo/actions");
-        int count = actions.get("count").getAsInt();
-        Assert.assertTrue(count < 72, "repos/:owner/:repo/actions counted every accessor: " + count);
-        Assert.assertEquals(actions.get("command").getAsString(), resource("repos/:owner/:repo/actions get"));
+        Assert.assertEquals(actions.get("command").getAsString(), resource("repos/:owner/:repo/actions"));
 
         JsonObject opened = answer("ballerinax__github", actions.get("command").getAsString());
-        Assert.assertEquals(opened.get("total").getAsInt(), count, opened.toString());
-        for (JsonElement element : opened.getAsJsonArray("resources")) {
-            Assert.assertEquals(element.getAsJsonObject().getAsJsonArray("accessors").toString(), "[\"get\"]");
+        int methods = 0;
+        for (JsonElement element : opened.has("groups") ? opened.getAsJsonArray("groups") : new JsonArray()) {
+            methods += element.getAsJsonObject().get("count").getAsInt();
         }
+        for (JsonElement element : opened.has("resources") ? opened.getAsJsonArray("resources") : new JsonArray()) {
+            methods += element.getAsJsonObject().getAsJsonArray("accessors").size();
+        }
+        Assert.assertEquals(methods, actions.get("count").getAsInt(), opened.toString());
     }
 
     @Test

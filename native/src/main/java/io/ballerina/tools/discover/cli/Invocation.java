@@ -36,6 +36,7 @@ import java.util.List;
  * @param pkg the {@code -p} value, or {@code null}
  * @param coordinate the package as it is read: {@code package}'s name, or {@code pkg}
  * @param owners the container flags given, in the order they are declared
+ * @param accessor the {@code --accessor} value, or {@code null}
  * @param output the {@code --output-format} value, or {@code null}
  * @param filter the {@code --filter} value, or {@code null}
  * @param page the {@code --page} value
@@ -44,7 +45,8 @@ import java.util.List;
  * @since 0.1.0
  */
 record Invocation(String noun, List<String> names, List<String> rest, String pkg, String coordinate,
-        List<Command.Owner> owners, String output, String filter, int page, String module, boolean refresh) {
+        List<Command.Owner> owners, String accessor, String output, String filter, int page, String module,
+        boolean refresh) {
 
     static Invocation of(Commands.Root root, String noun, Commands.Noun values) {
         Commands.Flags top = root.flags;
@@ -53,7 +55,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
         String pkg = values == null || values.pkg() == null ? root.pkg.pkg : values.pkg();
         String coordinate = Command.PACKAGE.equals(noun) ? (names.isEmpty() ? null : names.get(0)) : pkg;
         return new Invocation(noun, names, root.rest == null ? List.of() : List.copyOf(root.rest), pkg, coordinate,
-                owners(root, values),
+                owners(root, values), either(values == null ? null : values.accessor(), root.accessor.accessor),
                 either(own.output, top.output), either(own.filter, top.filter),
                 own.page != Command.FIRST_PAGE ? own.page : top.page, either(own.module, top.module),
                 own.refresh || top.refresh);
@@ -67,8 +69,8 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
     /** This bare coordinate as the {@code package} command it stands for. */
     Invocation asPackageOverview() {
         String named = rest.get(0);
-        return new Invocation(Command.PACKAGE, List.of(named), List.of(), pkg, named, owners, output, filter, page,
-                module, refresh);
+        return new Invocation(Command.PACKAGE, List.of(named), List.of(), pkg, named, owners, accessor, output, filter,
+                page, module, refresh);
     }
 
     // The container flags typed before the noun, then after it.
@@ -97,6 +99,9 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
         if (!root.owners.given().isEmpty() && !values.owners().isEmpty()) {
             return root.owners.given().get(0).flag();
         }
+        if (root.accessor.accessor != null && values.accessor() != null) {
+            return Command.ACCESSOR_FLAG;
+        }
         if (top.output != null && own.output != null) {
             return Commands.OUTPUT_FLAG;
         }
@@ -120,7 +125,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
         return names.stream().map(PathTree::plainSelector).toList();
     }
 
-    /** The noun and names a text answer's header echoes. */
+    /** The noun, names and accessor a text answer's header echoes. */
     List<String> trail() {
         if (Command.PACKAGE.equals(noun)) {
             return List.of();
@@ -128,6 +133,9 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
         List<String> trail = new ArrayList<>();
         trail.add(noun);
         trail.addAll(echoed());
+        if (accessor != null) {
+            trail.add(accessor);
+        }
         return trail;
     }
 
@@ -141,7 +149,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
         if (Command.PACKAGE.equals(noun)) {
             return Command.overview(target).filtered(filter);
         }
-        Command command = Command.of(noun, echoed()).in(target).filtered(filter);
+        Command command = Command.of(noun, echoed()).in(target).accessedBy(accessor).filtered(filter);
         return owner() == null ? command : command.ownedBy(owner());
     }
 
@@ -173,13 +181,18 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
             written = new ArrayList<>(names);
             written.set(0, text);
         }
-        return new Invocation(noun, List.copyOf(written), rest, pkg == null ? null : text, text, owners,
+        return new Invocation(noun, List.copyOf(written), rest, pkg == null ? null : text, text, owners, accessor,
                 output, filter, page, module, refresh);
     }
 
     Invocation withNames(List<String> others) {
-        return new Invocation(noun, List.copyOf(others), rest, pkg, coordinate, owners, output, filter, page,
-                module, refresh);
+        return new Invocation(noun, List.copyOf(others), rest, pkg, coordinate, owners, accessor, output, filter,
+                page, module, refresh);
+    }
+
+    Invocation withAccessor(String other) {
+        return new Invocation(noun, names, rest, pkg, coordinate, owners, other, output, filter, page, module,
+                refresh);
     }
 
     /** The container flag given, or {@code null}; {@link Cli} rejects more than one. */
@@ -189,8 +202,8 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
 
     /** This command with only {@code kept} of its container flags. */
     Invocation ownedBy(Command.Owner kept) {
-        return new Invocation(noun, names, rest, pkg, coordinate, List.of(kept), output, filter, page, module,
-                refresh);
+        return new Invocation(noun, names, rest, pkg, coordinate, List.of(kept), accessor, output, filter, page,
+                module, refresh);
     }
 
     /** The scope the container flag names, or {@code null} without one. */

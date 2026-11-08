@@ -1,6 +1,6 @@
 Read a Ballerina package's API off Central; trust it over memory or the web
 
-Usage: bal discover <noun> [<name> ...] -p <org>/<name>[:<version>] [options]
+Usage: bal discover <noun> [<name>] -p <org>/<name>[:<version>] [options]
        bal discover package <org>/<name>[:<version>] [options]
 
 Commands:
@@ -12,7 +12,7 @@ Commands:
   function [<name>]                 the functions, or one function's signature
   type [<name>]                     every type, or one declaration
   method [<name>]                   a container's methods, or one's signature
-  resource [<path> [<accessor>]]    resource paths, or one method's signature
+  resource [<path>]                 resource paths, or one method's signature
   readme [<n>|"<title>"]            the readme, or one section of it
   Every noun but package needs -p; search takes it only to search one package.
   bal discover <org>/<name> is short for bal discover package <org>/<name>.
@@ -22,6 +22,7 @@ Commands:
 Options:
   -p, --package <org>/<name>[:<version>]
                               read this package, as bal pull names it
+  --accessor <name>           name the resource method of the path, e.g. get
   --client|--class|--service <name>
                               name the container of a method or resource
   --filter <keyword>          narrow a listing to the names that match a keyword
@@ -39,8 +40,8 @@ Examples:
   bal discover package ballerinax/kafka
   # A method's signature, its container named
   bal discover method send -p ballerinax/kafka --client Producer
-  # A resource method's signature: the path, then its accessor
-  bal discover resource gists/public get -p ballerinax/github --client Client
+  # A resource method's signature: its path, then its accessor
+  bal discover resource gists/:gistId/star -p ballerinax/github --accessor put
   # A record, enum or error
   bal discover type ConnectionConfig -p ballerinax/github
   # One version; without one, ./Dependencies.toml's lock, else the latest

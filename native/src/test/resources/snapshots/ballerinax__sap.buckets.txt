@@ -14,7 +14,7 @@ Remote methods (->)
   post
   put
 
-Next: bal discover resource <path> <accessor> -p ballerinax/sap --client Client
+Next: bal discover resource <path> -p ballerinax/sap --client Client --accessor <accessor>
 Next: bal discover method <name> -p ballerinax/sap --client Client
 == service ==
 ballerinax/sap · service
