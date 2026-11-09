@@ -60,7 +60,7 @@ public final class TextRenderer {
 
     private static final String PATH_PLACEHOLDER = "<path>";
 
-    private static final String ACCESSOR_PLACEHOLDER = "<accessor>";
+    private static final String ACCESSOR_PLACEHOLDER = Command.ACCESSOR_LABEL;
 
     private static final String CONTAINER_PLACEHOLDER = "<container>";
 
