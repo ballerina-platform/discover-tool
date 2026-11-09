@@ -196,11 +196,14 @@ public class OnePositionalTest {
     @Test
     public void anAccessorOnAnotherNounIsAUsageErrorWithTheCommandWithoutIt() {
         List<List<String>> argvs = List.of(List.of("method", "send", "--accessor", "get", "-p", "ballerinax/kafka"),
+                List.of("method", "send", "-p", "ballerinax/kafka", "--accessor", "get"),
+                List.of("method", "send", "-p", "ballerinax/kafka", "--accessor=get"),
                 List.of("--accessor", "get", "client", "-p", GITHUB),
                 List.of("search", "kafka", "--accessor", "get"),
                 List.of("package", GITHUB, "--accessor", "get"));
-        List<String> commands = List.of("bal discover method send -p ballerinax/kafka", "bal discover client -p "
-                + GITHUB, "bal discover search kafka", "bal discover package " + GITHUB);
+        List<String> commands = List.of("bal discover method send -p ballerinax/kafka",
+                "bal discover method send -p ballerinax/kafka", "bal discover method send -p ballerinax/kafka",
+                "bal discover client -p " + GITHUB, "bal discover search kafka", "bal discover package " + GITHUB);
         for (int i = 0; i < argvs.size(); i++) {
             CliTest.Capture capture = failure(Failure.USAGE, null, argvs.get(i).toArray(String[]::new));
             Assert.assertEquals(capture.field("message"), "--accessor applies only to resource", capture.stderr());

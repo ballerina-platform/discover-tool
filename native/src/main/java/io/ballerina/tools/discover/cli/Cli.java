@@ -187,6 +187,10 @@ public final class Cli {
                     ? null
                     : cause.getCommandLine().getCommandSpec().name();
             UsageErrors usage = new UsageErrors(grammar, noun, streams, json);
+            Failure.Validation accessor = unparsedAccessor(argv, cause);
+            if (accessor != null) {
+                return usage.error(accessor);
+            }
             Failure.Validation specific = describeParseError(cause);
             return specific == null
                     ? usage.helpError(firstLine(cause.getMessage()))
@@ -514,16 +518,43 @@ public final class Cli {
         if (unknown == null) {
             return null;
         }
-        if (!unknown.equals(Command.ACCESSOR_FLAG) && !unknown.startsWith(Command.ACCESSOR_FLAG + VALUE_SEPARATOR)) {
-            return unknownFlag(unknown, call.noun());
+        return isAccessorFlag(unknown)
+                ? accessorElsewhere(grammar, call.withNames(droppingAccessor(call.names(), unknown)), literal)
+                : unknownFlag(unknown, call.noun());
+    }
+
+    private static boolean isAccessorFlag(String word) {
+        return word.equals(Command.ACCESSOR_FLAG) || word.startsWith(Command.ACCESSOR_FLAG + VALUE_SEPARATOR);
+    }
+
+    // `words` without the `--accessor` word `flag`, and its value when that is the next word.
+    private static List<String> droppingAccessor(List<String> words, String flag) {
+        List<String> kept = new ArrayList<>(words);
+        int at = kept.indexOf(flag);
+        kept.remove(at);
+        if (flag.equals(Command.ACCESSOR_FLAG) && at < kept.size()) {
+            kept.remove(at);
         }
-        List<String> names = new ArrayList<>(call.names());
-        int at = names.indexOf(unknown);
-        names.remove(at);
-        if (unknown.equals(Command.ACCESSOR_FLAG) && at < names.size() - literal) {
-            names.remove(at);
+        return kept;
+    }
+
+    // `--accessor` where the parsed noun has no room for it: the command line without it, read as any other is.
+    private static Failure.Validation unparsedAccessor(List<String> argv, CommandLine.ParameterException cause) {
+        if (!(cause instanceof CommandLine.UnmatchedArgumentException unmatched)
+                || unmatched.getUnmatched().isEmpty() || !isAccessorFlag(unmatched.getUnmatched().getFirst())) {
+            return null;
         }
-        return accessorElsewhere(grammar, call.withNames(names), literal);
+        List<String> rest = droppingAccessor(argv, unmatched.getUnmatched().getFirst());
+        Commands.Grammar probe = Commands.Grammar.create();
+        try {
+            if (!probe.line().parseArgs(rest.toArray(new String[0])).hasSubcommand()) {
+                return null;
+            }
+        } catch (CommandLine.ParameterException unparsed) {
+            return null;
+        }
+        String noun = probe.line().getParseResult().subcommand().commandSpec().name();
+        return accessorElsewhere(probe, Invocation.of(probe.root(), noun, probe.nouns().get(noun)), literalWords(rest));
     }
 
     private static Failure.Validation unknownFlag(String flag, String noun) {
