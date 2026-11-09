@@ -89,6 +89,8 @@ final class UsageRenderer {
                 slots.add(required.contains(name) ? spelled : "[" + spelled + "]");
             } else if (noun != null && Command.OWNER_FLAGS.get(0).equals(name)) {
                 slots.add("[" + ownerLabel(option) + "]");
+            } else if (noun != null && Command.ACCESSOR_FLAG.equals(name)) {
+                slots.add("[" + name + " " + option.paramLabel() + "]");
             }
         }
         slots.add(OPTIONS_SLOT);

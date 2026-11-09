@@ -164,7 +164,7 @@ final class Commands {
     /** The method a resource path declares, by its accessor. */
     static final class Accessor {
 
-        @CommandLine.Option(names = Command.ACCESSOR_FLAG, paramLabel = NAME_LABEL,
+        @CommandLine.Option(names = Command.ACCESSOR_FLAG, paramLabel = Command.ACCESSOR_LABEL,
                 description = "name the resource method of the path, e.g. get")
         String accessor;
     }

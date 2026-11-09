@@ -35,7 +35,7 @@ public class UsageRendererTest {
                         + "[options]");
         Assert.assertEquals(UsageRenderer.usageLine(grammar, "resource"),
                 "Usage: bal discover resource [<path>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] "
-                        + "[options]");
+                        + "[--accessor <accessor>] [options]");
         Assert.assertEquals(UsageRenderer.usageLine(grammar, "search"),
                 "Usage: bal discover search <query> [-p <org>/<name>[:<version>]] [options]");
     }
