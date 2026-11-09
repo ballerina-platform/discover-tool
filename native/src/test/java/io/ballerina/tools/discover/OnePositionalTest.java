@@ -278,7 +278,7 @@ public class OnePositionalTest {
 
     @Test
     public void aPackageTypedBeforeThePathIsThePackage() {
-        for (String path : List.of("gists/public", "gists")) {
+        for (String path : List.of("gists/:gistId/star", "gists")) {
             CliTest.Capture before = failure(Failure.USAGE, null, "resource", GITHUB, path);
             Assert.assertEquals(before.field("message"), "'" + GITHUB + "' is a package, not a resource name; name it "
                     + "with -p", before.stderr());

@@ -34,7 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `search kafka send` is `search "kafka send"`, and `resource gists/public get` is
   `resource gists/public --accessor get` when `get` is one of the path's accessors (one command per container when
   several declare it, and a miss listing the path's accessors when it is not one); a package typed before the path,
-  `resource ballerinax/github gists/public`, is read as the package
+  `resource ballerinax/github gists/:gistId/star`, is read as the package, and two names that both read as a
+  package get no command
 - Match every selector exactly as the listings print it — case-sensitive, a parameter only as `:name`, a path whole
   from its first segment, the container always named — and fail a miss as `symbol-not-found` (exit 1) that lists
   every name at the level the lookup reached as `candidates` when there are 40 or fewer, sorted as the listing

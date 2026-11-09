@@ -350,15 +350,19 @@ public final class Cli {
     // A resource path reads as a coordinate too, so with one name more than a path and its accessor the first name is
     // the package when it is one and the rest are a path and its accessor, else the last.
     private static String resourcePackage(Invocation call) {
+        return resourcePackages(call).stream().findFirst().orElse(null);
+    }
+
+    private static List<String> resourcePackages(Invocation call) {
         if (accessorMoved(call).names().size() <= MAX_NAMES) {
-            return null;
+            return List.of();
         }
         List<String> names = call.names();
         return Stream.of(names.getFirst(), names.getLast())
+                .distinct()
                 .filter(name -> isCoordinate(name)
                         && accessorMoved(call.withNames(without(names, name))).names().size() == MAX_NAMES)
-                .findFirst()
-                .orElse(null);
+                .toList();
     }
 
     // One name more than the noun takes: the last name, or the first when a slashed name follows it.
@@ -390,6 +394,14 @@ public final class Cli {
     }
 
     private static Failure.Validation packageAsName(Invocation call, String pkg) {
+        List<String> either = call.pkg() == null && Command.RESOURCE.equals(call.noun())
+                ? resourcePackages(call)
+                : List.of();
+        if (either.size() > 1) {
+            return new Failure.Validation("'" + either.getFirst() + "' and '" + either.getLast()
+                    + "' both read as a package; name the package with -p",
+                    "Name the package with -p and the path alone.");
+        }
         List<String> others = without(call.names(), pkg);
         String target = call.pkg() == null ? pkg : call.pkg();
         String where = call.pkg() == null ? "name it with -p" : "-p names the package already";

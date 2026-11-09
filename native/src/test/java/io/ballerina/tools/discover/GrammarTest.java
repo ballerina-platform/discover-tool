@@ -391,11 +391,23 @@ public class GrammarTest {
                         + GITHUB + " --accessor get"},
                 {List.of("resource", "gists/public", "get", GITHUB), "bal discover resource gists/public -p "
                         + GITHUB + " --accessor get"},
-                {List.of("resource", GITHUB, "gists/public"), "bal discover resource gists/public -p " + GITHUB},
                 {List.of("resource", GITHUB, "repos"), "bal discover resource repos -p " + GITHUB},
                 {List.of("resource", "gists/:gistId/star", GITHUB), "bal discover resource gists/:gistId/star -p "
                         + GITHUB},
                 {List.of("client", KAFKA, "-p", KAFKA), "bal discover client -p " + KAFKA}};
+    }
+
+    @Test
+    public void aResourceGivenTwoNamesThatBothReadAsAPackageGetsNoCommand() {
+        for (List<String> names : List.of(List.of("gists/public", GITHUB), List.of(GITHUB, "gists/public"))) {
+            List<String> argv = new ArrayList<>(List.of("resource"));
+            argv.addAll(names);
+            CliTest.Capture both = failure(USAGE, null, argv.toArray(String[]::new));
+            Assert.assertEquals(both.field("message"), "'" + names.get(0) + "' and '" + names.get(1)
+                    + "' both read as a package; name the package with -p", both.stderr());
+            Assert.assertEquals(both.field("suggestion"), "Name the package with -p and the path alone.");
+            Assert.assertFalse(both.failure().has("command"), both.stderr());
+        }
     }
 
     @Test(dataProvider = "packageAsName")
