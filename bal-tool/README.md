@@ -382,7 +382,8 @@ is slack's `reactions\.get` path (accessor `get`), the root path is `.`, and htt
 `:...path`. The older form with the accessor as a second word (`resource gists/public get`) is a usage error (exit
 2) whose command is the same request with `--accessor get`, or that lists each container's command when several
 declare it; a second word that is not one of the path's accessors fails as a miss (exit 1) listing them. A package
-typed before the path (`resource ballerinax/github gists/public`) is read as the package.
+typed before the path (`resource ballerinax/github gists/:gistId/star`) is read as the package; when the path
+reads as a package too (`resource ballerinax/github gists/public`), the error has no command and asks for `-p`.
 
 Operations that end exactly at a grouped prefix are listed beside its groups rather than as a group of their
 own, and a group deeper than the top is named by its full path:
