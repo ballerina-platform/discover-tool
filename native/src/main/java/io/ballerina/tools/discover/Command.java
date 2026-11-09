@@ -78,6 +78,9 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     public static final String PAGE_FLAG = "--page";
     public static final String ACCESSOR_FLAG = "--accessor";
 
+    /** What {@link #ACCESSOR_FLAG} takes, as help and a command's shape write it. */
+    public static final String ACCESSOR_LABEL = "<accessor>";
+
     /** The container flags, in the order the usage lists them. */
     public static final List<String> OWNER_FLAGS = List.of(CLIENT_FLAG, CLASS_FLAG, SERVICE_FLAG);
 

@@ -18,6 +18,8 @@
 
 package io.ballerina.tools.discover;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.ballerina.tools.discover.central.HttpOptions;
@@ -153,22 +155,61 @@ public class OnePositionalTest {
     public void theOldPathThenAccessorFormIsFixedWithItsContainerWhenOnlyOneDeclaresIt() {
         CliTest.Capture one = failure(Failure.USAGE, "ballerinax__slack", "resource", "chat.delete", "post", "-p",
                 SLACK);
+        Assert.assertEquals(one.field("message"), "resource takes one path, and its accessor as --accessor; got 2");
+        Assert.assertEquals(one.field("suggestion"), "Put the accessor in --accessor.");
         Assert.assertEquals(one.field("command"), "bal discover resource chat.delete -p " + SLACK
                 + " --client Client --accessor post");
-        CliTest.Capture several = failure(Failure.USAGE, "ballerina__http", "resource", ":...path", "get", "-p", HTTP);
-        Assert.assertEquals(several.field("command"), "bal discover resource :...path -p " + HTTP + " --accessor get",
-                "the container is left to the ambiguity the command answers with");
     }
 
     @Test
-    public void anAccessorIsAResourcesFlagAlone() {
-        for (List<String> argv : List.of(List.of("method", "send", "--accessor", "get", "-p", "ballerinax/kafka"),
+    public void theOldPathThenAccessorFormDeclaredBySeveralContainersListsEachOnesCommand() {
+        CliTest.Capture several = failure(Failure.USAGE, "ballerina__http", "resource", ":...path", "get", "-p", HTTP);
+        Assert.assertFalse(several.failure().has("command"), several.stderr());
+        JsonArray owners = several.failure().getAsJsonArray("owners");
+        Assert.assertTrue(owners.size() > 1, several.stderr());
+        for (JsonElement owner : owners) {
+            String command = owner.getAsJsonObject().get("command").getAsString();
+            Assert.assertTrue(command.startsWith("bal discover resource :...path -p " + HTTP + " --"), command);
+            Assert.assertTrue(command.endsWith(" --accessor get"), command);
+            JsonObject opened = answer("ballerina__http", command.substring(Command.PREFIX.length()).split(" "));
+            Assert.assertEquals(opened.get("accessor").getAsString(), "get", command);
+        }
+    }
+
+    @DataProvider(name = "notAnAccessor")
+    public Object[][] notAnAccessor() {
+        return new Object[][] {{"gists/:gistId/star", "post", "[\"get\",\"put\",\"delete\"]"},
+                {"gists/public", "GET", "[\"get\"]"}};
+    }
+
+    @Test(dataProvider = "notAnAccessor")
+    public void aWordAfterThePathThatIsNotItsAccessorMissesWithThePathsAccessors(String path, String word,
+            String accessors) {
+        CliTest.Capture miss = failure(Failure.RUNTIME, "ballerinax__github", "resource", path, word, "-p", GITHUB);
+        Assert.assertEquals(miss.field("kind"), "symbol-not-found", miss.stderr());
+        Assert.assertTrue(miss.field("message").startsWith("resource takes one path, and its accessor as --accessor;"
+                + " got 2; '" + word + "' is not an accessor of " + path), miss.stderr());
+        Assert.assertEquals(miss.failure().getAsJsonArray("candidates").toString(), accessors, miss.stderr());
+        Assert.assertFalse(miss.failure().has("command"), miss.stderr());
+    }
+
+    @Test
+    public void anAccessorOnAnotherNounIsAUsageErrorWithTheCommandWithoutIt() {
+        List<List<String>> argvs = List.of(List.of("method", "send", "--accessor", "get", "-p", "ballerinax/kafka"),
                 List.of("--accessor", "get", "client", "-p", GITHUB),
                 List.of("search", "kafka", "--accessor", "get"),
-                List.of("package", GITHUB, "--accessor", "get"))) {
-            CliTest.Capture capture = failure(Failure.USAGE, null, argv.toArray(String[]::new));
-            Assert.assertEquals(capture.field("message"), "unknown option '--accessor'", capture.stderr());
+                List.of("package", GITHUB, "--accessor", "get"));
+        List<String> commands = List.of("bal discover method send -p ballerinax/kafka", "bal discover client -p "
+                + GITHUB, "bal discover search kafka", "bal discover package " + GITHUB);
+        for (int i = 0; i < argvs.size(); i++) {
+            CliTest.Capture capture = failure(Failure.USAGE, null, argvs.get(i).toArray(String[]::new));
+            Assert.assertEquals(capture.field("message"), "--accessor applies only to resource", capture.stderr());
+            Assert.assertEquals(capture.field("suggestion"), "Drop --accessor.", capture.stderr());
+            Assert.assertEquals(capture.field("command"), commands.get(i), capture.stderr());
         }
+        CliTest.Capture worse = failure(Failure.USAGE, null, "client", "A", "B", "--accessor", "get", "-p", GITHUB);
+        Assert.assertTrue(worse.field("message").startsWith("--accessor applies only to resource; client takes one "
+                + "name"), worse.stderr());
         JsonObject before = answer("ballerinax__github", "--accessor", "get", "resource", "gists/public", "-p", GITHUB);
         Assert.assertEquals(before.get("accessor").getAsString(), "get", "an option may come before the noun");
     }
@@ -190,6 +231,105 @@ public class OnePositionalTest {
     }
 
     @Test
+    public void aPathWithOneAccessorAndPathsUnderItLists() {
+        JsonObject listing = answer("ballerinax__github", "resource", "users/:username", "-p", GITHUB, "--client",
+                "Client");
+        JsonArray resources = listing.getAsJsonArray("resources");
+        Assert.assertTrue(resources.size() > 1, listing.toString());
+        JsonObject own = resources.get(0).getAsJsonObject();
+        Assert.assertEquals(own.get("path").getAsString(), "users/:username", listing.toString());
+        Assert.assertEquals(own.getAsJsonArray("accessors").size(), 1, listing.toString());
+    }
+
+    @Test
+    public void aFilterNarrowsAResourceListingToOneAccessor() {
+        JsonObject listing = answer("ballerinax__github", "resource", "gists", "-p", GITHUB, "--client", "Client",
+                "--filter", "get");
+        JsonArray resources = listing.getAsJsonArray("resources");
+        Assert.assertTrue(resources.size() > 1, listing.toString());
+        resources.forEach(resource -> Assert.assertEquals(
+                resource.getAsJsonObject().getAsJsonArray("accessors").toString(), "[\"get\"]", listing.toString()));
+        JsonObject one = answer("ballerinax__github", "resource", "gists", "-p", GITHUB, "--client", "Client",
+                "--filter", "put");
+        Assert.assertEquals(one.get("accessor").getAsString(), "put", "the one put under gists: " + one);
+    }
+
+    @Test
+    public void anAccessorIsMatchedAsSpelled() {
+        CliTest.Capture upper = failure(Failure.RUNTIME, "ballerinax__github", "resource", "gists/:gistId/star",
+                "--accessor", "GET", "-p", GITHUB);
+        Assert.assertEquals(upper.failure().getAsJsonArray("candidates").toString(), "[\"get\",\"put\",\"delete\"]",
+                upper.stderr());
+    }
+
+    @Test
+    public void aPathEndingInASlashMissesSayingSo() {
+        CliTest.Capture slash = failure(Failure.RUNTIME, "ballerinax__github", "resource", "gists/public/", "-p",
+                GITHUB, "--client", "Client");
+        Assert.assertTrue(slash.field("message").endsWith("; a resource path does not end in /"), slash.stderr());
+        Assert.assertEquals(slash.field("suggestion"),
+                "Name one of the resource paths that start with gists/public below.", slash.stderr());
+        Assert.assertEquals(slash.failure().getAsJsonArray("candidates").toString(), "[\"gists/public\"]",
+                slash.stderr());
+    }
+
+    @Test
+    public void aPackageTypedBeforeThePathIsThePackage() {
+        for (String path : List.of("gists/public", "gists")) {
+            CliTest.Capture before = failure(Failure.USAGE, null, "resource", GITHUB, path);
+            Assert.assertEquals(before.field("message"), "'" + GITHUB + "' is a package, not a resource name; name it "
+                    + "with -p", before.stderr());
+            String command = before.field("command");
+            Assert.assertEquals(command, "bal discover resource " + path + " -p " + GITHUB);
+            answer("ballerinax__github", command.substring(Command.PREFIX.length()).split(" "));
+        }
+    }
+
+    @Test
+    public void thePackageFirstFormMovesOnlyAnAccessorToItsFlag() {
+        CliTest.Capture verb = failure(Failure.USAGE, null, GITHUB, "resource", "gists/public", "get");
+        Assert.assertEquals(verb.field("command"), "bal discover resource gists/public -p " + GITHUB
+                + " --accessor get", verb.stderr());
+        for (List<String> words : List.of(List.of("gists", "public", "get"), List.of("gists/public", "frob"))) {
+            List<String> argv = new ArrayList<>(List.of(GITHUB, "resource"));
+            argv.addAll(words);
+            CliTest.Capture none = failure(Failure.USAGE, null, argv.toArray(String[]::new));
+            Assert.assertFalse(none.failure().has("command"), none.stderr());
+            Assert.assertTrue(none.field("suggestion").endsWith("Write the path alone, and put its accessor in "
+                    + "--accessor."), none.stderr());
+        }
+    }
+
+    @Test
+    public void aContainersMemberIsAResourceOnlyWithAPathOrAPathAndItsAccessor() {
+        CliTest.Capture method = failure(Failure.USAGE, null, "client", "Client", "get", "-p", GITHUB);
+        Assert.assertEquals(method.field("command"), "bal discover method get -p " + GITHUB + " --client Client");
+        CliTest.Capture accessed = failure(Failure.USAGE, null, "client", "Client", "gists/public", "get", "-p",
+                GITHUB);
+        Assert.assertEquals(accessed.field("command"), "bal discover resource gists/public -p " + GITHUB
+                + " --client Client --accessor get");
+        CliTest.Capture stray = failure(Failure.USAGE, null, "client", "Client", "gists/public", "frob", "-p", GITHUB);
+        Assert.assertFalse(stray.failure().has("command"), stray.stderr());
+        Assert.assertEquals(stray.field("suggestion"), "Write the path alone, and put its accessor in --accessor.");
+    }
+
+    @Test
+    public void aMissingPackagesShapeNeverKeepsAWordThatIsNotAnAccessor() {
+        CliTest.Capture shape = failure(Failure.USAGE, null, "resource", "gists/:gistId/star", "frob");
+        Assert.assertTrue(shape.field("suggestion").endsWith("then write 'bal discover resource gists/:gistId/star "
+                + "-p <org>/<name> --accessor <accessor>'."), shape.stderr());
+    }
+
+    @Test
+    public void aSearchNeedsAQuery() {
+        for (String query : List.of("", "   ")) {
+            CliTest.Capture empty = failure(Failure.USAGE, null, "search", query);
+            Assert.assertEquals(empty.field("message"), "the search needs a query of one or more keywords",
+                    empty.stderr());
+        }
+    }
+
+    @Test
     public void aSearchsQueryIsQuotedOnlyWhenItHoldsASpace() {
         CliTest.Capture one = failure(Failure.USAGE, null, "search", "kafka", "--page", "0");
         Assert.assertEquals(one.field("command"), "bal discover search kafka");
@@ -204,8 +344,9 @@ public class OnePositionalTest {
         Assert.assertEquals(central.field("suggestion"), "Quote the keywords as one query.");
         Assert.assertEquals(central.field("command"), "bal discover search \"kafka send\"");
 
-        JsonObject searched = answer("ballerinax__kafka", "search", "producer send", "-p", "ballerinax/kafka");
-        Assert.assertEquals(searched.getAsJsonArray("keywords").toString(), "[\"producer\",\"send\"]");
+        JsonObject searched = answer("ballerinax__github", "search", "gists star", "-p", GITHUB);
+        Assert.assertEquals(searched.getAsJsonArray("keywords").toString(), "[\"gists\",\"star\"]");
+        Assert.assertTrue(searched.toString().contains("gists/:gistId/star"), searched.toString());
     }
 
     @Test

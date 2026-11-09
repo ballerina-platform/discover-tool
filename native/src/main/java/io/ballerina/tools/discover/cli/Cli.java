@@ -102,11 +102,18 @@ public final class Cli {
 
     private static final String PLACEHOLDER_QUERY = "<query>";
 
+    /** How a resource is written, for a usage error that has no command to offer. */
+    private static final String RESOURCE_FORM = "Write the path alone, and put its accessor in "
+            + Command.ACCESSOR_FLAG + ".";
+
     /** The short form {@code --module} had before the CLI tool guide reserved {@code -m}. */
     private static final String RETIRED_MODULE_SHORT = "-m";
 
 
     private static final String PATH_SEPARATOR = "/";
+
+    /** What joins a flag to its value in one word, {@code --flag=value}. */
+    private static final String VALUE_SEPARATOR = "=";
 
     /** The accessors a resource is most often declared with, which tell a resource's last name from a stray word. */
     private static final Set<String> RESOURCE_ACCESSORS =
@@ -245,7 +252,7 @@ public final class Cli {
             return unknownFlag(call.owners().get(0).flag(), call.noun());
         }
         if (!Command.RESOURCE.equals(call.noun()) && call.accessor() != null) {
-            return unknownFlag(Command.ACCESSOR_FLAG, call.noun());
+            return accessorElsewhere(grammar, call, literal);
         }
         Failure.Validation output = rejectInvalidOutput(call.output());
         if (output != null) {
@@ -259,6 +266,25 @@ public final class Cli {
             return tooManyNames(call);
         }
         return Command.PACKAGE.equals(call.noun()) ? packageMisuse(call) : scopedMisuse(call);
+    }
+
+    // `--accessor` on a noun other than `resource`: the same command without it, once that one is well formed.
+    private static Failure.Validation accessorElsewhere(Commands.Grammar grammar, Invocation call, int literal) {
+        String message = Command.ACCESSOR_FLAG + " applies only to " + Command.RESOURCE;
+        String drop = "Drop " + Command.ACCESSOR_FLAG + ".";
+        Invocation without = call.withAccessor(null);
+        Failure.Validation further = misuse(grammar, without, literal);
+        if (further != null) {
+            return new Failure.Validation(message + "; " + further.message(), further.suggestion(),
+                    further.command(), null, null, further.owners());
+        }
+        if (Command.SEARCH.equals(call.noun()) && call.pkg() == null) {
+            return new Failure.Validation(message, drop,
+                    call.paged(Command.of(Command.SEARCH, call.names())).text());
+        }
+        return without.coordinate() == null
+                ? new Failure.Validation(message, drop)
+                : new Failure.Validation(message, drop, without.paged(without.command()).text());
     }
 
     private static Failure.Validation packageMisuse(Invocation call) {
@@ -298,39 +324,56 @@ public final class Cli {
                         + ".");
     }
 
-    // A name that is a package coordinate: the package typed where a name goes, one name more than the noun takes
-    // when -p is missing. A resource path reads as a coordinate too, so the package is the last name, or the first
-    // when a path follows it. With -p given, a slashed name where a path or a readme title may go is the package only
-    // when it is the same package.
+    // A name that is a package coordinate, typed where a name goes. With -p given, a slashed name where a path or a
+    // readme title may go is the package only when it is the same package.
     private static String misplacedPackage(Invocation call) {
         List<String> names = call.names();
-        String candidate = Command.SEARCH.equals(call.noun()) ? null : packageCandidate(names);
-        if (candidate == null) {
+        if (Command.SEARCH.equals(call.noun()) || names.isEmpty()) {
             return null;
         }
-        boolean resource = Command.RESOURCE.equals(call.noun());
         if (call.pkg() == null) {
-            int most = resource ? MAX_NAMES + 2 : MAX_NAMES + 1;
-            return names.size() <= most && (!resource || names.size() > MAX_NAMES) ? candidate : null;
+            return Command.RESOURCE.equals(call.noun()) ? resourcePackage(call) : namePackage(names);
         }
-        if (names.size() > MAX_NAMES) {
+        String candidate = names.getFirst();
+        if (names.size() > MAX_NAMES || !isCoordinate(candidate)) {
             return null;
         }
-        boolean slashed = resource || Command.README.equals(call.noun())
+        boolean slashed = Command.RESOURCE.equals(call.noun()) || Command.README.equals(call.noun())
                 || (CONTAINER_NOUNS.containsKey(call.noun()) && !Command.FUNCTION.equals(call.noun()));
         return !slashed || samePackage(candidate, call.pkg()) ? candidate : null;
     }
 
-    private static String packageCandidate(List<String> names) {
-        if (names.isEmpty()) {
+    // A resource path reads as a coordinate too, so with one name more than a path and its accessor the first name is
+    // the package when it is one and the rest are a path and its accessor, else the last.
+    private static String resourcePackage(Invocation call) {
+        if (accessorMoved(call).names().size() <= MAX_NAMES) {
             return null;
         }
-        String last = names.get(names.size() - 1);
-        if (isCoordinate(last)) {
-            return last;
+        List<String> names = call.names();
+        return Stream.of(names.getFirst(), names.getLast())
+                .filter(name -> isCoordinate(name)
+                        && accessorMoved(call.withNames(without(names, name))).names().size() == MAX_NAMES)
+                .findFirst()
+                .orElse(null);
+    }
+
+    // One name more than the noun takes: the last name, or the first when a slashed name follows it.
+    private static String namePackage(List<String> names) {
+        if (names.size() > MAX_NAMES + 1) {
+            return null;
         }
-        String first = names.get(0);
-        return names.size() > 1 && names.get(1).contains(PATH_SEPARATOR) && isCoordinate(first) ? first : null;
+        if (isCoordinate(names.getLast())) {
+            return names.getLast();
+        }
+        return names.size() > MAX_NAMES && names.get(1).contains(PATH_SEPARATOR) && isCoordinate(names.getFirst())
+                ? names.getFirst()
+                : null;
+    }
+
+    private static List<String> without(List<String> names, String pkg) {
+        List<String> others = new ArrayList<>(names);
+        others.remove(pkg);
+        return others;
     }
 
     static boolean isCoordinate(String word) {
@@ -343,30 +386,38 @@ public final class Cli {
     }
 
     private static Failure.Validation packageAsName(Invocation call, String pkg) {
-        List<String> others = new ArrayList<>(call.names());
-        others.remove(pkg);
+        List<String> others = without(call.names(), pkg);
         String target = call.pkg() == null ? pkg : call.pkg();
-        String command = call.paged(accessorMoved(call.withNames(others))
-                .command(new Command.Target(target, call.module()))).text();
         String where = call.pkg() == null ? "name it with -p" : "-p names the package already";
-        return new Failure.Validation("'" + pkg + "' is a package, not a " + call.noun() + " name; " + where,
-                "Name the package with -p.", command);
+        String message = "'" + pkg + "' is a package, not a " + call.noun() + " name; " + where;
+        return new Failure.Validation(message, "Name the package with -p.",
+                call.paged(accessorMoved(call.withNames(others)).command(new Command.Target(target, call.module())))
+                        .text());
     }
 
-    // A resource's path and the accessor typed after it, read before the package is: the accessor as its flag when
-    // it is one of the accessors resources are most often declared with.
+    // A resource's names with the word typed last read before the package is: as its --accessor when it is one of
+    // the accessors resources are most often declared with.
     private static Invocation accessorMoved(Invocation call) {
         List<String> names = call.names();
-        boolean typedAfter = Command.RESOURCE.equals(call.noun()) && names.size() == MAX_NAMES + 1
-                && call.accessor() == null && RESOURCE_ACCESSORS.contains(names.getLast());
-        return typedAfter ? call.withNames(names.subList(0, MAX_NAMES)).withAccessor(names.getLast()) : call;
+        boolean typedAfter = Command.RESOURCE.equals(call.noun()) && names.size() > MAX_NAMES
+                && call.accessor() == null && isAccessor(names.getLast());
+        return typedAfter ? call.withNames(names.subList(0, names.size() - 1)).withAccessor(names.getLast()) : call;
+    }
+
+    private static boolean isAccessor(String word) {
+        return RESOURCE_ACCESSORS.contains(word);
     }
 
     // Never a package the caller did not give: the search that finds one, or the command's shape.
     private static Failure.Validation missingPackage(Invocation call) {
         String message = call.noun() + " needs the package it reads: -p " + Commands.PACKAGE_LABEL;
-        Command shape = accessorMoved(call).command(new Command.Target(Command.placeholder(PLACEHOLDER_PACKAGE),
-                call.module())).filtered(null);
+        Invocation moved = accessorMoved(call);
+        if (Command.RESOURCE.equals(call.noun()) && moved.names().size() > MAX_NAMES) {
+            moved = moved.withNames(moved.names().subList(0, MAX_NAMES))
+                    .withAccessor(Command.placeholder(Command.ACCESSOR_LABEL));
+        }
+        Command shape = moved.command(new Command.Target(Command.placeholder(PLACEHOLDER_PACKAGE), call.module()))
+                .filtered(null);
         String write = "Write " + Failure.quoted(shape.text());
         if (call.names().isEmpty() || Command.README.equals(call.noun())) {
             return new Failure.Validation(message, write + "; find the package with "
@@ -409,7 +460,11 @@ public final class Cli {
         }
         Command fixed;
         if (CONTAINER_NOUNS.containsKey(call.noun()) && !Command.FUNCTION.equals(call.noun())) {
-            fixed = call.retarget(memberOf(call.noun(), call.echoed()));
+            Command member = memberOf(call.noun(), call.echoed());
+            if (member == null) {
+                return new Failure.Validation(tooMany(call.noun(), names.size()), RESOURCE_FORM);
+            }
+            fixed = call.retarget(member);
         } else if (Command.README.equals(call.noun())) {
             fixed = call.withNames(List.of(String.join(" ", names))).command();
         } else {
@@ -422,7 +477,7 @@ public final class Cli {
 
     private static String tooMany(String noun, int given) {
         String takes = switch (noun) {
-            case Command.RESOURCE -> "one path, its method a flag";
+            case Command.RESOURCE -> "one path, and its accessor as " + Command.ACCESSOR_FLAG;
             case Command.README -> "one section, a title in quotes";
             case Command.SEARCH -> "one query, in quotes";
             default -> "one name";
@@ -431,14 +486,23 @@ public final class Cli {
     }
 
     // `client C m` read as the member it names: a resource when a path or an accessor follows, else the method,
-    // and any word after a method dropped.
+    // and any word after a method dropped. Null for a resource whose words are more than a path and its accessor.
     private static Command memberOf(String noun, List<String> names) {
         List<String> member = names.subList(1, names.size());
-        boolean accessed = member.size() > 1 && RESOURCE_ACCESSORS.contains(member.get(member.size() - 1));
-        Command meant = member.get(0).contains(PATH_SEPARATOR) || accessed
-                ? Command.of(Command.RESOURCE, member.get(0)).accessedBy(accessed ? member.getLast() : null)
-                : Command.of(Command.METHOD, member.get(0));
-        return meant.ownedBy(noun, names.get(0));
+        boolean resource = member.getFirst().contains(PATH_SEPARATOR)
+                || (member.size() > MAX_NAMES && isAccessor(member.getLast()));
+        Command meant = resource ? resourceMeant(member) : Command.of(Command.METHOD, member.getFirst());
+        return meant == null ? null : meant.ownedBy(noun, names.getFirst());
+    }
+
+    // A resource's words as the command they mean: the path, and a second word as its --accessor when it is an
+    // accessor. Null when any other word follows the path, since no command keeps it.
+    private static Command resourceMeant(List<String> words) {
+        boolean accessed = words.size() == MAX_NAMES + 1 && isAccessor(words.getLast());
+        if (words.size() > MAX_NAMES && !accessed) {
+            return null;
+        }
+        return Command.of(Command.RESOURCE, words.getFirst()).accessedBy(accessed ? words.getLast() : null);
     }
 
     // `literal`: how many of the last names follow `--`, where a leading dash is part of the name.
@@ -447,7 +511,19 @@ public final class Cli {
                 .filter(name -> name.startsWith(Command.FLAG_START) && name.length() > 1)
                 .findFirst()
                 .orElse(null);
-        return unknown == null ? null : unknownFlag(unknown, call.noun());
+        if (unknown == null) {
+            return null;
+        }
+        if (!unknown.equals(Command.ACCESSOR_FLAG) && !unknown.startsWith(Command.ACCESSOR_FLAG + VALUE_SEPARATOR)) {
+            return unknownFlag(unknown, call.noun());
+        }
+        List<String> names = new ArrayList<>(call.names());
+        int at = names.indexOf(unknown);
+        names.remove(at);
+        if (unknown.equals(Command.ACCESSOR_FLAG) && at < names.size() - literal) {
+            names.remove(at);
+        }
+        return accessorElsewhere(grammar, call.withNames(names), literal);
     }
 
     private static Failure.Validation unknownFlag(String flag, String noun) {
@@ -492,10 +568,13 @@ public final class Cli {
                 ? words.subList(1, words.size()).stream().map(PathTree::plainSelector).toList()
                 : List.of();
         Command mapped = oldBucket(bucket, selectors);
+        String message = "'" + typed + "' is not a noun; name the package with -p";
+        if (mapped == null) {
+            return new Failure.Validation(message, "Name the noun first and the package with -p. " + RESOURCE_FORM);
+        }
         String command = call.paged(mapped.in(new Command.Target(pkg, call.module())).filtered(call.filter()))
                 .text();
-        return new Failure.Validation("'" + typed + "' is not a noun; name the package with -p",
-                "Name the noun first and the package with -p.", command);
+        return new Failure.Validation(message, "Name the noun first and the package with -p.", command);
     }
 
     private static Command oldBucket(String bucket, List<String> selectors) {
@@ -512,8 +591,8 @@ public final class Cli {
         if ((Command.README.equals(noun) || Command.SEARCH.equals(noun)) && !selectors.isEmpty()) {
             return Command.of(noun, String.join(" ", selectors));
         }
-        if (Command.RESOURCE.equals(noun) && selectors.size() > MAX_NAMES) {
-            return Command.of(noun, selectors.getFirst()).accessedBy(selectors.get(MAX_NAMES));
+        if (Command.RESOURCE.equals(noun) && !selectors.isEmpty()) {
+            return resourceMeant(selectors);
         }
         return Command.of(noun, selectors);
     }
@@ -639,10 +718,9 @@ public final class Cli {
             streams.errorOut().accept(new Warning(Warning.STALE_CACHE, warning).describe(json) + "\n");
         }
 
-        Failure.Validation meant = memberMeant(loaded.value(), call);
+        Failure meant = memberMeant(loaded.value(), call);
         if (meant != null) {
-            LoadedPackage read = loaded.value();
-            return usage.error(meant.about(read.qualified().qualified(), read.version().text()));
+            return usage.report(readAt(meant, loaded.value()));
         }
         Result<DiscoverResult> answer = answer(loaded.value(), call);
         if (!answer.isOk()) {
@@ -660,28 +738,56 @@ public final class Cli {
         return Failure.ANSWERED;
     }
 
-    // More names than a method or a resource takes, read against the package: the member command they meant, else
-    // what to write instead.
-    private static Failure.Validation memberMeant(LoadedPackage loaded, Invocation call) {
+    // More names than a method or a resource takes, read against the package: the member command they meant, one
+    // per container when several declare it; a path then a word that is not its accessor, the miss that word is as
+    // --accessor; else what to write instead.
+    private static Failure memberMeant(LoadedPackage loaded, Invocation call) {
         if (!MEMBER_NOUNS.contains(call.noun()) || call.names().size() <= MAX_NAMES) {
             return null;
         }
         boolean resource = Command.RESOURCE.equals(call.noun());
         String message = tooMany(call.noun(), call.names().size());
-        Optional<Command> meant = Containers.memberMeant(loaded,
+        List<Command> meant = Containers.memberMeant(loaded,
                 resource ? Containers.Ask.RESOURCE : Containers.Ask.METHOD, call.owner(), call.names());
         if (meant.isEmpty()) {
-            return new Failure.Validation(message, "Write the path alone, and its method with "
-                    + Command.ACCESSOR_FLAG + " <accessor>.");
+            return accessorMiss(loaded, call, message).orElse(new Failure.Validation(message, RESOURCE_FORM));
         }
-        Command fixed = meant.get().accessor() != null || call.accessor() == null
-                ? meant.get()
-                : meant.get().accessedBy(call.accessor());
-        boolean pathFirst = meant.get().names().equals(List.of(PathTree.plainSelector(call.names().get(0))));
+        List<Command> fixed = meant.stream()
+                .map(command -> command.accessor() != null || call.accessor() == null
+                        ? command
+                        : command.accessedBy(call.accessor()))
+                .map(command -> call.paged(command.filtered(call.filter())))
+                .toList();
+        if (fixed.size() > 1) {
+            List<Failure.Match> rows = fixed.stream()
+                    .map(command -> new Failure.Match(command.owner().flag() + " " + command.owner().name(),
+                            command.text()))
+                    .toList();
+            return new Failure.Validation(message, "Put the accessor in " + Command.ACCESSOR_FLAG
+                    + ", and name the container with its flag.", rows);
+        }
+        boolean pathFirst = meant.getFirst().names().equals(List.of(PathTree.plainSelector(call.names().get(0))));
         String suggestion = resource && pathFirst
-                ? "Name the method with " + Command.ACCESSOR_FLAG + "."
+                ? "Put the accessor in " + Command.ACCESSOR_FLAG + "."
                 : "Name the container with its flag and the member alone.";
-        return new Failure.Validation(message, suggestion, call.paged(fixed.filtered(call.filter())).text());
+        return new Failure.Validation(message, suggestion, fixed.getFirst().text());
+    }
+
+    // `resource <path> <word>` whose word the path does not declare: the miss of `--accessor <word>`, which lists
+    // the path's accessors, or the paths near it when the path itself misses.
+    private static Optional<Failure> accessorMiss(LoadedPackage loaded, Invocation call, String message) {
+        if (!Command.RESOURCE.equals(call.noun()) || call.accessor() != null
+                || call.names().size() != MAX_NAMES + 1) {
+            return Optional.empty();
+        }
+        Invocation asked = call.withNames(call.names().subList(0, MAX_NAMES)).withAccessor(call.names().getLast());
+        Result<DiscoverResult> answer = answerFrom(loaded, asked);
+        if (answer.isOk() || !(answer.failure() instanceof Failure.SymbolNotFound miss)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Failure.SymbolNotFound(miss.qualified(), miss.version(), miss.module(),
+                miss.requested(), message + "; " + miss.message(), RESOURCE_FORM + " " + miss.suggestion(),
+                miss.command(), miss.candidates()));
     }
 
     private static Result<DiscoverResult> answer(LoadedPackage loaded, Invocation call) {
@@ -779,7 +885,7 @@ public final class Cli {
         for (int i = 0; i < argv.size(); i++) {
             String token = argv.get(i);
             String value = null;
-            if (token.startsWith(Commands.OUTPUT_FLAG + "=")) {
+            if (token.startsWith(Commands.OUTPUT_FLAG + VALUE_SEPARATOR)) {
                 value = token.substring(Commands.OUTPUT_FLAG.length() + 1);
             } else if (takesValue.contains(token) && i + 1 < argv.size()) {
                 i++;
@@ -954,7 +1060,7 @@ public final class Cli {
         String label = option.paramLabel();
         return new Failure.Validation(
                 "the " + name + " option needs a value",
-                "Write " + name + " " + label + " or " + name + "=" + label + ".");
+                "Write " + name + " " + label + " or " + name + VALUE_SEPARATOR + label + ".");
     }
 
     private static String firstLine(String message) {

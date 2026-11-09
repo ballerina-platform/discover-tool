@@ -290,8 +290,7 @@ public class CliTest {
     @Test
     public void aResourceGivenWordsThatAreNotOnePathAndAnAccessorIsAPlainUsageError() {
         String version = FixtureCorpus.FIXTURE_VERSION.text();
-        for (List<String> names : List.of(List.of("gists/public", "nope"), List.of("gists", "public", "get"),
-                List.of("gists/public", "get", "extra"), List.of("repos", ":owner"), List.of("gists/:gistId", "put"))) {
+        for (List<String> names : List.of(List.of("gists", "public", "get"), List.of("gists/public", "get", "extra"))) {
             List<String> argv = new ArrayList<>(List.of("resource"));
             argv.addAll(names);
             argv.addAll(List.of("-p", "ballerinax/github", "--client", "Client"));
@@ -300,10 +299,10 @@ public class CliTest {
             Assert.assertEquals(Cli.run(argv, capture.streams(), centralFor("ballerinax__github", version)),
                     Failure.USAGE, label + ": " + capture.stderr());
             Assert.assertEquals(capture.field("kind"), "usage", label);
-            Assert.assertEquals(capture.field("message"), "resource takes one path, its method a flag; got "
-                    + names.size(), label);
+            Assert.assertEquals(capture.field("message"),
+                    "resource takes one path, and its accessor as --accessor; got " + names.size(), label);
             Assert.assertEquals(capture.field("suggestion"),
-                    "Write the path alone, and its method with --accessor <accessor>.", label);
+                    "Write the path alone, and put its accessor in --accessor.", label);
             Assert.assertFalse(capture.failure().has("command"), "no word is guessed to be the accessor: " + label);
         }
     }

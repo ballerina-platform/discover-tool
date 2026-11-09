@@ -391,7 +391,10 @@ public class GrammarTest {
                         + GITHUB + " --accessor get"},
                 {List.of("resource", "gists/public", "get", GITHUB), "bal discover resource gists/public -p "
                         + GITHUB + " --accessor get"},
-                {List.of("resource", "gists/public", GITHUB), "bal discover resource gists/public -p " + GITHUB},
+                {List.of("resource", GITHUB, "gists/public"), "bal discover resource gists/public -p " + GITHUB},
+                {List.of("resource", GITHUB, "repos"), "bal discover resource repos -p " + GITHUB},
+                {List.of("resource", "gists/:gistId/star", GITHUB), "bal discover resource gists/:gistId/star -p "
+                        + GITHUB},
                 {List.of("client", KAFKA, "-p", KAFKA), "bal discover client -p " + KAFKA}};
     }
 
