@@ -22,7 +22,7 @@ Commands:
 Options:
   -p, --package <org>/<name>[:<version>]
                               read this package, as bal pull names it
-  --accessor <name>           name the resource method of the path, e.g. get
+  --accessor <accessor>       name the resource method of the path, e.g. get
   --client|--class|--service <name>
                               name the container of a method or resource
   --filter <keyword>          narrow a listing to the names that match a keyword

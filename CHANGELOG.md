@@ -25,13 +25,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Address resource functions by path, with path parameters spelled `:name` and keyword-escaped segments
   quoted in every printed command; a path is one argument matched whole as listed, so a dotted segment
   (`reactions.get`), the root path `.` and a rest parameter `:...path` need no splitting rule
-- Select one method of a resource path with `--accessor <name>`, valid on `resource` alone; a path with one accessor
-  answers with its signature without it, and an accessor the path does not declare fails with the path's
-  accessors as `candidates`
+- Select one method of a resource path with `--accessor <accessor>`, valid on `resource` alone (on another noun a
+  usage error whose `command` drops it); a path with one accessor and no path under it answers with its signature
+  without it, and an accessor the path does not declare fails with the path's accessors as `candidates`;
+  `--filter <accessor>` narrows a resource listing to that accessor's methods
 - Take at most one positional per noun: `search` takes its keywords as one quoted query (`search "kafka send"`),
   and more names than a noun takes is a usage error (exit 2) whose `command` is the fix when there is one —
   `search kafka send` is `search "kafka send"`, and `resource gists/public get` is
-  `resource gists/public --accessor get` when `get` is one of the path's accessors
+  `resource gists/public --accessor get` when `get` is one of the path's accessors (one command per container when
+  several declare it, and a miss listing the path's accessors when it is not one); a package typed before the path,
+  `resource ballerinax/github gists/public`, is read as the package
 - Match every selector exactly as the listings print it — case-sensitive, a parameter only as `:name`, a path whole
   from its first segment, the container always named — and fail a miss as `symbol-not-found` (exit 1) that lists
   every name at the level the lookup reached as `candidates` when there are 40 or fewer, sorted as the listing

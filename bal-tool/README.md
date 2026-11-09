@@ -42,7 +42,7 @@ below).
 | `class [<name>]`                   | Plain objects reached with `.`.                                                           |
 | `function [<name>]`                | Module-level functions, or one function's signature.                                      |
 | `method [<name>]`                  | A container's remote and plain methods, or one method's signature; `init` is the constructor. |
-| `resource [<path>]`                | A container's resource paths, the paths under one, or one resource method's signature (`client->path.accessor(...)`): a path with one accessor answers with it, and `--accessor <name>` picks one of several. |
+| `resource [<path>]`                | A container's resource paths, the paths under one, or one resource method's signature (`client->path.accessor(...)`): a path with one accessor and no path under it answers with it, and `--accessor <accessor>` picks one of several. |
 | `type [<name>]`                    | Every type the module declares: records, enums, errors, type aliases, constants, module variables, annotations, listeners, and the classes, clients and service types the nouns above also list. `type <Name>` opens any of them. |
 | `readme [<n>\|"<title>"]`          | The module's README, verbatim, or one section of it.                                      |
 
@@ -75,9 +75,9 @@ request in this order.
 | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | `-p, --package <org>/<package>[:<version>]` | The package to read, on every noun but `package`; on `search` only to search one package. |
 | `--client`, `--class`, `--service <name>` | The container a `method` or `resource` is declared by; optional when exactly one declares it. |
-| `--accessor <name>`    | On `resource` only: the method of the path, by its accessor (`get`, `post`, ...); optional when the path has one. |
+| `--accessor <accessor>` | On `resource` only: the method of the path, by its accessor (`get`, `post`, ...); optional when the path has one and no path under it. On any other noun it is a usage error. |
 | `--output-format json\|text` | Override the default: text when stdout is a terminal, JSON otherwise. |
-| `--filter <keyword>`   | Narrow a listing to entries whose name, path, parameter or type contains the keyword. Filtering is local to the fetched payload; nothing is sent to Central. On `package` it runs `search <keyword>`. |
+| `--filter <keyword>`   | Narrow a listing to entries whose name, path, accessor, parameter or type contains the keyword, so on a resource listing `--filter put` narrows it to the `put` methods (and any whose path, parameter or type contains `put`). Filtering is local to the fetched payload; nothing is sent to Central. On `package` it runs `search <keyword>`. |
 | `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is an error. |
 | `--module <name>`      | Target a submodule instead of the default module, on every noun including `readme`. The package's overview lists the submodules it has. A name Ballerina would not accept as a module name is a usage error, before anything is fetched. `--module` has no short form. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again; worth passing only when a name should exist and is not found. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. A switch takes no value: `--refresh=true` is a usage error whose `command` drops the value. |
@@ -372,13 +372,17 @@ ballerinax/github:6.0.0 · resource · Client · gists
 Next: bal discover resource <path> -p ballerinax/github --client Client --accessor <accessor>
 ```
 
-A path with one accessor answers with that method's signature (`resource gists/public`); a path with several is
-listed with each of them, and `--accessor` picks one (`resource gists/:gistId/star --accessor put`). An accessor
-the path does not declare fails with the path's accessors as its candidates. The path is matched whole, exactly
+A path with one accessor and no path under it answers with that method's signature (`resource gists/public`); a
+path with several accessors, or with paths under it (`users/:username`), is listed, each row with its commands, and
+`--accessor` picks one (`resource gists/:gistId/star --accessor put`). To list one accessor across a group, use
+`--filter` (`resource gists --filter get`). An accessor the path does not declare fails with the path's
+accessors as its candidates. The path is matched whole, exactly
 as listed, so a dotted segment stays part of the path: `bal discover resource reactions.get -p ballerinax/slack`
 is slack's `reactions\.get` path (accessor `get`), the root path is `.`, and http's rest-parameter path is
-`:...path`. The older form with the accessor as a second word (`resource gists/public get`) is a usage error whose
-command is the same request with `--accessor get`.
+`:...path`. The older form with the accessor as a second word (`resource gists/public get`) is a usage error (exit
+2) whose command is the same request with `--accessor get`, or that lists each container's command when several
+declare it; a second word that is not one of the path's accessors fails as a miss (exit 1) listing them. A package
+typed before the path (`resource ballerinax/github gists/public`) is read as the package.
 
 Operations that end exactly at a grouped prefix are listed beside its groups rather than as a group of their
 own, and a group deeper than the top is named by its full path:
