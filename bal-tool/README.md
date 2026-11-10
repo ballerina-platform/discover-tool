@@ -12,9 +12,9 @@ bal discover --help
 ## Usage
 
 ```
-bal discover <noun> [name] -p <org>/<package>[:<version>] [--client|--class|--service <name>] [flags]
-bal discover package <org>/<package>[:<version>]
-bal discover search <query>
+bal discover <noun> [<name>] -p <org>/<name>[:<version>] [options]
+bal discover package <org>/<name>[:<version>] [options]
+bal discover search <query> [-p <org>/<name>[:<version>]] [options]
 ```
 
 The first word says what comes back, a name after it says which one: a name means one thing, no name means a
@@ -88,14 +88,14 @@ request in this order.
 
 ## Walkthrough
 
-The output below is real, produced against recorded Central payloads (Central-wide search against live
-Central); live Central may have moved on since they were recorded.
+The output below is real, produced against live Central in November 2026; Central may have moved on since, so
+versions and counts can differ.
 
 What a package has:
 
 ```
 $ bal discover package ballerinax/kafka
-ballerinax/kafka:4.6.5
+ballerinax/kafka:4.6.8
 
 Clients (3)
   Caller     3 remote methods
@@ -115,7 +115,7 @@ Next: bal discover <noun> <name> -p ballerinax/kafka
 Next: bal discover search <query> -p ballerinax/kafka
 
 $ bal discover package ballerinax/kafka | cat
-{"qualified":"ballerinax/kafka","version":"4.6.5","clients":{"entries":[{"name":"Caller","remote":3,"command":"bal discover client Caller -p ballerinax/kafka"},{"name":"Consumer","remote":24,"command":"bal discover client Consumer -p ballerinax/kafka"},{"name":"Producer","remote":5,"command":"bal discover client Producer -p ballerinax/kafka"}],"shown":3,"total":3,"command":"bal discover client -p ballerinax/kafka"},"serviceTypes":{"entries":[{"name":"Service","command":"bal discover service Service -p ballerinax/kafka"}],"shown":1,"total":1,"command":"bal discover service -p ballerinax/kafka"},"classes":{"entries":[{"name":"AvroDeserializer","normal":1,"command":"bal discover class AvroDeserializer -p ballerinax/kafka"},{"name":"AvroSerializer","normal":1,"command":"bal discover class AvroSerializer -p ballerinax/kafka"},{"name":"Deserializer","normal":1,"command":"bal discover class Deserializer -p ballerinax/kafka"},{"name":"Serializer","normal":1,"command":"bal discover class Serializer -p ballerinax/kafka"}],"shown":4,"total":4,"command":"bal discover class -p ballerinax/kafka"},"types":{"counts":{"records":14,"enums":3,"errors":3,"aliases":8,"constants":29,"annotations":1,"listeners":1},"command":"bal discover type -p ballerinax/kafka"},"readme":{"sections":11,"command":"bal discover readme -p ballerinax/kafka"}}
+{"qualified":"ballerinax/kafka","version":"4.6.8","clients":{"entries":[{"name":"Caller","remote":3,"command":"bal discover client Caller -p ballerinax/kafka"},{"name":"Consumer","remote":24,"command":"bal discover client Consumer -p ballerinax/kafka"},{"name":"Producer","remote":5,"command":"bal discover client Producer -p ballerinax/kafka"}],"shown":3,"total":3,"command":"bal discover client -p ballerinax/kafka"},"serviceTypes":{"entries":[{"name":"Service","command":"bal discover service Service -p ballerinax/kafka"}],"shown":1,"total":1,"command":"bal discover service -p ballerinax/kafka"},"classes":{"entries":[{"name":"AvroDeserializer","normal":1,"command":"bal discover class AvroDeserializer -p ballerinax/kafka"},{"name":"AvroSerializer","normal":1,"command":"bal discover class AvroSerializer -p ballerinax/kafka"},{"name":"Deserializer","normal":1,"command":"bal discover class Deserializer -p ballerinax/kafka"},{"name":"Serializer","normal":1,"command":"bal discover class Serializer -p ballerinax/kafka"}],"shown":4,"total":4,"command":"bal discover class -p ballerinax/kafka"},"types":{"counts":{"records":14,"enums":3,"errors":3,"aliases":8,"constants":29,"annotations":1,"listeners":1},"command":"bal discover type -p ballerinax/kafka"},"readme":{"sections":11,"command":"bal discover readme -p ballerinax/kafka"}}
 ```
 
 The overview stays inside the 40-row ceiling: a section shows at most 10 rows, the type and readme lines are a row
@@ -190,24 +190,24 @@ listener they bind to, and the ones no listener accepts are listed apart, still 
 
 ```
 $ bal discover client -p ballerina/http
-ballerina/http:2.16.6 · client
+ballerina/http:2.18.2 · client
 10 clients
 
-  Caller                                                     5 remote methods  1 method
-  Client                                 1 resource method  15 remote methods  4 methods
-  ClientOAuth2Handler                                        1 remote method   2 methods
-  ClientObject                           1 resource method  15 remote methods
-  FailoverClient                         1 resource method  15 remote methods  1 method
-  ListenerLdapUserStoreBasicAuthHandler                      2 remote methods
-  ListenerOAuth2Handler                                      1 remote method
-  LoadBalanceClient                      1 resource method  15 remote methods
-  StatusCodeClient                       1 resource method  15 remote methods  4 methods
-  StatusCodeClientObject                 1 resource method  15 remote methods
+  Caller                                                      5 remote methods  1 method
+  Client                                 7 resource methods  15 remote methods  4 methods
+  ClientOAuth2Handler                                         1 remote method   2 methods
+  ClientObject                           7 resource methods  15 remote methods
+  FailoverClient                         7 resource methods  15 remote methods  1 method
+  ListenerLdapUserStoreBasicAuthHandler                       2 remote methods
+  ListenerOAuth2Handler                                       1 remote method
+  LoadBalanceClient                      7 resource methods  15 remote methods
+  StatusCodeClient                       7 resource methods  15 remote methods  4 methods
+  StatusCodeClientObject                 7 resource methods  15 remote methods
 
 Next: bal discover client <name> -p ballerina/http
 
 $ bal discover service -p ballerina/http
-ballerina/http:2.16.6 · service
+ballerina/http:2.18.2 · service
 7 service types
 
 http:Listener
@@ -237,19 +237,19 @@ in JSON, with the reason in `unconfirmedReason` — and opening one says why. Wi
 
 ```
 $ bal discover service -p ballerina/http
-ballerina/http:2.16.6 · service
+ballerina/http:2.18.2 · service
 7 service types
 
 http:Listener
   Service
 
 http:Listener — unverified (package source unavailable)
-  ServiceContract
-  RequestInterceptor
-  ResponseInterceptor
-  RequestErrorInterceptor
-  ResponseErrorInterceptor
   InterceptableService      1 method
+  RequestErrorInterceptor
+  RequestInterceptor
+  ResponseErrorInterceptor
+  ResponseInterceptor
+  ServiceContract
 
 Next: bal discover service <name> -p ballerina/http
 ```
@@ -263,7 +263,7 @@ file keeps the answer without methods.
 
 ```
 $ bal discover service Service -p ballerinax/kafka
-ballerinax/kafka:4.6.6 · service · Service
+ballerinax/kafka:4.6.8 · service · Service
 Methods to implement (2)
 
 remote function onConsumerRecord(kafka:Caller caller, kafka:AnydataConsumerRecord[]|kafka:BytesConsumerRecord[] records) returns error?
@@ -307,7 +307,7 @@ A container with too many resource paths to list is grouped by path segment:
 
 ```
 $ bal discover client -p ballerinax/github
-ballerinax/github:6.0.0 · client · Client
+ballerinax/github:6.1.0 · client · Client
 36 path groups
 
 Path groups (resource methods in each)
@@ -355,7 +355,7 @@ A group small enough to list shows one entry per path, with every accessor it an
 
 ```
 $ bal discover resource gists -p ballerinax/github --client Client
-ballerinax/github:6.0.0 · resource · Client · gists
+ballerinax/github:6.1.0 · resource · Client · gists
 10 resource paths
 
   gists                              get, post
@@ -390,7 +390,7 @@ own, and a group deeper than the top is named by its full path:
 
 ```
 $ bal discover resource repos -p ballerinax/github --client Client
-ballerinax/github:6.0.0 · resource · Client · repos
+ballerinax/github:6.1.0 · resource · Client · repos
 1 resource path here, 64 path groups
 
 Paths at this level
@@ -421,7 +421,7 @@ rather than a guess at one:
 
 ```
 $ bal discover resource gists -p ballerinax/github --client Client --filter star | cat
-{"qualified":"ballerinax/github","version":"6.0.0","container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor get","put":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor put","delete":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover resource gists/starred -p ballerinax/github --client Client --accessor get"}}],"shown":2,"total":2}
+{"qualified":"ballerinax/github","version":"6.1.0","container":"Client","resources":[{"path":"gists/:gistId/star","accessors":["get","put","delete"],"commands":{"get":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor get","put":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor put","delete":"bal discover resource gists/:gistId/star -p ballerinax/github --client Client --accessor delete"}},{"path":"gists/starred","accessors":["get"],"commands":{"get":"bal discover resource gists/starred -p ballerinax/github --client Client --accessor get"}}],"shown":2,"total":2}
 ```
 
 Everything else that opens exactly one thing — a method, a group, a container, a submodule, a readme section —
@@ -430,7 +430,7 @@ carries a plain `command`. A method row is `name` plus that `command`. Names pri
 
 ```
 $ bal discover client Producer -p ballerinax/kafka
-ballerinax/kafka:4.6.5 · client · Producer
+ballerinax/kafka:4.6.8 · client · Producer
 5 remote methods
 
   close
@@ -442,7 +442,7 @@ ballerinax/kafka:4.6.5 · client · Producer
 Next: bal discover method <name> -p ballerinax/kafka --client Producer
 
 $ bal discover client Producer -p ballerinax/kafka | cat
-{"qualified":"ballerinax/kafka","version":"4.6.5","container":"Producer","methods":[{"name":"close","command":"bal discover method close -p ballerinax/kafka --client Producer"},{"name":"flush","command":"bal discover method flush -p ballerinax/kafka --client Producer"},{"name":"getTopicPartitions","command":"bal discover method getTopicPartitions -p ballerinax/kafka --client Producer"},{"name":"send","command":"bal discover method send -p ballerinax/kafka --client Producer"},{"name":"sendWithMetadata","command":"bal discover method sendWithMetadata -p ballerinax/kafka --client Producer"}],"shown":5,"total":5}
+{"qualified":"ballerinax/kafka","version":"4.6.8","container":"Producer","methods":[{"name":"close","command":"bal discover method close -p ballerinax/kafka --client Producer"},{"name":"flush","command":"bal discover method flush -p ballerinax/kafka --client Producer"},{"name":"getTopicPartitions","command":"bal discover method getTopicPartitions -p ballerinax/kafka --client Producer"},{"name":"send","command":"bal discover method send -p ballerinax/kafka --client Producer"},{"name":"sendWithMetadata","command":"bal discover method sendWithMetadata -p ballerinax/kafka --client Producer"}],"shown":5,"total":5}
 ```
 
 A container whose methods come in more than one call form is split by form, since `->` against `.` is what a
@@ -450,7 +450,7 @@ caller has to get right:
 
 ```
 $ bal discover client -p ballerinax/postgresql
-ballerinax/postgresql:1.19.0 · client · Client
+ballerinax/postgresql:1.19.1 · client · Client
 5 remote methods, 1 method
 
 Remote methods (->)
@@ -466,7 +466,7 @@ Methods (.)
 Next: bal discover method <name> -p ballerinax/postgresql --client Client
 
 $ bal discover client -p ballerinax/postgresql | cat
-{"qualified":"ballerinax/postgresql","version":"1.19.0","container":"Client","remote":[{"name":"batchExecute","command":"bal discover method batchExecute -p ballerinax/postgresql --client Client"},{"name":"call","command":"bal discover method call -p ballerinax/postgresql --client Client"},{"name":"execute","command":"bal discover method execute -p ballerinax/postgresql --client Client"},{"name":"query","command":"bal discover method query -p ballerinax/postgresql --client Client"},{"name":"queryRow","command":"bal discover method queryRow -p ballerinax/postgresql --client Client"}],"normal":[{"name":"close","command":"bal discover method close -p ballerinax/postgresql --client Client"}],"counts":{"remote":5,"normal":1},"shown":6,"total":6}
+{"qualified":"ballerinax/postgresql","version":"1.19.1","container":"Client","remote":[{"name":"batchExecute","command":"bal discover method batchExecute -p ballerinax/postgresql --client Client"},{"name":"call","command":"bal discover method call -p ballerinax/postgresql --client Client"},{"name":"execute","command":"bal discover method execute -p ballerinax/postgresql --client Client"},{"name":"query","command":"bal discover method query -p ballerinax/postgresql --client Client"},{"name":"queryRow","command":"bal discover method queryRow -p ballerinax/postgresql --client Client"}],"normal":[{"name":"close","command":"bal discover method close -p ballerinax/postgresql --client Client"}],"counts":{"remote":5,"normal":1},"shown":6,"total":6}
 ```
 
 One callable is the end of a drill-down: its declaration with its doc comment; for a method of a client or
@@ -476,7 +476,7 @@ only Producer declares `send`:
 
 ```
 $ bal discover method send -p ballerinax/kafka
-ballerinax/kafka:4.6.5 · method · Producer · send
+ballerinax/kafka:4.6.8 · method · Producer · send
 
 # Produces records to the Kafka server.
 # ```ballerina
@@ -535,7 +535,7 @@ A listing over the ceiling says so, with the command that continues it:
 ```
 $ bal discover client -p ballerinax/twilio
 ballerinax/twilio:5.0.2 · client · Client
-199 methods
+199 remote methods
 
   createAccount
   createAddress
@@ -547,11 +547,11 @@ ballerinax/twilio:5.0.2 · client · Client
 ... 159 more (page 1 of 5)
 Next: bal discover method <name> -p ballerinax/twilio --client Client
 Next: bal discover client Client -p ballerinax/twilio --page 2
-Next: bal discover client -p ballerinax/twilio --filter <keyword>
+Next: bal discover client Client -p ballerinax/twilio --filter <keyword>
 
 $ bal discover client -p ballerinax/twilio --filter message
 ballerinax/twilio:5.0.2 · client · Client · --filter message
-14 methods
+14 remote methods
 
   createMessage
   createMessageFeedback
@@ -644,17 +644,17 @@ answers with its own documentation and the readme sections whose code declares s
 untyped on one of its listeners, when it is the type that listener's `attach` takes or the one service type the
 listener accepts (an untyped service on `http:Listener` is an `http:Service`, not an `http:ServiceContract`); or,
 for a module's only service type with no listener of its own, any service — or, when none does, the readme's
-command:
+command. `ballerina/http` 2.16.6 publishes no `trigger-metadata.json` (later versions do):
 
 ```
-$ bal discover service Service -p ballerina/http
+$ bal discover service Service -p ballerina/http:2.16.6
 ballerina/http:2.16.6 · service · Service
 Service declares no methods; a service of this type declares its own resource or remote methods.
 
 The HTTP service type.
 
 Readme sections that declare one
-  5  Listener  bal discover readme 5 -p ballerina/http
+  5  Listener  bal discover readme 5 -p ballerina/http:2.16.6
 
 Note: attach it to http:Listener
 ```
@@ -663,7 +663,7 @@ A declaration that is not callable, read whole with the declarations it names:
 
 ```
 $ bal discover type TopicPartitionOffset -p ballerinax/kafka
-ballerinax/kafka:4.6.5 · type · TopicPartitionOffset
+ballerinax/kafka:4.6.8 · type · TopicPartitionOffset
 
 # Represents a topic partition and an offset with a timestamp.
 public type TopicPartitionOffset [TopicPartition, OffsetAndTimestamp?];
@@ -696,11 +696,13 @@ them in `sections` (`{"name", "command"}`). A large readme can be narrowed to th
 
 ```
 $ bal discover readme -p ballerinax/kafka --filter producer
-ballerinax/kafka:4.6.5 · readme · --filter producer
-2 matching sections
+ballerinax/kafka:4.6.8 · readme · --filter producer
+4 matching sections
 
-  1  Kafka producer      18 lines
-  4  Data serialization  26 lines
+  3  Consumer and producer   1 line
+  4  Kafka producer         18 lines
+  7  Data serialization     26 lines
+  9  Examples                9 lines
 
 Next: bal discover readme <n> -p ballerinax/kafka
 ```
@@ -752,13 +754,13 @@ search · kafka send
 8 packages, 33 symbols
 
 Packages (8)
-  package ballerinax/kafka:4.6.6            Apache Kafka is a distributed event streaming platform used for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications.
+  package ballerinax/kafka:4.6.8            Apache Kafka is a distributed event streaming platform used for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications.
   package wso2/choreo.sendemail:0.6.1       Demo connector to send an email.
   ...
 
 Symbols (25 of 33)
-  remote method  method send -p ballerinax/kafka:4.6.6 --client Producer
-  remote method  method sendWithMetadata -p ballerinax/kafka:4.6.6 --client Producer
+  remote method  method send -p ballerinax/kafka:4.6.8 --client Producer
+  remote method  method sendWithMetadata -p ballerinax/kafka:4.6.8 --client Producer
   error          type KafkaPublishError -p thambaru/debezium_to_kafka:0.2.1
   remote method  method getMsgVpnKafkaSenders -p xlibb/solace.semp:0.2.0 --client Client
   ...
