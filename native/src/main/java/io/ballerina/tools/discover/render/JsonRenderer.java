@@ -20,6 +20,7 @@ package io.ballerina.tools.discover.render;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.ballerina.tools.discover.model.ServiceHandlers;
 
 import java.util.List;
 
@@ -56,6 +57,7 @@ public final class JsonRenderer {
             case DiscoverResult.PathGroups groups -> pathGroups(groups);
             case DiscoverResult.ResourceList resources -> resourceList(resources);
             case DiscoverResult.MethodList methods -> methodList(methods);
+            case DiscoverResult.ServiceHandlerList handlers -> serviceHandlers(handlers);
             case DiscoverResult.Readme readme -> readme(readme);
             case DiscoverResult.ReadmeChunks chunks -> readmeChunks(chunks);
             case DiscoverResult.Signature signature -> signature(signature);
@@ -215,6 +217,60 @@ public final class JsonRenderer {
         if (methods.note() != null) {
             json.addProperty("note", methods.note());
         }
+        return json;
+    }
+
+    private static JsonObject serviceHandlers(DiscoverResult.ServiceHandlerList list) {
+        JsonObject json = new JsonObject();
+        json.addProperty("container", list.container());
+        JsonArray handlers = new JsonArray();
+        for (ServiceHandlers.Handler handler : list.handlers()) {
+            JsonObject entry = new JsonObject();
+            addIfPresent(entry, "name", handler.name());
+            entry.addProperty("kind", handler.kind().label());
+            entry.addProperty("signature", handler.signature());
+            entry.addProperty("required", handler.required());
+            if (handler.repeatable()) {
+                entry.addProperty("repeatable", true);
+            }
+            if (!handler.accessors().isEmpty()) {
+                entry.add("accessors", strings(handler.accessors()));
+            }
+            addIfPresent(entry, "doc", handler.doc());
+            addIfPresent(entry, "deprecated", handler.deprecated());
+            JsonArray params = new JsonArray();
+            for (ServiceHandlers.Param param : handler.params()) {
+                JsonObject parameter = new JsonObject();
+                addIfPresent(parameter, "name", param.name());
+                parameter.addProperty("type", param.type());
+                parameter.addProperty("required", param.required());
+                if (param.repeatable()) {
+                    parameter.addProperty("repeatable", true);
+                }
+                addIfPresent(parameter, "doc", param.doc());
+                addIfPresent(parameter, "deprecated", param.deprecated());
+                params.add(parameter);
+            }
+            entry.add("params", params);
+            addIfPresent(entry, "returns", handler.returns());
+            handlers.add(entry);
+        }
+        json.add("handlers", handlers);
+        if (!list.rules().isEmpty()) {
+            JsonArray rules = new JsonArray();
+            for (ServiceHandlers.Rule rule : list.rules()) {
+                JsonObject entry = new JsonObject();
+                addIfPresent(entry, "requirement", rule.requirement());
+                if (!rule.handlers().isEmpty()) {
+                    entry.add("handlers", strings(rule.handlers()));
+                }
+                addIfPresent(entry, "message", rule.message());
+                rules.add(entry);
+            }
+            json.add("rules", rules);
+        }
+        addIfPresent(json, "warning", list.warning());
+        addIfPresent(json, "note", list.note());
         return json;
     }
 

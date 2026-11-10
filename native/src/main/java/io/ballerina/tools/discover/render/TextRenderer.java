@@ -20,6 +20,7 @@ package io.ballerina.tools.discover.render;
 
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.Texts;
+import io.ballerina.tools.discover.model.ServiceHandlers;
 import io.ballerina.tools.discover.symbols.Surface;
 
 import java.util.ArrayList;
@@ -123,6 +124,7 @@ public final class TextRenderer {
             case DiscoverResult.PathGroups groups -> pathGroups(layout, groups);
             case DiscoverResult.ResourceList resources -> resourceList(layout, resources);
             case DiscoverResult.MethodList methods -> methodList(layout, methods);
+            case DiscoverResult.ServiceHandlerList handlers -> serviceHandlers(layout, handlers);
             case DiscoverResult.Readme readme -> readmeChunk(layout, readme);
             case DiscoverResult.ReadmeChunks chunks -> readmeChunks(layout, chunks);
             case DiscoverResult.Signature signature -> signature(layout, signature);
@@ -281,6 +283,52 @@ public final class TextRenderer {
         layout.next(drill.pattern());
         documentedDrill.forEach(layout::next);
         layout.next(methods.next());
+    }
+
+    private static void serviceHandlers(Layout layout, DiscoverResult.ServiceHandlerList list) {
+        layout.top(HANDLERS_HEADING + " (" + list.handlers().size() + ")");
+        for (ServiceHandlers.Handler handler : list.handlers()) {
+            List<String> lines = new ArrayList<>();
+            lines.add(handler.signature());
+            lines.add(INDENT + presence(handler));
+            if (handler.deprecated() != null) {
+                lines.add(INDENT + "Deprecated: " + handler.deprecated());
+            }
+            if (!handler.doc().isBlank()) {
+                lines.add(INDENT + handler.doc().strip());
+            }
+            for (ServiceHandlers.Param param : handler.params()) {
+                lines.add(INDENT + (param.name() == null ? "<name>" : param.name())
+                        + " (" + (param.repeatable() ? "any number" : param.required() ? "required" : "optional")
+                        + ")" + (param.doc() == null || param.doc().isBlank() ? "" : ": " + param.doc().strip()));
+            }
+            layout.block(lines);
+        }
+        if (!list.rules().isEmpty()) {
+            List<String> lines = new ArrayList<>();
+            lines.add(RULES_HEADING);
+            list.rules().forEach(rule -> lines.add(INDENT + ruleText(rule)));
+            layout.block(lines);
+        }
+        layout.notices(list.note(), list.warning());
+    }
+
+    private static String presence(ServiceHandlers.Handler handler) {
+        return handler.repeatable() ? "any number" : handler.required() ? "required" : "optional";
+    }
+
+    private static String ruleText(ServiceHandlers.Rule rule) {
+        String requirement = rule.requirement() == null
+                ? null
+                : capitalised(rule.requirement()) + ": " + String.join(", ", rule.handlers());
+        if (requirement == null) {
+            return rule.message() == null ? "" : rule.message();
+        }
+        return rule.message() == null ? requirement : requirement + " — " + rule.message();
+    }
+
+    private static String capitalised(String text) {
+        return Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
 
     private static String verbatimReadme(DiscoverResult.Readme readme) {
@@ -450,6 +498,9 @@ public final class TextRenderer {
         }
         return parts.isEmpty() ? null : String.join(SEPARATOR, parts);
     }
+
+    private static final String HANDLERS_HEADING = "Methods to implement";
+    private static final String RULES_HEADING = "Rules";
 
     private static String containerOf(DiscoverResult result) {
         return switch (result) {

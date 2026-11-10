@@ -8,8 +8,19 @@ ballerinax/kafka · client
 
 Next: bal discover ballerinax/kafka client <name>
 == service ==
-ballerinax/kafka · service · Service
-No methods.
+ballerinax/kafka · service
+Methods to implement (2)
+
+remote function onConsumerRecord(kafka:Caller caller, kafka:AnydataConsumerRecord[]|kafka:BytesConsumerRecord[] records) returns error?
+  required
+  Invoked with each batch of records polled from the subscribed topics. The listener polls on its configured interval and dispatches everything it received as one batch.
+  caller (optional): Handle for committing offsets explicitly. Needed only when auto-commit is disabled.
+  records (required): The polled batch. Declare a narrower element type to project each record's value, see the consumerRecordPayload data-binding rule.
+
+remote function onError(kafka:Error kafkaError) returns error?
+  optional
+  Invoked when polling fails, or when a polled batch cannot be dispatched, most commonly because a record's value fails to bind to the declared type.
+  kafkaError (required): The failure that prevented the batch from being delivered.
 
 Note: binds to kafka:Listener
 == class ==

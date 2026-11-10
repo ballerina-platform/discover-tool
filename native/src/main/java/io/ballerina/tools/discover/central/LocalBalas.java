@@ -105,12 +105,25 @@ public final class LocalBalas implements ModuleSources {
             return Optional.empty();
         }
         for (Path platform : platforms) {
-            Optional<Map<String, String>> sources = readModule(platform.resolve("modules").resolve(moduleId));
-            if (sources.isPresent()) {
-                return sources;
+            Map<String, String> files = new TreeMap<>(
+                    readModule(platform.resolve(Bala.MODULES_DIR).resolve(moduleId)).orElse(Map.of()));
+            readTriggerMetadata(platform).ifPresent(metadata -> files.put(Bala.TRIGGER_METADATA, metadata));
+            if (!files.isEmpty()) {
+                return Optional.of(files);
             }
         }
         return Optional.empty();
+    }
+
+    private static Optional<String> readTriggerMetadata(Path platform) {
+        Path metadata = platform.resolve(Bala.TRIGGER_METADATA);
+        try {
+            return Files.isRegularFile(metadata) && Files.size(metadata) <= Bala.Limits.DEFAULT.sourceBytes()
+                    ? Optional.of(Files.readString(metadata, StandardCharsets.UTF_8))
+                    : Optional.empty();
+        } catch (IOException | RuntimeException unreadable) {
+            return Optional.empty();
+        }
     }
 
     private static Optional<Map<String, String>> readModule(Path moduleDir) {
