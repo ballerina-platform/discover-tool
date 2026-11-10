@@ -107,6 +107,7 @@ publishing {
 
 build.dependsOn updateTomlFiles
 build.dependsOn unpackJballerinaTools
+build.dependsOn "generatePomFileForMavenPublication"
 
 test.dependsOn updateTomlFiles
 test.dependsOn unpackJballerinaTools
