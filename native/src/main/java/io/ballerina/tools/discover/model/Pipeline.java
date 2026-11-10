@@ -48,8 +48,15 @@ public final class Pipeline {
 
     /** @param inclusions the module's object inclusions, read from its published source, when it was read */
     public static Library build(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
+        return build(module, inclusions, InlineRecords.NONE);
+    }
+
+    /** @param inlineRecords what the module's source declares for its inline records */
+    public static Library build(CentralDocs.Module module, Optional<ObjectInclusions> inclusions,
+            InlineRecords inlineRecords) {
         return Defaults.markUnwritable(
-                Patches.applyPatches(FromCentral.fromCentral(module, inclusions)), publishedButUnrendered(module));
+                Patches.applyPatches(FromCentral.fromCentral(module, inclusions, inlineRecords)),
+                publishedButUnrendered(module));
     }
 
     private static Set<String> publishedButUnrendered(CentralDocs.Module module) {

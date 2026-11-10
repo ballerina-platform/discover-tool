@@ -29,9 +29,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The package source is read only for an answer that shows a service type — the only answers that say which
- * listener one binds to — however the caller reached it. {@code ballerina/http} is the case that would read it:
- * four of its seven service types are no listener's attach target.
+ * The package source is read only for an answer that needs it: one showing a service type — which says which
+ * listener it binds to — however the caller reached it, or one printing an inline record, whose optionality and
+ * defaults only the source carries. {@code ballerina/http} is both: four of its seven
+ * service types are no listener's attach target.
  *
  * @since 0.1.0
  */
@@ -73,10 +74,6 @@ public class SourceScopeTest {
     public Object[][] otherAnswers() {
         return new Object[][] {
                 {List.of("ballerina/http")},
-                {List.of("ballerina/http", "client")},
-                {List.of("ballerina/http", "client", "Client")},
-                {List.of("ballerina/http", "class")},
-                {List.of("ballerina/http", "funcs")},
                 {List.of("ballerina/http", "readme")},
         };
     }
@@ -84,6 +81,29 @@ public class SourceScopeTest {
     @Test(dataProvider = "otherAnswers")
     public void noOtherAnswerReadsTheSource(List<String> argv) {
         Assert.assertEquals(sourceRequestsOf(argv), List.of(), argv + " asked for the package source");
+    }
+
+    @DataProvider(name = "answersWithoutInlineRecords")
+    public Object[][] answersWithoutInlineRecords() {
+        return new Object[][] {
+                {List.of("ballerina/http", "client")},
+                {List.of("ballerina/http", "client", "Client")},
+                {List.of("ballerina/http", "class")},
+                {List.of("ballerina/http", "funcs")},
+        };
+    }
+
+    /** http declares inline records, but an answer printing none has nothing to recover from its 24 MB source. */
+    @Test(dataProvider = "answersWithoutInlineRecords")
+    public void anAnswerPrintingNoInlineRecordNeverReadsTheSource(List<String> argv) {
+        Assert.assertEquals(sourceRequestsOf(argv), List.of(), argv + " asked for the package source");
+    }
+
+    /** Optionality and defaults of an inline record's members are only in the source. */
+    @Test
+    public void anAnswerPrintingAnInlineRecordReadsTheSource() {
+        List<String> argv = List.of("ballerina/http", "client", "Client", "new");
+        Assert.assertFalse(sourceRequestsOf(argv).isEmpty(), argv + " never asked for the package source");
     }
 
     @DataProvider(name = "serviceAnswers")

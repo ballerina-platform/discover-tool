@@ -36,7 +36,8 @@ public class ReadmeChunkingTest {
     private static LoadedPackage withReadme(String markdown) {
         LoadedPackage base = FixtureCorpus.loadedFixture("ballerinax__kafka");
         return new LoadedPackage(base.qualified(), base.version(), base.library(), Optional.of(markdown),
-                base.module(), base.submodules(), base.modules(), base.warning(), base.pinned(), base.bound());
+                base.module(), base.submodules(), base.modules(), base.warning(), base.pinned(), base.bound(),
+                base.handlers());
     }
 
     private static List<String> titles(String markdown) {

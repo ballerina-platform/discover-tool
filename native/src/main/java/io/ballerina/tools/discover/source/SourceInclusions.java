@@ -39,6 +39,7 @@ import io.ballerina.tools.discover.cache.DocsCache;
 import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.PackageRepository;
+import io.ballerina.tools.discover.model.InlineRecords;
 import io.ballerina.tools.discover.model.ObjectInclusions;
 import io.ballerina.tools.text.TextDocuments;
 
@@ -49,7 +50,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * A module's object inclusions, read from its published source with the Ballerina parser.
+ * A module's object inclusions and inline-record details, read from its published source with the Ballerina parser.
  *
  * <p>The parser is the {@code bal} distribution's own ({@code bre/lib}), which is the classpath this tool runs
  * on — compiled against, never bundled.
@@ -65,7 +66,13 @@ public final class SourceInclusions {
      * Which derivation produced a cached answer. Bumped whenever what {@link #parse} records changes, so an answer
      * an older reader cached is never served in place of what this one would derive.
      */
-    public static final String DERIVATION = "2";
+    public static final String DERIVATION = "4";
+
+    private static final String INCLUSIONS = "inclusions";
+    private static final String INLINE_RECORDS = "inlineRecords";
+    private static final String NAME = "name";
+    private static final String OPTIONAL = "optional";
+    private static final String DEFAULT = "default";
 
     private static final String BAL_SUFFIX = ".bal";
 
@@ -73,23 +80,23 @@ public final class SourceInclusions {
     }
 
     /**
-     * The inclusions of {@code moduleId} at the resolved version, from the cache when it holds them, otherwise from
+     * The facts of {@code moduleId} at the resolved version, from the cache when it holds them, otherwise from
      * {@code repository}'s published source — and then cached, since a version's source never changes.
      */
-    public static Optional<ObjectInclusions> load(PackageRepository repository, QualifiedName qualified,
+    public static Optional<SourceFacts> load(PackageRepository repository, QualifiedName qualified,
             CentralClient.ResolvedVersion resolved, String moduleId, HttpOptions options) {
         DocsCache cache = options.cache();
         DocsCache.DocsKey key = new DocsCache.DocsKey(
                 repository.id(), qualified.org(), qualified.name(), resolved.version().text());
         if (!options.refresh()) {
-            Optional<ObjectInclusions> cached = fromJson(cache.readInclusions(key, moduleId, DERIVATION));
+            Optional<SourceFacts> cached = fromJson(cache.readInclusions(key, moduleId, DERIVATION));
             if (cached.isPresent()) {
                 return cached;
             }
         }
-        Optional<ObjectInclusions> read = repository.fetchModuleSources(qualified, resolved, moduleId, options)
-                .flatMap(SourceInclusions::parse);
-        read.ifPresent(inclusions -> cache.writeInclusions(key, moduleId, DERIVATION, toJson(inclusions)));
+        Optional<SourceFacts> read = repository.fetchModuleSources(qualified, resolved, moduleId, options)
+                .flatMap(SourceInclusions::parseFacts);
+        read.ifPresent(facts -> cache.writeInclusions(key, moduleId, DERIVATION, toJson(facts)));
         return read;
     }
 
@@ -100,16 +107,23 @@ public final class SourceInclusions {
      * {@code *cdc:Service;} record the same thing. A prefix no import declares is dropped.
      */
     public static Optional<ObjectInclusions> parse(Map<String, String> files) {
+        return parseFacts(files).map(SourceFacts::inclusions);
+    }
+
+    /** {@link #parse} together with what the files' inline records declare. */
+    public static Optional<SourceFacts> parseFacts(Map<String, String> files) {
         try {
             Map<String, List<String>> byType = new LinkedHashMap<>();
-            files.entrySet().stream()
-                    .filter(file -> file.getKey().endsWith(BAL_SUFFIX))
-                    .forEach(file -> collect(SyntaxTree.from(TextDocuments.from(file.getValue()), file.getKey()),
-                            byType));
             if (files.keySet().stream().noneMatch(file -> file.endsWith(BAL_SUFFIX))) {
                 return Optional.empty();
             }
-            return Optional.of(new ObjectInclusions(byType));
+            List<SyntaxTree> trees = new ArrayList<>();
+            files.entrySet().stream()
+                    .filter(file -> file.getKey().endsWith(BAL_SUFFIX))
+                    .forEach(file -> trees.add(SyntaxTree.from(TextDocuments.from(file.getValue()), file.getKey())));
+            trees.forEach(tree -> collect(tree, byType));
+            return Optional.of(new SourceFacts(new ObjectInclusions(byType),
+                    InlineRecordSource.collect(trees.stream().<Node>map(SyntaxTree::rootNode).toList())));
         } catch (RuntimeException | LinkageError unparseable) {
             return Optional.empty();
         }
@@ -180,7 +194,41 @@ public final class SourceInclusions {
         };
     }
 
-    static JsonElement toJson(ObjectInclusions inclusions) {
+    static JsonElement toJson(SourceFacts facts) {
+        JsonObject json = new JsonObject();
+        json.add(INCLUSIONS, toJson(facts.inclusions()));
+        JsonArray records = new JsonArray();
+        facts.inlineRecords().byFields().values().forEach(members -> {
+            JsonArray array = new JsonArray();
+            members.forEach((name, member) -> {
+                JsonObject entry = new JsonObject();
+                entry.addProperty(NAME, name);
+                entry.addProperty(OPTIONAL, member.optional());
+                if (member.defaultValue() != null) {
+                    entry.addProperty(DEFAULT, member.defaultValue());
+                }
+                array.add(entry);
+            });
+            records.add(array);
+        });
+        json.add(INLINE_RECORDS, records);
+        return json;
+    }
+
+    static Optional<SourceFacts> fromJson(JsonElement json) {
+        if (json == null || !json.isJsonObject()) {
+            return Optional.empty();
+        }
+        JsonObject object = json.getAsJsonObject();
+        Optional<ObjectInclusions> inclusions = fromInclusionsJson(object.get(INCLUSIONS));
+        Optional<InlineRecords.Declared> records = inlineRecordsFromJson(object.get(INLINE_RECORDS));
+        if (inclusions.isEmpty() || records.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new SourceFacts(inclusions.get(), records.get()));
+    }
+
+    private static JsonElement toJson(ObjectInclusions inclusions) {
         JsonObject json = new JsonObject();
         inclusions.byType().forEach((type, included) -> {
             JsonArray array = new JsonArray();
@@ -190,8 +238,38 @@ public final class SourceInclusions {
         return json;
     }
 
+    private static Optional<InlineRecords.Declared> inlineRecordsFromJson(JsonElement json) {
+        if (json == null || !json.isJsonArray()) {
+            return Optional.empty();
+        }
+        Map<List<String>, Map<String, InlineRecords.Member>> byFields = new LinkedHashMap<>();
+        for (JsonElement record : json.getAsJsonArray()) {
+            if (!record.isJsonArray()) {
+                return Optional.empty();
+            }
+            Map<String, InlineRecords.Member> members = new LinkedHashMap<>();
+            for (JsonElement element : record.getAsJsonArray()) {
+                if (!element.isJsonObject() || !isString(element.getAsJsonObject().get(NAME))
+                        || !element.getAsJsonObject().has(OPTIONAL)) {
+                    return Optional.empty();
+                }
+                JsonObject entry = element.getAsJsonObject();
+                JsonElement defaultValue = entry.get(DEFAULT);
+                members.put(entry.get(NAME).getAsString(), new InlineRecords.Member(
+                        entry.get(OPTIONAL).getAsBoolean(),
+                        defaultValue == null ? null : defaultValue.getAsString()));
+            }
+            byFields.put(InlineRecords.Declared.key(members.keySet()), members);
+        }
+        return Optional.of(new InlineRecords.Declared(byFields));
+    }
+
+    private static boolean isString(JsonElement element) {
+        return element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isString();
+    }
+
     /** Empty for anything but an object of string arrays — a damaged entry is a miss, never a wrong answer. */
-    static Optional<ObjectInclusions> fromJson(JsonElement json) {
+    private static Optional<ObjectInclusions> fromInclusionsJson(JsonElement json) {
         if (json == null || !json.isJsonObject()) {
             return Optional.empty();
         }

@@ -42,6 +42,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -72,6 +73,9 @@ import java.util.stream.Collectors;
  * @since 0.1.0
  */
 public final class Cli {
+
+    // An inline record with members: the one thing in an answer that only the package source can complete.
+    private static final Pattern INLINE_RECORD = Pattern.compile("record \\{\\|?\\s*[^\\s|}]");
 
     private static final String OUTPUT_FLAG = "--output";
 
@@ -211,6 +215,16 @@ public final class Cli {
     }
 
     private static Result<DiscoverResult> answer(
+            LoadedPackage loaded, String bucket, List<String> rest, String filter, int page) {
+        Result<DiscoverResult> plain = answerFrom(loaded, bucket, rest, filter, page);
+        if (!plain.isOk() || !INLINE_RECORD.matcher(JsonRenderer.render(plain.value())).find()) {
+            return plain;
+        }
+        LoadedPackage settled = loaded.withSource();
+        return settled.library() == loaded.library() ? plain : answerFrom(settled, bucket, rest, filter, page);
+    }
+
+    private static Result<DiscoverResult> answerFrom(
             LoadedPackage loaded, String bucket, List<String> rest, String filter, int page) {
         if (bucket == null) {
             return Result.ok(bucketList(loaded));

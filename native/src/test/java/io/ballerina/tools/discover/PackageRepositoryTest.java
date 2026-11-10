@@ -141,7 +141,7 @@ public class PackageRepositoryTest {
     private static Result<LoadedPackage> loadHttp(FakeRepository repository) {
         Result<LoadedPackage> loaded = Loader.loadPackage(QualifiedName.parse("ballerina/http").value(),
                 new Loader.LoadOptions(httpThatMustNotReachTheNetwork(), null, List.of(repository), null, null));
-        return loaded.isOk() ? Result.ok(loaded.value().withBindings()) : loaded;
+        return loaded.isOk() ? Result.ok(loaded.value().withSource()) : loaded;
     }
 
     private static FakeRepository http(Optional<Map<String, String>> sources) {
@@ -175,8 +175,8 @@ public class PackageRepositoryTest {
 
         Assert.assertTrue(loaded.isOk(), loaded.isOk() ? "" : loaded.failure().describe());
         Assert.assertEquals(repository.sourceCalls, 0);
-        loaded.value().withBindings();
-        loaded.value().withBindings();
+        loaded.value().withSource();
+        loaded.value().withSource();
         Assert.assertEquals(repository.sourceCalls, 1);
     }
 

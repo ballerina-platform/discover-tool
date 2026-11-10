@@ -66,7 +66,7 @@ public final class FromCentral {
 
     private static final String OPEN_RECORD = "record {%s}";
     private static final String CLOSED_RECORD = "record {|%s|}";
-    private static final String FIELD = "%s %s%s; ";
+    private static final String FIELD = "%s %s%s%s; ";
     private static final String REST_FIELD = "%s...; ";
 
     private FromCentral() {
@@ -77,8 +77,9 @@ public final class FromCentral {
      *
      * @param moduleId the module's name
      * @param orgName the module's organization
+     * @param inlineRecords what the module's source says its inline records declare
      */
-    private record Scope(String moduleId, String orgName) { }
+    private record Scope(String moduleId, String orgName, InlineRecords inlineRecords) { }
 
     /** Which of Central's three type encodings a node uses. */
     private enum Encoding {
@@ -278,9 +279,15 @@ public final class FromCentral {
     }
 
     private static TypeRef inlineRecordFields(List<CentralDocs.TypeNode> members, boolean closed, Scope scope) {
+        Map<String, InlineRecords.Member> recovered = scope.inlineRecords()
+                .recover(members.stream()
+                        .filter(member -> !member.elementType().orElseThrow().isRestParam())
+                        .map(member -> member.name().orElseThrow())
+                        .toList())
+                .orElse(Map.of());
         StringBuilder fields = new StringBuilder();
         List<TypeRef.Link> links = new ArrayList<>();
-        boolean exclusive = closed;
+        boolean hasRest = false;
         for (int i = 0; i < members.size(); i++) {
             CentralDocs.TypeNode member = members.get(i);
             CentralDocs.TypeNode fieldType = member.elementType().orElseThrow();
@@ -291,14 +298,23 @@ public final class FromCentral {
             TypeRef typeRef = transformType(fieldType, scope);
             if (fieldType.isRestParam()) {
                 fields.append(REST_FIELD.formatted(typeRef.name()));
-                exclusive = true;
+                hasRest = true;
             } else {
-                fields.append(FIELD.formatted(typeRef.name(), member.name().orElseThrow(),
-                        member.isOptional() ? "?" : ""));
+                String name = member.name().orElseThrow();
+                InlineRecords.Member source = recovered.get(name);
+                boolean optional = member.isOptional() || source != null && source.optional();
+                String defaultValue = source == null || source.defaultValue() == null
+                        ? "" : " = " + source.defaultValue();
+                fields.append(FIELD.formatted(typeRef.name(), name, optional ? "?" : "", defaultValue));
             }
             links.addAll(typeRef.links());
         }
-        return ref((exclusive ? CLOSED_RECORD : OPEN_RECORD).formatted(fields), links);
+        return ref((isExclusive(closed, hasRest) ? CLOSED_RECORD : OPEN_RECORD).formatted(fields), links);
+    }
+
+    // A rest member is only legal in a closed record, so it makes an open one closed.
+    private static boolean isExclusive(boolean declaredClosed, boolean hasRest) {
+        return declaredClosed || hasRest;
     }
 
     private static TypeRef inlineRecord(List<CentralDocs.TypeNode> members, Scope scope) {
@@ -474,8 +490,8 @@ public final class FromCentral {
     // Central publishes isClosed:false even for records with an explicit rest field, which only a closed
     // record may declare.
     private static boolean isClosed(CentralDocs.RecordDecl record, List<RecordField> fields) {
-        return record.isClosed()
-                || fields.stream().anyMatch(field -> field.form() == RecordField.Form.REST);
+        return isExclusive(record.isClosed(),
+                fields.stream().anyMatch(field -> field.form() == RecordField.Form.REST));
     }
 
     private static RecordField declaredField(CentralDocs.Field.Declared entry, Scope scope) {
@@ -695,12 +711,18 @@ public final class FromCentral {
         return fromCentral(module, Optional.empty());
     }
 
+    public static Library fromCentral(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
+        return fromCentral(module, inclusions, InlineRecords.NONE);
+    }
+
     /**
      * @param inclusions what the module's published source says each object type includes, or empty when it was
      *     not read — the one fact about service bindings the docs payload cannot supply
+     * @param inlineRecords what that source declares for the module's inline records
      */
-    public static Library fromCentral(CentralDocs.Module module, Optional<ObjectInclusions> inclusions) {
-        Scope scope = new Scope(module.id(), module.orgName());
+    public static Library fromCentral(CentralDocs.Module module, Optional<ObjectInclusions> inclusions,
+            InlineRecords inlineRecords) {
+        Scope scope = new Scope(module.id(), module.orgName(), inlineRecords);
         List<TypeDef> typeDefs = new ArrayList<>();
 
         for (CentralDocs.RecordDecl record : module.records()) {

@@ -179,7 +179,7 @@ public type ClientSecureSocket record {|
     # Configurations associated with `crypto:KeyStore` or combination of certificate and private key of the client
     crypto:KeyStore|CertKey key?;
     # SSL/TLS protocol related options
-    record {|Protocol name; string[] versions; |} protocol?;
+    record {|Protocol name; string[] versions = []; |} protocol?;
     # Certificate validation against OCSP_CRL, OCSP_STAPLING related options
     record {|CertValidationType 'type; int cacheSize; int cacheValidityPeriod; |} certValidation?;
     # List of ciphers to be used
@@ -752,7 +752,7 @@ public type ListenerSecureSocket record {|
     # Configures associated with mutual SSL operations
     record {|VerifyClient verifyClient; crypto:TrustStore|string cert; |} mutualSsl?;
     # SSL/TLS protocol related options
-    record {|Protocol name; string[] versions; |} protocol?;
+    record {|Protocol name; string[] versions = []; |} protocol?;
     # Certificate validation against OCSP_CRL, OCSP_STAPLING related options
     record {|CertValidationType 'type; int cacheSize; int cacheValidityPeriod; |} certValidation?;
     # List of ciphers to be used
