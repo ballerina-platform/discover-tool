@@ -2,4 +2,4 @@
 id = "discover"
 
 [[dependency]]
-path = "../native/build/libs/native-0.1.0-SNAPSHOT.jar"
+path = "../native/build/libs/native-0.1.0.jar"
