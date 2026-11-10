@@ -233,7 +233,7 @@ public class ServiceAnswersTest {
                 .map(submodule -> new LoadedPackage.Submodule(submodule, ""))
                 .toList();
         return new LoadedPackage(QualifiedName.parse("test/" + name).value(), FixtureCorpus.FIXTURE_VERSION,
-                library, Optional.empty(), module, children, List.of(submodules), null, null, () -> library);
+                library, Optional.empty(), module, children, List.of(submodules), null, null, () -> library, Map::of);
     }
 
     private static DiscoverResult.ContainerRoster roster(LoadedPackage loaded) {

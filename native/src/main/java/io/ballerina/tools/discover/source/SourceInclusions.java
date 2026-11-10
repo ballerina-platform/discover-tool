@@ -67,6 +67,8 @@ public final class SourceInclusions {
      */
     public static final String DERIVATION = "2";
 
+    private static final String BAL_SUFFIX = ".bal";
+
     private SourceInclusions() {
     }
 
@@ -100,7 +102,13 @@ public final class SourceInclusions {
     public static Optional<ObjectInclusions> parse(Map<String, String> files) {
         try {
             Map<String, List<String>> byType = new LinkedHashMap<>();
-            files.forEach((file, text) -> collect(SyntaxTree.from(TextDocuments.from(text), file), byType));
+            files.entrySet().stream()
+                    .filter(file -> file.getKey().endsWith(BAL_SUFFIX))
+                    .forEach(file -> collect(SyntaxTree.from(TextDocuments.from(file.getValue()), file.getKey()),
+                            byType));
+            if (files.keySet().stream().noneMatch(file -> file.endsWith(BAL_SUFFIX))) {
+                return Optional.empty();
+            }
             return Optional.of(new ObjectInclusions(byType));
         } catch (RuntimeException | LinkageError unparseable) {
             return Optional.empty();

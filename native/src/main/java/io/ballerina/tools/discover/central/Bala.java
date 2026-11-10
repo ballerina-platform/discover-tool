@@ -75,13 +75,24 @@ public final class Bala {
                 new Limits(MAX_ARCHIVE_BYTES, MAX_SOURCE_BYTES, MAX_MODULE_BYTES, MAX_MODULE_FILES);
     }
 
+    /**
+     * Where a package describes the service handlers its listeners dispatch to. The one entry {@link #moduleSources}
+     * keeps that is not a module's {@code .bal} file; the slash keeps it from ever colliding with one.
+     */
+    public static final String TRIGGER_METADATA = "metadata/trigger-metadata.json";
+
+    static final String MODULES_DIR = "modules";
+
+    private static final String MODULES_PREFIX = MODULES_DIR + "/";
+
     private Bala() {
     }
 
     /**
-     * The {@code .bal} files directly under {@code modules/<moduleId>/}, by file name, or empty when the archive is
-     * unreadable, over a limit or holds none — a submodule's own directory is a sibling, never nested, so this reads
-     * exactly one module. Closes {@code archive}.
+     * The {@code .bal} files directly under {@code modules/<moduleId>/}, by file name, with the package's
+     * {@link #TRIGGER_METADATA} when it publishes one — or empty when the archive is unreadable, over a limit or
+     * holds neither. A submodule's own directory is a sibling, never nested, so this reads exactly one module.
+     * Closes {@code archive}.
      */
     public static Optional<Map<String, String>> moduleSources(InputStream archive, String moduleId) {
         return moduleSources(archive, moduleId, Limits.DEFAULT);
@@ -89,16 +100,20 @@ public final class Bala {
 
     /** {@link #moduleSources(InputStream, String)} under explicit limits. */
     public static Optional<Map<String, String>> moduleSources(InputStream archive, String moduleId, Limits limits) {
-        String prefix = "modules/" + moduleId + "/";
+        String prefix = MODULES_PREFIX + moduleId + "/";
         Map<String, String> files = new TreeMap<>();
         long kept = 0;
+        int sourceFiles = 0;
         try (ZipInputStream zip = new ZipInputStream(new Capped(archive, limits.archiveBytes()),
                 StandardCharsets.UTF_8)) {
             for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
                 String name = entry.getName();
-                if (!entry.isDirectory() && name.startsWith(prefix) && name.endsWith(".bal")
+                if (TRIGGER_METADATA.equals(name)) {
+                    files.put(TRIGGER_METADATA,
+                            new String(readSource(zip, limits.sourceBytes()), StandardCharsets.UTF_8));
+                } else if (!entry.isDirectory() && name.startsWith(prefix) && name.endsWith(".bal")
                         && name.indexOf('/', prefix.length()) < 0) {
-                    if (files.size() >= limits.moduleFiles()) {
+                    if (sourceFiles >= limits.moduleFiles()) {
                         return Optional.empty();
                     }
                     byte[] source = readSource(zip, limits.sourceBytes());
@@ -106,6 +121,7 @@ public final class Bala {
                     if (kept > limits.moduleBytes()) {
                         return Optional.empty();
                     }
+                    sourceFiles++;
                     files.put(name.substring(prefix.length()), new String(source, StandardCharsets.UTF_8));
                 }
             }

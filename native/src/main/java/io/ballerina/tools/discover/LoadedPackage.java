@@ -20,8 +20,10 @@ package io.ballerina.tools.discover;
 
 import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.ModuleRef;
+import io.ballerina.tools.discover.model.ServiceHandlers;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -44,6 +46,8 @@ import java.util.function.Supplier;
  *     every command this lookup prints, so drilling further stays on the version being read
  * @param bound {@code library} with its service bindings read from the package source — deferred, since only an
  *     answer that shows a service type needs it, and reading it can mean a download
+ * @param handlers the handler methods the package describes for its service types, by service type name — deferred
+ *     like {@code bound}, and empty for a version that describes none
  * @since 0.1.0
  */
 public record LoadedPackage(
@@ -56,7 +60,8 @@ public record LoadedPackage(
         List<String> modules,
         String warning,
         Version pinned,
-        Supplier<Library> bound) {
+        Supplier<Library> bound,
+        Supplier<Map<String, ServiceHandlers>> handlers) {
 
     /**
      * @param name the bare name {@code --module} itself takes, e.g. {@code dataloader}
@@ -133,7 +138,7 @@ public record LoadedPackage(
 
     public LoadedPackage withLibrary(Library replacement) {
         return new LoadedPackage(qualified, version, replacement, readme, module, submodules, modules, warning,
-                pinned, () -> replacement);
+                pinned, () -> replacement, handlers);
     }
 
     /**
@@ -143,5 +148,10 @@ public record LoadedPackage(
     public LoadedPackage withBindings() {
         Library settled = bound.get();
         return settled == library ? this : withLibrary(settled);
+    }
+
+    /** The handlers the package describes for the service type {@code name}, when it describes any. */
+    public Optional<ServiceHandlers> handlersOf(String name) {
+        return Optional.ofNullable(handlers.get().get(name));
     }
 }

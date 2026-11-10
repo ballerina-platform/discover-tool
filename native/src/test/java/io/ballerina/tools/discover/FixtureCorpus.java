@@ -25,10 +25,12 @@ import io.ballerina.tools.discover.central.schema.Schema;
 import io.ballerina.tools.discover.model.Bindings;
 import io.ballerina.tools.discover.model.FromCentral;
 import io.ballerina.tools.discover.model.Library;
+import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.ObjectInclusions;
 import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.source.SourceInclusions;
+import io.ballerina.tools.discover.source.TriggerMetadata;
 import io.ballerina.tools.discover.views.Readmes;
 
 import java.io.IOException;
@@ -96,6 +98,8 @@ public final class FixtureCorpus {
      * answer.
      */
     public static final Path SOURCES_DIR = RESOURCES.resolve("sources");
+
+    private static final String TRIGGER_METADATA_FILE = "trigger-metadata.json";
 
     public static final Path KEYSPACE_SNAPSHOT = SNAPSHOTS_DIR.resolve("keyspace.txt");
 
@@ -229,6 +233,19 @@ public final class FixtureCorpus {
         }
     }
 
+    /** The recorded {@code metadata/trigger-metadata.json} of one fixture's package, or empty when none was. */
+    public static Optional<JsonElement> recordedTriggerMetadata(String slug) {
+        Path file = SOURCES_DIR.resolve(slug).resolve(TRIGGER_METADATA_FILE);
+        if (!Files.isRegularFile(file)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)));
+        } catch (IOException cause) {
+            throw new UncheckedIOException("recorded trigger metadata for " + slug + " is unreadable", cause);
+        }
+    }
+
     /** A fixture as the views receive it, under a FIXED version and a verified load. */
     public static LoadedPackage loadedFixture(String slug) {
         Result<CentralDocs.Module> module =
@@ -248,7 +265,9 @@ public final class FixtureCorpus {
                 List.of(),
                 Loader.unverifiedWarning(false),
                 null,
-                () -> library);
+                () -> library,
+                () -> recordedTriggerMetadata(slug).map(json -> TriggerMetadata.parse(json,
+                        new ModuleRef(module.value().orgName(), module.value().id()).prefix())).orElse(Map.of()));
     }
 
     /**

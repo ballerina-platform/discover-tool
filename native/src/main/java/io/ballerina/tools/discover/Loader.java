@@ -22,17 +22,22 @@ import io.ballerina.tools.discover.central.CentralClient;
 import io.ballerina.tools.discover.central.DependenciesToml;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.PackageRepository;
+import io.ballerina.tools.discover.central.SharedSources;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.model.Bindings;
 import io.ballerina.tools.discover.model.FromCentral;
 import io.ballerina.tools.discover.model.Library;
+import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Pipeline;
+import io.ballerina.tools.discover.model.ServiceHandlers;
 import io.ballerina.tools.discover.source.SourceInclusions;
+import io.ballerina.tools.discover.source.TriggerMetadata;
 import io.ballerina.tools.discover.views.Readmes;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -272,10 +277,16 @@ public final class Loader {
             return module.cast();
         }
         Library library = Pipeline.build(module.value());
+        PackageRepository repository = new SharedSources(fetched.repository());
         Supplier<Library> bound = Bindings.needsSource(module.value())
                 ? memoized(() -> Pipeline.build(module.value(), SourceInclusions.load(
-                        fetched.repository(), qualified, resolved, module.value().id(), options.http())))
+                        repository, qualified, resolved, module.value().id(), options.http())))
                 : () -> library;
+        String prefix = new ModuleRef(module.value().orgName(), module.value().id()).prefix();
+        Supplier<Map<String, ServiceHandlers>> handlers = submodule == null && !module.value().serviceTypes().isEmpty()
+                ? memoized(() -> TriggerMetadata.load(
+                        repository, qualified, resolved, module.value().id(), prefix, options.http()))
+                : Map::of;
 
         return Result.ok(new LoadedPackage(
                 qualified,
@@ -287,7 +298,8 @@ public final class Loader {
                 moduleNamesOf(docs, qualified),
                 unverifiedWarning(resolved.stale()),
                 options.version(),
-                bound));
+                bound,
+                handlers));
     }
 
     private static <T> Supplier<T> memoized(Supplier<T> compute) {

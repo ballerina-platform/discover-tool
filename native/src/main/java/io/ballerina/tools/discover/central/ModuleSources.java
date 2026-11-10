@@ -38,7 +38,8 @@ public interface ModuleSources {
 
     /**
      * @param moduleId the module's full id as Central names it — {@code http}, or {@code http.httpscerr}
-     * @return the module's {@code .bal} files by file name
+     * @return the module's {@code .bal} files by file name, and under {@link Bala#TRIGGER_METADATA} the package's
+     *     handler description when its bala carries one
      */
     Optional<Map<String, String>> moduleSources(
             QualifiedName qualified, Version version, String moduleId, HttpOptions options);

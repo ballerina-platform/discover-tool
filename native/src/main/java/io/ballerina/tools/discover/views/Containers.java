@@ -27,6 +27,7 @@ import io.ballerina.tools.discover.model.Fn;
 import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.Param;
 import io.ballerina.tools.discover.model.Service;
+import io.ballerina.tools.discover.model.ServiceHandlers;
 import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Signatures;
@@ -663,6 +664,10 @@ public final class Containers {
             container = Surface.byName(Surface.of(loaded.library(), Surface.Scope.SERVICE), container.name())
                     .orElse(container);
         }
+        Optional<DiscoverResult> handlers = handlerAnswer(loaded, container, selectors, options);
+        if (handlers.isPresent()) {
+            return Result.ok(handlers.get());
+        }
         int read = consumed(container, selectors);
         List<Entry> selected = select(container, selectors.subList(0, read));
         if (selected.isEmpty() && read > 0) {
@@ -683,6 +688,28 @@ public final class Containers {
             return signature(loaded, scope, container, selectors, selected.get(0), options, documented, note);
         }
         return listing(loaded, scope, container, selectors, selected, options, documented, note);
+    }
+
+    // A service type that only marks what a listener accepts has no methods of its own; its package may describe the
+    // ones a service defines, and naming one of them narrows the answer to it.
+    private static Optional<DiscoverResult> handlerAnswer(LoadedPackage loaded, Surface.Container container,
+            List<String> selectors, Options options) {
+        boolean marker = container.scope() == Surface.Scope.SERVICE && !options.filtered() && selectors.size() <= 1
+                && entriesOf(container).stream().noneMatch(entry -> !(entry.fn() instanceof Fn.Constructor));
+        Optional<ServiceHandlers> described = marker ? loaded.handlersOf(container.name()) : Optional.empty();
+        if (described.isEmpty()) {
+            return Optional.empty();
+        }
+        List<ServiceHandlers.Handler> handlers = described.get().handlers();
+        if (!selectors.isEmpty()) {
+            handlers = handlers.stream().filter(handler -> selectors.get(0).equals(handler.name())).toList();
+            if (handlers.isEmpty()) {
+                return Optional.empty();
+            }
+        }
+        List<ServiceHandlers.Rule> rules = selectors.isEmpty() ? described.get().rules() : List.of();
+        return Optional.of(new DiscoverResult.ServiceHandlerList(
+                containerName(container), handlers, rules, loaded.warning(), listenerNote(loaded, container)));
     }
 
     /**

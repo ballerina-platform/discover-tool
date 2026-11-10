@@ -173,6 +173,9 @@ public class PointersTest {
                 methods.methods().forEach(method -> commands.add(method.command()));
                 addIfPresent(commands, methods.next());
             }
+            case DiscoverResult.ServiceHandlerList ignored -> {
+                // The handlers a service defines are code to write, not commands to run.
+            }
             case DiscoverResult.Readme ignored -> {
                 // No embedded command fields on the whole-readme/single-chunk answer.
             }

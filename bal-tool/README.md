@@ -167,6 +167,32 @@ http:Listener — not confirmed (package source unavailable)
 Next: bal discover ballerina/http service <name>
 ```
 
+Most listener packages declare their service type with no methods (`public type Service distinct service object {};`),
+because the methods a service defines are enforced by the package's compiler plugin. Recent versions publish them as
+data, in the bala's `metadata/trigger-metadata.json`, found the same way as the source above and cached per version.
+Opening such a service type lists them under *Methods to implement*, each marked `required`, `optional` or
+`any number`, with its parameters and documentation; naming one shows it alone. A version that publishes no such
+file keeps the answer without methods.
+
+```
+$ bal discover ballerinax/kafka service Service
+ballerinax/kafka:4.6.6 · service · Service
+Methods to implement (2)
+
+remote function onConsumerRecord(kafka:Caller caller, kafka:AnydataConsumerRecord[]|kafka:BytesConsumerRecord[] records) returns error?
+  required
+  Invoked with each batch of records polled from the subscribed topics. [...]
+  caller (optional): Handle for committing offsets explicitly. Needed only when auto-commit is disabled.
+  records (required): The polled batch. [...]
+
+remote function onError(kafka:Error kafkaError) returns error?
+  optional
+  Invoked when polling fails, or when a polled batch cannot be dispatched, [...]
+  kafkaError (required): The failure that prevented the batch from being delivered.
+
+Note: binds to kafka:Listener
+```
+
 A listener whose `attach` takes another package's type points there:
 
 ```

@@ -18,6 +18,8 @@
 
 package io.ballerina.tools.discover.render;
 
+import io.ballerina.tools.discover.model.ServiceHandlers;
+
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -262,6 +264,28 @@ public sealed interface DiscoverResult {
     record MethodList(
             String container, List<Method> methods, int shown, int total, Paging paging, String next,
             Documented documented, String warning, String note) implements DiscoverResult { }
+
+    /**
+     * What a service type's package says a service of it must or may define: the methods to implement, and the
+     * constraints across them. Shown instead of "no methods" for a service type that is only a marker, so the caller
+     * learns {@code onConsumerRecord} from the tool rather than from a search.
+     *
+     * @param container the service type
+     * @param handlers the methods, in the package's own order
+     * @param rules the constraints that range over more than one of them
+     * @param warning why the loaded version cannot be trusted, or {@code null} when it was confirmed against the
+     *     registry — see {@code Loader.unverifiedWarning}
+     * @param note the listener the service type binds to, or that it is attachable to none
+     */
+    record ServiceHandlerList(
+            String container, List<ServiceHandlers.Handler> handlers, List<ServiceHandlers.Rule> rules,
+            String warning, String note) implements DiscoverResult {
+
+        public ServiceHandlerList {
+            handlers = List.copyOf(handlers);
+            rules = List.copyOf(rules);
+        }
+    }
 
     /**
      * The {@code readme} bucket's own answer: the whole readme verbatim, or — when a chunk selector resolved to
