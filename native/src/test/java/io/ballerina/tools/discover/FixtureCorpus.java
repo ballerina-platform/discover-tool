@@ -24,11 +24,13 @@ import io.ballerina.tools.discover.central.schema.CentralDocs;
 import io.ballerina.tools.discover.central.schema.Schema;
 import io.ballerina.tools.discover.model.Bindings;
 import io.ballerina.tools.discover.model.FromCentral;
+import io.ballerina.tools.discover.model.InlineRecords;
 import io.ballerina.tools.discover.model.Library;
 import io.ballerina.tools.discover.model.ModuleRef;
 import io.ballerina.tools.discover.model.ObjectInclusions;
 import io.ballerina.tools.discover.model.Pipeline;
 import io.ballerina.tools.discover.render.Documents;
+import io.ballerina.tools.discover.source.SourceFacts;
 import io.ballerina.tools.discover.source.SourceInclusions;
 import io.ballerina.tools.discover.source.TriggerMetadata;
 import io.ballerina.tools.discover.views.Readmes;
@@ -209,10 +211,12 @@ public final class FixtureCorpus {
                 throw new AssertionError("fixture " + key + " has no module named after it: "
                         + module.failure().describe());
             }
+            Optional<SourceFacts> facts = recordedSources(key).flatMap(SourceInclusions::parseFacts);
             Optional<ObjectInclusions> inclusions = Bindings.needsSource(module.value())
-                    ? recordedSources(key).flatMap(SourceInclusions::parse)
+                    ? facts.map(SourceFacts::inclusions)
                     : Optional.empty();
-            return Pipeline.build(module.value(), inclusions);
+            return Pipeline.build(module.value(), inclusions,
+                    facts.<InlineRecords>map(SourceFacts::inlineRecords).orElse(InlineRecords.NONE));
         });
     }
 

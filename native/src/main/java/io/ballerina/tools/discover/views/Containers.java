@@ -179,7 +179,7 @@ public final class Containers {
 
     public static Result<DiscoverResult> render(LoadedPackage loaded, Surface.Scope scope, Options options) {
         if (scope == Surface.Scope.SERVICE) {
-            loaded = loaded.withBindings();
+            loaded = loaded.withSource();
         }
         List<Surface.Container> containers = Surface.of(loaded.library(), scope);
         List<String> selectors = options.selectors();
@@ -660,7 +660,7 @@ public final class Containers {
         if (container.scope() == Surface.Scope.SERVICE) {
             // However the caller reached it — `type Interceptor` as well as `service Interceptor` — a service
             // type's answer says which listener it binds to, and that is settled from the source.
-            loaded = loaded.withBindings();
+            loaded = loaded.withSource();
             container = Surface.byName(Surface.of(loaded.library(), Surface.Scope.SERVICE), container.name())
                     .orElse(container);
         }

@@ -701,8 +701,8 @@ public class CliTest {
                 options(transport), projectDir.toString()), 0, capture.stderr());
         Assert.assertTrue(transport.urls().stream().anyMatch(url -> url.endsWith("/docs/ballerinax/kafka/4.6.5")),
                 transport.urls().toString());
-        Assert.assertTrue(transport.urls().stream().noneMatch(url -> url.contains("/registry/")),
-                transport.urls().toString());
+        Assert.assertTrue(transport.urls().stream()
+                .noneMatch(url -> url.endsWith("/registry/packages/ballerinax/kafka")), transport.urls().toString());
         Assert.assertTrue(capture.stdout().contains("\"bal discover ballerinax/kafka client Producer\""),
                 capture.stdout());
         Assert.assertFalse(capture.stdout().contains(":4.6.5"), capture.stdout());

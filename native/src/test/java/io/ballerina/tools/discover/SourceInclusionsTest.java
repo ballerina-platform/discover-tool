@@ -27,7 +27,9 @@ import io.ballerina.tools.discover.central.CentralRepository;
 import io.ballerina.tools.discover.central.HttpOptions;
 import io.ballerina.tools.discover.central.PackageRepository;
 import io.ballerina.tools.discover.central.schema.CentralDocs;
+import io.ballerina.tools.discover.model.InlineRecords;
 import io.ballerina.tools.discover.model.ObjectInclusions;
+import io.ballerina.tools.discover.source.SourceFacts;
 import io.ballerina.tools.discover.source.SourceInclusions;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -195,17 +197,18 @@ public class SourceInclusionsTest {
         DocsCache cache = diskCache();
         FakeTransport transport = central(Optional.of(bala(httpSources())));
 
-        Optional<ObjectInclusions> first = SourceInclusions.load(
+        Optional<SourceFacts> first = SourceInclusions.load(
                 CENTRAL, HTTP, RESOLVED, "http", options(transport, cache));
         int calls = transport.calls();
-        Optional<ObjectInclusions> second = SourceInclusions.load(
+        Optional<SourceFacts> second = SourceInclusions.load(
                 CENTRAL, HTTP, RESOLVED, "http", options(transport, cache));
 
         Assert.assertTrue(first.isPresent());
         Assert.assertEquals(second, first);
         Assert.assertEquals(transport.calls(), calls, "the second load reached the network");
         DocsCache.DocsKey key = new DocsCache.DocsKey("central", "ballerina", "http", "2.16.6");
-        Assert.assertEquals(cache.readInclusions(key, "http", SourceInclusions.DERIVATION).getAsJsonObject()
+        Assert.assertEquals(cache.readInclusions(key, "http", SourceInclusions.DERIVATION)
+                .getAsJsonObject().getAsJsonObject("inclusions")
                 .getAsJsonArray("ServiceContract").get(0).getAsString(), "Service");
     }
 
@@ -217,10 +220,10 @@ public class SourceInclusionsTest {
         cache.writeInclusions(key, "http", "0", JsonParser.parseString("{}"));
         FakeTransport transport = central(Optional.of(bala(httpSources())));
 
-        Optional<ObjectInclusions> read = SourceInclusions.load(
+        Optional<SourceFacts> read = SourceInclusions.load(
                 CENTRAL, HTTP, RESOLVED, "http", options(transport, cache));
 
-        Assert.assertTrue(read.orElseThrow().byType().containsKey("ServiceContract"));
+        Assert.assertTrue(read.orElseThrow().inclusions().byType().containsKey("ServiceContract"));
         Assert.assertTrue(transport.urls().contains(BALA_URL));
     }
 
@@ -229,16 +232,50 @@ public class SourceInclusionsTest {
         DocsCache cache = diskCache();
         DocsCache.DocsKey key = new DocsCache.DocsKey("central", "ballerina", "http", "2.16.6");
         String derivation = SourceInclusions.DERIVATION;
-        cache.writeInclusions(key, "http", derivation, JsonParser.parseString("{\"ServiceContract\":[1]}"));
+        cache.writeInclusions(key, "http", derivation,
+                JsonParser.parseString("{\"inclusions\":{\"ServiceContract\":[1]},\"inlineRecords\":[]}"));
 
         Assert.assertTrue(SourceInclusions.load(CENTRAL, HTTP, RESOLVED, "http",
                 options(central(Optional.empty()), cache)).isEmpty());
-        Assert.assertEquals(cache.readInclusions(key, "http", derivation).toString(), "{\"ServiceContract\":[1]}");
+        Assert.assertEquals(cache.readInclusions(key, "http", derivation).toString(),
+                "{\"inclusions\":{\"ServiceContract\":[1]},\"inlineRecords\":[]}");
 
         Assert.assertTrue(SourceInclusions.load(CENTRAL, HTTP, RESOLVED, "http",
                 options(central(Optional.of(bala(httpSources()))), cache)).isPresent());
         Assert.assertTrue(cache.readInclusions(key, "http", derivation).getAsJsonObject()
-                .has("InterceptableService"));
+                .getAsJsonObject("inclusions").has("InterceptableService"));
+    }
+
+    @Test
+    public void anInlineRecordsOptionalityAndDefaultsAreRecoveredByItsFieldNames() {
+        InlineRecords.Declared records = SourceInclusions.parseFacts(Map.of("types.bal", """
+                public type HttpOutput record {|
+                    record {|string contentType?; int contentLength;|} headers;
+                    record {|
+                        string[] versions = [
+                            "1.1"
+                        ];
+                    |} protocol?;
+                |};
+                """)).orElseThrow().inlineRecords();
+
+        Map<String, InlineRecords.Member> headers = records.recover(List.of("contentLength", "contentType"))
+                .orElseThrow();
+        Assert.assertTrue(headers.get("contentType").optional());
+        Assert.assertFalse(headers.get("contentLength").optional());
+        Assert.assertEquals(records.recover(List.of("versions")).orElseThrow().get("versions").defaultValue(),
+                "[ \"1.1\" ]");
+        Assert.assertTrue(records.recover(List.of("code")).isEmpty(), "a named record is not an inline one");
+    }
+
+    @Test
+    public void twoInlineRecordsWithTheSameFieldsAndDifferentAnswersRecoverNothing() {
+        InlineRecords.Declared records = SourceInclusions.parseFacts(Map.of("types.bal", """
+                public type A record {| record {|string a?;|} x; |};
+                public type B record {| record {|string a;|} y; |};
+                """)).orElseThrow().inlineRecords();
+
+        Assert.assertTrue(records.recover(List.of("a")).isEmpty());
     }
 
     @Test

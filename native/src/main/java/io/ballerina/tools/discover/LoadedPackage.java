@@ -44,8 +44,8 @@ import java.util.function.Supplier;
  *     registry — see {@link Loader#unverifiedWarning}
  * @param pinned the version the caller wrote in the coordinate, or {@code null} when it was resolved — carried into
  *     every command this lookup prints, so drilling further stays on the version being read
- * @param bound {@code library} with its service bindings read from the package source — deferred, since only an
- *     answer that shows a service type needs it, and reading it can mean a download
+ * @param bound {@code library} with what the package source settles — deferred, since only an
+ *     answer that shows a service type or an inline record needs it, and reading it can mean a download
  * @param handlers the handler methods the package describes for its service types, by service type name — deferred
  *     like {@code bound}, and empty for a version that describes none
  * @since 0.1.0
@@ -142,10 +142,10 @@ public record LoadedPackage(
     }
 
     /**
-     * The same package with its service bindings settled from the package source where the docs payload cannot
-     * settle them — read on first call, and only by an answer that shows a service type.
+     * The same package with what only the package source settles — service bindings and what inline records
+     * declare — read on first call, and only by an answer that needs it.
      */
-    public LoadedPackage withBindings() {
+    public LoadedPackage withSource() {
         Library settled = bound.get();
         return settled == library ? this : withLibrary(settled);
     }
