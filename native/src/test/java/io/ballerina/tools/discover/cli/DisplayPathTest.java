@@ -30,15 +30,19 @@ import java.nio.file.Path;
  */
 public class DisplayPathTest {
 
+    private static final String HOME = Path.of("/home/alice").toString();
+
     @Test
     public void theSettingsFileIsNamedWithATildeOnlyUnderTheUsersHome() {
-        Assert.assertEquals(DiscoverTool.displayPath(Path.of("/home/alice/.ballerina/Settings.toml"), "/home/alice"),
-                "~/.ballerina/Settings.toml");
-        Assert.assertEquals(DiscoverTool.displayPath(Path.of("/opt/bal-home/Settings.toml"), "/home/alice"),
-                "/opt/bal-home/Settings.toml");
-        Assert.assertEquals(DiscoverTool.displayPath(Path.of("/home/alicia/Settings.toml"), "/home/alice"),
-                "/home/alicia/Settings.toml");
-        Assert.assertEquals(DiscoverTool.displayPath(Path.of("/home/alice/Settings.toml"), ""),
-                "/home/alice/Settings.toml");
+        Path settings = Path.of(HOME, ".ballerina", "Settings.toml");
+        Assert.assertEquals(DiscoverTool.displayPath(settings, HOME),
+                "~" + settings.getFileSystem().getSeparator() + Path.of(".ballerina", "Settings.toml"));
+        assertShownWhole(Path.of("/opt/bal-home/Settings.toml"), HOME);
+        assertShownWhole(Path.of("/home/alicia/Settings.toml"), HOME);
+        assertShownWhole(Path.of(HOME, "Settings.toml"), "");
+    }
+
+    private static void assertShownWhole(Path file, String userHome) {
+        Assert.assertEquals(DiscoverTool.displayPath(file, userHome), file.toString());
     }
 }

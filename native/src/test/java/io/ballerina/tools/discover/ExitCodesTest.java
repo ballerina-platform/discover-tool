@@ -186,8 +186,9 @@ public class ExitCodesTest {
         Assert.assertEquals(capture.field("severity"), "error", label);
         String message = capture.field("message");
         Assert.assertFalse(message.endsWith("."), label + " -> " + message);
-        Assert.assertTrue(message.startsWith("Central") || !Character.isUpperCase(message.charAt(0)),
-                label + " -> " + message);
+        boolean namesTheLockFile = run.projectDir() != null && message.startsWith(run.projectDir());
+        Assert.assertTrue(message.startsWith("Central") || namesTheLockFile
+                || !Character.isUpperCase(message.charAt(0)), label + " -> " + message);
         Assert.assertEquals(RETRYABLE_KINDS.contains(run.kind()), run.retry(), label);
         Assert.assertFalse(capture.field("suggestion").contains(LATER) && !run.retry(),
                 "only a retryable kind says to run it again later: " + label + " -> " + capture.stderr());
