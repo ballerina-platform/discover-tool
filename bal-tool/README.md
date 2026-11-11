@@ -1010,8 +1010,12 @@ and caching is off when none of them is usable.
 
 ## Installing it
 
-Install it from Ballerina Central:
+`bal discover` needs Ballerina 2201.14.0 or later. Check with `bal version`, and update with
+`bal dist pull 2201.14.0` (or `bal dist update` for the latest). Then install it from Ballerina Central:
 
 ```bash
 bal tool pull discover
 ```
+
+On an older distribution, `bal tool pull discover` fails: Central has no version of the tool for it. Update
+the distribution and pull again.
