@@ -1012,11 +1012,15 @@ and caching is off when none of them is usable.
 
 ## Installing it
 
-Install it from Ballerina Central:
+`bal discover` needs Ballerina 2201.14.0 or later. Check with `bal version`, and update with
+`bal dist pull 2201.14.0` (or `bal dist update` for the latest). Then install it from Ballerina Central:
 
 ```bash
 bal tool pull discover
 ```
+
+On an older distribution, `bal tool pull discover` fails: Central has no version of the tool for it. Update
+the distribution and pull again.
 
 ## Building from the source
 
@@ -1143,6 +1147,18 @@ Publishing is manual, from GitHub Actions:
   the bala to Central and opens a sync pull request with the next `-SNAPSHOT` version.
 
 Before releasing, move `CHANGELOG.md`'s `[Unreleased]` entries under the new version.
+
+The release template runs in this order: tag `v<version>` and branch `release-<version>`, push the bala to
+Central, publish to GitHub Packages, create the GitHub release, open the sync pull request. If a run fails:
+
+- **Before Central has the version** (`bal tool search discover` doesn't list it): delete the tag and the
+  `release-<version>` branch on GitHub, fix the cause, and run the release again.
+- **After Central has the version:** don't re-run, because the tag exists and Central rejects the same
+  version. Never delete the tag. Finish by hand: create the GitHub release from the tag
+  (`gh release create v<version> --title "module-ballerina-tool_discover-v<version>"`), then open a pull
+  request from `release-<version>` to `main`. If the GitHub Packages publish failed, run it from a checkout of
+  the tag: `./gradlew -Pversion=<version> publishMavenPublicationToGitHubPackagesRepository -x test`, with
+  `packageUser`/`packagePAT` set to a token that has `write:packages`.
 
 ## Contributing to Ballerina
 
