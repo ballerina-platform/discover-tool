@@ -60,7 +60,7 @@ dependencies {
 }
 
 tasks.register('updateTomlFiles') {
-    dependsOn ':native:build'
+    dependsOn ':discover-tool-native:build'
     def projectVersion = project.version
     doLast {
         def newBallerinaToml = ballerinaTomlFilePlaceHolder.text.replace('@toml.version@', tomlVersion)

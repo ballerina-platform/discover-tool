@@ -40,9 +40,9 @@ pluginManagement {
 rootProject.name = 'bal-discover-tool'
 
 include ':checkstyle'
-include ':native'
-include ':bal-tool'
+include ':discover-tool-native'
+include ':discover-tool'
 
 project(':checkstyle').projectDir = file('config/checkstyle')
-project(':native').projectDir = file('native')
-project(':bal-tool').projectDir = file('bal-tool')
+project(':discover-tool-native').projectDir = file('native')
+project(':discover-tool').projectDir = file('bal-tool')
