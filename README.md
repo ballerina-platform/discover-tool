@@ -1149,22 +1149,18 @@ Publishing is manual, from GitHub Actions:
 Before releasing, move `CHANGELOG.md`'s `[Unreleased]` entries under the new version.
 
 The release template runs in this order: tag `v<version>` and branch `release-<version>`, push the bala to
-Central, publish to GitHub Packages, create the GitHub release, open the sync pull request. If a run fails,
-first check whether Central has the version. Ask Central's registry directly, not `bal tool search`, which may go
-through a configured repository or proxy:
+Central, publish to GitHub Packages, create the GitHub release, open the sync pull request. If a run fails
+after Central has the version, don't re-run it: the tag exists and Central rejects the same version. Never
+delete the tag. Finish by hand: create the GitHub release from the tag
+(`gh release create v<version> --title "module-ballerina-tool_discover-v<version>"`), then open a pull request
+from `release-<version>` to `main`. If the GitHub Packages publish failed, run it from a checkout of the tag:
+`./gradlew -Pversion=<version> publishMavenPublicationToGitHubPackagesRepository -x test`, with
+`packageUser`/`packagePAT` set to a token that has `write:packages`. To see whether Central has the version,
+ask its registry directly, not `bal tool search`, which may go through a configured repository or proxy:
 
 ```bash
 curl -s https://api.central.ballerina.io/2.0/registry/packages/ballerina/tool_discover   # e.g. ["0.1.0"]
 ```
-
-- **Before Central has the version:** delete the tag and the `release-<version>` branch on GitHub, fix the
-  cause, and run the release again.
-- **After Central has the version:** don't re-run, because the tag exists and Central rejects the same
-  version. Never delete the tag. Finish by hand: create the GitHub release from the tag
-  (`gh release create v<version> --title "module-ballerina-tool_discover-v<version>"`), then open a pull
-  request from `release-<version>` to `main`. If the GitHub Packages publish failed, run it from a checkout of
-  the tag: `./gradlew -Pversion=<version> publishMavenPublicationToGitHubPackagesRepository -x test`, with
-  `packageUser`/`packagePAT` set to a token that has `write:packages`.
 
 ## Contributing to Ballerina
 
