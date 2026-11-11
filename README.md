@@ -1038,8 +1038,8 @@ export packagePAT="$(gh auth token)"
 
 | Path | What it is |
 |---|---|
-| `native/` | The tool itself (`io.ballerina.tools.discover`): Central client and cache, the model built from Central's docs payload, the views, and the JSON/text renderers. |
-| `bal-tool/` | Packs `native`'s jar into the `ballerina/tool_discover` bala (platform `java25`) with `io.ballerina.plugin`, the way `openapi-tools` packs `bal openapi`. |
+| `native/` | Gradle project `discover-tool-native`. The tool itself (`io.ballerina.tools.discover`): Central client and cache, the model built from Central's docs payload, the views, and the JSON/text renderers. |
+| `bal-tool/` | Gradle project `discover-tool`, published to GitHub Packages as the Maven artifact `io.ballerina:discover-tool`. Packs `native`'s jar into the `ballerina/tool_discover` bala (platform `java25`) with `io.ballerina.plugin`, the way `openapi-tools` packs `bal openapi`. |
 | `config/resources/` | The `Ballerina.toml`/`BalTool.toml` templates for the bala. `BalTool.toml` declares the tool id `discover`, the name `bal` dispatches on. |
 | `native/src/test/resources/fixtures/` | Recorded Central payloads; the whole test suite runs against them, offline. |
 | `native/src/test/resources/snapshots/` | Per fixture, the `.bal` API document and every noun's bare listing as `.buckets.txt`/`.buckets.json`. |
@@ -1052,17 +1052,17 @@ HTTP is `java.net.http` from the JDK.
 ### Build and test
 
 ```bash
-./gradlew build                   # everything, including checkstyle, spotbugs and the tests
-./gradlew :native:test            # the test suite: offline, no network, no access to your real cache
-./gradlew :native:check           # tests plus the coverage floor (80% instructions, 70% branches)
-./gradlew :bal-tool:build         # package the tool jar into a ballerina/tool_discover bala
+./gradlew build                         # everything, including checkstyle, spotbugs and the tests
+./gradlew :discover-tool-native:test    # the test suite: offline, no network, no access to your real cache
+./gradlew :discover-tool-native:check   # tests plus the coverage floor (80% instructions, 70% branches)
+./gradlew :discover-tool:build          # package the tool jar into a ballerina/tool_discover bala
 ```
 
 When a rendering change is intentional, regenerate the snapshots and review the diff before committing it:
 
 ```bash
-UPDATE_SNAPSHOTS=1 ./gradlew :native:test               # answer snapshots and usage text
-BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :native:test   # after re-recording the fixtures
+UPDATE_SNAPSHOTS=1 ./gradlew :discover-tool-native:test               # answer snapshots and usage text
+BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :discover-tool-native:test   # after re-recording the fixtures
 ```
 
 The `.bal` API snapshots have no update switch on purpose: they are the oracle every quoted declaration is
@@ -1073,9 +1073,9 @@ checked against.
 Until it is released, build and install it locally. This is the same packaging a Central publish uses:
 
 ```bash
-./gradlew :bal-tool:build -PpublishToLocalCentral=true          # pack the bala, push it to the local repository
-bal tool pull discover:<version> --repository=local              # register it as an active tool
-bal discover --help                                              # smoke test
+./gradlew :discover-tool:build -PpublishToLocalCentral=true   # pack the bala, push it to the local repository
+bal tool pull discover:<version> --repository=local           # register it as an active tool
+bal discover --help                                           # smoke test
 ```
 
 `<version>` is `gradle.properties`' `version` without its `-SNAPSHOT` suffix. Re-run the first two commands
