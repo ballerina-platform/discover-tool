@@ -39,7 +39,7 @@ import java.util.Optional;
  * or moved — including the ones the reader does not read yet, which is precisely the class of change a schema that
  * strips unknown keys cannot see.
  *
- * <p>{@code BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :native:test} rewrites the snapshot after a refresh.
+ * <p>{@code BAL_DISCOVER_UPDATE_KEYSPACE=1 ./gradlew :discover-tool-native:test} rewrites the snapshot after a refresh.
  *
  * @since 0.1.0
  */
