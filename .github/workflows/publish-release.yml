@@ -16,3 +16,4 @@ jobs:
     with:
       package-name: tool_discover
       package-org: ballerina
+      additional-build-flags: "-PautoCommitToml"

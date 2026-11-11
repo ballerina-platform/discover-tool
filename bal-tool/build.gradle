@@ -75,13 +75,15 @@ tasks.register('commitTomlFiles')  {
     def execHelper = project.objects.newInstance(BallerinaExecHelper)
     def autoCommit = project.hasProperty('autoCommitToml')
     onlyIf { autoCommit }
+    def tomlFiles = 'Ballerina.toml BalTool.toml Dependencies.toml'
+    def tomlCommitMessage = "chore: update the bal-tool toml files for ${tomlVersion}"
     doLast {
         execHelper.execOperations.exec {
             ignoreExitValue = true
             if (Os.isFamily(Os.FAMILY_WINDOWS)) {
-                commandLine 'cmd', '/c', 'git commit -m \"[Automated] Update the native jar version\" Ballerina.toml BalTool.toml'
+                commandLine 'cmd', '/c', "git commit -m \"${tomlCommitMessage}\" ${tomlFiles}"
             } else {
-                commandLine 'sh', '-c', "git commit -m '[Automated] Update the native jar version' Ballerina.toml BalTool.toml"
+                commandLine 'sh', '-c', "git commit -m '${tomlCommitMessage}' ${tomlFiles}"
             }
         }
     }
