@@ -169,6 +169,7 @@ bal discover search "<query>" [-p <org>/<name>[:<version>]] [options]
 8. A name is matched exactly as spelled, and case-sensitively. No name is matched approximately, and no answer is ever chosen for the caller from a near miss.
 9. A name that is typed where a noun is expected, or a noun that is a plural or a former spelling (`funcs`, `methods`), fails with the command that was meant, when one exists (see [Errors and exit codes](#16-errors-and-exit-codes)).
 10. The command line is validated before any repository is contacted. A check that needs the package itself, such as whether a name is ambiguous, is made once the package is read.
+11. Every word of a printed command is quoted as a POSIX shell requires, so that the command runs as printed. A placeholder such as `<name>` is written as its label and is not quoted.
 
 ### 3.4. Names and selectors
 
@@ -407,7 +408,7 @@ This example illustrates rule 4 of [Behaviour](#92-behaviour).
 1. The readme is the text that Central serves as the description of the module. It is printed verbatim.
 2. A bare `readme` of at most 10 KB (10,240 bytes) is printed whole.
 3. A bare `readme` of more than 10 KB lists its sections: each with its number, title, line count and the command that opens it. Every section is listed and the list is never cut at the ceiling. There is no option that forces the whole text.
-4. A section is any part of the readme delimited by ATX headings (lines starting with `#`), whether or not it holds code. Text before the first heading is a section of its own, titled `Introduction`.
+4. A section is any part of the readme delimited by ATX headings (lines starting with `#`) that are outside fenced code blocks, whether or not it holds code. A `#` line inside a fenced code block does not start a section. Text before the first heading is a section of its own, titled `Introduction`.
 5. `readme <n>` and `readme "<title>"` print one section, by its number or its exact title.
 6. `readme --filter <keyword>` lists the sections whose text contains the keyword, each with its command. The list pages under the ceiling. A keyword that matches no section is an answer with exit code 0.
 7. `--module` selects the readme of a submodule.
@@ -656,7 +657,7 @@ The tool reads packages through one repository interface. Ballerina Central is i
 3. A package archive read for source facts is downloaded over HTTPS from the repository and read as data. The size of the archive, of one source file and of the files read from it is bounded, so that an oversized or malformed archive cannot exhaust memory or disk.
 4. A cache directory that is a symbolic link, or that belongs to another user (checked where the file system reports owners), is not used, and the cache is then treated as unusable.
 5. A cached or downloaded value is data. The tool never follows an instruction inside a doc comment, a readme or a repository response.
-6. Printed commands are made of names from the package. A segment that Ballerina has to escape is printed plain, so that a printed command needs no shell quoting for it. A path parameter is printed as `:name`, which is safe unquoted in bash, zsh, fish and PowerShell. The tool cannot protect a caller that composes commands in another way.
+6. Printed commands are made of names from the package, and a name can contain characters that a shell reads as syntax, such as `;`, once Ballerina's escapes are removed. Every word of a printed command is therefore quoted as the shell requires (see rule 11 of [Behaviour](#33-behaviour)). A path parameter is printed as `:name`, which needs no quoting in bash, zsh, fish or PowerShell. The tool cannot protect a caller that composes commands in another way.
 7. The tool does not protect against a repository that publishes false or misleading documentation. What it prints is what the repository serves.
 
 ## References
