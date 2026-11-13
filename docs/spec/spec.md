@@ -110,7 +110,7 @@ The tool never calls a model, never writes to the project it is run in, and neve
 - **Container**: an object type that has members: a client, a service type or a class. A container flag names one.
 - **Client**: an object type whose members are called with `->`.
 - **Service type**: a `service object` type.
-- **Class**: a plain object type whose members are called with `.` and that is neither a client nor a service type.
+- **Class**: a plain object type whose members are called with `.` and that is neither a client, a service type nor a listener.
 - **Listener**: the declaration a service is attached to. A listener is opened with `type`, never with `service`.
 - **Resource method**: a member called as `client->path.accessor(...)`. A **path** and an **accessor** together address one resource method.
 - **Remote method**: a member called as `client->name(...)`.
@@ -118,7 +118,11 @@ The tool never calls a model, never writes to the project it is run in, and neve
 - **Function**: a module-level callable.
 - **Listing**: an answer that lists several entries, each of which opens one thing.
 - **Leaf**: an answer about one declaration: one callable or one type.
-- **Entry**: one row of a listing.
+- **Entry**: one row of a listing. This specification says "entry" for a row.
+- **Section**: a part of a readme delimited by a heading, or a titled group of entries in a listing.
+- **Member**: a method, resource method or field declared by a container or a type.
+- **Owner**: a container that declares a name that was asked for.
+- **Declaration**: the source text of a type or callable, as the library states it.
 - **Ceiling**: the largest number of entries a listing shows at once (see [Pagination and the entry ceiling](#12-pagination-and-the-entry-ceiling)).
 - **Answer**: the structured result of a successful command.
 - **Failure**: the structured result of a command that cannot answer.
@@ -142,7 +146,7 @@ bal discover search "<query>" [-p <org>/<name>[:<version>]] [options]
 
 | Option                                    | Type                | Default                     | Meaning                                                                                                                                                       |
 |-------------------------------------------|---------------------|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `-p`, `--package`                         | coordinate          | Required, except on `package` and `search` | The package to read. On `search` it restricts the search to that package. Not accepted by `package`, which takes the coordinate as its name.   |
+| `-p`, `--package`                         | coordinate          | `Required`; on `package` and `search` see the meaning | The package to read. On `search` it is optional and restricts the search to that package. Not accepted by `package`, which takes the coordinate as its name.   |
 | `--client`, `--class`, `--service`        | name                | absent                      | The container that declares the method or resource asked for. Accepted by `method` and `resource` only. At most one of the three may be given.                |
 | `--accessor`                              | accessor            | absent                      | The accessor of the resource method asked for. Accepted by `resource` only.                                                                                   |
 | `--module`                                | module name         | absent                      | Reads a submodule instead of the default module. It has no short form.                                                                                        |
@@ -157,7 +161,7 @@ bal discover search "<query>" [-p <org>/<name>[:<version>]] [options]
 
 1. An option MAY be written before or after the noun.
 2. Every noun takes at most one positional value, its name: the coordinate after `package`, a container name after `client`, `service` or `class`, a method name after `method` or `function`, a resource path after `resource`, a type name after `type`, a readme section after `readme`, and a query after `search`. The noun is not a positional value.
-3. A noun given with no name answers with a listing, and a noun given a name answers about that one thing.
+3. A noun that lists, given no name, answers with a listing, and given a name answers about that one thing. `search` requires a query, and a bare `readme` prints the whole readme (see [Readme](#10-readme)).
 4. `bal discover <org>/<name>[:<version>]` is the same command as `bal discover package <org>/<name>[:<version>]`, with the same answer, exit code and options. It is the only form in which the noun may be omitted.
 5. With no arguments, the tool prints the root help and exits with 0.
 6. A printed command writes its words in this order: the noun, its name, `-p`, the container flag, `--accessor`, then the other options. A printed command always names the container of a method or resource.
@@ -184,10 +188,11 @@ The noun fixes what a name means. After `client` a name is a client, after `meth
 | Condition                                                                                                                                                                            | Failure kind |
 |--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
 | An unknown option, including `-m` and `--version` after a noun; an option without a required value, or with an invalid one; `--refresh` with a value; an option given twice, or before and after the noun | `usage`      |
-| No noun, an unknown noun, a malformed coordinate, an incomplete version, or a version typed as a name                                                                                | `usage`      |
+| No noun, an unknown noun, a malformed coordinate, an incomplete version, or a complete version typed as a name (`client 1.2.3`)                                                      | `usage`      |
+| A noun other than `package` and `search` with no `-p`. The printed command is the Central search for the name, and no package is ever supplied that the caller did not name           | `usage`      |
 | More names than the noun takes, more than one container flag, `--filter` together with a type name, `--accessor` with no path or on a noun other than `resource`                      | `usage`      |
 | `--module` with a value that is not a valid module name, or `--module` on `search` across Central                                                                                    | `usage`      |
-| `-p` on `package`, a package typed as a name, and the former package-first form (`bal discover ballerinax/kafka client Producer`)                                                       | `usage`      |
+| `-p` on `package`, a package typed as a name when there is no `-p` or when it equals the `-p` package, and the former package-first form (`bal discover ballerinax/kafka client Producer`) | `usage`      |
 
 ### 3.6. Interactions
 
@@ -195,11 +200,15 @@ The noun fixes what a name means. After `client` a name is a client, after `meth
 
 ### 3.7. Example: A command and its pieces
 
+This example illustrates rules 2 and 3 of [Behaviour](#33-behaviour).
+
 `bal discover method send -p ballerinax/kafka --client Producer` names the noun `method`, the name `send`, the package `ballerinax/kafka` and the container `Producer`. It answers with the signature of the remote method `send` of `Producer`.
 
 ### 3.8. Example: The former package-first form
 
-`bal discover ballerinax/kafka client Producer` is rejected with kind `usage` and the printed command `bal discover client Producer -p ballerinax/kafka`, by rule 9 of [Behaviour](#33-behaviour).
+This example illustrates rule 9 of [Behaviour](#33-behaviour).
+
+`bal discover ballerinax/kafka client Producer` is rejected with kind `usage` and the printed command `bal discover client Producer -p ballerinax/kafka`, by that rule.
 
 ## 4. Version resolution
 
@@ -209,7 +218,9 @@ The version of the package to read is decided once per command.
 
 ### 4.2. Configuration
 
-A version is written after a colon in the coordinate (`ballerina/http:2.15.7`). It MUST be a complete semantic version, and MUST NOT start with `v`. A version in a coordinate applies to the package, not to the module.
+| Field                          | Type             | Default                       | Meaning                                                                                                                                                                  |
+|--------------------------------|------------------|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Version in the coordinate (`<org>/<name>:<version>`) | complete semantic version | absent (see [Behaviour](#43-behaviour)) | The version to read. It MUST be complete, MUST NOT start with `v`, and MUST NOT have a leading zero in a number (`2.015.7` is a usage failure). A pre-release version is complete. It applies to the package, not to the module. |
 
 ### 4.3. Behaviour
 
@@ -270,7 +281,7 @@ A coordinate that does not resolve fails with kind `package-not-found`. A coordi
 6. A service type is bound to a listener when it is the type that the `attach` method of the listener takes as its first parameter, resolved through unions and type aliases, or when it includes that type. The binding is derived from the package source when the package listing alone cannot settle it. The source is read from the local Ballerina home repository, then from the distribution, then from the bala that Central publishes.
 7. A binding that could not be settled is listed under the candidate listener with `confirmed` false in JSON and the reason in `unconfirmedReason`, and opening the type says why. A binding is never guessed silently.
 8. A listener is not a service type and is not listed by `service`. It is listed and opened under `type`.
-9. When the package describes the methods that a service defines, opening a service type lists them under _Methods to implement_, each as the declaration a service would write, marked `required`, `optional` or `any number`, with its documentation and one line per parameter. The description is read from `metadata/trigger-metadata.json` in the package. The reader accepts versions `1.x` of the file, ignores fields it does not know, and refuses version `2` and later. A service type whose types cannot be written down lists no methods. A service type that declares its own methods lists those. Nothing is invented for a package that describes none.
+9. When the package describes the methods that a service defines, opening a service type lists them under _Methods to implement_, each as the declaration a service would write, marked `required`, `optional` or `any number`, with its documentation and one line per parameter. The description is read from `metadata/trigger-metadata.json` in the package. The reader accepts a file whose `version` is `v1.<n>`, ignores fields it does not know, and treats a file with any other version as describing no methods. A service type whose types cannot be written down lists no methods. A service type that declares its own methods lists those. Nothing is invented for a package that describes none.
 10. A noun that the package has nothing in answers with exit code 0, says that it is empty, and lists under _Elsewhere in the package_ (`elsewhere` in JSON) the nouns that hold something, each with its count and command.
 
 ### 6.3. Errors
@@ -285,6 +296,8 @@ A coordinate that does not resolve fails with kind `package-not-found`. A coordi
 `client`, `service` and `class` open only their own kind, whereas `type` opens any type (see [Types](#9-types)).
 
 ### 6.5. Example: An empty noun
+
+This example illustrates rule 10 of [Behaviour](#62-behaviour).
 
 `bal discover function -p ballerinax/googleapis.gmail` answers with exit code 0 that the package has no functions, and lists `client` and `type` with their counts under _Elsewhere in the package_.
 
@@ -303,7 +316,7 @@ A coordinate that does not resolve fails with kind `package-not-found`. A coordi
     3. _Other types it uses, not printed_: every such type that is not printed, each with the command that opens it.
     4. _Readme sections that call it_: the readme sections whose code calls the method.
 3. The parameter types of the callable are always printed in full.
-4. The return type and the types beneath it are printed only while the printed total stays within 6 KB. A class or object type that the callable names is never printed, because its declaration is a drill-down of its own.
+4. The return type and the types beneath it are printed only while the printed total stays within 6,000 bytes. A class or object type that the callable names is never printed, because its declaration is a drill-down of its own.
 5. Every type the callable names that is not printed is listed by name with its command. The list is never cut.
 6. A declaration is never cut, however many fields its types carry.
 7. A type declared by another package is spelled module-qualified, is listed under `foreign` with its module, its version and its command, and its command carries the version the signature was generated against. A command is printed only when the package that declares the type is known exactly.
@@ -313,6 +326,8 @@ A coordinate that does not resolve fails with kind `package-not-found`. A coordi
 A method that the container does not declare fails with kind `symbol-not-found`. A method name that several containers declare fails with kind `ambiguous` and lists each owner with its command.
 
 ### 7.4. Example: Name in several containers
+
+This example illustrates rule 3 of [Names and selectors](#34-names-and-selectors) and the table of [Errors](#73-errors).
 
 `bal discover method commit -p ballerinax/kafka` fails with kind `ambiguous` because both `Caller` and `Consumer` declare `commit`. The failure prints `bal discover method commit -p ballerinax/kafka --client Caller` and the same command for `Consumer`, and the exit code is 2.
 
@@ -341,15 +356,19 @@ A method that the container does not declare fails with kind `symbol-not-found`.
 | An accessor the path does not declare                        | `symbol-not-found` |
 | `--accessor` with no path                                    | `usage`            |
 
-A path that does not exist lists the paths under the deepest prefix of it that did match as `candidates`.
+A path that does not exist lists the paths under the deepest prefix of it that did match as `candidates` when there are 40 or fewer, and otherwise carries the command that lists that level, as stated in [Names and selectors](#34-names-and-selectors).
 
 ### 8.4. Example: One accessor answers directly
+
+This example illustrates rule 5 of [Behaviour](#82-behaviour).
 
 `bal discover resource gists/public -p ballerinax/github` answers with the signature of `get`, because `gists/public` has only that accessor and no path beneath it.
 
 ### 8.5. Example: Several accessors
 
-`bal discover resource gists/:gistId/star -p ballerinax/github` lists the path with the accessors `get`, `put` and `delete`, and prints the command for each. `--accessor put` opens the signature of `put`.
+This example illustrates rules 1, 5 and 6 of [Behaviour](#82-behaviour).
+
+`bal discover resource gists/:gistId/star -p ballerinax/github` lists the path with the accessors `get`, `put` and `delete`, and, in JSON, carries a command for each in `commands`; in text, one `Next:` line prints the command with `<accessor>` as a placeholder. `--accessor put` opens the signature of `put`.
 
 ## 9. Types
 
@@ -373,6 +392,8 @@ A path that does not exist lists the paths under the deepest prefix of it that d
 
 ### 9.4. Example: An enum member
 
+This example illustrates rule 4 of [Behaviour](#92-behaviour).
+
 `bal discover type SSL -p ballerinax/kafka` prints the declaration of the enum `Protocol` and a note that `SSL` is a member of it.
 
 ## 10. Readme
@@ -386,7 +407,7 @@ A path that does not exist lists the paths under the deepest prefix of it that d
 1. The readme is the text that Central serves as the description of the module. It is printed verbatim.
 2. A bare `readme` of at most 10 KB (10,240 bytes) is printed whole.
 3. A bare `readme` of more than 10 KB lists its sections: each with its number, title, line count and the command that opens it. Every section is listed and the list is never cut at the ceiling. There is no option that forces the whole text.
-4. A section is any part of the readme delimited by headings, whether or not it holds code.
+4. A section is any part of the readme delimited by ATX headings (lines starting with `#`), whether or not it holds code. Text before the first heading is a section of its own, titled `Introduction`.
 5. `readme <n>` and `readme "<title>"` print one section, by its number or its exact title.
 6. `readme --filter <keyword>` lists the sections whose text contains the keyword, each with its command. The list pages under the ceiling. A keyword that matches no section is an answer with exit code 0.
 7. `--module` selects the readme of a submodule.
@@ -418,9 +439,11 @@ A `filter-no-match` failure prints the command that reads the section without `-
 
 ### 11.3. Errors
 
-`--filter` together with the name of one declaration fails with kind `usage`.
+`--filter` together with the name of one type (`type <name>`) fails with kind `usage`. The effect of `--filter` together with a name on any other noun is unspecified.
 
 ### 11.4. Example: Filtering remote methods
+
+This example illustrates rule 1 of [Behaviour](#112-behaviour).
 
 `bal discover client --filter report -p ballerinax/salesforce` lists the remote methods of `Client` whose names contain `report`.
 
@@ -432,10 +455,10 @@ A listing shows at most 40 entries at a time and always says when it is incomple
 
 ### 12.2. Configuration
 
-| Value             | Meaning                                                                                                                         |
-|-------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| Entry ceiling `40` | The largest number of entries of a listing.                                                                                    |
-| `--page <n>`      | The page to show, from `1`. A page past the last is a failure, and `0` is a usage error.                                         |
+| Field    | Type                | Default | Meaning                                                                                                    |
+|----------|---------------------|---------|------------------------------------------------------------------------------------------------------------|
+| Ceiling  | fixed integer       | `40`    | The largest number of entries a listing shows at once. It is not configurable.                             |
+| `--page` | integer, 1 or more  | `1`     | The page to show. A page past the last is a failure, and `0` is a usage failure.                           |
 
 ### 12.3. Behaviour
 
@@ -461,7 +484,7 @@ A listing shows at most 40 entries at a time and always says when it is incomple
 ### 13.2. Behaviour
 
 1. The query is the one name of the noun. A query of several keywords is written as one quoted value.
-2. `search "<query>" -p <package>` finds names inside one package, locally, with nothing sent to a repository. Each keyword is matched as a case-insensitive substring, and a name matches when every keyword does.
+2. `search "<query>" -p <package>` finds names inside one package. The query is matched by the tool and is never sent to a repository, but the tool reads the package data from the cache, or from the repository when the cache is empty or disabled. Each keyword is matched as a case-insensitive substring, and a name matches when every keyword does.
 3. The names searched are the names of containers, listeners, functions and types, the names of methods but not of their containers, the paths and accessors of resource methods, the titles of readme sections, and the names of submodules. Parameters and documentation are not searched.
 4. The matches are grouped by kind and page as one sequence under the ceiling. No match is an answer, with exit code 0, and points at the overview of the package.
 5. `search "<query>"` without `-p` asks Central for its package search and its symbol search. It shows 10 packages and 25 symbols a page. Symbols must match every keyword. Packages are ranked as Central ranks them. Each row carries the command that opens it, pinned to the version Central matched. The result is not cached.
@@ -481,7 +504,7 @@ A listing shows at most 40 entries at a time and always says when it is incomple
 
 1. The coordinate is always resolved as one complete package name, dots included. No other reading of it is tried.
 2. `--module` applies to every noun, `type` and `readme` included.
-3. A module name MUST be a valid Ballerina module name, and an invalid name is a usage error before anything is fetched.
+3. A module name MUST be a valid Ballerina module name, and an invalid name is a usage failure before anything is fetched.
 4. The page of a submodule is read at the resolved version of the package, and accepted only when the repository marks it as a non-default module of that package.
 5. The submodules of a package are those the repository names for its default module.
 6. Every printed command under `--module` keeps `--module`.
@@ -496,6 +519,8 @@ The failure lists the submodules the package does publish as `candidates`, with 
 
 ### 14.4. Example: A module typed as a package
 
+This example illustrates rule 1 of [Behaviour](#142-behaviour) and the table of [Errors](#143-errors).
+
 `bal discover ballerina/graphql.dataloader` fails with kind `package-not-found` and prints `bal discover package ballerina/graphql --module dataloader`.
 
 ## 15. Output
@@ -509,11 +534,11 @@ Every answer is one structured result rendered as JSON or as text.
 1. The renderer is JSON when standard output is not a terminal, and text when it is. `--output-format` overrides either.
 2. Standard output holds the answer and nothing else. A warning and a failure go to standard error.
 3. Every JSON answer is exactly one line, with no line break inside it. A text answer is never in JSON, and the reverse.
-4. Every answer carries `qualified` (as `org/name`) and `version`, except a search across Central, which names no package. The header of a text answer names the same: `org/name:version · noun · container · name`.
+4. Every answer carries `qualified` (as `org/name`) and `version`, except a search across Central, which names no package. The header of a text answer names the same: `org/name:version · noun · container · name`. The header also names the module under `--module` (`org/name:version · module <name> · noun`), the `--filter` keyword, the query of a search (`search · <query>`) and the accessor of a resource method; the package overview's header is only `org/name:version`.
 5. Every row that opens one thing carries `command`. Every resource row carries `commands`, keyed by accessor.
-6. A text answer is a header, a count line, entries in aligned columns under section headings, then a footer made of notes, the continuation line of a cut listing, and `Next:` lines. When every row's command has one shape, one `Next:` line prints it with a placeholder (`<name>`, `<group>`, `<path>`, `<accessor>`, `<query>`).
+6. A text answer is a header, a count line, entries in aligned columns under section headings, then a footer made of notes, the continuation line of a cut listing, and `Next:` lines. When every row's command has one shape, one `Next:` line prints it with a placeholder (`<noun>`, `<name>`, `<group>`, `<path>`, `<accessor>`, `<container>`, `<query>`).
 7. Any answer may carry `note`.
-8. The same query gives the same output for the same repository content. No output depends on a model, on time, or on the order in which a repository returns entries.
+8. The same query gives the same output for the same repository content. No output depends on a model or on time, and no output depends on the order in which a repository returns entries, except a search across Central, which lists packages and symbols in the order Central ranks them.
 
 ### 15.3. Interactions
 
@@ -521,7 +546,9 @@ The answers differ in their JSON fields. The list of shapes and their fields is 
 
 ### 15.4. Example: One query, two renderers
 
-`bal discover client -p ballerinax/kafka` on a terminal prints the three clients as a table. The same command piped to a file prints one JSON line starting `{"qualified":"ballerinax/kafka","version":...`.
+This example illustrates rules 1 and 3 of [Behaviour](#152-behaviour).
+
+`bal discover client -p ballerinax/kafka` on a terminal prints the three clients as a table. The same command piped to a file prints one JSON line carrying `qualified` and `version`.
 
 ## 16. Errors and exit codes
 
@@ -548,14 +575,14 @@ A command that cannot answer ends with one failure and an exit code.
 
 ### 16.3. Behaviour
 
-1. The exit code is `0` for an answer, `2` for a usage failure, `1` for every other failure, and `130` when the command is interrupted. The tool never exits with `3` or `4`.
+1. The exit code is `0` for an answer, `2` for a usage failure, `1` for every other failure, and `130` when the command is interrupted by SIGINT, as the shell reports it. The tool never exits with `3` or `4`.
 2. On failure standard output is empty and standard error holds exactly one failure.
 3. A failure is rendered in the mode that an answer of the same run would have used, chosen once per run.
 4. A JSON failure is one object carrying `"severity":"error"`, `kind`, `message` and `suggestion`. It carries `qualified` as `org/name` when the failure concerns a package, `version` when one was reached, and `module` when `--module` was given.
 5. A text failure is `bal discover: error: <message>`, then the suggestion indented beneath it, and `Try: <command>` beneath that when one command fixes it.
 6. A message states what went wrong in one line, begins in lowercase (except that a message that starts with the name Central keeps its capital) and has no closing period.
 7. When one fix applies, a JSON failure carries the whole command of the caller with the fix applied as `command`, and a text failure prints it as the `Try:` line.
-8. A usage failure found before anything is fetched is followed in text by a one-line usage synopsis and a pointer to `--help`. The JSON object is unchanged.
+8. A usage failure, whether found before anything is fetched or after the package is read, is followed in text by a one-line usage synopsis and a pointer to `--help`. The JSON object is unchanged.
 9. A name that matches nothing lists the names of its level in `candidates` as stated in [Names and selectors](#34-names-and-selectors). A name that matches several things carries no `command` and lists them in `owners`.
 10. An `unavailable`, `upstream` or `timeout` failure names what failed: the host, or the proxy and the `Settings.toml` that sets it. `reached` is `true` when the repository answered, with an error status in `status` or a body that is not JSON, and `false` when no answer came back.
 11. A warning never changes the exit code and is never part of an answer. It is a report of its own on standard error, `{"severity":"warning","kind":"stale-cache","message":...}` in JSON, and `bal discover: warning: <message>` in text. The only warning is `stale-cache`: the repository could not be reached to confirm the version, so the cached copy was read.
@@ -564,9 +591,13 @@ A command that cannot answer ends with one failure and an exit code.
 
 ### 16.4. Example: A miss with candidates
 
+This example illustrates rule 9 of [Behaviour](#163-behaviour).
+
 `bal discover client NoSuch -p ballerinax/kafka` exits with 1, kind `symbol-not-found`, and lists `Caller`, `Consumer` and `Producer` as candidates.
 
 ### 16.5. Example: Page out of range
+
+This example illustrates rule 7 of [Behaviour](#123-behaviour).
 
 `bal discover client --page 9 -p ballerinax/twilio` exits with 1, kind `page-not-found`, and prints the command for page 5, which is the last.
 
@@ -578,23 +609,21 @@ The tool keeps a disk cache of what it reads from a repository.
 
 ### 17.2. Configuration
 
-| Setting                          | Meaning                                                                                  |
-|----------------------------------|------------------------------------------------------------------------------------------|
-| `BAL_DISCOVER_CACHE=off`         | Disables caching.                                                                        |
-| `BAL_DISCOVER_CACHE_DIR=<dir>`   | The cache directory.                                                                     |
-| `XDG_CACHE_HOME`                 | When set, the cache directory is `$XDG_CACHE_HOME/bal-discover`.                         |
-| default                          | `~/.cache/bal-discover`, then `<tmpdir>/bal-discover-<user>`.                            |
-
-The location is the first usable one in the order of the table. Caching is off when none is usable.
+| Field                    | Type      | Default                     | Meaning                                                                                                   |
+|--------------------------|-----------|-----------------------------|-----------------------------------------------------------------------------------------------------------|
+| `BAL_DISCOVER_CACHE`     | `off`     | absent                      | `off` disables caching. Any other value is ignored.                                                       |
+| `BAL_DISCOVER_CACHE_DIR` | directory | absent                      | The cache directory. An empty value is ignored. When it is set, no other location is tried.               |
+| `XDG_CACHE_HOME`         | absolute directory | absent             | The cache directory is `$XDG_CACHE_HOME/bal-discover`. A relative or empty value is ignored.              |
 
 ### 17.3. Behaviour
 
-1. Three things are cached, each keyed by package coordinates and version: the documentation payload of the package, the answer derived from the package source about its service types, and the `metadata/trigger-metadata.json` of the package, or the fact that there is none. A package archive is never cached.
-2. A write is atomic. A crash never leaves a corrupt entry.
-3. A cache that is missing, unreadable, corrupt or unwritable is never a failure: the tool reads from the repository.
-4. `--refresh` ignores the three cached values and reads again. A cached value is replaced only by a read that succeeded.
-5. A search across Central is never cached.
-6. When the repository cannot be reached to confirm a version and a cached copy exists, the tool reads the copy and reports a `stale-cache` warning.
+1. The location is chosen in this order: caching off; `BAL_DISCOVER_CACHE_DIR`; `$XDG_CACHE_HOME/bal-discover` when `XDG_CACHE_HOME` is set and absolute, and otherwise `~/.cache/bal-discover`; then `<tmpdir>/bal-discover-<user>` when the previous one is unusable. When `BAL_DISCOVER_CACHE_DIR` is set but unusable, caching is off. Caching is off when no location is usable.
+2. The cache holds the documentation payloads of packages and of submodules, the latest version resolved for a package, the answers derived from the package source about its service types, and the `metadata/trigger-metadata.json` of a package or the fact that there is none. Entries are keyed by package coordinates and version. A package archive is never cached.
+3. A write is atomic. A crash never leaves a corrupt entry.
+4. A cache that is missing, unreadable, corrupt or unwritable is never a failure: the tool reads from the repository.
+5. `--refresh` ignores every cached value, including the latest version, and reads again. A cached value is replaced only by a read that succeeded.
+6. A search across Central is never cached.
+7. When the repository cannot be reached to confirm a version and a cached copy exists, the tool reads the copy and reports a `stale-cache` warning.
 
 ## 18. Repositories and network
 
@@ -604,10 +633,12 @@ The tool reads packages through one repository interface. Ballerina Central is i
 
 ### 18.2. Configuration
 
-| Setting                                         | Meaning                                                                                       |
-|-------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| `[proxy]` in `~/.ballerina/Settings.toml`       | `host`, `port`, and optionally `username` and `password` of the HTTP proxy.                   |
-| `BALLERINA_HOME_DIR`                            | When set, `Settings.toml` is read from this directory instead.                                |
+| Field                                     | Type      | Default            | Meaning                                                                                  |
+|-------------------------------------------|-----------|--------------------|------------------------------------------------------------------------------------------|
+| `[proxy]` `host`                          | string    | absent             | The proxy host. An empty value means no proxy.                                           |
+| `[proxy]` `port`                          | integer   | absent             | The proxy port. Without it, no proxy is used.                                            |
+| `[proxy]` `username`, `password`          | string    | absent             | Credentials for the proxy. Used only when both are set.                                  |
+| `BALLERINA_HOME_DIR`                      | directory | `~/.ballerina`     | When set, `Settings.toml` is read from this directory instead.                           |
 
 ### 18.3. Behaviour
 
@@ -620,12 +651,12 @@ The tool reads packages through one repository interface. Ballerina Central is i
 
 ## 19. Security considerations
 
-1. The tool only reads. It never writes to the project it is run in, never executes the code of a library, and never executes a command that it prints.
+1. The tool only reads from repositories and from the project. It writes only its cache, and never writes to the project it is run in, never executes the code of a library, and never executes a command that it prints.
 2. The tool does not include credentials in a request except the proxy credentials of `Settings.toml`, which go to the proxy and never to Central. Credentials are never printed in an answer or a failure.
 3. A package archive read for source facts is downloaded over HTTPS from the repository and read as data. The size of the archive, of one source file and of the files read from it is bounded, so that an oversized or malformed archive cannot exhaust memory or disk.
 4. A cache directory that is a symbolic link, or that belongs to another user (checked where the file system reports owners), is not used, and the cache is then treated as unusable.
 5. A cached or downloaded value is data. The tool never follows an instruction inside a doc comment, a readme or a repository response.
-6. Printed commands are made of names from the package. A name that would be unsafe unquoted in a shell is printed in the escaped spelling that is safe, so that a caller can run a printed command as it is. The tool cannot protect a caller that composes commands in another way.
+6. Printed commands are made of names from the package. A segment that Ballerina has to escape is printed plain, so that a printed command needs no shell quoting for it. A path parameter is printed as `:name`, which is safe unquoted in bash, zsh, fish and PowerShell. The tool cannot protect a caller that composes commands in another way.
 7. The tool does not protect against a repository that publishes false or misleading documentation. What it prints is what the repository serves.
 
 ## References
