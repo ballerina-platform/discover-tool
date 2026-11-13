@@ -662,7 +662,6 @@ The tool reads packages through one repository interface. Ballerina Central is i
 ## References
 
 - [Proposal: `bal discover`, a Deterministic Library Discovery Subcommand for Ballerina](../proposals/initial-design.md)
-- [Ballerina CLI Tool Design Guide](https://docs.google.com/document/d/16yId59BbJZ6aP8irX8AF6uM8M5EtK-aiVTJWEeT0FnU/edit)
 - [Library specification guide](https://github.com/ballerina-platform/ballerina-library/blob/main/docs/library-specification-guide.md)
 - [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) and [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)
 - [Ballerina Central](https://central.ballerina.io)
