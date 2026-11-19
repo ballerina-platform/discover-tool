@@ -19,6 +19,7 @@
 package io.ballerina.tools.discover.render;
 
 import io.ballerina.tools.discover.Command;
+import io.ballerina.tools.discover.Failure;
 import io.ballerina.tools.discover.model.ServiceHandlers;
 
 import java.util.Collections;
@@ -380,7 +381,7 @@ public sealed interface DiscoverResult {
      * @param params its parameters, in declaration order — a resource's path parameters live in {@code path}
      * @param returns its return type, or {@code null} when it returns nothing
      * @param deprecated whether calling it is discouraged
-     * @param types the declarations its signature names, one level deep
+     * @param types the declarations its signature names, one level deep, under {@code --expand-types} only
      * @param omitted every declaration it names that {@code types} does not print, each with its command
      * @param foreign the declarations from other packages that {@code types} name
      * @param create how to construct the container a method is called on, or {@code null} for a function, a
@@ -397,6 +398,12 @@ public sealed interface DiscoverResult {
             List<Type> types, List<Method> omitted, List<Foreign> foreign, Create create,
             List<ReadmeSections.Section> callers, Documented documented, Paging paging,
             String next, String note) implements DiscoverResult {
+
+        /** This answer printing {@code used} as the types it uses, and listing {@code left} by name. */
+        public Signature using(List<Type> used, List<Method> left) {
+            return new Signature(container, kind, name, accessor, path, form, declaration, params, returns, deprecated,
+                    used, left, foreign, create, callers, documented, paging, next, note);
+        }
 
         /**
          * One line of Ballerina that constructs the container, and its constructor's parameters.
@@ -538,16 +545,45 @@ public sealed interface DiscoverResult {
      * @param kind {@code record}, {@code enum}, {@code error}, {@code alias}, {@code constant}, {@code variable},
      *     {@code annotation} or {@code listener}
      * @param declaration the declaration, verbatim
-     * @param types the declarations it names, one level deep
+     * @param included the declarations it includes with {@code *T}, and those they include, each once, in the order
+     *     met: part of the declaration, printed with or without {@code --expand-types}
+     * @param types the declarations it uses, one level deep, under {@code --expand-types} only
      * @param omitted every declaration it names that {@code types} does not print, each with the command that
      *     opens it
      * @param foreign the declarations it names that another package declares
      * @param note the enum an enum member's answer shows, or {@code null}
      */
     record TypeDeclaration(
-            String name, String kind, String declaration, List<Signature.Type> types, List<Method> omitted,
-            List<Foreign> foreign, String note)
-            implements DiscoverResult { }
+            String name, String kind, String declaration, List<Signature.Type> included, List<Signature.Type> types,
+            List<Method> omitted, List<Foreign> foreign, String note)
+            implements DiscoverResult {
+
+        public TypeDeclaration(String name, String kind, String declaration, List<Signature.Type> types,
+                List<Method> omitted, List<Foreign> foreign, String note) {
+            this(name, kind, declaration, List.of(), types, omitted, foreign, note);
+        }
+
+        /** This answer printing {@code used} as the types it uses, and listing {@code left} by name. */
+        public TypeDeclaration using(List<Signature.Type> used, List<Method> left) {
+            return new TypeDeclaration(name, kind, declaration, included, used, left, foreign, note);
+        }
+    }
+
+    /**
+     * The answers of a list of names, one for each name that resolved, in the order typed, each the answer its name
+     * gives alone.
+     *
+     * @param items the answers, each with the name that asked for it
+     * @param partial the failure that follows these answers when some name did not resolve, or {@code null}
+     */
+    record Answers(List<Item> items, Failure.Partial partial) implements DiscoverResult {
+
+        /**
+         * @param name the name that was asked
+         * @param answer what it answers
+         */
+        public record Item(String name, DiscoverResult answer) { }
+    }
 
     /**
      * Every symbol and readme section of one package whose name holds every keyword, grouped by kind and paged as

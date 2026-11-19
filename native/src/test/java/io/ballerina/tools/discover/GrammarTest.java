@@ -29,6 +29,7 @@ import org.testng.annotations.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The noun-first grammar: every noun with and without a name, the container flags, and every usage error.
@@ -342,7 +343,8 @@ public class GrammarTest {
         Map<String, List<String>> values = Map.of(Command.FILTER_FLAG, List.of("send"),
                 Command.PAGE_FLAG, List.of("1"), Command.MODULE_FLAG, List.of("nosuch"),
                 "--output-format", List.of("json"), "--refresh", List.of(), "--help", List.of(),
-                Command.ACCESSOR_FLAG, List.of("get"));
+                Command.ACCESSOR_FLAG, List.of("get"), Command.EXPAND_TYPES_FLAG, List.of(),
+                Command.NO_DOCS_FLAG, List.of());
         for (String noun : Command.NOUNS) {
             CliTest.Capture help = new CliTest.Capture();
             Assert.assertEquals(Cli.run(List.of(noun, "--help"), help.streams(), CliTest.never()), 0, noun);
@@ -354,12 +356,19 @@ public class GrammarTest {
                     .map(flag -> flag.equals("-h") ? "--help" : flag)
                     .filter(flag -> !flag.equals(Command.PACKAGE_FLAG) && !Command.OWNER_FLAGS.contains(flag))
                     .toList();
-            int notTaken = (Command.SEARCH.equals(noun) ? 1 : 0) + (Command.RESOURCE.equals(noun) ? 0 : 1);
+            boolean shaped = Set.of(Command.TYPE, Command.METHOD, Command.RESOURCE, Command.FUNCTION).contains(noun);
+            int notTaken = (Command.SEARCH.equals(noun) ? 1 : 0) + (Command.RESOURCE.equals(noun) ? 0 : 1)
+                    + (shaped ? 0 : 2);
             Assert.assertEquals(listed.size(), values.size() - notTaken, noun + " lists " + listed);
             String slug = Command.RESOURCE.equals(noun) ? "ballerinax__github" : "ballerinax__kafka";
             for (String flag : listed) {
                 Assert.assertTrue(values.containsKey(flag), noun + " lists an option this test does not know: " + flag);
-                List<String> argv = new ArrayList<>(optionBase(noun));
+                boolean shapes = flag.equals(Command.EXPAND_TYPES_FLAG) || flag.equals(Command.NO_DOCS_FLAG);
+                List<String> base = shapes ? declarationBase(noun) : optionBase(noun);
+                if (base == null) {
+                    continue;
+                }
+                List<String> argv = new ArrayList<>(base);
                 argv.add(flag);
                 argv.addAll(values.get(flag));
                 CliTest.Capture run = new CliTest.Capture();
@@ -367,6 +376,16 @@ public class GrammarTest {
                 Assert.assertNotEquals(code, USAGE, String.join(" ", argv) + " -> " + run.stderr());
             }
         }
+    }
+
+    // A declaration each noun that can open one answers, which is all `--expand-types` and `--no-docs` shape.
+    private static List<String> declarationBase(String noun) {
+        return switch (noun) {
+            case Command.TYPE -> List.of(noun, "TopicPartition", "-p", KAFKA);
+            case Command.METHOD -> List.of(noun, "init", "-p", KAFKA, "--client", "Producer");
+            case Command.RESOURCE -> List.of(noun, "gists/public", "-p", GITHUB, "--client", "Client");
+            default -> null;
+        };
     }
 
     // The listing each noun answers, so an option is tried where it applies.

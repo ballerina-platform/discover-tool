@@ -228,6 +228,8 @@ public class PointersTest {
                 declaration.omitted().forEach(omitted -> commands.add(omitted.command()));
                 addForeign(commands, declaration.foreign());
             }
+            case DiscoverResult.Answers list ->
+                    list.items().forEach(item -> commands.addAll(commandsOf(item.answer())));
         }
         return commands;
     }

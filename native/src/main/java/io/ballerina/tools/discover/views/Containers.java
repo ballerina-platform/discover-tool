@@ -192,12 +192,22 @@ public final class Containers {
      * @param accessor the {@code --accessor} value of a resource, or {@code null}
      * @param filter the {@code --filter} keyword, or {@code null}
      * @param page {@code --page}, 1-indexed, for any listing over the ceiling
+     * @param shape whether used types are printed, and whether documentation is
      */
     public record Options(Ask ask, String container, List<String> selectors, String accessor, String filter,
-            int page) {
+            int page, Shape shape) {
 
         public Options {
             selectors = List.copyOf(selectors);
+        }
+
+        public Options(Ask ask, String container, List<String> selectors, String accessor, String filter, int page) {
+            this(ask, container, selectors, accessor, filter, page, Shape.DEFAULT);
+        }
+
+        /** These options printing as {@code other} says. */
+        public Options shaped(Shape other) {
+            return new Options(ask, container, selectors, accessor, filter, page, other);
         }
 
         /** {@code client [Name]}, {@code service [Name]}, {@code class [Name]}, or {@code function [name]}. */
@@ -266,6 +276,21 @@ public final class Containers {
             return answer(loaded, scope, named.get(), List.of(), options);
         }
         return Result.err(notInBucket(loaded, scope, name, options));
+    }
+
+    /**
+     * The failure of a container flag that names no container of its kind, or empty when the flag is absent or names
+     * one. Lets a list tell a missing container, which fails the whole command, from a missing member.
+     */
+    public static Optional<Failure> missingOwner(LoadedPackage loaded, Surface.Scope scope, Options options) {
+        String name = options.container();
+        if (name == null || options.ask() == Ask.CONTAINER) {
+            return Optional.empty();
+        }
+        List<Surface.Container> candidates = scope == null ? containersOf(loaded) : Surface.of(loaded.library(), scope);
+        return Surface.byName(candidates, name).isPresent()
+                ? Optional.empty()
+                : Optional.of(noSuchOwner(loaded, scope, name, options));
     }
 
     // A method or a resource: of the container its flag names, else of the one container that declares it.
@@ -1163,6 +1188,7 @@ public final class Containers {
                     .filter(Fn.PathSegment.Parameter.class::isInstance)
                     .forEach(segment -> inPath.add(((Fn.PathSegment.Parameter) segment).name()));
         }
+        Shape shape = options.shape();
         List<DiscoverResult.Signature.Parameter> params = fn.params().stream()
                 .filter(param -> !inPath.contains(param.name()))
                 .map(param -> new DiscoverResult.Signature.Parameter(param.name(), Signatures.paramType(param),
@@ -1172,15 +1198,29 @@ public final class Containers {
                             case INCLUSION -> "inclusion";
                             case REST -> "rest";
                         },
-                        param.description()))
+                        shape.noDocs() ? "" : param.description()))
                 .toList();
 
         Declarations index = Declarations.index(loaded.library().addressable());
         Closure.Roots roots = Closure.rootsOf(fn, index);
-        Closure.Result closure = roots.parameters().isEmpty() && roots.others().isEmpty()
-                ? null
-                : Closure.leaf(roots, index);
-        List<DiscoverResult.Signature.Type> types = closure == null ? List.of() : closure.types(index);
+        Closure.Result closure;
+        if (roots.parameters().isEmpty() && roots.others().isEmpty()) {
+            closure = null;
+        } else if (shape.expandTypes()) {
+            closure = Closure.leaf(roots, index);
+        } else {
+            List<String> named = new ArrayList<>(roots.parameters());
+            named.addAll(roots.others());
+            closure = Closure.omitting(named, index);
+        }
+        List<DiscoverResult.Signature.Type> types = closure == null
+                ? List.of()
+                : closure.types(index).stream()
+                        .map(type -> shape.noDocs()
+                                ? new DiscoverResult.Signature.Type(type.name(),
+                                        Signatures.withoutDocs(type.declaration()))
+                                : type)
+                        .toList();
         List<DiscoverResult.Method> omitted = closure == null
                 ? List.of()
                 : Types.omittedOf(loaded, closure);
@@ -1190,6 +1230,9 @@ public final class Containers {
         }
         List<DiscoverResult.Foreign> foreign = Types.foreignOf(
                 loaded, closure == null ? new Closure.Result(List.of(), List.of()) : closure, index, named);
+        if (shape.noDocs()) {
+            declaration = Signatures.withoutDocs(declaration);
+        }
 
         String kind = switch (fn) {
             case Fn.Resource ignored -> "resource";

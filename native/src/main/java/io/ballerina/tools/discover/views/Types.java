@@ -30,6 +30,7 @@ import io.ballerina.tools.discover.model.TypeRef;
 import io.ballerina.tools.discover.render.DiscoverResult;
 import io.ballerina.tools.discover.render.Documents;
 import io.ballerina.tools.discover.render.Identifiers;
+import io.ballerina.tools.discover.render.Signatures;
 import io.ballerina.tools.discover.render.TypeDefs;
 import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.Filter;
@@ -63,8 +64,13 @@ public final class Types {
      * @param selectors everything after {@code type}: at most one declaration name
      * @param filter the {@code --filter} keyword, or {@code null}
      * @param page {@code --page}, 1-indexed, for a roster over the ceiling, or the answer a class gets
+     * @param shape whether used types are printed, and whether documentation is
      */
-    public record Options(List<String> selectors, String filter, int page) {
+    public record Options(List<String> selectors, String filter, int page, Shape shape) {
+
+        public Options(List<String> selectors, String filter, int page) {
+            this(selectors, filter, page, Shape.DEFAULT);
+        }
 
         public boolean filtered() {
             return filter != null && !filter.isBlank();
@@ -138,7 +144,7 @@ public final class Types {
         if (options.selectors().isEmpty()) {
             return roster(loaded, options);
         }
-        return leaf(loaded, options.selectors().get(0), options.page());
+        return leaf(loaded, options.selectors().get(0), options.page(), options.shape());
     }
 
     /**
@@ -269,7 +275,7 @@ public final class Types {
                 window.paging(), window.next(command), documentedHere));
     }
 
-    private static Result<DiscoverResult> leaf(LoadedPackage loaded, String requested, int page) {
+    private static Result<DiscoverResult> leaf(LoadedPackage loaded, String requested, int page, Shape shape) {
         Library library = loaded.library();
         Declarations index = Declarations.index(library.addressable());
         List<String> names = new ArrayList<>(index.names());
@@ -279,25 +285,26 @@ public final class Types {
         String plain = Identifiers.plain(requested);
         Optional<String> declared = names.stream().filter(name -> Identifiers.plain(name).equals(plain)).findFirst();
         if (declared.isEmpty()) {
-            return member(loaded, index, requested);
+            return member(loaded, index, requested, shape);
         }
         String name = declared.get();
         TypeDef typeDef = index.get(name);
         if (typeDef == null) {
-            return Result.ok(annotationLeaf(loaded, index, name));
+            return Result.ok(annotationLeaf(loaded, index, name, shape));
         }
         if (typeDef instanceof TypeDef.ObjectDef object && !isListener(library, name)) {
             return Containers.render(loaded, Surface.scopeOf(object), Containers.Options.container(name, null, page));
         }
-        return declaration(loaded, index, name, null);
+        return declaration(loaded, index, name, null, shape);
     }
 
-    private static Result<DiscoverResult> member(LoadedPackage loaded, Declarations index, String requested) {
+    private static Result<DiscoverResult> member(LoadedPackage loaded, Declarations index, String requested,
+            Shape shape) {
         List<TypeDef.Enumeration> owners = enumsWithMember(loaded, requested);
         if (owners.size() == 1) {
             String enumName = owners.get(0).name();
             return declaration(loaded, index, enumName,
-                    "'" + requested + "' is a member of the enum " + enumName + ".");
+                    "'" + requested + "' is a member of the enum " + enumName + ".", shape);
         }
         String listing = loaded.command(Command.TYPE).text();
         if (owners.isEmpty()) {
@@ -314,16 +321,39 @@ public final class Types {
     }
 
     private static Result<DiscoverResult> declaration(
-            LoadedPackage loaded, Declarations index, String name, String note) {
+            LoadedPackage loaded, Declarations index, String name, String note, Shape shape) {
         TypeDef typeDef = index.get(name);
-        Closure.Result closure = Closure.leaf(Closure.Roots.askedFor(List.of(name)), index);
-        List<DiscoverResult.Signature.Type> types = closure.types(index).stream()
-                .filter(type -> !type.name().equals(name))
-                .toList();
+        List<String> included = Closure.included(name, index);
+        List<String> printed = new ArrayList<>();
+        printed.add(name);
+        printed.addAll(included);
+        Closure.Result closure;
+        List<DiscoverResult.Signature.Type> used;
+        if (shape.expandTypes()) {
+            closure = Closure.leaf(Closure.Roots.askedFor(List.of(name)), index);
+            used = typesOf(closure.names().stream()
+                    .filter(each -> !printed.contains(each)).toList(), index, shape);
+        } else {
+            closure = Closure.named(printed, index);
+            used = List.of();
+        }
         return Result.ok(new DiscoverResult.TypeDeclaration(Identifiers.plain(name),
-                kindOf(loaded.library(), typeDef).noun(),
-                TypeDefs.renderTypeDef(typeDef), types, omittedOf(loaded, closure),
-                foreignOf(loaded, closure, index, List.of()), note));
+                kindOf(loaded.library(), typeDef).noun(), declared(typeDef, shape), typesOf(included, index, shape),
+                used, omittedOf(loaded, closure), foreignOf(loaded, closure, index, List.of()), note));
+    }
+
+    private static String declared(TypeDef typeDef, Shape shape) {
+        return docs(TypeDefs.renderTypeDef(typeDef), shape);
+    }
+
+    private static String docs(String declaration, Shape shape) {
+        return shape.noDocs() ? Signatures.withoutDocs(declaration) : declaration;
+    }
+
+    private static List<DiscoverResult.Signature.Type> typesOf(List<String> names, Declarations index, Shape shape) {
+        return names.stream()
+                .map(each -> new DiscoverResult.Signature.Type(each, declared(index.get(each), shape)))
+                .toList();
     }
 
     private static List<TypeDef.Enumeration> enumsWithMember(LoadedPackage loaded, String member) {
@@ -335,18 +365,65 @@ public final class Types {
                 .toList();
     }
 
-    private static DiscoverResult annotationLeaf(LoadedPackage loaded, Declarations index, String name) {
+    private static DiscoverResult annotationLeaf(LoadedPackage loaded, Declarations index, String name, Shape shape) {
         Library.AnnotationDef annotation = annotationNamed(loaded.library(), name).orElseThrow();
         List<String> roots = annotation.type().map(type -> Closure.rootsOf(type, index)).orElse(List.of());
-        Closure.Result closure = Closure.leaf(Closure.Roots.askedFor(roots), index);
+        Closure.Result closure = shape.expandTypes()
+                ? Closure.leaf(Closure.Roots.askedFor(roots), index)
+                : Closure.omitting(roots, index);
         return new DiscoverResult.TypeDeclaration(Identifiers.plain(name),
                 DiscoverResult.TypeRoster.Kind.ANNOTATIONS.noun(),
-                Documents.renderAnnotation(annotation), closure.types(index), omittedOf(loaded, closure),
+                docs(Documents.renderAnnotation(annotation), shape), List.of(),
+                typesOf(closure.names(), index, shape), omittedOf(loaded, closure),
                 foreignOf(loaded, closure, index, annotation.type().map(List::of).orElse(List.of())), null);
     }
 
     private static Optional<Library.AnnotationDef> annotationNamed(Library library, String name) {
         return library.annotations().stream().filter(candidate -> candidate.name().equals(name)).findFirst();
+    }
+
+    /**
+     * {@code answers}, the answers of a list of names, with each used type printed once: under the first answer that
+     * prints it, and by name, with its command, under the later ones. A declaration an earlier answer printed, asked
+     * for or included, is no more printed as a used type. Only answers under {@code --expand-types} have used types.
+     */
+    public static List<DiscoverResult> sharingUsed(LoadedPackage loaded, List<DiscoverResult> answers) {
+        Set<String> printed = new LinkedHashSet<>();
+        List<DiscoverResult> shared = new ArrayList<>();
+        for (DiscoverResult answer : answers) {
+            switch (answer) {
+                case DiscoverResult.Signature signature -> {
+                    Split split = Split.of(loaded, signature.types(), signature.omitted(), printed);
+                    shared.add(signature.using(split.kept(), split.omitted()));
+                }
+                case DiscoverResult.TypeDeclaration declaration -> {
+                    printed.add(declaration.name());
+                    declaration.included().forEach(type -> printed.add(type.name()));
+                    Split split = Split.of(loaded, declaration.types(), declaration.omitted(), printed);
+                    shared.add(declaration.using(split.kept(), split.omitted()));
+                }
+                default -> shared.add(answer);
+            }
+        }
+        return List.copyOf(shared);
+    }
+
+    private record Split(List<DiscoverResult.Signature.Type> kept, List<DiscoverResult.Method> omitted) {
+
+        static Split of(LoadedPackage loaded, List<DiscoverResult.Signature.Type> types,
+                List<DiscoverResult.Method> omitted, Set<String> printed) {
+            List<DiscoverResult.Signature.Type> kept = new ArrayList<>();
+            List<DiscoverResult.Method> left = new ArrayList<>(omitted);
+            for (DiscoverResult.Signature.Type type : types) {
+                if (printed.add(type.name())) {
+                    kept.add(type);
+                } else {
+                    left.add(new DiscoverResult.Method(Identifiers.plain(type.name()),
+                            commandFor(loaded, Identifiers.plain(type.name()))));
+                }
+            }
+            return new Split(List.copyOf(kept), List.copyOf(left));
+        }
     }
 
     /** Every name a closure left out, each with the command that opens it. */

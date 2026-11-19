@@ -19,7 +19,8 @@ bal discover search <query> [-p <org>/<name>[:<version>]] [options]
 
 The first word says what comes back, a name after it says which one: a name means one thing, no name means a
 listing. A noun takes at most one name; what narrows it further is a flag (a container's `--client`, a resource
-path's `--accessor`), and more than one name is a usage error. Every noun but `package` takes the package with
+path's `--accessor`), and more than one name is a usage error. The one name of `type`, `method` and `readme` may
+be a comma-separated list instead (see Lists of names, below). Every noun but `package` takes the package with
 `-p`, and every command the tool prints is written in that one order: the noun, its name, `-p`, the container
 flag, `--accessor`, then the other flags. You may type a flag before the noun too
 (`bal discover -p ballerinax/kafka method send`). `bal discover package <org>/<package>` is the package's
@@ -41,10 +42,10 @@ below).
 | `service [<name>]`                 | Service object types, under the listener(s) that accept them; the rest are listed apart. |
 | `class [<name>]`                   | Plain objects reached with `.`.                                                           |
 | `function [<name>]`                | Module-level functions, or one function's signature.                                      |
-| `method [<name>]`                  | A container's remote and plain methods, or one method's signature; `init` is the constructor. |
+| `method [<name>[,<name>...]]`      | A container's remote and plain methods, or one method's signature; `init` is the constructor. |
 | `resource [<path>]`                | A container's resource paths, the paths under one, or one resource method's signature (`client->path.accessor(...)`): a path with one accessor and no path under it answers with it, and `--accessor <accessor>` picks one of several. |
-| `type [<name>]`                    | Every type the module declares: records, enums, errors, type aliases, constants, module variables, annotations, listeners, and the classes, clients and service types the nouns above also list. `type <Name>` opens any of them. |
-| `readme [<n>\|"<title>"]`          | The module's README, verbatim, or one section of it.                                      |
+| `type [<name>[,<name>...]]`        | Every type the module declares: records, enums, errors, type aliases, constants, module variables, annotations, listeners, and the classes, clients and service types the nouns above also list. `type <Name>` opens any of them. |
+| `readme [<n>[,<n>...]\|"<title>"]` | The module's README, verbatim, or one section of it, or several sections by number.      |
 
 `client`, `service`, `class` and `function` are derived from how a symbol is called, not from Central's
 `isClient`-style flags: `ballerina/http` declares ten clients, two of which Central files as ordinary
@@ -52,13 +53,17 @@ declarations. `type` and `readme` are not callable, so they have no containers o
 
 `type` lists its declarations grouped by kind (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`,
 `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`) and pages them like any listing; `--filter` is how a large one — `ballerinax/github` declares
-over a thousand records — is narrowed. `type <Name>` prints the declaration whole, then the declarations it
-names one level deep, each only while it is no larger than 6 KB and never a class; every type it uses but does
-not print is listed, all of them, with the command that opens each, and so are the declarations another package
-owns (`bal discover type BearerTokenConfig -p ballerina/http`).
-It takes one name and no `--filter`. A class, client or service type answers as its own noun does
+over a thousand records — is narrowed. `type <Name>` prints the declaration whole and nothing it uses: every type
+it names is listed under *Other types it uses, not printed*, all of them, with the command that opens each, and so
+are the declarations another package owns (`bal discover type BearerTokenConfig -p ballerina/http`). The one
+exception is a type the declaration includes with `*T`: its fields are the declaration's own fields, so it is
+printed under *Included types*, and so is every type it includes in turn, each once, in the order met
+(`type ClientConfiguration -p ballerina/http` prints the record's one field and `CommonClientConfiguration`, which it
+includes). An included type of another package is listed, not printed. `--expand-types` also prints the types the
+declaration uses (see What an answer prints, below).
+It takes names and no `--filter`. A class, client or service type answers as its own noun does
 (`type Response` as `class Response`), a listener — opened nowhere else — prints its own declaration, `init` and
-its other methods included, with the types it uses, and an enum member (`HTTP_1_1`) answers with the enum that
+its other methods included, and an enum member (`HTTP_1_1`) answers with the enum that
 declares it (`HttpVersion`) and a note naming it.
 
 `method` and `resource` name their container with `--client`, `--class` or `--service`
@@ -80,8 +85,52 @@ request in this order.
 | `--filter <keyword>`   | Narrow a listing to entries whose name, path, accessor, parameter or type contains the keyword, so on a resource listing `--filter put` narrows it to the `put` methods (and any whose path, parameter or type contains `put`). Filtering is local to the fetched payload; nothing is sent to Central. On `package` it runs `search <keyword>`. |
 | `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is an error. |
 | `--module <name>`      | Target a submodule instead of the default module, on every noun including `readme`. The package's overview lists the submodules it has. A name Ballerina would not accept as a module name is a usage error, before anything is fetched. `--module` has no short form. |
+| `--expand-types`       | On `type`, `method`, `resource` and `function` when they open one declaration: also print the declarations of the types it uses, one level deep, under *Types it uses* (`types` in JSON). Parameter types are printed in full; the return type and the types beneath it only while the printed total stays within 6,000 bytes; a class or object type is never printed; an inclusion (`*T`) does not count against the depth. Elsewhere it is a usage error. A switch takes no value. |
+| `--no-docs`            | Same nouns as `--expand-types`: leave the `#` doc comment lines out of every declaration printed (the one asked for, its included types and any expanded type), and in JSON the `description` of each parameter. The declaration is otherwise verbatim. Independent of `--expand-types`; elsewhere it is a usage error. A switch takes no value. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again; worth passing only when a name should exist and is not found. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. A switch takes no value: `--refresh=true` is a usage error whose `command` drops the value. |
 | `-V, --version`        | Print the tool's version (`0.1.0`) and exit 0. Only on its own: the version is the tool's, so a noun, or a bare coordinate standing for `package`, rejects it. |
+
+### What an answer prints
+
+By default one declaration prints alone. `type <name>`, `method <name>`, `resource <path>` (a leaf) and
+`function <name>` print the declaration asked for, and list every type it names under *Other types it uses, not
+printed (N)* (`omitted` in JSON: `{name, command}` rows, never cut); a type another package declares is listed
+under *From other packages* (`foreign`). The JSON key `types` stays, and is `[]`. A caller that needs one of those
+types opens it, alone or in a list (`bal discover type A,B -p ...`). A type a declaration includes with `*T` is
+the exception, printed under *Included types (N)* (`included` in JSON: `{name, declaration}`), with or without
+`--expand-types`.
+
+`--expand-types` restores printing the types an answer uses, one level deep, under *Types it uses (N)* (`types`):
+the parameter types in full, the return type and the types beneath it within 6,000 bytes, and never a class or an
+object type. `--no-docs` leaves the `#` documentation out of everything printed. Neither changes which names are
+listed, their commands or the exit code.
+
+### Lists of names
+
+The one name of `type`, `method` and `readme` is a list when it holds a comma: `type A,B -p ballerina/http`,
+`method init,run --class Agent -p ...`, `readme 7,8 -p ...`. A readme value is a list only when it is section
+numbers and commas; any other value is one title, so `readme "Setup, part 2"` is not split. A list has 2 to 20 names
+(a name is trimmed of surrounding spaces); an empty name (`A,,B`, `A,`), more than 20, and a list given to `client`,
+`service`, `class`, `function` or `resource`, and `--page` on a list, are usage errors before anything is fetched. A name given twice is
+answered once, at its first place. The container flag, `--module`, `--expand-types` and `--no-docs` apply to every
+name, and each name is read as it would be alone.
+
+A list answers with one JSON object, `{"qualified", "version", "answers": [...]}`, holding one answer for each name
+that resolved, in the order typed, each shaped as that name's answer alone. In text each answer has its own header,
+and one blank line separates two answers. Under `--expand-types` a type the answers use is printed once, under the
+first answer that uses it; later answers list it by name with its command.
+
+When some names do not resolve, the answers of those that did are printed on standard output, and standard error
+holds one failure of kind `partial` (exit code 1) with a `failures` array, one entry for each unresolved name in the
+order typed: `name`, `kind`, `message`, `suggestion`, and the `command`, `candidates` or `owners` that name's failure
+carries alone. Its message says how many of how many names did not resolve, and it has no `command`. When no name
+resolved, standard output is empty. A failure of the whole command (`usage`, `package-not-found`, `unavailable`,
+`timeout`) is not partial: it is the one failure, with standard output empty and its own exit code.
+
+```
+$ bal discover type ClientConfiguration,NoSuch -p ballerina/http >/dev/null
+{"severity":"error","kind":"partial","message":"1 of 2 names did not resolve","qualified":"ballerina/http","version":"2.16.6","suggestion":"Fix or drop the names listed below; the answers of the names that resolved are on standard output.","failures":[{"name":"NoSuch","kind":"symbol-not-found","message":"'NoSuch' is not a type in ballerina/http:2.16.6","suggestion":"List the types.","command":"bal discover type -p ballerina/http"}]}
+```
 
 `bal discover --help` prints a one-line description, the synopsis, the nouns, every option and commented examples;
 `bal discover <noun> --help` prints one noun's description, synopsis, every option that noun takes and examples.
@@ -470,7 +519,7 @@ $ bal discover client -p ballerinax/postgresql | cat
 ```
 
 One callable is the end of a drill-down: its declaration with its doc comment; for a method of a client or
-class with an `init`, how to construct it; the declarations its signature names, one level deep; and, for a
+class with an `init`, how to construct it; the types its signature names, listed with the command that opens each (`--expand-types` prints them, one level deep); and, for a
 remote or resource method, the readme sections whose code calls it. The container flag is left out here, since
 only Producer declares `send`:
 
@@ -491,25 +540,9 @@ Create it
   init(string|string[] bootstrapServers, *kafka:ProducerConfiguration config)
   bal discover method init -p ballerinax/kafka --client Producer
 
-Types it uses (2)
-  # Details related to the anydata producer record.
-  public type AnydataProducerRecord record {|
-      # Topic to which the record will be appended
-      string topic;
-      # Key that is included in the record
-      anydata key?;
-      # Anydata record content
-      anydata value;
-      # Timestamp of the record, in milliseconds since epoch
-      int timestamp?;
-      # Partition to which the record should be sent
-      int partition?;
-      # Map of headers to be included with the record
-      map<byte[]|byte[][]|string|string[]> headers?;
-  |};
-
-  # Defines the common error type for the module.
-  public type Error distinct error;
+Other types it uses, not printed (2)
+  AnydataProducerRecord  bal discover type AnydataProducerRecord -p ballerinax/kafka
+  Error                  bal discover type Error -p ballerinax/kafka
 
 Readme sections that call it
   7  Data serialization  bal discover readme 7 -p ballerinax/kafka
@@ -659,7 +692,7 @@ Readme sections that declare one
 Note: attach it to http:Listener
 ```
 
-A declaration that is not callable, read whole with the declarations it names:
+A declaration that is not callable, read whole, with the types it names listed:
 
 ```
 $ bal discover type TopicPartitionOffset -p ballerinax/kafka
@@ -668,24 +701,9 @@ ballerinax/kafka:4.6.8 · type · TopicPartitionOffset
 # Represents a topic partition and an offset with a timestamp.
 public type TopicPartitionOffset [TopicPartition, OffsetAndTimestamp?];
 
-Types it uses (2)
-  # Represents a topic partition.
-  public type TopicPartition record {|
-      # Topic to which the partition is related
-      string topic;
-      # Index of the specific partition
-      int partition;
-  |};
-
-  # Represents an offset and a timestamp for a topic partition.
-  public type OffsetAndTimestamp record {|
-      # The offset of the record in the topic partition
-      int offset;
-      # The timestamp of the record in the topic partition
-      int timestamp;
-      # The leader epoch of the record in the topic partition
-      int? leaderEpoch = ();
-  |};
+Other types it uses, not printed (2)
+  TopicPartition       bal discover type TopicPartition -p ballerinax/kafka
+  OffsetAndTimestamp   bal discover type OffsetAndTimestamp -p ballerinax/kafka
 ```
 
 A readme of at most 10 KB prints whole, under the same header line as every other answer. A larger one lists every
@@ -783,9 +801,10 @@ no line breaks inside it, so a `head`/`tail` cut never splits one — and these 
 | resource paths                       | `container`, `resources` (`path`, `accessors`, `commands`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
 | methods of one call form             | `container`, `methods` (`name`, `command`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`)                 |
 | more than one call form              | `container`, `resources` (`path`, `accessors`, `commands`), `remote` (`name`, `command`), `normal` (`name`, `command`), `counts` (`resources`, `remote`, `normal`), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
-| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`), `create` (`code`, `command`), `callers` (`number`, `title`, `lines`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
+| one callable                         | `container`, `kind`, `name` or `accessor` + `path`, `form` (`->`, `.` or `new`), `declaration`, `params` (`name`, `type`, `default`, `kind`, `description`), `returns`, `deprecated`, `types` (`name`, `declaration`; `[]` unless `--expand-types`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`), `create` (`code`, `command`), `callers` (`number`, `title`, `lines`, `command`), `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`), `page`, `pages`, `remaining`, `next` |
 | type declarations                    | `sections` (`records`, `enums`, `errors`, `aliases`, `constants`, `variables`, `annotations`, `listeners`, `classes`, `clients`, `serviceTypes`, each a list of `name`, `command`), `counts` (per kind, every page included), `shown`, `total`, `page`, `pages`, `remaining`, `next`, `documented` (`name`, `command`, or for a resource `path`, `accessors`, `commands`) |
-| one declaration                      | `name`, `kind`, `declaration`, `types` (`name`, `declaration`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`) |
+| one declaration                      | `name`, `kind`, `declaration`, `included` (`name`, `declaration`; only when the declaration includes a type), `types` (`name`, `declaration`; `[]` unless `--expand-types`), `omitted` (`name`, `command`), `foreign` (`name`, `module`, `version`, `command`) |
+| a list of names                      | `answers`: one answer for each name that resolved, in the order typed, each shaped as that name's answer alone |
 | empty noun                           | `bucket` (the noun), `total`, `elsewhere` (`bucket`, `count`, `command`)                                            |
 | one service type                     | `container`, `note`; when the package describes the methods a service defines, `handlers` (`name`, or `id` for a shape a service names itself, as `rules` refer to it, `kind`, `signature`, `required`, `repeatable`, `accessors`, `doc`, `deprecated`, `params`, `returns`) and `rules` (`requirement`, `handlers`, `message`); when it declares none and describes none, `methods` (empty), `description`, `examples` (`number`, `title`, `lines`, `command`) and `next` (the readme) when no section declares one |
 | search in a package                  | `keywords`, then per kind with a match `clients`, `serviceTypes`, `classes`, `listeners`, `functions` (`name`, `command`), `remote`, `methods` (`container`, `name`, `command`), `resources` (`container`, `path`, `accessor`, `command`), `types` (`name`, `kind`, `command`), `readme` (`number`, `title`, `command`), `submodules` (`name`, `command`); `counts` (per kind), `shown`, `total`, `page`, `pages`, `remaining`, `next`, and `overview` when nothing matched |
@@ -865,7 +884,7 @@ error naming the command that reads them, never silently dropped.
 | stderr | any warning, each its own report, and on failure exactly one failure             |
 | exit 0 | an answer, and stdout is complete — an empty `--filter` or search result too     |
 
-On failure stdout is empty. The exit code follows the Ballerina CLI tool guide's closed table: 2 for a usage
+On failure stdout is empty, except for `partial`, which follows the answers of the names that did resolve. The exit code follows the Ballerina CLI tool guide's closed table: 2 for a usage
 error, 1 for every other failure, 130 when interrupted (SIGINT); `bal discover` never exits 3 or 4. The failure's
 `kind` says which failure it is, and each `kind` falls under one core kind, which decides the exit code:
 
@@ -876,6 +895,7 @@ error, 1 for every other failure, 130 when interrupted (SIGINT); `bal discover` 
 | `package-not-found` | `runtime` | 1    | no          | Central publishes no such package, version or module                |
 | `symbol-not-found`  | `runtime` | 1    | no          | no name in the package matches what was asked                       |
 | `page-not-found`    | `runtime` | 1    | no          | a page past the end of a paged listing                              |
+| `partial`           | `runtime` | 1    | no          | some names of a list did not resolve; the answers of the others are on stdout, and `failures` lists each unresolved name with its own `kind`, `message`, `suggestion` and `command`, `candidates` or `owners` |
 | `filter-no-match`   | `runtime` | 1    | no          | a readme section asked with a `--filter` keyword it does not mention |
 | `invalid-lock`      | `runtime` | 1    | no          | the project's `Dependencies.toml` locks the package at something that is not a complete version |
 | `unavailable`       | `runtime` | 1    | yes         | no answer came back (network, DNS, TLS, the proxy), or Central or the proxy was throttling or overloaded (429, 500, 502, 503, 504; the proxy's 502, 503, 504) |

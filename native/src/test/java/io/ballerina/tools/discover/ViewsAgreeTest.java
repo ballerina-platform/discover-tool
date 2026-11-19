@@ -25,6 +25,7 @@ import io.ballerina.tools.discover.symbols.Declarations;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
 import io.ballerina.tools.discover.views.Closure;
+import io.ballerina.tools.discover.views.Shape;
 import io.ballerina.tools.discover.views.Types;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -301,10 +302,11 @@ public class ViewsAgreeTest {
         // types are the configuration a caller sets, and would be hidden one level further down otherwise.
         LoadedPackage http = FixtureCorpus.loadedFixture("ballerina__http");
         DiscoverResult.TypeDeclaration config = (DiscoverResult.TypeDeclaration) expectAnswer(
-                Types.render(http, new Types.Options(List.of("ClientConfiguration"), null, 1)),
-                "type ClientConfiguration");
+                Types.render(http, new Types.Options(List.of("ClientConfiguration"), null, 1, new Shape(true, false))),
+                "type ClientConfiguration --expand-types");
+        List<String> included = config.included().stream().map(DiscoverResult.Signature.Type::name).toList();
         List<String> named = config.types().stream().map(DiscoverResult.Signature.Type::name).toList();
-        Assert.assertTrue(named.contains("CommonClientConfiguration"), named.toString());
+        Assert.assertEquals(included, List.of("CommonClientConfiguration"));
         Assert.assertTrue(named.contains("HttpVersion"), "a field of the included record: " + named);
     }
 
@@ -315,7 +317,7 @@ public class ViewsAgreeTest {
         // carry the record.
         LoadedPackage context = FixtureCorpus.loadedFixture("ballerinax__github");
         DiscoverResult view = expectAnswer(Asked.of(context, "resource", "repos/:owner/:repo/actions/caches",
-                "--accessor", "delete", "--client", "Client"), "caches delete");
+                "--accessor", "delete", "--client", "Client", "--expand-types"), "caches delete");
         Assert.assertTrue(view instanceof DiscoverResult.Signature, view.toString());
         DiscoverResult.Signature signature = (DiscoverResult.Signature) view;
         Assert.assertTrue(signature.declaration().contains(
@@ -336,7 +338,8 @@ public class ViewsAgreeTest {
     public void aLeafFollowsAChainInBreadthFirstOrderAndStopsAtThePackageBoundary() {
         DiscoverResult.TypeDeclaration error = (DiscoverResult.TypeDeclaration) expectAnswer(
                 Types.render(FixtureCorpus.loadedFixture("ballerina__http"),
-                        new Types.Options(List.of("ClientRequestError"), null, 1)), "type ClientRequestError");
+                        new Types.Options(List.of("ClientRequestError"), null, 1, new Shape(true, false))),
+                "type ClientRequestError --expand-types");
         List<String> order = error.types().stream().map(DiscoverResult.Signature.Type::name).toList();
         // The root, then everything it names: a shallow field cannot be pushed past the budget by a deep
         // one, and the chain a reader needs is complete.

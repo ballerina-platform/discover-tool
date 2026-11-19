@@ -156,6 +156,51 @@ public final class Closure {
         return new Result(List.copyOf(order), List.copyOf(omitted));
     }
 
+    /**
+     * The declarations {@code root} includes with {@code *T}, and the ones those include in turn, each once, in the
+     * order the inclusions are met. An inclusion states that another record's fields ARE this one's, so these are
+     * part of the declaration and not types it uses. An inclusion of another package is no local declaration and is
+     * not here.
+     */
+    public static List<String> included(String root, Declarations index) {
+        Set<String> seen = new LinkedHashSet<>();
+        seen.add(root);
+        List<String> order = new ArrayList<>();
+        Deque<String> queue = new ArrayDeque<>();
+        queue.add(root);
+        while (!queue.isEmpty()) {
+            TypeDef typeDef = index.get(queue.removeFirst());
+            for (String name : inclusionsOf(typeDef)) {
+                for (String token : localTokens(name)) {
+                    if (index.get(token) != null && seen.add(token)) {
+                        order.add(token);
+                        queue.add(token);
+                    }
+                }
+            }
+        }
+        return List.copyOf(order);
+    }
+
+    /**
+     * What a leaf prints when it prints no used type: {@code printed}, and every same-package declaration those name
+     * that is not among them, each a legal {@code type} argument.
+     */
+    public static Result named(List<String> printed, Declarations index) {
+        Set<String> omitted = new LinkedHashSet<>();
+        for (String name : printed) {
+            localReferences(index.get(name), index).stream()
+                    .filter(referenced -> !printed.contains(referenced))
+                    .forEach(omitted::add);
+        }
+        return new Result(List.copyOf(printed), List.copyOf(omitted));
+    }
+
+    /** {@code names} that {@code index} declares, each once, as the omitted names of a leaf that prints none. */
+    public static Result omitting(List<String> names, Declarations index) {
+        return new Result(List.of(), names.stream().filter(name -> index.get(name) != null).distinct().toList());
+    }
+
     private static void admit(
             List<String> names, boolean unlimited, Declarations index, Set<String> visited, List<String> order,
             Set<String> omitted, Deque<Step> queue) {

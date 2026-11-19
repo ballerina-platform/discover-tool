@@ -148,6 +148,16 @@ public final class Signatures {
         return unwritableDefaults.isEmpty() ? "" : " // " + unwritableFieldClause(unwritableDefaults);
     }
 
+    /**
+     * {@code declaration} without its documentation: every line that is a {@code #} comment, the doc comment above a
+     * declaration or above a field or method inside one. Nothing else changes.
+     */
+    public static String withoutDocs(String declaration) {
+        return Arrays.stream(declaration.split("\n", -1))
+                .filter(line -> !line.stripLeading().startsWith("#"))
+                .collect(Collectors.joining("\n"));
+    }
+
     /** Ballerina doc comments, one {@code #} per line, with the trailing newline callers splice in. */
     public static String renderDescription(String description) {
         if (description.trim().isEmpty()) {

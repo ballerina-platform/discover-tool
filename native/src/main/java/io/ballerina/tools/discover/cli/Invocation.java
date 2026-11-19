@@ -22,9 +22,11 @@ import io.ballerina.tools.discover.Command;
 import io.ballerina.tools.discover.Coordinate;
 import io.ballerina.tools.discover.symbols.PathTree;
 import io.ballerina.tools.discover.symbols.Surface;
+import io.ballerina.tools.discover.views.Shape;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * One command line as the caller typed it, the root's flags merged under the noun's: what is asked, and the
@@ -42,11 +44,13 @@ import java.util.List;
  * @param page the {@code --page} value
  * @param module the {@code --module} value, or {@code null}
  * @param refresh whether {@code --refresh} was given
+ * @param expandTypes whether {@code --expand-types} was given
+ * @param noDocs whether {@code --no-docs} was given
  * @since 0.1.0
  */
 record Invocation(String noun, List<String> names, List<String> rest, String pkg, String coordinate,
         List<Command.Owner> owners, String accessor, String output, String filter, int page, String module,
-        boolean refresh) {
+        boolean refresh, boolean expandTypes, boolean noDocs) {
 
     static Invocation of(Commands.Root root, String noun, Commands.Noun values) {
         Commands.Flags top = root.flags;
@@ -58,7 +62,13 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
                 owners(root, values), either(values == null ? null : values.accessor(), root.accessor.accessor),
                 either(own.output, top.output), either(own.filter, top.filter),
                 own.page != Command.FIRST_PAGE ? own.page : top.page, either(own.module, top.module),
-                own.refresh || top.refresh);
+                own.refresh || top.refresh, shaped(root.shaped, values, true), shaped(root.shaped, values, false));
+    }
+
+    private static boolean shaped(Commands.Shaped root, Commands.Noun values, boolean expand) {
+        Commands.Shaped own = values == null ? null : values.shaped();
+        return expand ? root.expandTypes || own != null && own.expandTypes
+                : root.noDocs || own != null && own.noDocs;
     }
 
     /** Whether the line is one package coordinate and nothing else: the package overview, written without its noun. */
@@ -70,7 +80,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
     Invocation asPackageOverview() {
         String named = rest.get(0);
         return new Invocation(Command.PACKAGE, List.of(named), List.of(), pkg, named, owners, accessor, output, filter,
-                page, module, refresh);
+                page, module, refresh, expandTypes, noDocs);
     }
 
     // The container flags typed before the noun, then after it.
@@ -114,6 +124,13 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
         if (top.module != null && own.module != null) {
             return Command.MODULE_FLAG;
         }
+        Commands.Shaped ownShape = values.shaped();
+        if (ownShape != null && root.shaped.expandTypes && ownShape.expandTypes) {
+            return Command.EXPAND_TYPES_FLAG;
+        }
+        if (ownShape != null && root.shaped.noDocs && ownShape.noDocs) {
+            return Command.NO_DOCS_FLAG;
+        }
         return top.refresh && own.refresh ? Commands.REFRESH_FLAG : null;
     }
 
@@ -150,7 +167,14 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
             return Command.overview(target).filtered(filter);
         }
         Command command = Command.of(noun, echoed()).in(target).accessedBy(accessor).filtered(filter);
-        return owner() == null ? command : command.ownedBy(owner());
+        return kept(owner() == null ? command : command.ownedBy(owner()));
+    }
+
+    /** {@code command} keeping {@code --expand-types} and {@code --no-docs} when it opens a declaration. */
+    Command kept(Command command) {
+        boolean opens = Set.of(Command.TYPE, Command.METHOD, Command.RESOURCE, Command.FUNCTION)
+                .contains(command.noun());
+        return opens ? command.shaped(expandTypes, noDocs) : command;
     }
 
     /** The bare {@code noun}, asked of this command's package. */
@@ -160,7 +184,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
 
     /** {@code fixed} asked of this command's package and narrowed by its filter, as a whole command line. */
     Command retarget(Command fixed) {
-        return fixed.in(new Command.Target(coordinate, module)).filtered(filter);
+        return kept(fixed.in(new Command.Target(coordinate, module)).filtered(filter));
     }
 
     /** A command a lower layer printed for another package or module, made this command asked of that one. */
@@ -170,7 +194,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
 
     /** {@code command} on this command's page. */
     Command paged(Command command) {
-        return command.paged(page);
+        return kept(command).paged(page);
     }
 
     /** This command with the package written as {@code read}. */
@@ -182,17 +206,22 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
             written.set(0, text);
         }
         return new Invocation(noun, List.copyOf(written), rest, pkg == null ? null : text, text, owners, accessor,
-                output, filter, page, module, refresh);
+                output, filter, page, module, refresh, expandTypes, noDocs);
     }
 
     Invocation withNames(List<String> others) {
         return new Invocation(noun, List.copyOf(others), rest, pkg, coordinate, owners, accessor, output, filter,
-                page, module, refresh);
+                page, module, refresh, expandTypes, noDocs);
     }
 
     Invocation withAccessor(String other) {
         return new Invocation(noun, names, rest, pkg, coordinate, owners, other, output, filter, page, module,
-                refresh);
+                refresh, expandTypes, noDocs);
+    }
+
+    /** What the caller asked an answer to print. */
+    Shape shape() {
+        return new Shape(expandTypes, noDocs);
     }
 
     /** The container flag given, or {@code null}; {@link Cli} rejects more than one. */
@@ -203,7 +232,7 @@ record Invocation(String noun, List<String> names, List<String> rest, String pkg
     /** This command with only {@code kept} of its container flags. */
     Invocation ownedBy(Command.Owner kept) {
         return new Invocation(noun, names, rest, pkg, coordinate, List.of(kept), accessor, output, filter, page,
-                module, refresh);
+                module, refresh, expandTypes, noDocs);
     }
 
     /** The scope the container flag names, or {@code null} without one. */

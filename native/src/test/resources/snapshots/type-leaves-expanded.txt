@@ -1,0 +1,1059 @@
+== ballerina__http type ClientConfiguration ==
+ballerina/http · type · ClientConfiguration
+
+# Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
+# The following fields are inherited from the other configuration records in addition to the `Client`-specific
+# configs.
+public type ClientConfiguration record {|
+    *CommonClientConfiguration;
+    # SSL/TLS security settings for HTTPS connections
+    ClientSecureSocket? secureSocket = ();
+|};
+
+Included types (1)
+  # Common client configurations for the next level clients.
+  public type CommonClientConfiguration record {|
+      # HTTP protocol version supported by the client
+      HttpVersion httpVersion = HTTP_2_0;
+      # HTTP/1.x specific settings
+      ClientHttp1Settings http1Settings = {};
+      # HTTP/2 specific settings
+      ClientHttp2Settings http2Settings = {};
+      # Maximum time(in seconds) to wait for a response before the request times out
+      decimal timeout = 30;
+      # The choice of setting `Forwarded`/`X-Forwarded-For` header, when acting as a proxy
+      string forwarded = "disable";
+      # HTTP redirect handling configurations (with 3xx status codes)
+      FollowRedirects? followRedirects = ();
+      # Configurations associated with the request connection pool
+      PoolConfiguration? poolConfig = ();
+      # HTTP response caching related configurations
+      CacheConfig cache = {};
+      # Enable request/response compression (using `accept-encoding` header)
+      Compression compression = COMPRESSION_AUTO;
+      # Client authentication options (Basic, Bearer token, OAuth, etc.)
+      ClientAuthConfig? auth = ();
+      # Circuit breaker configurations to prevent cascading failures
+      CircuitBreakerConfig? circuitBreaker = ();
+      # Automatic retry settings for failed requests
+      RetryConfig? retryConfig = ();
+      # Cookie handling settings for session management
+      CookieConfig? cookieConfig = ();
+      # Limits for response size and headers (to prevent memory issues)
+      ResponseLimitConfigs responseLimits = {};
+      # Proxy server settings if requests need to go through a proxy
+      ProxyConfig? proxy = ();
+      # Enable automatic payload validation for request/response data against constraints
+      boolean validation = true;
+      # Low-level socket settings (timeouts, buffer sizes, etc.)
+      ClientSocketConfig socketConfig = {};
+      # Enable relaxed data binding on the client side.
+      # When enabled:
+      # - `null` values in JSON are allowed to be mapped to optional fields
+      # - missing fields in JSON are allowed to be mapped as `null` values
+      boolean laxDataBinding = false;
+  |};
+
+Types it uses (15)
+  # Provides configurations for facilitating secure communication with a remote HTTP endpoint.
+  public type ClientSecureSocket record {|
+      # Enable SSL validation
+      boolean enable = true;
+      # Configurations associated with `crypto:TrustStore` or single certificate file that the client trusts
+      crypto:TrustStore|string cert?;
+      # Configurations associated with `crypto:KeyStore` or combination of certificate and private key of the client
+      crypto:KeyStore|CertKey key?;
+      # SSL/TLS protocol related options
+      record {|Protocol name; string[] versions = []; |} protocol?;
+      # Certificate validation against OCSP_CRL, OCSP_STAPLING related options
+      record {|CertValidationType 'type; int cacheSize; int cacheValidityPeriod; |} certValidation?;
+      # List of ciphers to be used
+      # eg: TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
+      string[] ciphers?;
+      # Enable/disable host name verification
+      boolean verifyHostName = true;
+      # Enable/disable new SSL session creation
+      boolean shareSession = true;
+      # SSL handshake time out
+      decimal handshakeTimeout?;
+      # SSL session time out
+      decimal sessionTimeout?;
+      # Server name indication(SNI) to be used. If this is not present, hostname from the target URL will be used
+      string serverName?;
+  |};
+
+  # Defines the supported HTTP protocols.
+  public enum HttpVersion {
+      # Represents HTTP/1.0 protocol
+      HTTP_1_0,
+      # Represents HTTP/1.1 protocol
+      HTTP_1_1,
+      # Represents HTTP/2.0 protocol
+      HTTP_2_0
+  }
+
+  # Provides settings related to HTTP/1.x protocol.
+  public type ClientHttp1Settings record {|
+      # Specifies whether to reuse a connection for multiple requests
+      KeepAlive keepAlive = KEEPALIVE_AUTO;
+      # The chunking behaviour of the request
+      Chunking chunking = CHUNKING_AUTO;
+      # Proxy server related options
+      ProxyConfig? proxy = ();
+  |};
+
+  # Provides settings related to HTTP/2 protocol.
+  public type ClientHttp2Settings record {|
+      # Configuration to enable HTTP/2 prior knowledge
+      boolean http2PriorKnowledge = false;
+      # Configuration to change the initial window size
+      int http2InitialWindowSize = 65535;
+  |};
+
+  # Provides configurations for controlling the endpoint's behaviour in response to HTTP redirect related responses.
+  # The response status codes of 301, 302, and 303 are redirected using a GET request while 300, 305, 307, and 308
+  # status codes use the original request HTTP method during redirection.
+  public type FollowRedirects record {|
+      # Enable/disable redirection
+      boolean enabled = false;
+      # Maximum number of redirects to follow
+      int maxCount = 5;
+      # By default Authorization and Proxy-Authorization headers are removed from the redirect requests.
+      # Set it to true if Auth headers are needed to be sent during the redirection
+      boolean allowAuthHeaders = false;
+  |};
+
+  # Configurations for managing HTTP client connection pool.
+  public type PoolConfiguration record {|
+      # Max active connections per route(host:port). Default value is -1 which indicates unlimited.
+      int maxActiveConnections = maxActiveConnections;
+      # Maximum number of idle connections allowed per pool.
+      int maxIdleConnections = maxIdleConnections;
+      # Maximum amount of time (in seconds), the client should wait for an idle connection before it sends an error when the pool is exhausted
+      decimal waitTime = waitTime;
+      # Maximum active streams per connection. This only applies to HTTP/2. Default value is 100
+      int maxActiveStreamsPerConnection = maxActiveStreamsPerConnection;
+      # Minimum evictable time for an idle connection in seconds. Default value is 5 minutes
+      decimal minEvictableIdleTime = minEvictableIdleTime;
+      # Time between eviction runs in seconds. Default value is 30 seconds
+      decimal timeBetweenEvictionRuns = timeBetweenEvictionRuns;
+      # Minimum time in seconds for a connection to be kept open which has received a GOAWAY.
+      # This only applies for HTTP/2. Default value is 5 minutes. If the value is set to -1,
+      # the connection will be closed after all in-flight streams are completed
+      decimal minIdleTimeInStaleState = minIdleTimeInStaleState;
+      # Time between the connection stale eviction runs in seconds. This only applies for HTTP/2.
+      # Default value is 30 seconds
+      decimal timeBetweenStaleEviction = timeBetweenStaleEviction;
+  |};
+
+  # Provides a set of configurations for controlling the caching behaviour of the endpoint.
+  public type CacheConfig record {|
+      # Specifies whether HTTP caching is enabled. Caching is enabled by default.
+      boolean enabled = true;
+      # Specifies whether the HTTP caching layer should behave as a public cache or a private cache
+      boolean isShared = false;
+      # The capacity of the cache
+      int capacity = 16;
+      # The fraction of entries to be removed when the cache is full. The value should be
+      # between 0 (exclusive) and 1 (inclusive).
+      float evictionFactor = 0.2;
+      # Gives the user some control over the caching behaviour. By default, this is set to
+      # `CACHE_CONTROL_AND_VALIDATORS`. The default behaviour is to allow caching only when the `cache-control`
+      # header and either the `etag` or `last-modified` header are present.
+      CachingPolicy policy = CACHE_CONTROL_AND_VALIDATORS;
+  |};
+
+  # Options to compress using gzip or deflate.
+  # 
+  # `AUTO`: When service behaves as a HTTP gateway inbound request/response accept-encoding option is set as the
+  # outbound request/response accept-encoding/content-encoding option
+  # `ALWAYS`: Always set accept-encoding/content-encoding in outbound request/response
+  # `NEVER`: Never set accept-encoding/content-encoding header in outbound request/response
+  public type Compression COMPRESSION_AUTO|COMPRESSION_ALWAYS|COMPRESSION_NEVER;
+
+  # Defines the authentication configurations for the HTTP client.
+  public type ClientAuthConfig CredentialsConfig|BearerTokenConfig|JwtIssuerConfig|OAuth2GrantConfig;
+
+  # Provides a set of configurations for controlling the behaviour of the Circuit Breaker.
+  public type CircuitBreakerConfig record {|
+      # The `http:RollingWindow` options of the `CircuitBreaker`
+      RollingWindow rollingWindow = {};
+      # The threshold for request failures. When this threshold exceeds, the circuit trips. The threshold should be a
+      # value between 0 and 1
+      float failureThreshold = 0.0;
+      # The time period (in seconds) to wait before attempting to make another request to the upstream service
+      decimal resetTime = 0;
+      # Array of HTTP response status codes which are considered as failures
+      int[] statusCodes = [];
+  |};
+
+  # Provides configurations for controlling the retrying behavior in failure scenarios.
+  public type RetryConfig record {|
+      # Number of retry attempts before giving up
+      int count = 0;
+      # Retry interval in seconds
+      decimal interval = 0;
+      # Multiplier, which increases the retry interval exponentially.
+      float backOffFactor = 0.0;
+      # Maximum time of the retry interval in seconds
+      decimal maxWaitInterval = 0;
+      # HTTP response status codes which are considered as failures
+      int[] statusCodes = [];
+  |};
+
+  # Client configuration for cookies.
+  public type CookieConfig record {|
+      # User agents provide users with a mechanism for disabling or enabling cookies
+      boolean enabled = false;
+      # Maximum number of cookies per domain, which is 50
+      int maxCookiesPerDomain = 50;
+      # Maximum number of total cookies allowed to be stored in cookie store, which is 3000
+      int maxTotalCookieCount = 3000;
+      # User can block cookies from third party responses and refuse to send cookies for third party requests, if needed
+      boolean blockThirdPartyCookies = true;
+      # To manage persistent cookies, users are provided with a mechanism for specifying a persistent cookie store with their own mechanism
+      # which references the persistent cookie handler or specifying the CSV persistent cookie handler. If not specified any, only the session cookies are used
+      PersistentCookieHandler persistentCookieHandler?;
+  |};
+
+  # Provides inbound response status line, total header and entity body size threshold configurations.
+  public type ResponseLimitConfigs record {|
+      # Maximum allowed length for response status line(`HTTP/1.1 200 OK`). Exceeding this limit will
+      # result in a `ClientError`
+      int maxStatusLineLength = 4096;
+      # Maximum allowed size for headers. Exceeding this limit will result in a `ClientError`
+      int maxHeaderSize = 8192;
+      # Maximum allowed size for the entity body. By default it is set to -1 which means there is no
+      # restriction `maxEntityBodySize`, On the Exceeding this limit will result in a `ClientError`
+      int maxEntityBodySize = -1;
+  |};
+
+  # Proxy server configurations to be used with the HTTP client endpoint.
+  public type ProxyConfig record {|
+      # Host name of the proxy server
+      string host = "";
+      # Proxy server port
+      int port = 0;
+      # Proxy server username
+      string userName = "";
+      # proxy server password
+      string password = "";
+  |};
+
+  # Provides settings related to client socket configuration.
+  public type ClientSocketConfig record {|
+      # Connect timeout of the channel in seconds. If the Channel does not support connect operation,
+      # this property is not used at all, and therefore will be ignored.
+      decimal connectTimeOut = 15;
+      # Sets the SO_RCVBUF option to the specified value for this Socket.
+      int receiveBufferSize = 1048576;
+      # Sets the SO_SNDBUF option to the specified value for this Socket.
+      int sendBufferSize = 1048576;
+      # Enable/disable TCP_NODELAY (disable/enable Nagle's algorithm).
+      boolean tcpNoDelay = true;
+      # Enable/disable the SO_REUSEADDR socket option.
+      boolean socketReuse = true;
+      # Enable/disable SO_KEEPALIVE.
+      boolean keepAlive = false;
+  |};
+
+Other types it uses, not printed (15)
+  CertKey                  bal discover type CertKey -p ballerina/http
+  Protocol                 bal discover type Protocol -p ballerina/http
+  CertValidationType       bal discover type CertValidationType -p ballerina/http
+  KeepAlive                bal discover type KeepAlive -p ballerina/http
+  Chunking                 bal discover type Chunking -p ballerina/http
+  CachingPolicy            bal discover type CachingPolicy -p ballerina/http
+  COMPRESSION_AUTO         bal discover type COMPRESSION_AUTO -p ballerina/http
+  COMPRESSION_ALWAYS       bal discover type COMPRESSION_ALWAYS -p ballerina/http
+  COMPRESSION_NEVER        bal discover type COMPRESSION_NEVER -p ballerina/http
+  CredentialsConfig        bal discover type CredentialsConfig -p ballerina/http
+  BearerTokenConfig        bal discover type BearerTokenConfig -p ballerina/http
+  JwtIssuerConfig          bal discover type JwtIssuerConfig -p ballerina/http
+  OAuth2GrantConfig        bal discover type OAuth2GrantConfig -p ballerina/http
+  RollingWindow            bal discover type RollingWindow -p ballerina/http
+  PersistentCookieHandler  bal discover class PersistentCookieHandler -p ballerina/http
+
+From other packages (2)
+  TrustStore  ballerina/crypto 2.9.3  bal discover type TrustStore -p ballerina/crypto:2.9.3
+  KeyStore    ballerina/crypto 2.9.3  bal discover type KeyStore -p ballerina/crypto:2.9.3
+== ballerina__http type ClientError ==
+ballerina/http · type · ClientError
+
+# Defines the possible client error types.
+public type ClientError distinct Error;
+
+Types it uses (1)
+  # Defines the common error type for the module.
+  public type Error distinct error;
+== ballerina__http type StatusCodeResponse ==
+ballerina/http · type · StatusCodeResponse
+
+# Defines the possible status code response record types.
+public type StatusCodeResponse Continue|SwitchingProtocols|Processing|EarlyHints|Ok|Created|Accepted|NonAuthoritativeInformation|NoContent|ResetContent|PartialContent|MultiStatus|AlreadyReported|IMUsed|MultipleChoices|MovedPermanently|Found|SeeOther|NotModified|UseProxy|TemporaryRedirect|PermanentRedirect|BadRequest|Unauthorized|PaymentRequired|Forbidden|NotFound|MethodNotAllowed|NotAcceptable|ProxyAuthenticationRequired|RequestTimeout|Conflict|Gone|LengthRequired|PreconditionFailed|PayloadTooLarge|UriTooLong|UnsupportedMediaType|RangeNotSatisfiable|ExpectationFailed|MisdirectedRequest|UnprocessableEntity|Locked|FailedDependency|TooEarly|PreconditionRequired|UnavailableDueToLegalReasons|UpgradeRequired|TooManyRequests|RequestHeaderFieldsTooLarge|InternalServerError|NotImplemented|BadGateway|ServiceUnavailable|GatewayTimeout|HttpVersionNotSupported|VariantAlsoNegotiates|InsufficientStorage|LoopDetected|NotExtended|NetworkAuthenticationRequired|DefaultStatusCodeResponse;
+
+Types it uses (62)
+  # The status code response record of `Continue`.
+  public type Continue record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusContinue status = STATUS_CONTINUE_OBJ; // the default STATUS_CONTINUE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `SwitchingProtocols`.
+  public type SwitchingProtocols record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusSwitchingProtocols status = STATUS_SWITCHING_PROTOCOLS_OBJ; // the default STATUS_SWITCHING_PROTOCOLS_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Processing`.
+  public type Processing record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusProcessing status = STATUS_PROCESSING_OBJ; // the default STATUS_PROCESSING_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `EarlyHints`.
+  public type EarlyHints record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusEarlyHints status = STATUS_EARLY_HINTS_OBJ; // the default STATUS_EARLY_HINTS_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Ok`.
+  public type Ok record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusOK status = STATUS_OK_OBJ; // the default STATUS_OK_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Created`.
+  public type Created record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusCreated status = STATUS_CREATED_OBJ; // the default STATUS_CREATED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Accepted`.
+  public type Accepted record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusAccepted status = STATUS_ACCEPTED_OBJ; // the default STATUS_ACCEPTED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `NonAuthoritativeInformation`.
+  public type NonAuthoritativeInformation record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusNonAuthoritativeInformation status = STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ; // the default STATUS_NON_AUTHORITATIVE_INFORMATION_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `NoContent`.
+  public type NoContent record {|
+      # The response headers
+      map<string|int|boolean|string[]|int[]|boolean[]> headers?;
+      # The response status code obj
+      readonly StatusNoContent status = STATUS_NO_CONTENT_OBJ; // the default STATUS_NO_CONTENT_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `ResetContent`.
+  public type ResetContent record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusResetContent status = STATUS_RESET_CONTENT_OBJ; // the default STATUS_RESET_CONTENT_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `PartialContent`.
+  public type PartialContent record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusPartialContent status = STATUS_PARTIAL_CONTENT_OBJ; // the default STATUS_PARTIAL_CONTENT_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `MultiStatus`.
+  public type MultiStatus record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusMultiStatus status = STATUS_MULTI_STATUS_OBJ; // the default STATUS_MULTI_STATUS_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `AlreadyReported`.
+  public type AlreadyReported record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusAlreadyReported status = STATUS_ALREADY_REPORTED_OBJ; // the default STATUS_ALREADY_REPORTED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `IMUsed`.
+  public type IMUsed record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusIMUsed status = STATUS_IM_USED_OBJ; // the default STATUS_IM_USED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `MultipleChoices`.
+  public type MultipleChoices record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusMultipleChoices status = STATUS_MULTIPLE_CHOICES_OBJ; // the default STATUS_MULTIPLE_CHOICES_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `MovedPermanently`.
+  public type MovedPermanently record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusMovedPermanently status = STATUS_MOVED_PERMANENTLY_OBJ; // the default STATUS_MOVED_PERMANENTLY_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Found`.
+  public type Found record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusFound status = STATUS_FOUND_OBJ; // the default STATUS_FOUND_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `SeeOther`.
+  public type SeeOther record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusSeeOther status = STATUS_SEE_OTHER_OBJ; // the default STATUS_SEE_OTHER_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `NotModified`.
+  public type NotModified record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusNotModified status = STATUS_NOT_MODIFIED_OBJ; // the default STATUS_NOT_MODIFIED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `UseProxy`.
+  public type UseProxy record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusUseProxy status = STATUS_USE_PROXY_OBJ; // the default STATUS_USE_PROXY_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `TemporaryRedirect`.
+  public type TemporaryRedirect record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusTemporaryRedirect status = STATUS_TEMPORARY_REDIRECT_OBJ; // the default STATUS_TEMPORARY_REDIRECT_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `PermanentRedirect`.
+  public type PermanentRedirect record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusPermanentRedirect status = STATUS_PERMANENT_REDIRECT_OBJ; // the default STATUS_PERMANENT_REDIRECT_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `BadRequest`.
+  public type BadRequest record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusBadRequest status = STATUS_BAD_REQUEST_OBJ; // the default STATUS_BAD_REQUEST_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Unauthorized`.
+  public type Unauthorized record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusUnauthorized status = STATUS_UNAUTHORIZED_OBJ; // the default STATUS_UNAUTHORIZED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `PaymentRequired`.
+  public type PaymentRequired record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusPaymentRequired status = STATUS_PAYMENT_REQUIRED_OBJ; // the default STATUS_PAYMENT_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Forbidden`.
+  public type Forbidden record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusForbidden status = STATUS_FORBIDDEN_OBJ; // the default STATUS_FORBIDDEN_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `NotFound`.
+  public type NotFound record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusNotFound status = STATUS_NOT_FOUND_OBJ; // the default STATUS_NOT_FOUND_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `MethodNotAllowed`.
+  public type MethodNotAllowed record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusMethodNotAllowed status = STATUS_METHOD_NOT_ALLOWED_OBJ; // the default STATUS_METHOD_NOT_ALLOWED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `NotAcceptable`.
+  public type NotAcceptable record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusNotAcceptable status = STATUS_NOT_ACCEPTABLE_OBJ; // the default STATUS_NOT_ACCEPTABLE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `ProxyAuthenticationRequired`.
+  public type ProxyAuthenticationRequired record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusProxyAuthenticationRequired status = STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_PROXY_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `RequestTimeout`.
+  public type RequestTimeout record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusRequestTimeout status = STATUS_REQUEST_TIMEOUT_OBJ; // the default STATUS_REQUEST_TIMEOUT_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Conflict`.
+  public type Conflict record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusConflict status = STATUS_CONFLICT_OBJ; // the default STATUS_CONFLICT_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Gone`.
+  public type Gone record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusGone status = STATUS_GONE_OBJ; // the default STATUS_GONE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `LengthRequired`.
+  public type LengthRequired record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusLengthRequired status = STATUS_LENGTH_REQUIRED_OBJ; // the default STATUS_LENGTH_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `PreconditionFailed`.
+  public type PreconditionFailed record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusPreconditionFailed status = STATUS_PRECONDITION_FAILED_OBJ; // the default STATUS_PRECONDITION_FAILED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `PayloadTooLarge`.
+  public type PayloadTooLarge record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusPayloadTooLarge status = STATUS_PAYLOAD_TOO_LARGE_OBJ; // the default STATUS_PAYLOAD_TOO_LARGE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `UriTooLong`.
+  public type UriTooLong record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusUriTooLong status = STATUS_URI_TOO_LONG_OBJ; // the default STATUS_URI_TOO_LONG_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `UnsupportedMediaType`.
+  public type UnsupportedMediaType record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusUnsupportedMediaType status = STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ; // the default STATUS_UNSUPPORTED_MEDIA_TYPE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `RangeNotSatisfiable`.
+  public type RangeNotSatisfiable record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusRangeNotSatisfiable status = STATUS_RANGE_NOT_SATISFIABLE_OBJ; // the default STATUS_RANGE_NOT_SATISFIABLE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `ExpectationFailed`.
+  public type ExpectationFailed record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusExpectationFailed status = STATUS_EXPECTATION_FAILED_OBJ; // the default STATUS_EXPECTATION_FAILED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `MisdirectedRequest`.
+  public type MisdirectedRequest record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusMisdirectedRequest status = STATUS_MISDIRECTED_REQUEST_OBJ; // the default STATUS_MISDIRECTED_REQUEST_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `UnprocessableEntity`.
+  public type UnprocessableEntity record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusUnprocessableEntity status = STATUS_UNPROCESSABLE_ENTITY_OBJ; // the default STATUS_UNPROCESSABLE_ENTITY_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `Locked`.
+  public type Locked record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusLocked status = STATUS_LOCKED_OBJ; // the default STATUS_LOCKED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `FailedDependency`.
+  public type FailedDependency record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusFailedDependency status = STATUS_FAILED_DEPENDENCY_OBJ; // the default STATUS_FAILED_DEPENDENCY_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `TooEarly`.
+  public type TooEarly record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusTooEarly status = STATUS_TOO_EARLY_OBJ; // the default STATUS_TOO_EARLY_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `PreconditionRequired`.
+  public type PreconditionRequired record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusPreconditionRequired status = STATUS_PRECONDITION_REQUIRED_OBJ; // the default STATUS_PRECONDITION_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `UnavailableDueToLegalReasons`.
+  public type UnavailableDueToLegalReasons record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusUnavailableDueToLegalReasons status = STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ; // the default STATUS_UNAVAILABLE_DUE_TO_LEGAL_REASONS_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `UpgradeRequired`.
+  public type UpgradeRequired record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusUpgradeRequired status = STATUS_UPGRADE_REQUIRED_OBJ; // the default STATUS_UPGRADE_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `TooManyRequests`.
+  public type TooManyRequests record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusTooManyRequests status = STATUS_TOO_MANY_REQUESTS_OBJ; // the default STATUS_TOO_MANY_REQUESTS_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `RequestHeaderFieldsTooLarge`.
+  public type RequestHeaderFieldsTooLarge record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusRequestHeaderFieldsTooLarge status = STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ; // the default STATUS_REQUEST_HEADER_FIELDS_TOO_LARGE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `InternalServerError`.
+  public type InternalServerError record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusInternalServerError status = STATUS_INTERNAL_SERVER_ERROR_OBJ; // the default STATUS_INTERNAL_SERVER_ERROR_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `NotImplemented`.
+  public type NotImplemented record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusNotImplemented status = STATUS_NOT_IMPLEMENTED_OBJ; // the default STATUS_NOT_IMPLEMENTED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `BadGateway`.
+  public type BadGateway record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusBadGateway status = STATUS_BAD_GATEWAY_OBJ; // the default STATUS_BAD_GATEWAY_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `ServiceUnavailable`.
+  public type ServiceUnavailable record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusServiceUnavailable status = STATUS_SERVICE_UNAVAILABLE_OBJ; // the default STATUS_SERVICE_UNAVAILABLE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `GatewayTimeout`.
+  public type GatewayTimeout record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusGatewayTimeout status = STATUS_GATEWAY_TIMEOUT_OBJ; // the default STATUS_GATEWAY_TIMEOUT_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `HttpVersionNotSupported`.
+  public type HttpVersionNotSupported record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusHttpVersionNotSupported status = STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ; // the default STATUS_HTTP_VERSION_NOT_SUPPORTED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `VariantAlsoNegotiates`.
+  public type VariantAlsoNegotiates record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusVariantAlsoNegotiates status = STATUS_VARIANT_ALSO_NEGOTIATES_OBJ; // the default STATUS_VARIANT_ALSO_NEGOTIATES_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `InsufficientStorage`.
+  public type InsufficientStorage record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusInsufficientStorage status = STATUS_INSUFFICIENT_STORAGE_OBJ; // the default STATUS_INSUFFICIENT_STORAGE_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `LoopDetected`.
+  public type LoopDetected record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusLoopDetected status = STATUS_LOOP_DETECTED_OBJ; // the default STATUS_LOOP_DETECTED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `NotExtended`.
+  public type NotExtended record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusNotExtended status = STATUS_NOT_EXTENDED_OBJ; // the default STATUS_NOT_EXTENDED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The status code response record of `NetworkAuthenticationRequired`.
+  public type NetworkAuthenticationRequired record {|
+      *CommonResponse;
+      # The response status code obj
+      readonly StatusNetworkAuthenticationRequired status = STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ; // the default STATUS_NETWORK_AUTHENTICATION_REQUIRED_OBJ is not exported by this package; leave the field out rather than writing it
+  |};
+
+  # The default status code response record.
+  public type DefaultStatusCodeResponse record {|
+      *CommonResponse;
+      # The response status code object
+      readonly DefaultStatus status;
+  |};
+
+Other types it uses, not printed (63)
+  CommonResponse                       bal discover type CommonResponse -p ballerina/http
+  StatusContinue                       bal discover class StatusContinue -p ballerina/http
+  StatusSwitchingProtocols             bal discover class StatusSwitchingProtocols -p ballerina/http
+  StatusProcessing                     bal discover class StatusProcessing -p ballerina/http
+  StatusEarlyHints                     bal discover class StatusEarlyHints -p ballerina/http
+  StatusOK                             bal discover class StatusOK -p ballerina/http
+  StatusCreated                        bal discover class StatusCreated -p ballerina/http
+  StatusAccepted                       bal discover class StatusAccepted -p ballerina/http
+  StatusNonAuthoritativeInformation    bal discover class StatusNonAuthoritativeInformation -p ballerina/http
+  StatusNoContent                      bal discover class StatusNoContent -p ballerina/http
+  StatusResetContent                   bal discover class StatusResetContent -p ballerina/http
+  StatusPartialContent                 bal discover class StatusPartialContent -p ballerina/http
+  StatusMultiStatus                    bal discover class StatusMultiStatus -p ballerina/http
+  StatusAlreadyReported                bal discover class StatusAlreadyReported -p ballerina/http
+  StatusIMUsed                         bal discover class StatusIMUsed -p ballerina/http
+  StatusMultipleChoices                bal discover class StatusMultipleChoices -p ballerina/http
+  StatusMovedPermanently               bal discover class StatusMovedPermanently -p ballerina/http
+  StatusFound                          bal discover class StatusFound -p ballerina/http
+  StatusSeeOther                       bal discover class StatusSeeOther -p ballerina/http
+  StatusNotModified                    bal discover class StatusNotModified -p ballerina/http
+  StatusUseProxy                       bal discover class StatusUseProxy -p ballerina/http
+  StatusTemporaryRedirect              bal discover class StatusTemporaryRedirect -p ballerina/http
+  StatusPermanentRedirect              bal discover class StatusPermanentRedirect -p ballerina/http
+  StatusBadRequest                     bal discover class StatusBadRequest -p ballerina/http
+  StatusUnauthorized                   bal discover class StatusUnauthorized -p ballerina/http
+  StatusPaymentRequired                bal discover class StatusPaymentRequired -p ballerina/http
+  StatusForbidden                      bal discover class StatusForbidden -p ballerina/http
+  StatusNotFound                       bal discover class StatusNotFound -p ballerina/http
+  StatusMethodNotAllowed               bal discover class StatusMethodNotAllowed -p ballerina/http
+  StatusNotAcceptable                  bal discover class StatusNotAcceptable -p ballerina/http
+  StatusProxyAuthenticationRequired    bal discover class StatusProxyAuthenticationRequired -p ballerina/http
+  StatusRequestTimeout                 bal discover class StatusRequestTimeout -p ballerina/http
+  StatusConflict                       bal discover class StatusConflict -p ballerina/http
+  StatusGone                           bal discover class StatusGone -p ballerina/http
+  StatusLengthRequired                 bal discover class StatusLengthRequired -p ballerina/http
+  StatusPreconditionFailed             bal discover class StatusPreconditionFailed -p ballerina/http
+  StatusPayloadTooLarge                bal discover class StatusPayloadTooLarge -p ballerina/http
+  StatusUriTooLong                     bal discover class StatusUriTooLong -p ballerina/http
+  StatusUnsupportedMediaType           bal discover class StatusUnsupportedMediaType -p ballerina/http
+  StatusRangeNotSatisfiable            bal discover class StatusRangeNotSatisfiable -p ballerina/http
+  StatusExpectationFailed              bal discover class StatusExpectationFailed -p ballerina/http
+  StatusMisdirectedRequest             bal discover class StatusMisdirectedRequest -p ballerina/http
+  StatusUnprocessableEntity            bal discover class StatusUnprocessableEntity -p ballerina/http
+  StatusLocked                         bal discover class StatusLocked -p ballerina/http
+  StatusFailedDependency               bal discover class StatusFailedDependency -p ballerina/http
+  StatusTooEarly                       bal discover class StatusTooEarly -p ballerina/http
+  StatusPreconditionRequired           bal discover class StatusPreconditionRequired -p ballerina/http
+  StatusUnavailableDueToLegalReasons   bal discover class StatusUnavailableDueToLegalReasons -p ballerina/http
+  StatusUpgradeRequired                bal discover class StatusUpgradeRequired -p ballerina/http
+  StatusTooManyRequests                bal discover class StatusTooManyRequests -p ballerina/http
+  StatusRequestHeaderFieldsTooLarge    bal discover class StatusRequestHeaderFieldsTooLarge -p ballerina/http
+  StatusInternalServerError            bal discover class StatusInternalServerError -p ballerina/http
+  StatusNotImplemented                 bal discover class StatusNotImplemented -p ballerina/http
+  StatusBadGateway                     bal discover class StatusBadGateway -p ballerina/http
+  StatusServiceUnavailable             bal discover class StatusServiceUnavailable -p ballerina/http
+  StatusGatewayTimeout                 bal discover class StatusGatewayTimeout -p ballerina/http
+  StatusHttpVersionNotSupported        bal discover class StatusHttpVersionNotSupported -p ballerina/http
+  StatusVariantAlsoNegotiates          bal discover class StatusVariantAlsoNegotiates -p ballerina/http
+  StatusInsufficientStorage            bal discover class StatusInsufficientStorage -p ballerina/http
+  StatusLoopDetected                   bal discover class StatusLoopDetected -p ballerina/http
+  StatusNotExtended                    bal discover class StatusNotExtended -p ballerina/http
+  StatusNetworkAuthenticationRequired  bal discover class StatusNetworkAuthenticationRequired -p ballerina/http
+  DefaultStatus                        bal discover class DefaultStatus -p ballerina/http
+== ballerina__http type ResourceConfig ==
+ballerina/http · type · ResourceConfig
+
+# The annotation which is used to configure an HTTP resource.
+public annotation HttpResourceConfig ResourceConfig on object function;
+
+Types it uses (5)
+  # Configuration for an HTTP resource.
+  public type HttpResourceConfig record {|
+      # The name of the resource
+      string name?;
+      # The media types which are accepted by resource
+      string[] consumes = [];
+      # The media types which are produced by resource
+      string[] produces = [];
+      # The cross origin resource sharing configurations for the resource. If not set, the resource will inherit the CORS behaviour of the enclosing service.
+      CorsConfig cors = {};
+      # Allow to participate in the distributed transactions if value is true
+      boolean transactionInfectable = true;
+      # Resource auth configurations
+      ListenerAuthConfig[]|Scopes auth?;
+      # The array of linked resources
+      LinkedTo[] linkedTo?;
+  |};
+
+  # Configurations for CORS support.
+  public type CorsConfig record {|
+      # The array of allowed headers by the service
+      string[] allowHeaders = [];
+      # The array of allowed methods by the service
+      string[] allowMethods = [];
+      # The array of origins with which the response is shared by the service
+      string[] allowOrigins = [];
+      # The allowlisted headers, which clients are allowed to access
+      string[] exposeHeaders = [];
+      # Specifies whether credentials are required to access the service
+      boolean allowCredentials = false;
+      # The maximum duration to cache the preflight from client side
+      decimal maxAge = -1;
+  |};
+
+  # Defines the authentication configurations for the HTTP listener.
+  public type ListenerAuthConfig FileUserStoreConfigWithScopes|LdapUserStoreConfigWithScopes|JwtValidatorConfigWithScopes|OAuth2IntrospectionConfigWithScopes;
+
+  # Represents the annotation used for authorization.
+  public type Scopes record {|
+      # Scopes allowed for authorization
+      string|string[] scopes;
+  |};
+
+  public type LinkedTo record {|
+      # Name of the linked resource
+      string name;
+      # Name of the relationship between the linked resource and the current resource.
+      # Defaulted to the IANA link relation `self`
+      string relation = "self";
+      # Method allowed in the linked resource
+      string method?;
+  |};
+
+Other types it uses, not printed (4)
+  FileUserStoreConfigWithScopes        bal discover type FileUserStoreConfigWithScopes -p ballerina/http
+  LdapUserStoreConfigWithScopes        bal discover type LdapUserStoreConfigWithScopes -p ballerina/http
+  JwtValidatorConfigWithScopes         bal discover type JwtValidatorConfigWithScopes -p ballerina/http
+  OAuth2IntrospectionConfigWithScopes  bal discover type OAuth2IntrospectionConfigWithScopes -p ballerina/http
+== ballerina__http type Client ==
+ballerina/http · type · Client
+7 resource methods, 15 remote methods, 4 methods
+
+Resource methods (->)
+  :...path  get, post, put, delete, patch, head, options
+
+Remote methods (->)
+  delete
+  execute
+  forward
+  get
+  getNextPromise
+  getPromisedResponse
+  getResponse
+  hasPromise
+  head
+  options
+  patch
+  post
+  put
+  rejectPromise
+  submit
+
+Methods (.)
+  circuitBreakerForceClose
+  circuitBreakerForceOpen
+  getCircuitBreakerCurrentState
+  getCookieStore
+
+Next: bal discover resource <path> -p ballerina/http --client Client --accessor <accessor>
+Next: bal discover method <name> -p ballerina/http --client Client
+== ballerina__graphql type ID ==
+ballerina/graphql · type · ID
+
+# Represents the annotation of the ID type.
+public annotation ID on record field, parameter, return;
+== ballerinax__github type ConnectionConfig ==
+ballerinax/github · type · ConnectionConfig
+
+# Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
+public type ConnectionConfig record {|
+    # Configurations related to client authentication
+    http:BearerTokenConfig auth;
+    # The HTTP version understood by the client
+    http:HttpVersion httpVersion = http:HTTP_2_0;
+    # Configurations related to HTTP/1.x protocol
+    http:ClientHttp1Settings http1Settings = {};
+    # Configurations related to HTTP/2 protocol
+    http:ClientHttp2Settings http2Settings = {};
+    # The maximum time to wait (in seconds) for a response before closing the connection
+    decimal timeout = 30;
+    # The choice of setting `forwarded`/`x-forwarded` header
+    string forwarded = "disable";
+    # Configurations associated with Redirection
+    http:FollowRedirects followRedirects?;
+    # Configurations associated with request pooling
+    http:PoolConfiguration poolConfig?;
+    # HTTP caching related configurations
+    http:CacheConfig cache = {};
+    # Specifies the way of handling compression (`accept-encoding`) header
+    http:Compression compression = http:COMPRESSION_AUTO;
+    # Configurations associated with the behaviour of the Circuit Breaker
+    http:CircuitBreakerConfig circuitBreaker?;
+    # Configurations associated with retrying
+    http:RetryConfig retryConfig?;
+    # Configurations associated with cookies
+    http:CookieConfig cookieConfig?;
+    # Configurations associated with inbound response size limits
+    http:ResponseLimitConfigs responseLimits = {};
+    # SSL/TLS-related options
+    http:ClientSecureSocket secureSocket?;
+    # Proxy server related options
+    http:ProxyConfig proxy?;
+    # Provides settings related to client socket configuration
+    http:ClientSocketConfig socketConfig = {};
+    # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
+    boolean validation = true;
+    # Enables relaxed data binding on the client side. When enabled, `nil` values are treated as optional, 
+    # and absent fields are handled as `nilable` types. Enabled by default.
+    boolean laxDataBinding = true;
+|};
+
+From other packages (15)
+  BearerTokenConfig     ballerina/http 2.15.5  bal discover type BearerTokenConfig -p ballerina/http:2.15.5
+  HttpVersion           ballerina/http 2.15.5  bal discover type HttpVersion -p ballerina/http:2.15.5
+  ClientHttp1Settings   ballerina/http 2.15.5  bal discover type ClientHttp1Settings -p ballerina/http:2.15.5
+  ClientHttp2Settings   ballerina/http 2.15.5  bal discover type ClientHttp2Settings -p ballerina/http:2.15.5
+  FollowRedirects       ballerina/http 2.15.5  bal discover type FollowRedirects -p ballerina/http:2.15.5
+  PoolConfiguration     ballerina/http 2.15.5  bal discover type PoolConfiguration -p ballerina/http:2.15.5
+  CacheConfig           ballerina/http 2.15.5  bal discover type CacheConfig -p ballerina/http:2.15.5
+  Compression           ballerina/http 2.15.5  bal discover type Compression -p ballerina/http:2.15.5
+  CircuitBreakerConfig  ballerina/http 2.15.5  bal discover type CircuitBreakerConfig -p ballerina/http:2.15.5
+  RetryConfig           ballerina/http 2.15.5  bal discover type RetryConfig -p ballerina/http:2.15.5
+  CookieConfig          ballerina/http 2.15.5  bal discover type CookieConfig -p ballerina/http:2.15.5
+  ResponseLimitConfigs  ballerina/http 2.15.5  bal discover type ResponseLimitConfigs -p ballerina/http:2.15.5
+  ClientSecureSocket    ballerina/http 2.15.5  bal discover type ClientSecureSocket -p ballerina/http:2.15.5
+  ProxyConfig           ballerina/http 2.15.5  bal discover type ProxyConfig -p ballerina/http:2.15.5
+  ClientSocketConfig    ballerina/http 2.15.5  bal discover type ClientSocketConfig -p ballerina/http:2.15.5
+== ballerinax__googleapis.sheets type ConnectionConfig ==
+ballerinax/googleapis.sheets · type · ConnectionConfig
+
+# Provides a set of configurations for controlling the behaviours when communicating with a remote HTTP endpoint.
+public type ConnectionConfig record {|
+    # Configurations related to client authentication
+    http:BearerTokenConfig|OAuth2RefreshTokenGrantConfig auth;
+    # The HTTP version understood by the client
+    http:HttpVersion httpVersion = http:HTTP_2_0;
+    # Configurations related to HTTP/1.x protocol
+    ClientHttp1Settings http1Settings = {};
+    # Configurations related to HTTP/2 protocol
+    http:ClientHttp2Settings http2Settings = {};
+    # The maximum time to wait (in seconds) for a response before closing the connection
+    decimal timeout = 60;
+    # The choice of setting `forwarded`/`x-forwarded` header
+    string forwarded = "disable";
+    # Configurations associated with request pooling
+    http:PoolConfiguration? poolConfig = ();
+    # HTTP caching related configurations
+    http:CacheConfig cache = {};
+    # Specifies the way of handling compression (`accept-encoding`) header
+    http:Compression compression = http:COMPRESSION_AUTO;
+    # Configurations associated with the behaviour of the Circuit Breaker
+    http:CircuitBreakerConfig? circuitBreaker = ();
+    # Configurations associated with retrying
+    http:RetryConfig? retryConfig = ();
+    # Configurations associated with inbound response size limits
+    http:ResponseLimitConfigs responseLimits = {};
+    # SSL/TLS-related options
+    http:ClientSecureSocket secureSocket = {};
+    # Proxy server related options
+    http:ProxyConfig? proxy = ();
+    # Enables the inbound payload validation functionality which provided by the constraint package. Enabled by default
+    boolean validation = true;
+|};
+
+Types it uses (2)
+  # OAuth2 Refresh Token Grant Configs
+  public type OAuth2RefreshTokenGrantConfig record {|
+      *http:OAuth2RefreshTokenGrantConfig;
+      # Refresh URL
+      string refreshUrl = "https://accounts.google.com/o/oauth2/token";
+  |};
+
+  # Provides settings related to HTTP/1.x protocol.
+  public type ClientHttp1Settings record {|
+      # Specifies whether to reuse a connection for multiple requests
+      http:KeepAlive keepAlive = http:KEEPALIVE_AUTO;
+      # The chunking behaviour of the request
+      http:Chunking chunking = http:CHUNKING_AUTO;
+      # Proxy server related options
+      ProxyConfig? proxy = ();
+  |};
+
+Other types it uses, not printed (1)
+  ProxyConfig  bal discover type ProxyConfig -p ballerinax/googleapis.sheets
+
+From other packages (14)
+  BearerTokenConfig              ballerina/http 2.14.10  bal discover type BearerTokenConfig -p ballerina/http:2.14.10
+  HttpVersion                    ballerina/http 2.14.10  bal discover type HttpVersion -p ballerina/http:2.14.10
+  ClientHttp2Settings            ballerina/http 2.14.10  bal discover type ClientHttp2Settings -p ballerina/http:2.14.10
+  PoolConfiguration              ballerina/http 2.14.10  bal discover type PoolConfiguration -p ballerina/http:2.14.10
+  CacheConfig                    ballerina/http 2.14.10  bal discover type CacheConfig -p ballerina/http:2.14.10
+  Compression                    ballerina/http 2.14.10  bal discover type Compression -p ballerina/http:2.14.10
+  CircuitBreakerConfig           ballerina/http 2.14.10  bal discover type CircuitBreakerConfig -p ballerina/http:2.14.10
+  RetryConfig                    ballerina/http 2.14.10  bal discover type RetryConfig -p ballerina/http:2.14.10
+  ResponseLimitConfigs           ballerina/http 2.14.10  bal discover type ResponseLimitConfigs -p ballerina/http:2.14.10
+  ClientSecureSocket             ballerina/http 2.14.10  bal discover type ClientSecureSocket -p ballerina/http:2.14.10
+  ProxyConfig                    ballerina/http 2.14.10  bal discover type ProxyConfig -p ballerina/http:2.14.10
+  OAuth2RefreshTokenGrantConfig  ballerina/http 2.14.10  bal discover type OAuth2RefreshTokenGrantConfig -p ballerina/http:2.14.10
+  KeepAlive                      ballerina/http 2.14.10  bal discover type KeepAlive -p ballerina/http:2.14.10
+  Chunking                       ballerina/http 2.14.10  bal discover type Chunking -p ballerina/http:2.14.10
+== ballerinax__kafka type TopicPartitionOffset ==
+ballerinax/kafka · type · TopicPartitionOffset
+
+# Represents a topic partition and an offset with a timestamp.
+public type TopicPartitionOffset [TopicPartition, OffsetAndTimestamp?];
+
+Types it uses (2)
+  # Represents a topic partition.
+  public type TopicPartition record {|
+      # Topic to which the partition is related
+      string topic;
+      # Index of the specific partition
+      int partition;
+  |};
+
+  # Represents an offset and a timestamp for a topic partition.
+  public type OffsetAndTimestamp record {|
+      # The offset of the record in the topic partition
+      int offset;
+      # The timestamp of the record in the topic partition
+      int timestamp;
+      # The leader epoch of the record in the topic partition
+      int? leaderEpoch = ();
+  |};
+== ballerinax__kafka type NoSuchType ==
+bal discover: error: 'NoSuchType' is not a type in ballerinax/kafka:0.0.0-fixture
+  List the types.
+  Try: bal discover type -p ballerinax/kafka
