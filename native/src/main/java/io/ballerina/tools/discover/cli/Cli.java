@@ -52,6 +52,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -119,6 +120,25 @@ public final class Cli {
     private static final Set<String> RESOURCE_ACCESSORS =
             Set.of("get", "post", "put", "delete", "patch", "head", "options", "default");
 
+
+    /** The nouns whose one input may be a comma-separated list of names. */
+    private static final Set<String> LIST_NOUNS = Set.of(Command.TYPE, Command.METHOD, Command.README);
+
+    /** The nouns whose names are identifiers or paths, which never hold a comma: a list there is a mistake. */
+    private static final Set<String> SINGLE_NOUNS = Set.of(Command.CLIENT, Command.SERVICE, Command.CLASS,
+            Command.FUNCTION, Command.RESOURCE);
+
+    /** The nouns that can open one declaration, so take {@code --expand-types} and {@code --no-docs}. */
+    private static final Set<String> SHAPED_NOUNS = Set.of(Command.TYPE, Command.METHOD, Command.RESOURCE,
+            Command.FUNCTION);
+
+    private static final String LIST_SEPARATOR = ",";
+
+    /** The most names one list holds. */
+    static final int MAX_LIST = 20;
+
+    /** What a readme list is made of: section numbers. */
+    private static final Pattern SECTION_NUMBERS = Pattern.compile("[0-9,]+");
 
     /** How many names a noun takes: one, its query for {@code search}; a resource's accessor is a flag. */
     private static final int MAX_NAMES = 1;
@@ -257,6 +277,10 @@ public final class Cli {
         }
         if (!Command.RESOURCE.equals(call.noun()) && call.accessor() != null) {
             return accessorElsewhere(grammar, call, literal);
+        }
+        if (call.shape().any() && !SHAPED_NOUNS.contains(call.noun())) {
+            return unknownFlag(call.shape().expandTypes() ? Command.EXPAND_TYPES_FLAG : Command.NO_DOCS_FLAG,
+                    call.noun());
         }
         Failure.Validation output = rejectInvalidOutput(call.output());
         if (output != null) {
@@ -769,6 +793,10 @@ public final class Cli {
         if (!answer.isOk()) {
             return usage.report(readAt(answer.failure(), loaded.value()));
         }
+        Failure.Validation shape = shapeMisuse(call, answer.value());
+        if (shape != null) {
+            return usage.report(readAt(shape, loaded.value()));
+        }
         if (call.page() != Command.FIRST_PAGE && answer.value().paging() == null) {
             return usage.report(readAt(notPaged(pinned), loaded.value()));
         }
@@ -776,6 +804,14 @@ public final class Cli {
         TextRenderer.Context where = new TextRenderer.Context(qualified.qualified(), call.module(), call.trail(),
                 call.filter(), Version.textOf(version), read);
         JsonRenderer.Where about = new JsonRenderer.Where(qualified.qualified(), read, call.module());
+        if (answer.value() instanceof DiscoverResult.Answers list && list.partial() != null) {
+            // The names that resolved are an answer of their own; the ones that did not are the one failure.
+            if (!list.items().isEmpty()) {
+                streams.out().accept((json ? JsonRenderer.render(answer.value(), about)
+                        : TextRenderer.render(answer.value(), where)) + "\n");
+            }
+            return usage.report(list.partial());
+        }
         streams.out().accept((json ? JsonRenderer.render(answer.value(), about)
                 : TextRenderer.render(answer.value(), where)) + "\n");
         return Failure.ANSWERED;
@@ -842,6 +878,128 @@ public final class Cli {
         return settled.library() == loaded.library() ? plain : answerFrom(settled, call);
     }
 
+    // A readme's input is a list only when it is section numbers and commas; a title is never split.
+    private static boolean isList(String noun, String input) {
+        return input.contains(LIST_SEPARATOR)
+                && (!Command.README.equals(noun) || SECTION_NUMBERS.matcher(input).matches());
+    }
+
+    // The names of a list, in the order typed with each once, or null when the command's input is one name.
+    private static List<String> listOf(Invocation call) {
+        if (call.names().size() != 1 || !LIST_NOUNS.contains(call.noun())) {
+            return null;
+        }
+        String input = call.names().getFirst();
+        if (!isList(call.noun(), input)) {
+            return null;
+        }
+        List<String> names = new ArrayList<>();
+        for (String part : input.split(LIST_SEPARATOR, -1)) {
+            String name = part.strip();
+            if (!names.contains(name)) {
+                names.add(name);
+            }
+        }
+        return List.copyOf(names);
+    }
+
+    // A list that cannot be answered, found before anything is fetched: an empty name, more than 20 names, or a
+    // list given to a noun that takes one name.
+    private static Failure.Validation listMisuse(Invocation call) {
+        if (call.names().size() != 1) {
+            return null;
+        }
+        String input = call.names().getFirst();
+        if (SINGLE_NOUNS.contains(call.noun()) && input.contains(LIST_SEPARATOR)) {
+            return new Failure.Validation(call.noun() + " takes one name, not a list",
+                    "Name one " + call.noun() + "; only " + Texts.and(List.of(Command.TYPE, Command.METHOD,
+                            Command.README)) + " take a list.");
+        }
+        if (!LIST_NOUNS.contains(call.noun()) || !isList(call.noun(), input)) {
+            return null;
+        }
+        String[] typed = input.split(LIST_SEPARATOR, -1);
+        if (Arrays.stream(typed).anyMatch(part -> part.isBlank())) {
+            return new Failure.Validation("the list '" + input + "' has an empty name",
+                    "Write each name once, with one comma between two names.");
+        }
+        if (typed.length > MAX_LIST) {
+            return new Failure.Validation("a list holds at most " + MAX_LIST + " names; got " + typed.length,
+                    "Split it into lists of at most " + MAX_LIST + " names.");
+        }
+        if (call.page() != Command.FIRST_PAGE) {
+            return new Failure.Validation("--page does not apply to a list of names",
+                    "Drop --page; a list gives one answer for each name.");
+        }
+        return null;
+    }
+
+    // Each name of a list answered as it would be alone. A name that does not resolve is reported with the others
+    // that did not; a failure that concerns the command as a whole is the one failure, whatever the names.
+    private static Result<DiscoverResult> answerList(LoadedPackage loaded, Invocation call, List<String> names) {
+        List<DiscoverResult> answers = new ArrayList<>();
+        List<String> answered = new ArrayList<>();
+        List<Failure.Named> failed = new ArrayList<>();
+        if (Command.METHOD.equals(call.noun()) && call.owner() != null) {
+            // The container is resolved once: a container that is missing fails the command, not each name.
+            Optional<Failure> missing = Containers.missingOwner(loaded, call.ownerScope(),
+                    Containers.Options.method(call.ownerName(), names.getFirst(), call.filter(), call.page()));
+            if (missing.isPresent()) {
+                return Result.err(missing.get());
+            }
+        }
+        for (String name : names) {
+            Result<DiscoverResult> one = answerFrom(loaded, call.withNames(List.of(name)));
+            if (one.isOk()) {
+                answers.add(one.value());
+                answered.add(name);
+            } else if (one.failure() instanceof Failure.SymbolNotFound || one.failure() instanceof Failure.Ambiguous
+                    || one.failure() instanceof Failure.FilterNoMatch) {
+                failed.add(new Failure.Named(name, one.failure()));
+            } else {
+                return Result.err(one.failure());
+            }
+        }
+        // Without a container flag, names that are all declared by several containers leave the command itself
+        // ambiguous: there is no name to prefer, so the one failure asks for the container. An ambiguous name
+        // beside names that resolved is that name's own failure (spec 16.3 rule 14).
+        if (Command.METHOD.equals(call.noun()) && call.owner() == null && answers.isEmpty()
+                && failed.stream().allMatch(named -> named.failure() instanceof Failure.Ambiguous)) {
+            return Result.err(failed.getFirst().failure());
+        }
+        List<DiscoverResult> shared = call.shape().expandTypes() ? Types.sharingUsed(loaded, answers) : answers;
+        List<DiscoverResult.Answers.Item> items = new ArrayList<>();
+        for (int i = 0; i < shared.size(); i++) {
+            items.add(new DiscoverResult.Answers.Item(answered.get(i), shared.get(i)));
+        }
+        Failure.Partial partial = failed.isEmpty()
+                ? null
+                : new Failure.Partial(loaded.qualified().qualified(), loaded.version().text(), call.module(),
+                        names.size(), List.copyOf(failed));
+        return Result.ok(new DiscoverResult.Answers(List.copyOf(items), partial));
+    }
+
+    // `--expand-types` and `--no-docs` shape a declaration: an answer that prints none has nothing for them to do.
+    private static Failure.Validation shapeMisuse(Invocation call, DiscoverResult answer) {
+        if (!call.shape().any()) {
+            return null;
+        }
+        List<DiscoverResult> printed = answer instanceof DiscoverResult.Answers list
+                ? list.items().stream().map(DiscoverResult.Answers.Item::answer).toList()
+                : List.of(answer);
+        boolean declarations = printed.stream().allMatch(each -> each instanceof DiscoverResult.Signature
+                || each instanceof DiscoverResult.TypeDeclaration);
+        if (declarations) {
+            return null;
+        }
+        String flags = call.shape().expandTypes() && call.shape().noDocs()
+                ? Command.EXPAND_TYPES_FLAG + " and " + Command.NO_DOCS_FLAG
+                : call.shape().expandTypes() ? Command.EXPAND_TYPES_FLAG : Command.NO_DOCS_FLAG;
+        return new Failure.Validation(flags + " applies to a declaration, and this answer prints none",
+                "Name one declaration, or drop " + flags + ".",
+                call.command().shaped(false, false).paged(call.page()).text());
+    }
+
     /**
      * What {@code argv} — a noun, its names and its flags, no package — answers of {@code loaded}, parsed and
      * dispatched as {@link #run} does it, without fetching anything. Lets a test ask a view the way a caller does.
@@ -864,6 +1022,14 @@ public final class Cli {
     }
 
     private static Result<DiscoverResult> answerFrom(LoadedPackage loaded, Invocation call) {
+        List<String> list = listOf(call);
+        if (list != null && list.size() == 1) {
+            // A list of names that are all the same is read as that one name.
+            return answerFrom(loaded, call.withNames(list));
+        }
+        if (list != null) {
+            return answerList(loaded, call, list);
+        }
         String name = call.names().isEmpty() ? null : call.names().get(0);
         String filter = call.filter();
         int page = call.page();
@@ -873,13 +1039,14 @@ public final class Cli {
                     : Search.render(loaded, new Search.Options(filter, page));
             case Command.SEARCH -> Search.render(loaded, new Search.Options(name, page));
             case Command.README -> Readme.render(loaded, new Readme.Options(name, filter, page));
-            case Command.TYPE -> Types.render(loaded, new Types.Options(call.names(), filter, page));
+            case Command.TYPE -> Types.render(loaded, new Types.Options(call.names(), filter, page, call.shape()));
             case Command.FUNCTION -> Containers.render(loaded, Surface.Scope.MODULE,
-                    Containers.Options.function(name, filter, page));
+                    Containers.Options.function(name, filter, page).shaped(call.shape()));
             case Command.METHOD -> Containers.render(loaded, call.ownerScope(),
-                    Containers.Options.method(call.ownerName(), name, filter, page));
+                    Containers.Options.method(call.ownerName(), name, filter, page).shaped(call.shape()));
             case Command.RESOURCE -> Containers.render(loaded, call.ownerScope(),
-                    Containers.Options.resource(call.ownerName(), name, call.accessor(), filter, page));
+                    Containers.Options.resource(call.ownerName(), name, call.accessor(), filter, page)
+                            .shaped(call.shape()));
             default -> Containers.render(loaded, CONTAINER_NOUNS.get(call.noun()),
                     Containers.Options.container(name, filter, page));
         };
@@ -953,6 +1120,10 @@ public final class Cli {
         Failure.Validation version = rejectVersionArguments(call);
         if (version != null) {
             return version;
+        }
+        Failure.Validation list = listMisuse(call);
+        if (list != null) {
+            return list;
         }
         if (Command.TYPE.equals(call.noun())) {
             return Types.misuse(call.command(Command.TYPE),

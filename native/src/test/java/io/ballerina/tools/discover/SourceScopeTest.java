@@ -101,6 +101,7 @@ public class SourceScopeTest {
                 {List.of("function", "-p", "ballerina/http")},
                 {List.of("type", "CredentialsConfig", "-p", "ballerina/http")},
                 {List.of("type", "ClientAuthConfig", "-p", "ballerina/http")},
+                {List.of("method", "init", "-p", "ballerina/http", "--client", "Client")},
         };
     }
 
@@ -125,7 +126,8 @@ public class SourceScopeTest {
     /** Optionality and defaults of an inline record's members are only in the source. */
     @Test
     public void anAnswerPrintingAnInlineRecordReadsTheSource() {
-        List<String> argv = List.of("method", "init", "-p", "ballerina/http", "--client", "Client");
+        List<String> argv = List.of("method", "init", "-p", "ballerina/http", "--client", "Client",
+                "--expand-types");
         Assert.assertFalse(sourceRequestsOf(argv).isEmpty(), argv + " never asked for the package source");
     }
 

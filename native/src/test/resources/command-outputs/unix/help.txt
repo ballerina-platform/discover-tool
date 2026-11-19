@@ -10,10 +10,10 @@ Commands:
   service [<name>]                  the service types, or one and its methods
   class [<name>]                    the classes, or one class's members
   function [<name>]                 the functions, or one function's signature
-  type [<name>]                     every type, or one declaration
-  method [<name>]                   a container's methods, or one's signature
+  type [<name>]                     every type, or declarations by name
+  method [<name>]                   a container's methods, or signatures
   resource [<path>]                 resource paths, or one method's signature
-  readme [<n>|"<title>"]            the readme, or one section of it
+  readme [<n>|"<title>"]            the readme, or sections of it
   Every noun but package needs -p; search takes it only to search one package.
   bal discover <org>/<name> is short for bal discover package <org>/<name>.
   Options may come before or after the noun.
@@ -25,9 +25,11 @@ Options:
   --accessor <accessor>       name the resource method of the path, e.g. get
   --client|--class|--service <name>
                               name the container of a method or resource
+  --expand-types              print the types a declaration uses, one level deep
   --filter <keyword>          narrow a listing to the names that match a keyword
   -h, --help                  print this help
   --module <name>             read this submodule by name, e.g. httpscerr
+  --no-docs                   leave the doc comments out of declarations
   --output-format json|text   set the format (default: text on a TTY, else json)
   --page <n>                  show page n, 40 entries a page (default: 1)
   --refresh                   refetch when a name should exist but is not found
@@ -42,7 +44,7 @@ Examples:
   bal discover method send -p ballerinax/kafka --client Producer
   # A resource method's signature: its path, then its accessor
   bal discover resource gists/:gistId/star -p ballerinax/github --accessor put
-  # A record, enum or error
+  # A record, enum or error; types it names are listed, not printed
   bal discover type ConnectionConfig -p ballerinax/github
   # One version; without one, ./Dependencies.toml's lock, else the latest
   bal discover client Client -p ballerina/http:2.15.7
