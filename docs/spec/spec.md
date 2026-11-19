@@ -3,7 +3,7 @@
 _Owners_: @ThisaruGuruge  
 _Reviewers_:  
 _Created_: 2026/11/12  
-_Updated_: 2026/11/12  
+_Updated_: 2026/11/18  
 _Edition_: Swan Lake 2201.14.0  
 
 ## Introduction
@@ -150,6 +150,8 @@ bal discover search "<query>" [-p <org>/<name>[:<version>]] [options]
 | `--client`, `--class`, `--service`        | name                | absent                      | The container that declares the method or resource asked for. Accepted by `method` and `resource` only. At most one of the three may be given.                |
 | `--accessor`                              | accessor            | absent                      | The accessor of the resource method asked for. Accepted by `resource` only.                                                                                   |
 | `--module`                                | module name         | absent                      | Reads a submodule instead of the default module. It has no short form.                                                                                        |
+| `--expand-types`                          | switch              | off                         | Prints the declarations of the types an answer uses, one level deep, instead of listing them by name (see [Methods](#72-behaviour)). Accepted by `type`, `method`, `resource` and `function` when they open one declaration. It takes no value. |
+| `--no-docs`                               | switch              | off                         | Leaves the documentation out of the declarations an answer prints (see [Methods](#72-behaviour)). Accepted wherever `--expand-types` is. It takes no value.   |
 | `--filter`                                | keyword             | absent                      | Narrows a listing (see [Filtering](#11-filtering)). Not accepted by `search`.                                                                                 |
 | `--page`                                  | integer, 1 or more  | `1`                         | The page of a paged listing to show.                                                                                                                          |
 | `--output-format`                         | `json` or `text`    | `text` on a terminal, otherwise `json` | The renderer.                                                                                                                                      |
@@ -160,7 +162,7 @@ bal discover search "<query>" [-p <org>/<name>[:<version>]] [options]
 ### 3.3. Behaviour
 
 1. An option MAY be written before or after the noun.
-2. Every noun takes at most one positional value, its name: the coordinate after `package`, a container name after `client`, `service` or `class`, a method name after `method` or `function`, a resource path after `resource`, a type name after `type`, a readme section after `readme`, and a query after `search`. The noun is not a positional value.
+2. Every noun takes at most one positional value, its input: the coordinate after `package`, a container name after `client`, `service` or `class`, a method name after `method` or `function`, a resource path after `resource`, a type name after `type`, a readme section after `readme`, and a query after `search`. The noun is not a positional value. The input of `type`, `method` and `readme` may be a comma-separated list of names (see [Names and selectors](#34-names-and-selectors)); the list is still one positional value.
 3. A noun that lists, given no name, answers with a listing, and given a name answers about that one thing. `search` requires a query, and a bare `readme` prints the whole readme (see [Readme](#10-readme)).
 4. `bal discover <org>/<name>[:<version>]` is the same command as `bal discover package <org>/<name>[:<version>]`, with the same answer, exit code and options. It is the only form in which the noun may be omitted.
 5. With no arguments, the tool prints the root help and exits with 0.
@@ -182,7 +184,13 @@ The noun fixes what a name means. After `client` a name is a client, after `meth
 5. `init` names the constructor of a container.
 6. A rest-parameter resource method is a calling shorthand and is not an addressable path: it is listed as `:...path` with its accessors, and the method of the same name is opened with `method`.
 7. `--accessor` is strict. It names one method of the path given, never filters a listing, and an accessor the path does not declare fails with kind `symbol-not-found`, listing the accessors of the path as `candidates`.
-8. More names than a noun takes fail with kind `usage` and print the command that reads them, when one command does. `method Producer send` prints `method send --client Producer`, `resource gists/public get` prints `resource gists/public --accessor get` when `get` is an accessor of the path, and `search kafka send` prints `search "kafka send"`. When no one command reads them, the failure carries no printed command.
+8. More names than a noun takes fail with kind `usage` and print the command that reads them, when one command does. `method Producer send` prints `method send --client Producer`, `resource gists/public get` prints `resource gists/public --accessor get` when `get` is an accessor of the path, and `search kafka send` prints `search "kafka send"`. When no one command reads them, the failure carries no printed command. A comma-separated list is one value, not more names, and rule 8 does not apply to it.
+9. The input of `type`, `method` and `readme` is a list when it contains a comma: `type AgentTool,ToolConfig`, `method init,run --class Agent`, `readme 7,8`. A list names each thing to open, in the order typed, and every name is read as it would be alone. A list is accepted only by `type`, `method` and `readme`. On `client`, `service`, `class`, `function` and `resource` a comma fails with kind `usage`; on `package` and `search` a comma is part of the value.
+10. A readme value is a list only when it consists of section numbers and commas. A readme title is never split, so `readme "Setup, part 2"` is one title.
+11. A list has at least two names and at most 20. An empty name (`A,,B`, `A,`), a list longer than 20, a list on `client`, `service`, `class`, `function` or `resource`, and `--page` on a list (`--page does not apply to a list of names`) fail with kind `usage`, before anything is fetched. A name that is repeated is answered once, at its first place. The container flag of `method`, the module and every other option apply to every name of the list.
+12. A list gives one answer per name, in the order typed. A name that resolves gives the answer it would give alone. A name that does not resolve gives a failure of the kind it would fail with alone. The answers that resolved are printed even when others did not, and the failures are reported together, as stated in [Errors and exit codes](#16-errors-and-exit-codes).
+13. `--expand-types` or `--no-docs` on a list in which any name opens something that prints no declaration (a class, client, service type or listener-less listing) fails the whole command with kind `usage`, before any answer is printed.
+14. Under `--expand-types`, a type that the answers of a list use is printed once, under the first answer that uses it, and later answers list it by name with its command. Without `--expand-types` no answer prints a used type, so there is nothing to share.
 
 ### 3.5. Errors
 
@@ -193,6 +201,7 @@ The noun fixes what a name means. After `client` a name is a client, after `meth
 | A noun other than `package` and `search` with no `-p`. The printed command is the Central search for the name, and no package is ever supplied that the caller did not name           | `usage`      |
 | More names than the noun takes, more than one container flag, `--filter` together with a type name, `--accessor` with no path or on a noun other than `resource`                      | `usage`      |
 | `--module` with a value that is not a valid module name, or `--module` on `search` across Central                                                                                    | `usage`      |
+| An empty name in a list, a list of more than 20 names, a list on a noun that does not take one, `--page` on a list, `--expand-types` or `--no-docs` on an answer that prints no declaration                    | `usage`      |
 | `-p` on `package`, a package typed as a name when there is no `-p` or when it equals the `-p` package, and the former package-first form (`bal discover ballerinax/kafka client Producer`) | `usage`      |
 
 ### 3.6. Interactions
@@ -313,14 +322,16 @@ This example illustrates rule 10 of [Behaviour](#62-behaviour).
 1. `method` with no name lists the methods of the container named by the container flag. Without a flag, it answers when exactly one container declares methods. When several do, it fails with kind `ambiguous` and lists each container with its command. When none does, it fails with kind `usage` and prints the command of the noun that holds the callables, such as `client`.
 2. `method <name>` opens the method of that name. The answer is the declaration exactly as the library's source states it, including its doc comment, followed by these parts, in this order, each only when it applies:
     1. _Create it_: the line that constructs the container, the signature of `init` and the command that opens it.
-    2. _Types it uses_: the declarations of the types the callable names, one level deep.
-    3. _Other types it uses, not printed_: every such type that is not printed, each with the command that opens it.
+    2. _Types it uses_: only under `--expand-types`: the declarations of the types the callable names, one level deep (rules 5 and 6).
+    3. _Other types it uses, not printed_: every type the callable names whose declaration is not printed, each with the command that opens it. Without `--expand-types` this is every type the callable names.
     4. _Readme sections that call it_: the readme sections whose code calls the method.
-3. The parameter types of the callable are always printed in full.
-4. The return type and the types beneath it are printed only while the printed total stays within 6,000 bytes. A class or object type that the callable names is never printed, because its declaration is a drill-down of its own.
-5. Every type the callable names that is not printed is listed by name with its command. The list is never cut.
+3. Without `--expand-types`, no declaration of a used type is printed. The answer is the declaration asked for, and every type it names is listed with its command. A caller that needs one opens it, alone or in a list.
+4. Every type the callable names that is not printed is listed by name with its command. The list is never cut.
+5. Under `--expand-types`, the parameter types of the callable are printed in full. The return type and the types beneath it are printed only while the printed total stays within 6,000 bytes. A class or object type that the callable names is never printed, because its declaration is a drill-down of its own.
 6. A declaration is never cut, however many fields its types carry.
-7. A type declared by another package is spelled module-qualified, is listed under `foreign` with its module, its version and its command, and its command carries the version the signature was generated against. A command is printed only when the package that declares the type is known exactly.
+7. Under `--no-docs`, every declaration the answer prints, the one asked for and any used type under `--expand-types`, has its documentation left out: the `#` comment lines, and in JSON the `description` of each parameter. Nothing else changes, and the declaration is otherwise verbatim. `--no-docs` is independent of `--expand-types`.
+8. `--expand-types` and `--no-docs` change what is printed and nothing else: the same names, the same commands and the same exit code.
+9. A type declared by another package is spelled module-qualified, is listed under `foreign` with its module, its version and its command, and its command carries the version the signature was generated against. A command is printed only when the package that declares the type is known exactly.
 
 ### 7.3. Errors
 
@@ -383,15 +394,22 @@ This example illustrates rules 1, 5 and 6 of [Behaviour](#82-behaviour).
 2. The listing is grouped into sections by kind, alphabetical within each. The listing is held to the ceiling and pages. The size of every section is given across all pages.
 3. `type <name>` opens any type of that name. A class, client or service type gives the same answer as its own noun gives. A listener's answer is its declaration, including `init` and its other methods.
 4. An enum member is a type. Opening it shows the enum that declares it, with a note that names the enum.
-5. The declaration is verbatim and is never cut. The declarations of the types it uses are printed one level deep, within the limit of rule 4 of [Methods](#72-behaviour), and an inclusion (`*T`) does not count against that depth.
-6. Every used type that is not printed is listed with its command, and so is every type of another package, as stated in rule 7 of [Methods](#72-behaviour).
-7. A name that no type has fails with kind `symbol-not-found`. It lists the types as `candidates` when there are 40 or fewer, and otherwise carries the listing command.
+5. The declaration is verbatim and is never cut. A type that the declaration includes (`*T`) is part of the declaration, because its fields are fields of the type: it is printed under _Included types_ (`included` in JSON), and so is every type that it includes in turn, each once, in the order the inclusions are met. This holds with or without `--expand-types`. An included type of another package is not printed, and is listed as stated in rule 9 of [Methods](#72-behaviour).
+6. Without `--expand-types`, no other used type is printed. With it, the declarations of the other types it uses are printed one level deep, within the limit of rule 5 of [Methods](#72-behaviour). An included type never counts against that depth.
+7. Every used type that is not printed is listed with its command, and so is every type of another package, as stated in rules 4 and 9 of [Methods](#72-behaviour). `--no-docs` applies as stated in rule 7 of [Methods](#72-behaviour).
+8. A name that no type has fails with kind `symbol-not-found`. It lists the types as `candidates` when there are 40 or fewer, and otherwise carries the listing command.
 
 ### 9.3. Errors
 
 `--filter` together with a type name fails with kind `usage`.
 
-### 9.4. Example: An enum member
+### 9.4. Example: Included and used types
+
+This example illustrates rules 5 and 6 of [Behaviour](#92-behaviour).
+
+`bal discover type ClientConfiguration -p ballerina/http` prints the declaration of `ClientConfiguration`, which has one field of its own and includes `CommonClientConfiguration`. It prints `CommonClientConfiguration` under _Included types_, and lists the other types the two declarations name (`HttpVersion`, `ClientSecureSocket` and the rest) with their commands. `bal discover type ClientConfiguration -p ballerina/http --expand-types` also prints those types, one level deep. `bal discover type ClientSecureSocket,HttpVersion -p ballerina/http` opens the two in one call.
+
+### 9.5. Example: An enum member
 
 This example illustrates rule 4 of [Behaviour](#92-behaviour).
 
@@ -409,7 +427,7 @@ This example illustrates rule 4 of [Behaviour](#92-behaviour).
 2. A bare `readme` of at most 10 KB (10,240 bytes) is printed whole.
 3. A bare `readme` of more than 10 KB lists its sections: each with its number, title, line count and the command that opens it. Every section is listed and the list is never cut at the ceiling. There is no option that forces the whole text.
 4. A section is any part of the readme delimited by ATX headings (lines starting with `#`) that are outside fenced code blocks, whether or not it holds code. A `#` line inside a fenced code block does not start a section. Text before the first heading is a section of its own, titled `Introduction`.
-5. `readme <n>` and `readme "<title>"` print one section, by its number or its exact title.
+5. `readme <n>` and `readme "<title>"` print one section, by its number or its exact title. `readme <n>,<n>` prints each section in the order typed, as stated in rules 9 to 12 of [Names and selectors](#34-names-and-selectors). A list holds section numbers only (rule 10 there).
 6. `readme --filter <keyword>` lists the sections whose text contains the keyword, each with its command. The list pages under the ceiling. A keyword that matches no section is an answer with exit code 0.
 7. `--module` selects the readme of a submodule.
 
@@ -540,6 +558,7 @@ Every answer is one structured result rendered as JSON or as text.
 6. A text answer is a header, a count line, entries in aligned columns under section headings, then a footer made of notes, the continuation line of a cut listing, and `Next:` lines. When every row's command has one shape, one `Next:` line prints it with a placeholder (`<noun>`, `<name>`, `<group>`, `<path>`, `<accessor>`, `<container>`, `<query>`).
 7. Any answer may carry `note`.
 8. The same query gives the same output for the same repository content. No output depends on a model or on time, and no output depends on the order in which a repository returns entries, except a search across Central, which lists packages and symbols in the order Central ranks them.
+9. The answer of a list of names is one object that carries `qualified`, `version` and `answers`, an array with one answer for each name that resolved, in the order typed, each shaped as the answer of that name alone. In text, each answer is rendered with its own header, and one blank line separates two answers.
 
 ### 15.3. Interactions
 
@@ -568,6 +587,7 @@ A command that cannot answer ends with one failure and an exit code.
 | `page-not-found`    | `runtime` | 1         | no          | A page past the end of a paged listing.                                                               |
 | `filter-no-match`   | `runtime` | 1         | no          | A readme section asked with a `--filter` keyword it does not mention.                                 |
 | `invalid-lock`      | `runtime` | 1         | no          | `Dependencies.toml` locks the package at a version that is not complete.                              |
+| `partial`           | `runtime` | 1         | no          | One or more names of a list did not resolve. The answers of the names that did are on standard output. |
 | `unavailable`       | `runtime` | 1         | yes         | No answer came back, or the repository or the proxy was throttling or overloaded.                     |
 | `timeout`           | `runtime` | 1         | yes         | The repository did not answer in time.                                                                |
 | `upstream`          | `runtime` | 1         | no          | The repository or the proxy refused the request, or answered with a body that is not JSON.            |
@@ -577,7 +597,7 @@ A command that cannot answer ends with one failure and an exit code.
 ### 16.3. Behaviour
 
 1. The exit code is `0` for an answer, `2` for a usage failure, `1` for every other failure, and `130` when the command is interrupted by SIGINT, as the shell reports it. The tool never exits with `3` or `4`.
-2. On failure standard output is empty and standard error holds exactly one failure.
+2. On failure standard output is empty and standard error holds exactly one failure. The one exception is a `partial` failure (rule 14), which may follow answers on standard output.
 3. A failure is rendered in the mode that an answer of the same run would have used, chosen once per run.
 4. A JSON failure is one object carrying `"severity":"error"`, `kind`, `message` and `suggestion`. It carries `qualified` as `org/name` when the failure concerns a package, `version` when one was reached, and `module` when `--module` was given.
 5. A text failure is `bal discover: error: <message>`, then the suggestion indented beneath it, and `Try: <command>` beneath that when one command fixes it.
@@ -589,6 +609,7 @@ A command that cannot answer ends with one failure and an exit code.
 11. A warning never changes the exit code and is never part of an answer. It is a report of its own on standard error, `{"severity":"warning","kind":"stale-cache","message":...}` in JSON, and `bal discover: warning: <message>` in text. The only warning is `stale-cache`: the repository could not be reached to confirm the version, so the cached copy was read.
 12. A miss is a failure. An empty `--filter`, an empty search and an empty noun are answers.
 13. Only `unavailable` and `timeout` say that running the same command again may succeed.
+14. A list of names (see [Names and selectors](#34-names-and-selectors)) in which at least one name does not resolve ends with exit code 1 and one `partial` failure on standard error. The answers of the names that resolved are on standard output, in the order typed. When no name resolved, standard output is empty. The failure's `failures` array has one entry per name that did not resolve, in the order typed, each with `name`, the `kind` the name would fail with alone, `message`, `suggestion`, and, as that failure would carry them, `command`, `candidates` or `owners`. The `message` of the `partial` failure states how many of how many names did not resolve. It carries no `command`. A failure that concerns the command as a whole, such as `usage`, `package-not-found`, `unavailable` or `timeout`, is not partial: it is the one failure, with empty standard output and its own exit code. So is a container flag of `method` that names no container, and a `method` list without a container flag in which no name resolved and every name is declared by several containers: each is the one failure, of kind `symbol-not-found` and `ambiguous`. An ambiguous name beside names that resolved is that name's own entry in `failures`. In text, each entry also prints its `candidates` or `owners`.
 
 ### 16.4. Example: A miss with candidates
 
@@ -596,7 +617,13 @@ This example illustrates rule 9 of [Behaviour](#163-behaviour).
 
 `bal discover client NoSuch -p ballerinax/kafka` exits with 1, kind `symbol-not-found`, and lists `Caller`, `Consumer` and `Producer` as candidates.
 
-### 16.5. Example: Page out of range
+### 16.5. Example: A list with one miss
+
+This example illustrates rule 14 of [Behaviour](#163-behaviour).
+
+`bal discover type ClientConfiguration,NoSuch -p ballerina/http` prints the answer for `ClientConfiguration` on standard output, writes one `partial` failure to standard error that lists `NoSuch` with its `symbol-not-found` kind, and exits with 1.
+
+### 16.6. Example: Page out of range
 
 This example illustrates rule 7 of [Behaviour](#123-behaviour).
 
