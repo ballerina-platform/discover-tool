@@ -953,7 +953,8 @@ public final class Cli {
             if (one.isOk()) {
                 answers.add(one.value());
                 answered.add(name);
-            } else if (one.failure() instanceof Failure.SymbolNotFound || one.failure() instanceof Failure.Ambiguous) {
+            } else if (one.failure() instanceof Failure.SymbolNotFound || one.failure() instanceof Failure.Ambiguous
+                    || one.failure() instanceof Failure.FilterNoMatch) {
                 failed.add(new Failure.Named(name, one.failure()));
             } else {
                 return Result.err(one.failure());
@@ -995,7 +996,8 @@ public final class Cli {
                 ? Command.EXPAND_TYPES_FLAG + " and " + Command.NO_DOCS_FLAG
                 : call.shape().expandTypes() ? Command.EXPAND_TYPES_FLAG : Command.NO_DOCS_FLAG;
         return new Failure.Validation(flags + " applies to a declaration, and this answer prints none",
-                "Name one declaration, or drop " + flags + ".", call.paged(call.command()).text());
+                "Name one declaration, or drop " + flags + ".",
+                call.command().shaped(false, false).paged(call.page()).text());
     }
 
     /**
@@ -1021,6 +1023,10 @@ public final class Cli {
 
     private static Result<DiscoverResult> answerFrom(LoadedPackage loaded, Invocation call) {
         List<String> list = listOf(call);
+        if (list != null && list.size() == 1) {
+            // A list of names that are all the same is read as that one name.
+            return answerFrom(loaded, call.withNames(list));
+        }
         if (list != null) {
             return answerList(loaded, call, list);
         }

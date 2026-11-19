@@ -218,7 +218,7 @@ ballerina/http:2.18.1 · client
 
 Next: bal discover client <name> -p ballerina/http
 
-$ bal discover method get -p ballerina/http --client Client
+$ bal discover method get -p ballerina/http --client Client --expand-types
 ballerina/http:2.18.1 · method · Client · get
 
 # Retrieve a representation of a specified resource from an HTTP endpoint.
@@ -516,10 +516,10 @@ ballerinax/github:6.1.0 · resource · Client · repos/:owner/:repo/actions/runs
 Next: bal discover resource <path> -p ballerinax/github --client Client --accessor <accessor>
 ```
 
-**iii. One more level down: a resource's own parameter/return-type signature.** Path plus accessors is the terminal answer for *which* resources exist, but not yet for *how to call* one — the same gap `method` already closes for remote methods. The path stays the one positional, and the accessor is the `--accessor` flag. A path with one accessor and no path under it answers directly with its signature, since there is nothing to choose between: 65.7% of the 5,739 resource paths on Central (every package's latest version, surveyed 2026-11-07) have exactly one accessor, so most resource lookups need no flag at all, the way a method needs no container flag when one container declares it. Any other path — several accessors, or paths under it — lists, and each row carries the full `--accessor` command for each of its accessors. Central's docs API carries the same fully-expanded parameter/return-type data for resource methods that it does for remote methods, so this is a real, already-available drill-down, not a new data source. The answer is a header naming the package, noun, container, path and accessor (when one was given), then the declaration as the library's own source states it — doc comments and the full `isolated resource function ...` line — then *Create it* and the declarations of the types it names (see The `type` Noun, below). In JSON the same answer carries the declaration plus a structured `params` list (name, type, default, description) and `returns`:
+**iii. One more level down: a resource's own parameter/return-type signature.** Path plus accessors is the terminal answer for *which* resources exist, but not yet for *how to call* one — the same gap `method` already closes for remote methods. The path stays the one positional, and the accessor is the `--accessor` flag. A path with one accessor and no path under it answers directly with its signature, since there is nothing to choose between: 65.7% of the 5,739 resource paths on Central (every package's latest version, surveyed 2026-11-07) have exactly one accessor, so most resource lookups need no flag at all, the way a method needs no container flag when one container declares it. Any other path — several accessors, or paths under it — lists, and each row carries the full `--accessor` command for each of its accessors. Central's docs API carries the same fully-expanded parameter/return-type data for resource methods that it does for remote methods, so this is a real, already-available drill-down, not a new data source. The answer is a header naming the package, noun, container, path and accessor (when one was given), then the declaration as the library's own source states it — doc comments and the full `isolated resource function ...` line — then *Create it* and, under `--expand-types` (the sample below shows that shape), the declarations of the types it names (see The `type` Noun, below). In JSON the same answer carries the declaration plus a structured `params` list (name, type, default, description) and `returns`:
 
 ```
-$ bal discover resource gists/public -p ballerinax/github
+$ bal discover resource gists/public -p ballerinax/github --expand-types
 ballerinax/github:6.1.0 · resource · Client · gists/public
 
 # List public gists

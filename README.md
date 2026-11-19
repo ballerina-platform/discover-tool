@@ -113,7 +113,7 @@ The one name of `type`, `method` and `readme` is a list when it holds a comma: `
 `method init,run --class Agent -p ...`, `readme 7,8 -p ...`. A readme value is a list only when it is section
 numbers and commas; any other value is one title, so `readme "Setup, part 2"` is not split. A list has 2 to 20 names
 (a name is trimmed of surrounding spaces); an empty name (`A,,B`, `A,`), more than 20, and a list given to `client`,
-`service`, `class`, `function` or `resource` are usage errors before anything is fetched. A name given twice is
+`service`, `class`, `function` or `resource`, and `--page` on a list, are usage errors before anything is fetched. A name given twice is
 answered once, at its first place. The container flag, `--module`, `--expand-types` and `--no-docs` apply to every
 name, and each name is read as it would be alone.
 

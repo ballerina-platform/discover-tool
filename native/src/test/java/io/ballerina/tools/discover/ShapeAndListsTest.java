@@ -204,7 +204,19 @@ public class ShapeAndListsTest {
             CliTest.Capture capture = run(kafka(), Failure.USAGE, argv);
             Assert.assertEquals(capture.stdout(), "", String.join(" ", argv));
             Assert.assertEquals(capture.field("kind"), "usage", String.join(" ", argv));
+            String fix = capture.field("command");
+            Assert.assertTrue(fix == null || String.join(" ", argv).contains("=true")
+                    || !fix.contains("--expand-types") && !fix.contains("--no-docs"),
+                    String.join(" ", argv) + " -> " + fix);
         }
+    }
+
+    @Test
+    public void theFixCommandOfAMisusedShapeFlagDropsTheFlag() {
+        Assert.assertEquals(run(http(), Failure.USAGE, "type", "--expand-types", "-p", HTTP).field("command"),
+                "bal discover type -p ballerina/http");
+        Assert.assertEquals(run(http(), Failure.USAGE, "type", "HttpVersion,Client", "--no-docs", "--expand-types",
+                "-p", HTTP).field("command"), "bal discover type \"HttpVersion,Client\" -p ballerina/http");
     }
 
     @Test
@@ -453,5 +465,35 @@ public class ShapeAndListsTest {
         CliTest.Capture none = run(kafka(), Failure.USAGE, "readme", "3,7", "-p", KAFKA, "--no-docs");
         Assert.assertEquals(none.field("kind"), "usage");
         Assert.assertEquals(none.stdout(), "");
+    }
+
+    @Test
+    public void aFilterThatMatchesOneSectionOfAReadmeListIsAPerNameFailure() {
+        CliTest.Capture capture = run(http(), Failure.RUNTIME, "readme", "3,1", "--filter", "Resiliency", "-p", HTTP);
+        JsonArray answers = json(capture).getAsJsonArray("answers");
+        Assert.assertEquals(answers.size(), 1, capture.stdout());
+        JsonObject failure = capture.failure();
+        Assert.assertEquals(failure.get("kind").getAsString(), "partial");
+        JsonArray failures = failure.getAsJsonArray("failures");
+        Assert.assertEquals(names(failures), List.of("1"));
+        Assert.assertEquals(failures.get(0).getAsJsonObject().get("kind").getAsString(), "filter-no-match");
+    }
+
+    @Test
+    public void aListOfOneNameRepeatedIsReadAsThatName() {
+        CliTest.Capture seven = run(http(), 0, "readme", "7,7", "-p", HTTP);
+        Assert.assertEquals(seven.stdout(), run(http(), 0, "readme", "7", "-p", HTTP).stdout());
+        Assert.assertFalse(json(seven).has("answers"), seven.stdout());
+        CliTest.Capture type = run(http(), 0, "type", "HttpVersion,HttpVersion", "-p", HTTP);
+        Assert.assertEquals(type.stdout(), run(http(), 0, "type", "HttpVersion", "-p", HTTP).stdout());
+        Assert.assertFalse(json(type).has("answers"), type.stdout());
+    }
+
+    @Test
+    public void aNameOfAListIsTrimmedAndADuplicateKeepsItsFirstPlace() {
+        Assert.assertEquals(names(json(run(http(), 0, "type", "HttpVersion, ClientConfiguration", "-p", HTTP))
+                .getAsJsonArray("answers")), List.of("HttpVersion", "ClientConfiguration"));
+        Assert.assertEquals(names(json(run(http(), 0, "type", "HttpVersion,ClientConfiguration,HttpVersion", "-p",
+                HTTP)).getAsJsonArray("answers")), List.of("HttpVersion", "ClientConfiguration"));
     }
 }
