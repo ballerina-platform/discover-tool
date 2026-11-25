@@ -124,6 +124,16 @@ public final class Closure {
                 queue.add(new Step(root, 0, true));
             }
         }
+        // What an asked declaration includes, transitively, is part of it and printed with it at depth 0, so its own
+        // references are walked even when another branch would have met it beyond the depth.
+        for (String root : roots.asked()) {
+            for (String inclusion : included(root, index)) {
+                if (visited.add(inclusion)) {
+                    order.add(inclusion);
+                    queue.add(new Step(inclusion, 0, true));
+                }
+            }
+        }
         admit(roots.parameters(), true, index, visited, order, omitted, queue);
         admit(roots.others(), false, index, visited, order, omitted, queue);
 
@@ -153,9 +163,6 @@ public final class Closure {
         // A name reached late may also have been printed early on another branch; the omission list is what the
         // caller has to ask for again, so anything printed is removed from it.
         omitted.removeAll(visited);
-        // What the asked declarations include is printed by the caller as part of them, even when this walk met it
-        // beyond the depth through another branch.
-        roots.asked().forEach(root -> omitted.removeAll(included(root, index)));
         return new Result(List.copyOf(order), List.copyOf(omitted));
     }
 
