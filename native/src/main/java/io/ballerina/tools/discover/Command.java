@@ -40,10 +40,12 @@ import java.util.Optional;
  * @param accessor the accessor that selects one {@code resource} method of the path, or {@code null}
  * @param filter the {@code --filter} keyword, or {@code null}
  * @param page the {@code --page} number, written only past the first page
+ * @param expandTypes whether {@code --expand-types} is written
+ * @param noDocs whether {@code --no-docs} is written
  * @since 0.1.0
  */
 public record Command(String noun, List<String> names, Target target, Owner owner, String accessor, String filter,
-        int page) {
+        int page, boolean expandTypes, boolean noDocs) {
 
     /** The program name every text-mode report starts with. */
     public static final String PROGRAM = "bal discover";
@@ -77,6 +79,8 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     public static final String FILTER_FLAG = "--filter";
     public static final String PAGE_FLAG = "--page";
     public static final String ACCESSOR_FLAG = "--accessor";
+    public static final String EXPAND_TYPES_FLAG = "--expand-types";
+    public static final String NO_DOCS_FLAG = "--no-docs";
 
     /** What {@link #ACCESSOR_FLAG} takes, as help and a command's shape write it. */
     public static final String ACCESSOR_LABEL = "<accessor>";
@@ -118,7 +122,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public static Command of(String noun, List<String> names) {
-        return new Command(noun, names, null, null, null, null, FIRST_PAGE);
+        return new Command(noun, names, null, null, null, null, FIRST_PAGE, false, false);
     }
 
     /** {@code bal discover package <pkg> [--module <m>]}: a package's overview. */
@@ -136,7 +140,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public Command in(Target target) {
-        return new Command(noun, names, target, owner, accessor, filter, page);
+        return new Command(noun, names, target, owner, accessor, filter, page, expandTypes, noDocs);
     }
 
     public Command with(String... more) {
@@ -150,7 +154,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public Command withNames(List<String> others) {
-        return new Command(noun, others, target, owner, accessor, filter, page);
+        return new Command(noun, others, target, owner, accessor, filter, page, expandTypes, noDocs);
     }
 
     public Command ownedBy(String kind, String name) {
@@ -158,22 +162,27 @@ public record Command(String noun, List<String> names, Target target, Owner owne
     }
 
     public Command ownedBy(Owner other) {
-        return new Command(noun, names, target, other, accessor, filter, page);
+        return new Command(noun, names, target, other, accessor, filter, page, expandTypes, noDocs);
     }
 
     /** This command selecting the {@code resource} method its path declares for {@code other}, or none. */
     public Command accessedBy(String other) {
-        return new Command(noun, names, target, owner, other, filter, page);
+        return new Command(noun, names, target, owner, other, filter, page, expandTypes, noDocs);
     }
 
     /** This command narrowed by {@code keyword}, or as it is when {@code keyword} is {@code null}. */
     public Command filtered(String keyword) {
-        return new Command(noun, names, target, owner, accessor, keyword, page);
+        return new Command(noun, names, target, owner, accessor, keyword, page, expandTypes, noDocs);
     }
 
     /** This command on page {@code number}; the first page writes no {@code --page}. */
     public Command paged(int number) {
-        return new Command(noun, names, target, owner, accessor, filter, number);
+        return new Command(noun, names, target, owner, accessor, filter, number, expandTypes, noDocs);
+    }
+
+    /** This command writing {@code --expand-types} and {@code --no-docs} as asked. */
+    public Command shaped(boolean expand, boolean docsOff) {
+        return new Command(noun, names, target, owner, accessor, filter, page, expand, docsOff);
     }
 
     // A name that starts with a dash would read as a flag, so such names go last, after `--`.
@@ -197,6 +206,12 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         }
         if (target != null && target.module() != null) {
             flag(text, MODULE_FLAG, target.module());
+        }
+        if (expandTypes) {
+            text.append(' ').append(EXPAND_TYPES_FLAG);
+        }
+        if (noDocs) {
+            text.append(' ').append(NO_DOCS_FLAG);
         }
         if (filter != null) {
             flag(text, FILTER_FLAG, filter);
@@ -236,11 +251,18 @@ public record Command(String noun, List<String> names, Target target, Owner owne
         Owner owner = null;
         String accessor = null;
         int page = FIRST_PAGE;
+        boolean expand = false;
+        boolean docsOff = false;
         for (int i = 1; i < words.size(); i++) {
             String word = words.get(i);
             if (END_OF_OPTIONS.equals(word)) {
                 names.addAll(words.subList(i + 1, words.size()));
                 break;
+            }
+            if (EXPAND_TYPES_FLAG.equals(word) || NO_DOCS_FLAG.equals(word)) {
+                expand |= EXPAND_TYPES_FLAG.equals(word);
+                docsOff |= NO_DOCS_FLAG.equals(word);
+                continue;
             }
             boolean flag = PACKAGE_FLAG.equals(word) || MODULE_FLAG.equals(word) || FILTER_FLAG.equals(word)
                     || PAGE_FLAG.equals(word) || ACCESSOR_FLAG.equals(word) || OWNER_KINDS.containsKey(word);
@@ -271,7 +293,7 @@ public record Command(String noun, List<String> names, Target target, Owner owne
             }
         }
         Target target = pkg == null ? null : new Target(pkg, module);
-        return Optional.of(new Command(noun, names, target, owner, accessor, filter, page));
+        return Optional.of(new Command(noun, names, target, owner, accessor, filter, page, expand, docsOff));
     }
 
     @Override

@@ -287,6 +287,16 @@ public class ViewsTest {
     /** One of each shape a leaf takes, so a change to any of them shows in a diff. */
     @Test
     public void curatedTypeLeavesAreUnchanged() {
+        curatedLeaves(io.ballerina.tools.discover.views.Shape.DEFAULT, "type-leaves");
+    }
+
+    /** The same leaves under {@code --expand-types}, which prints the types each one uses. */
+    @Test
+    public void curatedTypeLeavesUnderExpandTypesAreUnchanged() {
+        curatedLeaves(new io.ballerina.tools.discover.views.Shape(true, false), "type-leaves-expanded");
+    }
+
+    private static void curatedLeaves(io.ballerina.tools.discover.views.Shape shape, String snapshot) {
         String[][] leaves = {
                 {"ballerina__http", "ClientConfiguration"}, {"ballerina__http", "ClientError"},
                 {"ballerina__http", "StatusCodeResponse"}, {"ballerina__http", "ResourceConfig"},
@@ -297,7 +307,8 @@ public class ViewsTest {
         StringBuilder json = new StringBuilder();
         for (String[] leaf : leaves) {
             LoadedPackage loaded = FixtureCorpus.loadedFixture(leaf[0]);
-            Result<DiscoverResult> answer = Types.render(loaded, new Types.Options(List.of(leaf[1]), null, 1));
+            Result<DiscoverResult> answer = Types.render(loaded,
+                    new Types.Options(List.of(leaf[1]), null, 1, shape));
             text.append("== ").append(leaf[0]).append(" type ").append(leaf[1]).append(" ==\n");
             if (answer.isOk()) {
                 text.append(TextRenderer.render(answer.value(), new TextRenderer.Context(
@@ -309,10 +320,10 @@ public class ViewsTest {
                 json.append(answer.failure().describe()).append("\n");
             }
         }
-        FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve("type-leaves.txt"), text.toString(),
-                "type leaves text");
-        FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve("type-leaves.json"), json.toString(),
-                "type leaves json");
+        FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(snapshot + ".txt"), text.toString(),
+                snapshot + " text");
+        FixtureCorpus.matchesSnapshot(FixtureCorpus.SNAPSHOTS_DIR.resolve(snapshot + ".json"), json.toString(),
+                snapshot + " json");
     }
 
     /**
@@ -413,8 +424,15 @@ public class ViewsTest {
         Assert.assertTrue(send.declaration().contains("# + "), send.declaration());
         Assert.assertFalse(send.params().isEmpty(), send.toString());
         Assert.assertNotNull(send.returns(), send.toString());
-        // And the types the signature names arrive with it, one level deep, so the common flow is one call.
-        Assert.assertFalse(send.types().isEmpty(), send.toString());
+        // One declaration prints alone: the types the signature names are listed with their commands, not printed.
+        Assert.assertTrue(send.types().isEmpty(), send.toString());
+        Assert.assertEquals(send.omitted().stream().map(DiscoverResult.Method::name).toList(),
+                List.of("AnydataProducerRecord", "Error"));
+        // `--expand-types` prints them one level deep, as the answer once did.
+        DiscoverResult.Signature expanded = signature(FixtureCorpus.loadedFixture("ballerinax__kafka"), "method",
+                "send", "--client", "Producer", "--expand-types");
+        Assert.assertFalse(expanded.types().isEmpty(), expanded.toString());
+        Assert.assertTrue(expanded.omitted().isEmpty(), expanded.toString());
     }
 
     @Test
@@ -860,6 +878,13 @@ public class ViewsTest {
                 "type " + List.of(names));
     }
 
+    /** {@code type <names> --expand-types}: the answer that prints the types a declaration uses. */
+    private static DiscoverResult typeExpanded(String slug, String... names) {
+        return result(Types.render(FixtureCorpus.loadedFixture(slug),
+                new Types.Options(List.of(names), null, 1, new io.ballerina.tools.discover.views.Shape(true, false))),
+                "type " + List.of(names) + " --expand-types");
+    }
+
     @Test
     public void anErrorIsADeclarationOfKindErrorPrintedWithItsSubtypeChain() {
         DiscoverResult.TypeDeclaration request =
@@ -912,7 +937,7 @@ public class ViewsTest {
     @Test
     public void everyTypeAPrintedTypeReferencesIsPrintedOrListed() {
         DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
-                type("ballerina__http", "ClientConfiguration"));
+                typeExpanded("ballerina__http", "ClientConfiguration"));
         List<String> accounted = new ArrayList<>(config.types().stream().map(DiscoverResult.Signature.Type::name)
                 .toList());
         config.omitted().forEach(omitted -> accounted.add(omitted.name()));
@@ -937,7 +962,7 @@ public class ViewsTest {
         Assert.assertTrue(local.foreign().isEmpty());
 
         DiscoverResult.TypeDeclaration config = as(DiscoverResult.TypeDeclaration.class,
-                type(slug, "ConnectionConfig"));
+                typeExpanded(slug, "ConnectionConfig"));
         Assert.assertTrue(config.types().stream().anyMatch(each -> each.name().equals("ClientHttp1Settings")
                 && each.declaration().contains("ProxyConfig? proxy = ();")), config.types().toString());
         List<DiscoverResult.Foreign> foreignProxies = config.foreign().stream()
@@ -1086,7 +1111,7 @@ public class ViewsTest {
     @Test
     public void aListenerNamedToTypePrintsItsOwnDeclarationWithTheTypesItUses() {
         DiscoverResult.TypeDeclaration listener = as(DiscoverResult.TypeDeclaration.class,
-                type("ballerinax__kafka", "Listener"));
+                typeExpanded("ballerinax__kafka", "Listener"));
         Assert.assertEquals(listener.kind(), "listener");
         Assert.assertTrue(listener.declaration().contains("class Listener {"), listener.declaration());
         Assert.assertTrue(listener.declaration().contains("function init("), listener.declaration());

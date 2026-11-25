@@ -95,7 +95,16 @@ public final class JsonRenderer {
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(declaration);
             case DiscoverResult.Search search -> search(search);
             case DiscoverResult.CentralSearch search -> centralSearch(search);
+            case DiscoverResult.Answers answers -> answers(answers);
         };
+    }
+
+    private static JsonObject answers(DiscoverResult.Answers answers) {
+        JsonObject json = new JsonObject();
+        JsonArray each = new JsonArray();
+        answers.items().forEach(item -> each.add(toJson(item.answer())));
+        json.add("answers", each);
+        return json;
     }
 
     private static JsonObject overview(DiscoverResult.Overview overview) {
@@ -593,6 +602,9 @@ public final class JsonRenderer {
         json.addProperty("name", declaration.name());
         json.addProperty("kind", declaration.kind());
         json.addProperty("declaration", declaration.declaration());
+        if (!declaration.included().isEmpty()) {
+            json.add("included", types(declaration.included()));
+        }
         json.add("types", types(declaration.types()));
         if (!declaration.omitted().isEmpty()) {
             json.add("omitted", methods(declaration.omitted()));

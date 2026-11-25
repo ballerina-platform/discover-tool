@@ -269,6 +269,34 @@ public sealed interface Failure {
             String suggestion, String matchesKey, List<Match> matches) implements Failure { }
 
     /**
+     * Some names of a list did not resolve. The answers of the names that did are on standard output.
+     *
+     * @param qualified the {@code org/name} the names were read in
+     * @param version the version that was read
+     * @param module the {@code --module} that was read, or {@code null} for the package's default module
+     * @param total how many names the list held, once repeats are dropped
+     * @param failures one failure for each name that did not resolve, in the order typed, each the failure that name
+     *     gives alone
+     */
+    record Partial(String qualified, String version, String module, int total, List<Named> failures)
+            implements Failure {
+
+        @Override
+        public String suggestion() {
+            return "Fix or drop the names listed below; the answers of the names that resolved are on standard "
+                    + "output.";
+        }
+    }
+
+    /**
+     * A name of a list and the failure it gives alone.
+     *
+     * @param name the name, as typed
+     * @param failure why it did not resolve
+     */
+    record Named(String name, Failure failure) { }
+
+    /**
      * One of several things a command could mean: a container that declares what was named, or a readme section.
      *
      * @param name the match's name
@@ -296,6 +324,9 @@ public sealed interface Failure {
 
     /** The core kind of {@link #RUNTIME}. */
     String RUNTIME_KIND = "runtime";
+
+    /** The kind of a {@link Partial} failure. */
+    String PARTIAL_KIND = "partial";
 
     /**
      * The kind of an {@link Upstream} failure worth running unchanged later: no answer came back, or Central was
@@ -373,6 +404,7 @@ public sealed interface Failure {
             case Internal ignored -> "internal";
             case InvalidLock ignored -> "invalid-lock";
             case FilterNoMatch ignored -> "filter-no-match";
+            case Partial ignored -> PARTIAL_KIND;
         };
     }
 
@@ -408,6 +440,7 @@ public sealed interface Failure {
             case InvalidLock f -> f.lock() + " locks " + f.qualified() + " at '" + f.locked()
                     + "', which is not a complete version";
             case FilterNoMatch f -> f.message();
+            case Partial f -> f.failures().size() + " of " + f.total() + " names did not resolve";
         };
     }
 
@@ -425,6 +458,7 @@ public sealed interface Failure {
             case SchemaDrift ignored -> null;
             case Internal ignored -> null;
             case InvalidLock ignored -> null;
+            case Partial ignored -> null;
         };
     }
 
@@ -465,6 +499,29 @@ public sealed interface Failure {
             case Validation f -> f.owners();
             default -> List.of();
         };
+        if (this instanceof Partial f) {
+            lines.add(INDENT + "failures:");
+            f.failures().forEach(named -> {
+                lines.add(DETAIL_INDENT + named.name() + ": " + named.failure().headline() + " ("
+                        + named.failure().kind() + ")");
+                lines.add(DETAIL_INDENT + INDENT + named.failure().suggestion());
+                String fix = named.failure().fixCommand();
+                if (fix != null) {
+                    lines.add(DETAIL_INDENT + INDENT + TRY + fix);
+                }
+                List<String> missed = named.failure() instanceof SymbolNotFound sym ? sym.candidates() : List.of();
+                if (!missed.isEmpty()) {
+                    lines.add(DETAIL_INDENT + INDENT + "candidates:");
+                    missed.forEach(candidate -> lines.add(DETAIL_INDENT + INDENT + INDENT + candidate));
+                }
+                if (named.failure() instanceof Ambiguous amb && !amb.matches().isEmpty()) {
+                    lines.add(DETAIL_INDENT + INDENT + amb.matchesKey() + ":");
+                    int wide = amb.matches().stream().mapToInt(match -> match.name().length()).max().orElse(0);
+                    amb.matches().forEach(match -> lines.add(DETAIL_INDENT + INDENT + INDENT + match.name()
+                            + " ".repeat(wide - match.name().length() + COLUMN_GAP) + match.command()));
+                }
+            });
+        }
         int width = matches.stream().mapToInt(match -> match.name().length()).max().orElse(0);
         matches.forEach(match -> lines.add(DETAIL_INDENT + match.name()
                 + " ".repeat(width - match.name().length() + COLUMN_GAP) + match.command()));
@@ -575,8 +632,37 @@ public sealed interface Failure {
                 json.addProperty("suggestion", f.suggestion());
                 command(json, f.command());
             }
+            case Partial f -> {
+                coordinates(json, f.qualified(), f.version(), f.module());
+                json.addProperty("suggestion", f.suggestion());
+                JsonArray rows = new JsonArray();
+                f.failures().forEach(named -> rows.add(namedJson(named)));
+                json.add("failures", rows);
+            }
         }
         return json.toString();
+    }
+
+    // One name of a partial failure: what the name would fail with alone, as a failure carries it, less what the
+    // whole failure already says.
+    private static JsonObject namedJson(Named named) {
+        Failure failure = named.failure();
+        JsonObject json = new JsonObject();
+        json.addProperty("name", named.name());
+        json.addProperty("kind", failure.kind());
+        json.addProperty("message", failure.headline());
+        json.addProperty("suggestion", failure.suggestion());
+        command(json, failure.fixCommand());
+        switch (failure) {
+            case SymbolNotFound f -> {
+                if (!f.candidates().isEmpty()) {
+                    json.add("candidates", strings(f.candidates()));
+                }
+            }
+            case Ambiguous f -> matches(json, f.matchesKey(), f.matches());
+            default -> { }
+        }
+        return json;
     }
 
     private static void matches(JsonObject json, String key, List<Match> matches) {

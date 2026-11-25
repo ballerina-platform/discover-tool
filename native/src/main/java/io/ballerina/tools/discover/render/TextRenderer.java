@@ -121,6 +121,9 @@ public final class TextRenderer {
      * {@code result} under a header naming where it was asked from. A whole readme follows the header verbatim.
      */
     public static String render(DiscoverResult result, Context where) {
+        if (result instanceof DiscoverResult.Answers answers) {
+            return answers(answers, where);
+        }
         if (result instanceof DiscoverResult.Readme readme && readme.section() == null) {
             String header = header(where, null);
             return header == null ? readme.markdown() : header + "\n\n" + readme.markdown();
@@ -132,6 +135,18 @@ public final class TextRenderer {
             layout.next(filterCommand(result));
         }
         return layout.render();
+    }
+
+    // Each answer under its own header, as the name would answer alone, one blank line between two.
+    private static String answers(DiscoverResult.Answers answers, Context where) {
+        List<String> each = new ArrayList<>();
+        for (DiscoverResult.Answers.Item item : answers.items()) {
+            List<String> trail = new ArrayList<>(where.trail().isEmpty() ? List.of() : where.trail().subList(0, 1));
+            trail.add(item.name());
+            each.add(render(item.answer(),
+                    new Context(where.pkg(), where.module(), trail, where.filter(), where.pin(), where.version())));
+        }
+        return String.join("\n\n", each);
     }
 
     private static String filterCommand(DiscoverResult result) {
@@ -168,6 +183,7 @@ public final class TextRenderer {
             case DiscoverResult.TypeDeclaration declaration -> typeDeclaration(layout, declaration);
             case DiscoverResult.Search search -> search(layout, search);
             case DiscoverResult.CentralSearch search -> centralSearch(layout, search);
+            case DiscoverResult.Answers answers -> layout.top(answers(answers, where));
         }
     }
 
@@ -660,6 +676,15 @@ public final class TextRenderer {
 
     private static void typeDeclaration(Layout layout, DiscoverResult.TypeDeclaration declaration) {
         layout.block(List.of(declaration.declaration()));
+        List<DiscoverResult.Signature.Type> included = declaration.included();
+        for (int i = 0; i < included.size(); i++) {
+            List<String> block = new ArrayList<>();
+            if (i == 0) {
+                block.add("Included types (" + included.size() + ")");
+            }
+            block.addAll(indented(included.get(i).declaration().lines().toList()));
+            layout.block(block);
+        }
         List<DiscoverResult.Signature.Type> types = declaration.types();
         for (int i = 0; i < types.size(); i++) {
             List<String> block = new ArrayList<>();

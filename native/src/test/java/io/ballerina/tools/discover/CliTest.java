@@ -983,13 +983,24 @@ public class CliTest {
         Assert.assertTrue(json.get("declaration").getAsString().contains("remote function send("), json.toString());
         Assert.assertFalse(json.getAsJsonArray("params").isEmpty(), json.toString());
         Assert.assertTrue(json.has("returns"), json.toString());
-        Assert.assertFalse(json.getAsJsonArray("types").isEmpty(), json.toString());
+        // One declaration prints alone: the types it names are listed, not printed.
+        Assert.assertTrue(json.getAsJsonArray("types").isEmpty(), json.toString());
+        Assert.assertFalse(json.getAsJsonArray("omitted").isEmpty(), json.toString());
+
+        List<String> expanded = new ArrayList<>(argv);
+        expanded.add("--expand-types");
+        JsonObject withTypes = JsonParser.parseString(run(expanded, "ballerinax__kafka", "4.6.5", false).stdout())
+                .getAsJsonObject();
+        Assert.assertFalse(withTypes.getAsJsonArray("types").isEmpty(), withTypes.toString());
 
         String text = run(argv, "ballerinax__kafka", "4.6.5", true).stdout();
         Assert.assertTrue(text.startsWith("ballerinax/kafka:4.6.5 · method · Producer · send\n\n# "),
                 "the header, then the declaration's own doc comment: " + text);
         Assert.assertTrue(text.contains("remote function send("), text);
-        Assert.assertTrue(text.contains("\n\nTypes it uses (2)\n  # "), text);
+        Assert.assertTrue(text.contains("\n\nOther types it uses, not printed (2)\n"), text);
+        Assert.assertFalse(text.contains("Types it uses (2)"), text);
+        String expandedText = run(expanded, "ballerinax__kafka", "4.6.5", true).stdout();
+        Assert.assertTrue(expandedText.contains("\n\nTypes it uses (2)\n  # "), expandedText);
     }
 
     @Test
@@ -1112,8 +1123,8 @@ public class CliTest {
                 + "  Name the one you mean with --client, --class or --service.\n"
                 + "    Caller    bal discover method commit -p ballerinax/kafka --client Caller\n"
                 + "    Consumer  bal discover method commit -p ballerinax/kafka --client Consumer\n"
-                + "Usage: bal discover method [<name>] -p <org>/<name>[:<version>] [--client|--class|--service <name>] "
-                + "[options]\n"
+                + "Usage: bal discover method [<name>] -p <org>/<name>[:<version>] "
+                + "[--client|--class|--service <name>] [options]\n"
                 + "Try 'bal discover method --help' for more information.\n");
     }
 
@@ -1213,8 +1224,17 @@ public class CliTest {
                 options(graphqlCentral()));
         JsonObject answer = JsonParser.parseString(leaf.stdout()).getAsJsonObject();
         Assert.assertEquals(answer.get("kind").getAsString(), "annotation");
-        Assert.assertEquals(answer.getAsJsonArray("types").size(), 2);
-        Assert.assertEquals(answer.getAsJsonArray("types").get(0).getAsJsonObject().get("name").getAsString(),
+        Assert.assertEquals(answer.getAsJsonArray("types").size(), 0);
+        Assert.assertEquals(answer.getAsJsonArray("omitted").size(), 1);
+        Assert.assertEquals(answer.getAsJsonArray("omitted").get(0).getAsJsonObject().get("command").getAsString(),
+                "bal discover type FederatedEntity -p ballerina/graphql --module subgraph");
+
+        Capture expanded = new Capture();
+        Cli.run(List.of("type", "Entity", "-p", "ballerina/graphql", "--module", "subgraph", "--expand-types"),
+                expanded.streams(), options(graphqlCentral()));
+        JsonObject withTypes = JsonParser.parseString(expanded.stdout()).getAsJsonObject();
+        Assert.assertEquals(withTypes.getAsJsonArray("types").size(), 2);
+        Assert.assertEquals(withTypes.getAsJsonArray("types").get(0).getAsJsonObject().get("name").getAsString(),
                 "FederatedEntity");
     }
 

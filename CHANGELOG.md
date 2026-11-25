@@ -35,6 +35,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   that declares it
 - Add `readme`, the module's README verbatim when it is at most 10 KB, else every one of its sections with the
   command that opens it; `readme <n>` or `readme "<title>"` reads one section
+- Print one declaration alone: `type <name>`, `method <name>`, `resource <path>` and `function <name>` print the
+  declaration asked for and list every type it names, with the command that opens each, instead of printing those
+  types too; a type the declaration includes with `*T` is part of it, so it is printed, with the types it includes in
+  turn, under *Included types* (`included` in JSON), and one of another package is listed
+- Add `--expand-types` to `type`, `method`, `resource` and `function`, to print the types a declaration uses, one
+  level deep, as the answer did before: parameter types in full, the return type and what is beneath it within
+  6,000 bytes each, never a class or an object type
+- Add `--no-docs` to the same nouns, to leave the `#` doc comments out of every declaration printed and, in JSON,
+  the `description` of each parameter
+- Add lists of names to `type`, `method` and `readme` (`type A,B`, `method init,run --class Agent`, `readme 7,8`):
+  2 to 20 names, answered in the order typed, each once; an empty name, more than 20 names and a list on another
+  noun are `usage` failures before anything is fetched; the JSON answer is `{qualified, version, answers}`
+- Report the names of a list that do not resolve as one `partial` failure (exit code 1) with a `failures` array
+  after the answers of the names that did, which stay on standard output
 - Pair each service type with the listener it binds to in `service` — the listener's `attach` target, or a type
   that includes it, read from the package's source when Central's docs cannot say — and list the service types no
   listener accepts apart

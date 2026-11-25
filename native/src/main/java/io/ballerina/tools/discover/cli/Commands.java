@@ -83,6 +83,7 @@ final class Commands {
                     case Command.PACKAGE -> new PackageNoun();
                     case Command.METHOD -> new MemberNoun();
                     case Command.RESOURCE -> new ResourceNoun();
+                    case Command.TYPE, Command.FUNCTION -> new ShapedNoun();
                     default -> new ScopedNoun();
                 };
                 nouns.put(name, noun);
@@ -121,6 +122,18 @@ final class Commands {
 
         @CommandLine.Option(names = REFRESH_FLAG, description = "refetch when a name should exist but is not found")
         boolean refresh;
+    }
+
+    /** What a declaration's answer prints: the types it uses, and its documentation. */
+    static final class Shaped {
+
+        @CommandLine.Option(names = Command.EXPAND_TYPES_FLAG,
+                description = "print the types a declaration uses, one level deep")
+        boolean expandTypes;
+
+        @CommandLine.Option(names = Command.NO_DOCS_FLAG,
+                description = "leave the doc comments out of declarations")
+        boolean noDocs;
     }
 
     /** The package a noun is asked of. */
@@ -188,6 +201,9 @@ final class Commands {
         @CommandLine.Mixin
         Accessor accessor = new Accessor();
 
+        @CommandLine.Mixin
+        Shaped shaped = new Shaped();
+
         @CommandLine.Option(names = {VERSION_SHORT, VERSION_FLAG}, versionHelp = true,
                 description = "print the tool's version")
         boolean version;
@@ -221,6 +237,11 @@ final class Commands {
         String accessor() {
             return null;
         }
+
+        /** The flags that shape a declaration's answer, or {@code null} for a noun that takes none. */
+        Shaped shaped() {
+            return null;
+        }
     }
 
     @CommandLine.Command
@@ -249,8 +270,21 @@ final class Commands {
         }
     }
 
+    /** A noun that can answer with one declaration, so it takes the flags that shape it. */
     @CommandLine.Command
-    static class MemberNoun extends ScopedNoun {
+    static class ShapedNoun extends ScopedNoun {
+
+        @CommandLine.Mixin
+        Shaped shaped = new Shaped();
+
+        @Override
+        Shaped shaped() {
+            return shaped;
+        }
+    }
+
+    @CommandLine.Command
+    static class MemberNoun extends ShapedNoun {
 
         @CommandLine.Mixin
         Owners owners = new Owners();
