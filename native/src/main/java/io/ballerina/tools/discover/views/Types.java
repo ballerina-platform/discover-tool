@@ -293,7 +293,8 @@ public final class Types {
             return Result.ok(annotationLeaf(loaded, index, name, shape));
         }
         if (typeDef instanceof TypeDef.ObjectDef object && !isListener(library, name)) {
-            return Containers.render(loaded, Surface.scopeOf(object), Containers.Options.container(name, null, page));
+            return Containers.render(loaded, Surface.scopeOf(object),
+                    Containers.Options.container(name, null, page).shaped(shape));
         }
         return declaration(loaded, index, name, null, shape);
     }

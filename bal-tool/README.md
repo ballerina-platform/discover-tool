@@ -85,7 +85,7 @@ request in this order.
 | `--filter <keyword>`   | Narrow a listing to entries whose name, path, accessor, parameter or type contains the keyword, so on a resource listing `--filter put` narrows it to the `put` methods (and any whose path, parameter or type contains `put`). Filtering is local to the fetched payload; nothing is sent to Central. On `package` it runs `search <keyword>`. |
 | `--page <n>`           | Show page `<n>` of a listing longer than 40 entries — every listing pages, from a roster of clients to the readme sections a `--filter` narrows. Pages start at 1; a page outside the listing, or against an answer that does not page, is an error. |
 | `--module <name>`      | Target a submodule instead of the default module, on every noun including `readme`. The package's overview lists the submodules it has. A name Ballerina would not accept as a module name is a usage error, before anything is fetched. `--module` has no short form. |
-| `--expand-types`       | On `type`, `method`, `resource` and `function` when they open one declaration: also print the declarations of the types it uses, one level deep, under *Types it uses* (`types` in JSON). Parameter types are printed in full; the return type and the types beneath it only while the printed total stays within 6,000 bytes; a class or object type is never printed; an inclusion (`*T`) does not count against the depth. Elsewhere it is a usage error. A switch takes no value. |
+| `--expand-types`       | On `type`, `method`, `resource` and `function` when they open one declaration: also print the declarations of the types it uses, one level deep, under *Types it uses* (`types` in JSON). Parameter types are printed in full; the return type and the types beneath it only while each declaration is within 6,000 bytes (a limit per declaration, not on the total printed); a class or object type is never printed; an inclusion (`*T`) does not count against the depth. Elsewhere it is a usage error. A switch takes no value. |
 | `--no-docs`            | Same nouns as `--expand-types`: leave the `#` doc comment lines out of every declaration printed (the one asked for, its included types and any expanded type), and in JSON the `description` of each parameter. The declaration is otherwise verbatim. Independent of `--expand-types`; elsewhere it is a usage error. A switch takes no value. |
 | `--refresh`            | Ignore the cached payload (and any cached source-derived answer) and fetch it again; worth passing only when a name should exist and is not found. Only a fetch that succeeds replaces the cached copy; a failed one leaves it in place. A switch takes no value: `--refresh=true` is a usage error whose `command` drops the value. |
 | `-V, --version`        | Print the tool's version (`0.1.0`) and exit 0. Only on its own: the version is the tool's, so a noun, or a bare coordinate standing for `package`, rejects it. |
@@ -101,9 +101,9 @@ the exception, printed under *Included types (N)* (`included` in JSON: `{name, d
 `--expand-types`.
 
 `--expand-types` restores printing the types an answer uses, one level deep, under *Types it uses (N)* (`types`):
-the parameter types in full, the return type and the types beneath it within 6,000 bytes, and never a class or an
-object type. `--no-docs` leaves the `#` documentation out of everything printed. Neither changes which names are
-listed, their commands or the exit code.
+the parameter types in full, the return type and the types beneath it when each is within 6,000 bytes (a limit per declaration, not on the
+total), and never a class or an object type. `--no-docs` leaves the `#` documentation out of everything printed. Neither changes the commands or the exit code, and `--no-docs` does not change which names are listed;
+`--expand-types` can expose references of the types it prints, so the listed names may differ.
 
 ### Lists of names
 

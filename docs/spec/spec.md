@@ -327,10 +327,10 @@ This example illustrates rule 10 of [Behaviour](#62-behaviour).
     4. _Readme sections that call it_: the readme sections whose code calls the method.
 3. Without `--expand-types`, no declaration of a used type is printed. The answer is the declaration asked for, and every type it names is listed with its command. A caller that needs one opens it, alone or in a list.
 4. Every type the callable names that is not printed is listed by name with its command. The list is never cut.
-5. Under `--expand-types`, the parameter types of the callable are printed in full. The return type and the types beneath it are printed only while the printed total stays within 6,000 bytes. A class or object type that the callable names is never printed, because its declaration is a drill-down of its own.
+5. Under `--expand-types`, the parameter types of the callable are printed in full. The return type and the types beneath it are printed only while each declaration is within 6,000 bytes; the limit is per declaration, not on the printed total. A class or object type that the callable names is never printed, because its declaration is a drill-down of its own.
 6. A declaration is never cut, however many fields its types carry.
 7. Under `--no-docs`, every declaration the answer prints, the one asked for and any used type under `--expand-types`, has its documentation left out: the `#` comment lines, and in JSON the `description` of each parameter. Nothing else changes, and the declaration is otherwise verbatim. `--no-docs` is independent of `--expand-types`.
-8. `--expand-types` and `--no-docs` change what is printed and nothing else: the same names, the same commands and the same exit code.
+8. `--no-docs` changes what is printed and nothing else: the same names, the same commands and the same exit code. `--expand-types` changes the commands and the exit code in no way, but it can expose references of the types it prints, so the listed names may differ.
 9. A type declared by another package is spelled module-qualified, is listed under `foreign` with its module, its version and its command, and its command carries the version the signature was generated against. A command is printed only when the package that declares the type is known exactly.
 
 ### 7.3. Errors

@@ -153,6 +153,9 @@ public final class Closure {
         // A name reached late may also have been printed early on another branch; the omission list is what the
         // caller has to ask for again, so anything printed is removed from it.
         omitted.removeAll(visited);
+        // What the asked declarations include is printed by the caller as part of them, even when this walk met it
+        // beyond the depth through another branch.
+        roots.asked().forEach(root -> omitted.removeAll(included(root, index)));
         return new Result(List.copyOf(order), List.copyOf(omitted));
     }
 

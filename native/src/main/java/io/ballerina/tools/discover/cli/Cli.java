@@ -881,7 +881,8 @@ public final class Cli {
     // A readme's input is a list only when it is section numbers and commas; a title is never split.
     private static boolean isList(String noun, String input) {
         return input.contains(LIST_SEPARATOR)
-                && (!Command.README.equals(noun) || SECTION_NUMBERS.matcher(input).matches());
+                && (!Command.README.equals(noun)
+                        || SECTION_NUMBERS.matcher(input.strip().replaceAll("\\s*,\\s*", ",")).matches());
     }
 
     // The names of a list, in the order typed with each once, or null when the command's input is one name.
